@@ -85,32 +85,45 @@ function data = importRigaku(filepath, options)
     end
 
     % ════════════════════════════════════════════════════════════════
-    %  STEP 3: Extract intensity data
-    %  Data begins at byte offset 3140 (1-indexed: 3141).
-    %  Each point is a uint32 (4 bytes). Skip leading large values
-    %  that belong to the header block.
+    %  STEP 3: Extract intensity data — row count from actual file bytes
+    %  Data begins at byte 3141 (1-indexed). Each point is uint32 (4 bytes).
+    %  numPoints from the header is used as a maximum / validation value;
+    %  the number of rows actually returned is determined by what is present
+    %  in the file, so truncated or oversized files are handled gracefully.
     % ════════════════════════════════════════════════════════════════
     dataOffset = 3141;
-    maxRead    = numPoints + 10;
-    rawInts    = zeros(maxRead, 1, 'double');
+    dataBytes  = raw(dataOffset : end);          % everything after the header
+    nAvail     = floor(numel(dataBytes) / 4);    % complete uint32 words present
 
-    for i = 1:maxRead
-        byteIdx = dataOffset + (i-1)*4;
-        if byteIdx + 3 <= nBytes
-            rawInts(i) = double(typecast(raw(byteIdx:byteIdx+3), 'uint32'));
-        end
+    if nAvail == 0
+        error('importRigaku:noData', ...
+            'No data bytes found after the header block in: %s', filepath);
     end
 
-    % Find start of actual intensity run (skip header remnants > 100 000)
+    % Read all available uint32 values in one vectorised call
+    rawInts = double(typecast(dataBytes(1 : nAvail*4), 'uint32'));
+
+    % Skip leading header-remnant words (values > 100 000 are not scan data)
     startIdx = 1;
-    for i = 2:maxRead
+    for i = 2:numel(rawInts)
         if rawInts(i) < 1e5
-            window = rawInts(i : min(i+9, maxRead));
+            window = rawInts(i : min(i+9, numel(rawInts)));
             if all(window < 1e5)
                 startIdx = i;
                 break;
             end
         end
+    end
+
+    % Reconcile header-specified numPoints with bytes actually present.
+    % If the file is truncated, use the smaller actual count and warn.
+    % If the file has extra trailing bytes, trust the header value.
+    availableFromStart = numel(rawInts) - startIdx + 1;
+    if availableFromStart < numPoints
+        warning('importRigaku:truncated', ...
+            'File contains %d data points but header says %d; using available count.', ...
+            availableFromStart, numPoints);
+        numPoints = availableFromStart;
     end
 
     intensities = rawInts(startIdx : startIdx + numPoints - 1);

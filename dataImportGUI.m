@@ -148,8 +148,8 @@ function dataImportGUI()
 
     function onBrowse(~,~)
         [fname,fpath] = uigetfile( ...
-            {'*.dat;*.csv;*.tsv;*.txt;*.xlsx;*.xls;*.xlsm;*.xlsb;*.raw', ...
-             'Supported data files (*.dat, *.csv, *.xlsx, *.raw)'; ...
+            {'*.dat;*.csv;*.tsv;*.txt;*.xlsx;*.xls;*.xlsm;*.xlsb;*.ods;*.raw', ...
+             'Supported data files (*.dat, *.csv, *.xlsx, *.ods, *.raw)'; ...
              '*.*','All files (*.*)'}, ...
             'Select a data file');
         if isequal(fname,0), return; end
@@ -188,7 +188,7 @@ function dataImportGUI()
         lbY.ValueChangedFcn = [];
 
         % Parser name shown in the panel title (avoids uilabel dependency)
-        ctrlPanel.Title = sprintf('Controls  —  %s', appData.parserName);
+        ctrlPanel.Title = sprintf('Controls  —  %s', guiParserLabel(appData.parserName));
 
         % X dropdown: default x-axis name first, then all Y channel names
         xName     = guiXName(d.metadata);
@@ -353,12 +353,13 @@ function [data, parserName] = guiImport(fp)
             parserName = 'importCSV';
 
         case '.dat'
+            % Load every available channel so the user can explore them in the GUI.
             try
-                data       = parser.importQDVSM(fp,'Verbose',false);
+                data       = parser.importQDVSM(fp, 'Verbose', false, 'YAxis', 'all');
                 parserName = 'importQDVSM';
             catch ME
                 if contains(ME.message,'[Data]','IgnoreCase',true)
-                    data       = parser.importPPMS(fp);
+                    data       = parser.importPPMS(fp, 'YAxis', 'all');
                     parserName = 'importPPMS';
                 else
                     rethrow(ME);
@@ -422,36 +423,135 @@ end
 
 
 function out = guiMetaLines(d, parserName, fp)
+%GUIMETALINES Build metadata summary lines, with parser-specific sections.
     [~,fn,ex] = fileparts(fp);
+    m   = d.metadata;
     out = {};
-    out{end+1} = sprintf('File:   %s%s', fn, ex);
-    out{end+1} = sprintf('Parser: %s',   parserName);
-    out{end+1} = sprintf('Rows:   %d',   numel(d.time));
-    out{end+1} = sprintf('Chan:   %d',   size(d.values,2));
-    out{end+1} = '---';
 
+    % ── Header ───────────────────────────────────────────────────────
+    out{end+1} = sprintf('File:    %s%s', fn, ex);
+    out{end+1} = sprintf('Parser:  %s  [%s]', guiParserLabel(parserName), parserName);
+
+    % ── Parser-specific info ──────────────────────────────────────────
+    switch parserName
+
+        case 'importRigaku'
+            out{end+1} = sprintf('Points:  %d', m.numPoints);
+            out{end+1} = sprintf('Start:   %.4g deg', m.startAngle);
+            out{end+1} = sprintf('Step:    %.4g deg', m.stepSize);
+            out{end+1} = sprintf('Count:   %.4g s/step', m.countingTime);
+
+        case 'importExcel'
+            if isfield(m,'sheetName')
+                if isfield(m,'allSheets') && numel(m.allSheets) > 1
+                    out{end+1} = sprintf('Sheet:   %s  (%d of %d)', ...
+                        m.sheetName, m.sheet, numel(m.allSheets));
+                else
+                    out{end+1} = sprintf('Sheet:   %s', m.sheetName);
+                end
+            end
+
+        case 'importCSV'
+            if isfield(m,'delimiter')
+                out{end+1} = sprintf('Delim:   %s', delimLabel(m.delimiter));
+            end
+
+        case 'importQDVSM'
+            if isfield(m,'title') && ~isempty(m.title)
+                out{end+1} = sprintf('Title:   %s', m.title);
+            end
+            if isfield(m,'fileOpenDate') && ~isempty(m.fileOpenDate)
+                if isfield(m,'fileOpenTimeStr')
+                    out{end+1} = sprintf('Date:    %s  %s', m.fileOpenDate, m.fileOpenTimeStr);
+                else
+                    out{end+1} = sprintf('Date:    %s', m.fileOpenDate);
+                end
+            end
+            if isfield(m,'app') && ~isempty(m.app)
+                out{end+1} = sprintf('App:     %s', m.app);
+            end
+            if isfield(m,'instrument') && isstruct(m.instrument)
+                fn2 = fieldnames(m.instrument);
+                for fi = 1:min(3, numel(fn2))
+                    out{end+1} = sprintf('  %s: %s', fn2{fi}, m.instrument.(fn2{fi}));
+                end
+            end
+
+        % importPPMS: no extra header info beyond what's shown below
+    end
+
+    % ── Summary counts ────────────────────────────────────────────────
+    out{end+1} = '---';
+    out{end+1} = sprintf('Rows:    %d', numel(d.time));
+    out{end+1} = sprintf('Chan:    %d', size(d.values,2));
+
+    % ── X-axis range ─────────────────────────────────────────────────
+    out{end+1} = '---';
+    xName = guiXName(m);
+    xUnit = guiXUnit(m);
+    xLbl  = guiLabel(xName, xUnit);
     if isdatetime(d.time)
-        out{end+1} = 'X: datetime';
+        out{end+1} = sprintf('X: %s  (datetime)', xLbl);
     else
         t = d.time(~isnan(d.time));
         if ~isempty(t)
-            out{end+1} = sprintf('X: [%.4g, %.4g]', min(t), max(t));
+            out{end+1} = sprintf('X: %s', xLbl);
+            out{end+1} = sprintf('   [%.4g, %.4g]', min(t), max(t));
         end
     end
 
+    % ── All columns available in file (QDVSM / PPMS) ─────────────────
+    if isfield(m,'allColumnNames') && numel(m.allColumnNames) > 0
+        out{end+1} = '';
+        out{end+1} = 'All file columns:';
+        allCols  = m.allColumnNames;
+        allUnits = {};
+        if isfield(m,'allColumnUnits'), allUnits = m.allColumnUnits; end
+        for k = 1:numel(allCols)
+            if k <= numel(allUnits) && ~isempty(allUnits{k})
+                out{end+1} = sprintf('  %s (%s)', allCols{k}, allUnits{k});
+            else
+                out{end+1} = sprintf('  %s', allCols{k});
+            end
+        end
+    end
+
+    % ── Loaded Y channel ranges ───────────────────────────────────────
     out{end+1} = '';
+    out{end+1} = 'Loaded channels:';
     for k = 1:size(d.values,2)
         col = d.values(~isnan(d.values(:,k)), k);
-        lbl = d.labels{k};
-        if ~isempty(d.units{k})
-            lbl = [lbl, ' (', d.units{k}, ')'];
-        end
+        lbl = guiLabel(d.labels{k}, d.units{k});
         if isempty(col)
-            out{end+1} = sprintf('Y%d: %s', k, lbl);
-            out{end+1} = '    (all NaN)';
+            out{end+1} = sprintf('  Y%d: %s  (all NaN)', k, lbl);
         else
-            out{end+1} = sprintf('Y%d: %s', k, lbl);
-            out{end+1} = sprintf('    [%.4g, %.4g]', min(col), max(col));
+            out{end+1} = sprintf('  Y%d: %s', k, lbl);
+            out{end+1} = sprintf('       [%.4g, %.4g]', min(col), max(col));
         end
+    end
+end
+
+
+function lbl = guiParserLabel(parserName)
+%GUIPARSERLABEL Human-readable description for each parser function.
+    switch parserName
+        case 'importRigaku',  lbl = 'Rigaku XRD';
+        case 'importExcel',   lbl = 'Excel Spreadsheet';
+        case 'importCSV',     lbl = 'Delimited Text';
+        case 'importQDVSM',   lbl = 'Quantum Design VSM';
+        case 'importPPMS',    lbl = 'QD PPMS (legacy)';
+        otherwise,            lbl = parserName;
+    end
+end
+
+
+function s = delimLabel(d)
+%DELIMLABEL Human-readable delimiter name.
+    switch d
+        case ',',          s = 'comma (,)';
+        case sprintf('\t'),s = 'tab';
+        case ';',          s = 'semicolon (;)';
+        case ' ',          s = 'space';
+        otherwise,         s = sprintf('"%s"', d);
     end
 end

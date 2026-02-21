@@ -64,6 +64,8 @@ function data = importPPMS(filepath, options)
         options.YAxis              = 'moment'
         options.TimeColumn         = ''    % alias for XAxis
         options.DataColumns        = ''    % alias for YAxis
+        options.HeaderRow    (1,1) double = 1   % 1-based line number; -1 = auto-detect
+        options.DataStartRow (1,1) double = -1  % 1-based line number; -1 = HeaderRow+1
         options.Verbose     (1,1) logical = false
     end
 
@@ -78,7 +80,10 @@ function data = importPPMS(filepath, options)
     end
 
     % ════════════════════════════════════════════════════════════════
-    %  STEP 1: Read header line and data
+    %  STEP 1: Read all lines, then locate header and data start
+    %  HeaderRow  = 1 (default) or -1 (auto-detect first non-comment line)
+    %  DataStartRow = -1 (auto = HeaderRow+1) or an explicit 1-based index
+    %  Comment lines are those whose first non-space character is ; # or %
     % ════════════════════════════════════════════════════════════════
     fid = fopen(filepath, 'r');
     if fid == -1
@@ -86,16 +91,51 @@ function data = importPPMS(filepath, options)
     end
     cleanObj = onCleanup(@() fclose(fid));
 
-    headerLine = fgetl(fid);
-    if ~ischar(headerLine)
+    allLines = {};
+    while ~feof(fid)
+        line = fgetl(fid);
+        if ischar(line)
+            allLines{end+1} = line; %#ok<AGROW>
+        end
+    end
+
+    if isempty(allLines)
         error('importPPMS:emptyFile', 'File is empty: %s', filepath);
     end
 
-    rawLines = {};
-    while ~feof(fid)
-        line = fgetl(fid);
-        if ischar(line) && ~isempty(strtrim(line))
-            rawLines{end+1} = line; %#ok<AGROW>
+    % Resolve header row
+    if options.HeaderRow == -1
+        headerRowIdx = 0;
+        for li = 1:numel(allLines)
+            ln = strtrim(allLines{li});
+            if isempty(ln), continue; end
+            if ~any(ln(1) == ';#%')
+                headerRowIdx = li;
+                break;
+            end
+        end
+        if headerRowIdx == 0
+            error('importPPMS:noHeader', ...
+                'No non-comment header line found in: %s', filepath);
+        end
+    else
+        headerRowIdx = options.HeaderRow;
+    end
+
+    % Resolve data start row
+    if options.DataStartRow == -1
+        dataStartIdx = headerRowIdx + 1;
+    else
+        dataStartIdx = options.DataStartRow;
+    end
+
+    % Collect non-empty lines from data start onward
+    headerLine = allLines{headerRowIdx};
+    rawLines   = {};
+    for li = dataStartIdx:numel(allLines)
+        ln = strtrim(allLines{li});
+        if ~isempty(ln)
+            rawLines{end+1} = ln; %#ok<AGROW>
         end
     end
 
@@ -198,6 +238,8 @@ function data = importPPMS(filepath, options)
     meta.xColumnName     = colNames{xColIdx};
     meta.xColumnUnit     = colUnits{xColIdx};
     meta.yColumnIndices  = yColIdx;
+    meta.numRawRows      = numel(allLines);
+    meta.headerRow       = headerRowIdx;
 
     data = parser.createDataStruct(timeVec, valuesMatrix, ...
         'labels', labels, 'units', units, 'metadata', meta);
