@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(winget upgrade:*)",
+      "WebFetch(domain:scholar.google.com)",
+      "WebFetch(domain:www.nist.gov)"
+    ]
+  }
+}
