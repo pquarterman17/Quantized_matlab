@@ -64,11 +64,11 @@ fprintf('=== 5. Rigaku .raw (XRD) ===\n');
 try
     if isfile(RAW1)
         d = parser.importAuto(RAW1);
-        assert(numel(d.time) > 0,       'time vector is empty');
-        assert(size(d.values,2) == 1,   'expected 1 intensity channel');
-        assert(isfield(d.metadata,'stepSize'),     'missing metadata.stepSize');
-        assert(isfield(d.metadata,'startAngle'),   'missing metadata.startAngle');
-        assert(isfield(d.metadata,'countingTime'), 'missing metadata.countingTime');
+        assert(numel(d.time) > 0,                     'time vector is empty');
+        assert(size(d.values,2) == 1,                 'expected 1 intensity channel');
+        assert(isfield(d.metadata,'stepSize'),         'missing metadata.stepSize');
+        assert(isfield(d.metadata,'startAngle'),       'missing metadata.startAngle');
+        assert(isfield(d.metadata,'countingTime'),     'missing metadata.countingTime');
         fprintf('  Points: %d  |  2Th: %.4f to %.4f deg  |  step: %.4f deg\n', ...
             numel(d.time), min(d.time), max(d.time), d.metadata.stepSize);
         passed = passed + 1;

@@ -2,26 +2,23 @@
 
 ## Project Overview
 
-Scientific data analysis toolbox for processing and visualizing X-ray diffraction (XRD) and magnetometry data from laboratory instruments. Supports Rigaku SmartLab XRD, Quantum Design PPMS/VSM/DynaCool, and generic CSV/TSV data.
+Scientific data analysis toolbox for processing and visualizing magnetometry and generic lab data from laboratory instruments. Supports Quantum Design PPMS/VSM/DynaCool and generic CSV/Excel/TSV data.
 
 ## Repository Structure
 
 ```
-Matlab/
+thin_film_toolkit_matlab/
 ├── setupToolbox.m          # Entry point — adds all subdirs to MATLAB path
-├── +parser/                # Data import and parsing (ACTIVE)
+├── dataImportGUI.m         # Interactive uifigure GUI: browse, preview, correct, export
+├── test_parsers.m          # Smoke tests for all +parser functions
+├── test_importAuto.m       # Smoke tests for parser.importAuto dispatch
+├── +parser/                # Data import namespace (ACTIVE)
+│   ├── importAuto.m        # Auto-detect file type and dispatch to correct parser
 │   ├── importCSV.m         # Universal CSV/TSV importer with auto-detection
-│   ├── importQDVSM.m       # Quantum Design PPMS/VSM/DynaCool importer
-│   ├── rigaku_raw/         # Rigaku XRD binary parser and plotting
-│   │   ├── rigaku_raw.m        # parse_rigaku_raw() — reads .raw binary files
-│   │   ├── plot_xrd_data.m     # Main XRD visualization function
-│   │   ├── quick_plot.m        # Minimal plotting template
-│   │   ├── plotting_examples.m # 11 usage examples
-│   │   ├── advanced_plotting.m # Publication-quality figure templates
-│   │   └── PLOTTING_README.md  # Comprehensive user documentation
-│   └── ppms_raw/           # Legacy PPMS magnetometry parser
-│       ├── PPMS_raw.m          # parse_magnetometry_data()
-│       └── @basicMath/         # Static math utility class
+│   ├── importExcel.m       # Excel (.xlsx/.xls/.ods) importer
+│   ├── importQDVSM.m       # Quantum Design VSM/DynaCool importer (.dat)
+│   ├── importPPMS.m        # Legacy QD PPMS importer (.dat)
+│   └── createDataStruct.m  # Validates and assembles the unified data struct
 ├── +plotting/              # Reserved — not yet implemented
 ├── +scripts/               # Reserved — not yet implemented
 ├── +styles/                # Reserved — not yet implemented
@@ -30,24 +27,24 @@ Matlab/
 
 ## Supported Data Formats
 
-| Format | Module | Description |
+| Format | Parser | Description |
 |--------|--------|-------------|
-| Rigaku XRD `.raw` (binary) | `rigaku_raw.m` | X-ray diffraction intensity vs. 2θ |
-| Quantum Design PPMS `.dat` | `importQDVSM.m` | Magnetometry (M vs H, M vs T) |
-| PPMS `.dat` (legacy) | `PPMS_raw.m` | Magnetometry — older parser |
-| CSV / TSV (generic) | `importCSV.m` | Generic lab data with auto-detection |
+| Quantum Design VSM `.dat` | `importQDVSM.m` | Magnetometry (M vs H, M vs T); [Header]/[Data] markers |
+| QD PPMS `.dat` (legacy) | `importPPMS.m` | Older PPMS magnetometry CSV format |
+| CSV / TSV / TXT | `importCSV.m` | Generic lab data with auto-detection of delimiter, headers, units |
+| Excel `.xlsx/.xls/.ods` | `importExcel.m` | Spreadsheet data with unit row support |
 
 ## Conventions
 
 ### Naming
-- **Functions:** mix of `snake_case` (`parse_rigaku_raw`, `plot_xrd_data`) and `PascalCase` (`importCSV`, `importQDVSM`)
-- **Parameters:** named arguments via `arguments` block (modern) or `inputParser` (older); booleans as `true`/`false`
-- **Variables:** `camelCase` for local vars (`colIdx`, `rawMatrix`); struct fields use lowercase (`data.theta`, `data.values`)
+- **Functions:** `PascalCase` (`importCSV`, `importQDVSM`, `createDataStruct`)
+- **Parameters:** named arguments via `arguments` block; booleans as `true`/`false`
+- **Variables:** `camelCase` for local vars (`colIdx`, `rawMatrix`); struct fields use lowercase
 
 ### Output Structs
-Functions return unified structs with consistent fields:
-- `.time` / `.timeVec` — x-axis values
-- `.values` — data matrix
+All parsers return unified structs with consistent fields:
+- `.time` — x-axis values (numeric vector or datetime)
+- `.values` — [N×K] data matrix
 - `.labels` — channel names (cell array of strings)
 - `.units` — unit strings (cell array)
 - `.metadata` — instrument params, source file info
@@ -63,34 +60,36 @@ Functions return unified structs with consistent fields:
 ### Documentation
 - Every public function has a docstring with: Syntax, Inputs, Outputs, Examples
 - Section dividers use `% ════════...` style
-- Example scripts demonstrate all major use cases
 
 ## Common Workflows
 
-### XRD Analysis
-```matlab
-setupToolbox()
-[data, params] = parse_rigaku_raw('sample.raw');
-plot_xrd_data('sample.raw', 'PlotType', 'log', 'FindPeaks', true, 'Normalize', true);
-```
-
 ### Magnetometry (PPMS/VSM)
 ```matlab
-data = importQDVSM('sample.dat', 'XAxis', 'field', 'YAxis', 'moment');
+data = parser.importQDVSM('sample.dat', 'XAxis', 'field', 'YAxis', 'moment');
 ```
 
 ### Generic CSV
 ```matlab
-data = importCSV('data.csv');  % auto-detects delimiter, headers, units
+data = parser.importCSV('data.csv');  % auto-detects delimiter, headers, units
+```
+
+### Auto-dispatch
+```matlab
+data = parser.importAuto('sample.dat');   % picks parser from extension + content
+```
+
+### Interactive GUI
+```matlab
+dataImportGUI   % browse, preview, apply corrections, export CSV
 ```
 
 ## Key Design Decisions
 
-- **No external toolboxes** — uses MATLAB built-ins only (`textscan`, `findpeaks`, `regexp`, etc.)
+- **No external toolboxes** — uses MATLAB built-ins only
 - **Functional approach** — pure functions returning structs; no heavy OOP
 - **Auto-detection heuristics** — delimiter, header row, data start, units all inferred automatically
-- **Pipeline pattern** — parse → normalize → plot; each stage independent
-- **Rigaku binary parsing** — reads fixed offsets (num_points @ 4–8, step size @ 1256, start angle @ 3136, data @ 3140+)
+- **Pipeline pattern** — parse → correct → plot; each stage independent
+- **Unified data struct** — all parsers emit the same field layout so GUI and plotting code is parser-agnostic
 
 ## Future Expansion
 

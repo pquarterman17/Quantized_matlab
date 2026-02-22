@@ -1,7 +1,6 @@
 function data = importAuto(filepath, varargin)
 %IMPORTAUTO Auto-detect file type and import with the appropriate parser.
 %
-%   data = parser.importAuto('scan.raw')
 %   data = parser.importAuto('results.xlsx')
 %   data = parser.importAuto('magnetometry.dat')
 %   data = parser.importAuto('log.csv', 'TimeColumn', 1)
@@ -12,7 +11,7 @@ function data = importAuto(filepath, varargin)
 %   underlying parser unchanged.
 %
 %   DISPATCH RULES:
-%     .raw              → parser.importRigaku
+%     .raw              → parser.importRigaku_raw
 %     .xlsx .xls .xlsm
 %       .ods .xlsb      → parser.importExcel
 %     .csv .tsv .txt    → parser.importCSV
@@ -30,13 +29,12 @@ function data = importAuto(filepath, varargin)
 %   EXAMPLES:
 %       % Let importAuto pick the parser
 %       d = parser.importAuto('EDP140_PerpStraw.dat');
-%       d = parser.importAuto('scan.raw', 'UseCountsPerSec', false);
 %       d = parser.importAuto('results.xlsx', 'Sheet', 2);
 %
 %       % Inspect the result
 %       parser.importAuto('log.csv')
 %
-%   See also IMPORTCSV, IMPORTEXCEL, IMPORTPPMS, IMPORTQDVSM, IMPORTRIGAKU
+%   See also IMPORTRIGAKU_RAW, IMPORTCSV, IMPORTEXCEL, IMPORTPPMS, IMPORTQDVSM
 
     arguments
         filepath (1,1) string {mustBeFile}
@@ -53,8 +51,8 @@ function data = importAuto(filepath, varargin)
     % ════════════════════════════════════════════════════════════════
     switch ext
         case '.raw'
-            parserName = 'importRigaku';
-            data = parser.importRigaku(filepath, varargin{:});
+            parserName = 'importRigaku_raw';
+            data = parser.importRigaku_raw(filepath, varargin{:});
 
         case {'.xlsx', '.xls', '.xlsm', '.xlsb', '.ods'}
             parserName = 'importExcel';
@@ -147,7 +145,7 @@ function label = resolveXLabel(meta)
             return;
         end
     end
-    if isfield(meta, 'startAngle')   % importRigaku
+    if isfield(meta, 'startAngle')   % importRigaku_raw
         label = '2-Theta (deg)';
         return;
     end

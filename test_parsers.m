@@ -14,7 +14,6 @@ ROOT = fileparts(mfilename('fullpath'));
 DAT_FILE   = 'G:\Onedrive\Coding\Python\DataPlotting\2449_1B_IP.dat';
 DAT_FILE2  = 'G:\Onedrive\Coding\Python\DataPlotting\EDP140_PerpStraw.dat';
 RAW_FILE   = 'G:\Onedrive\Work and School Research\NCNR Research\YIG_AF-Coupling-YabinFan\XRD\YIG_Py_S7.raw';
-
 passed = 0;
 failed = 0;
 
@@ -143,29 +142,32 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
-%  5. importRigaku  (skipped if no .raw file is provided)
+%  5. importRigaku_raw  (skipped if no .raw file is found at RAW_FILE)
 % ════════════════════════════════════════════════════════════════════════
-fprintf('\n══ TEST 5: parser.importRigaku ══\n');
-if isempty(RAW_FILE) || ~isfile(RAW_FILE)
-    fprintf('  SKIP – no .raw file found. Set RAW_FILE at top of script to enable.\n');
+fprintf('\n══ TEST 5: parser.importRigaku_raw ══\n');
+if ~isfile(RAW_FILE)
+    fprintf('  SKIP – RAW_FILE not found. Update RAW_FILE at top of script to enable.\n');
 else
     try
-        d = parser.importRigaku(RAW_FILE, 'Verbose', true);
+        d = parser.importRigaku_raw(RAW_FILE, 'Verbose', true);
 
-        assert(isstruct(d),             'output must be a struct');
-        assert(isfield(d,'time'),       'missing field: time');
-        assert(isfield(d,'values'),     'missing field: values');
-        assert(isfield(d,'labels'),     'missing field: labels');
-        assert(isfield(d,'units'),      'missing field: units');
-        assert(isfield(d,'metadata'),   'missing field: metadata');
-        assert(~isempty(d.time),        '2θ vector is empty');
-        assert(size(d.values,2) == 1,   'expected 1 intensity channel');
-        assert(isfield(d.metadata,'stepSize'), 'missing metadata.stepSize');
+        assert(isstruct(d),                          'output must be a struct');
+        assert(isfield(d,'time'),                    'missing field: time');
+        assert(isfield(d,'values'),                  'missing field: values');
+        assert(isfield(d,'labels'),                  'missing field: labels');
+        assert(isfield(d,'units'),                   'missing field: units');
+        assert(isfield(d,'metadata'),                'missing field: metadata');
+        assert(~isempty(d.time),                     '2θ vector is empty');
+        assert(size(d.values,2) == 1,                'expected exactly 1 intensity channel');
+        assert(isfield(d.metadata,'stepSize'),       'missing metadata.stepSize');
+        assert(isfield(d.metadata,'startAngle'),     'missing metadata.startAngle');
+        assert(isfield(d.metadata,'countingTime'),   'missing metadata.countingTime');
+        assert(strcmp(d.units{1},'counts'),          'default unit should be counts');
 
-        fprintf('  Points       : %d\n', numel(d.time));
-        fprintf('  2θ range     : %.4f to %.4f °\n', min(d.time), max(d.time));
-        fprintf('  Step size    : %.4f °\n', d.metadata.stepSize);
-        fprintf('  Count time   : %.4f s\n', d.metadata.countingTime);
+        fprintf('  Points        : %d\n',   numel(d.time));
+        fprintf('  2\xB0 range     : %.4f to %.4f deg\n', min(d.time), max(d.time));
+        fprintf('  Step size     : %.4f deg\n', d.metadata.stepSize);
+        fprintf('  Counting time : %.4f s\n',  d.metadata.countingTime);
         fprintf('  Peak intensity: %.1f %s\n', max(d.values), d.units{1});
         fprintf('  PASS\n');
         passed = passed + 1;
