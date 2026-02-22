@@ -436,10 +436,10 @@ function dataImportGUI()
         'RowSpacing',   4);
     peakBtnGL.Layout.Column = 2;
 
-    btnFitPeaks = uibutton(peakBtnGL,'Text','Fit Peaks (Gaussian)', ...
+    btnFitPeaks = uibutton(peakBtnGL,'Text','Fit Peaks (Lorentzian)', ...
         'ButtonPushedFcn',@onFitPeaks, ...
         'BackgroundColor',[0.15 0.37 0.63],'FontColor',[1 1 1], ...
-        'Tooltip','Fit a Gaussian to each listed peak and extract precise center and FWHM');
+        'Tooltip','Fit a Lorentzian to each listed peak and extract precise center and FWHM');
     btnFitPeaks.Layout.Row = 1;
 
     btnClearPeaks = uibutton(peakBtnGL,'Text','Clear All Peaks', ...
@@ -497,6 +497,8 @@ function dataImportGUI()
                 ds.bgInt      = 0;
                 ds.peaks      = struct('center',{},'fwhm',{},'height',{}, ...
                                        'xRange',{},'status',{},'bg',{});
+                ds.axLims     = struct('xMin','','xMax','','xStep','', ...
+                                       'yMin','','yMax','','yStep','');
                 appData.datasets{end+1} = ds;
                 nLoaded = nLoaded + 1;
             catch ME
@@ -528,6 +530,7 @@ function dataImportGUI()
         end
         if val == appData.activeIdx, return; end   % no change
 
+        saveAxisLimsToActiveDataset();   % persist zoom before leaving current dataset
         cancelInteractions();
         appData.activeIdx = val;
         updateControlsForActiveDataset();
@@ -563,6 +566,19 @@ function dataImportGUI()
             updateControlsForActiveDataset();
             onPlot([],[]);
         end
+    end
+
+    function saveAxisLimsToActiveDataset()
+    %SAVEAXISLIMSTOACTIVEDATASET  Copy current axis limit fields into the active dataset.
+    %  Called before switching datasets so each dataset remembers its own zoom level.
+        if appData.activeIdx < 1 || isempty(appData.datasets), return; end
+        lims.xMin  = efXMin.Value;
+        lims.xMax  = efXMax.Value;
+        lims.xStep = efXStep.Value;
+        lims.yMin  = efYMin.Value;
+        lims.yMax  = efYMax.Value;
+        lims.yStep = efYStep.Value;
+        appData.datasets{appData.activeIdx}.axLims = lims;
     end
 
     function rebuildDatasetList(keepActiveIdx)
@@ -667,6 +683,19 @@ function dataImportGUI()
         efYOffset.Value     = ds.yOff;
         efBGSlope.Value     = ds.bgSlope;
         efBGIntercept.Value = ds.bgInt;
+
+        % Restore per-dataset axis limits (auto-scale if not yet saved)
+        if isfield(ds, 'axLims')
+            efXMin.Value  = ds.axLims.xMin;
+            efXMax.Value  = ds.axLims.xMax;
+            efXStep.Value = ds.axLims.xStep;
+            efYMin.Value  = ds.axLims.yMin;
+            efYMax.Value  = ds.axLims.yMax;
+            efYStep.Value = ds.axLims.yStep;
+        else
+            efXMin.Value = '';  efXMax.Value = '';  efXStep.Value = '';
+            efYMin.Value = '';  efYMax.Value = '';  efYStep.Value = '';
+        end
 
         if ~isempty(ds.corrData)
             [fp2, fn2, ~] = fileparts(ds.filepath);
@@ -1053,8 +1082,8 @@ function dataImportGUI()
     % ── Peak fitter ───────────────────────────────────────────────────────
 
     function onFitPeaks(~,~)
-    %ONFITPEAKS  Fit a Gaussian to each entry in ds.peaks to refine center/FWHM.
-    %  Gaussian model: H * exp(-4*log(2)*((x - x0)/fwhm)^2) + bg
+    %ONFITPEAKS  Fit a Lorentzian to each entry in ds.peaks to refine center/FWHM.
+    %  Lorentzian model: H / (1 + 4*((x - x0)/fwhm)^2) + bg
     %  Fitted parameters: [H, x0, fwhm, bg].  Uses fminsearch (no toolbox needed).
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig,'Load a file first.','No data'); return;
@@ -1083,8 +1112,8 @@ function dataImportGUI()
         xv = xv(valid);  yv = yv(valid);
         xSpan = diff([min(xv), max(xv)]);
 
-        gaussFun = @(p,x) p(1) .* exp(-4*log(2).*((x - p(2))./p(3)).^2) + p(4);
-        opts     = optimset('Display','off','MaxIter',8000,'TolX',1e-10,'TolFun',1e-14);
+        lorentzFun = @(p,x) p(1) ./ (1 + 4.*((x - p(2))./p(3)).^2) + p(4);
+        opts       = optimset('Display','off','MaxIter',8000,'TolX',1e-10,'TolFun',1e-14);
 
         nFailed = 0;
         for pi = 1:numel(ds.peaks)
@@ -1117,7 +1146,7 @@ function dataImportGUI()
             fw0   = max(diff([min(xFit), max(xFit)]) * 0.3, (xFit(2)-xFit(1))*2);
             bg0   = min(yFit);
 
-            objFun = @(p) sum((gaussFun(p, xFit) - yFit).^2);
+            objFun = @(p) sum((lorentzFun(p, xFit) - yFit).^2);
             try
                 pFit = fminsearch(objFun, [H0, x0_0, fw0, bg0], opts);
                 fwhmFit = abs(pFit(3));
@@ -1681,6 +1710,9 @@ function dataImportGUI()
             colors = lines(max(nDS * nY, 1));
 
             % ── Draw ──────────────────────────────────────────────────────
+            % delete() removes ALL children including HandleVisibility='off' objects
+            % (peak markers); cla() alone misses those and leaves them on screen.
+            delete(targetAx.Children);
             cla(targetAx);
             hold(targetAx,'on');
             lsPrimary    = guiLineSpec(appData.style);
@@ -1829,7 +1861,7 @@ function dataImportGUI()
 
             % ── Peak annotations ──────────────────────────────────────────
             % Drawn after axis limits so YLim is finalised.
-            % Render order: (1) Gaussian fit curves, (2) marker lines + labels,
+            % Render order: (1) Lorentzian fit curves, (2) marker lines + labels,
             % so markers visually sit on top of the model overlay.
             if appData.activeIdx >= 1 && ~isempty(appData.datasets)
                 dsPk = appData.datasets{appData.activeIdx};
@@ -1838,9 +1870,9 @@ function dataImportGUI()
                     yLo   = targetAx.YLim(1);
                     yHi   = targetAx.YLim(2);
                     ySpan = yHi - yLo;
-                    gaussColor = [0.85 0.20 0.00];   % warm red-orange for all Gaussian overlays
+                    fitColor = [0.85 0.20 0.00];   % warm red-orange for all Lorentzian overlays
 
-                    % ── (1) Gaussian fit overlays ─────────────────────────
+                    % ── (1) Lorentzian fit overlays ───────────────────────
                     for pi = 1:numel(dsPk.peaks)
                         pk       = dsPk.peaks(pi);
                         hasBg    = isfield(pk,'bg') && ~isempty(pk.bg) && ~isnan(pk.bg);
@@ -1855,12 +1887,12 @@ function dataImportGUI()
                             gxHi = pk.center + 3*pk.fwhm;
                         end
                         xFitPlot = linspace(gxLo, gxHi, 300);
-                        yFitPlot = pk.height .* ...
-                            exp(-4*log(2).*((xFitPlot - pk.center)./pk.fwhm).^2) + pk.bg;
+                        yFitPlot = pk.height ./ ...
+                            (1 + 4.*((xFitPlot - pk.center)./pk.fwhm).^2) + pk.bg;
 
                         isSel = (pi == appData.selectedPeakIdx);
                         plot(targetAx, xFitPlot, yFitPlot, '-', ...
-                            'Color',            gaussColor, ...
+                            'Color',            fitColor, ...
                             'LineWidth',        guiTernary(isSel, 2.5, 1.5), ...
                             'HandleVisibility', 'off');
                     end
@@ -1888,7 +1920,7 @@ function dataImportGUI()
                             'Interpreter',        'none');
 
                         % FWHM horizontal bar at the true half-maximum height
-                        % For a fitted Gaussian: half-max is at bg + H/2.
+                        % For a fitted Lorentzian: half-max is at bg + H/2.
                         % For un-fitted peaks: fall back to H/2 as an estimate.
                         if ~isnan(pk.fwhm) && pk.fwhm > 0
                             hasBg = isfield(pk,'bg') && ~isempty(pk.bg) && ~isnan(pk.bg);
@@ -1918,6 +1950,7 @@ function dataImportGUI()
     %ONAUTOLIMITS  Clear all axis limit fields → return to auto-scale.
         efXMin.Value = '';  efXMax.Value = '';  efXStep.Value = '';
         efYMin.Value = '';  efYMax.Value = '';  efYStep.Value = '';
+        saveAxisLimsToActiveDataset();
         onPlot([],[]);
     end
 

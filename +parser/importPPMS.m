@@ -145,8 +145,15 @@ function data = importPPMS(filepath, options)
 
     % ════════════════════════════════════════════════════════════════
     %  STEP 2: Parse column headers (skip first "Comment" column)
+    %  Auto-detect delimiter: prefer tab if the header contains a tab,
+    %  otherwise fall back to comma (handles newer PPMS TSV exports).
     % ════════════════════════════════════════════════════════════════
-    allHeaders = strtrim(strsplit(headerLine, ',', 'CollapseDelimiters', false));
+    if contains(headerLine, sprintf('\t'))
+        delim = sprintf('\t');
+    else
+        delim = ',';
+    end
+    allHeaders = strtrim(strsplit(headerLine, delim, 'CollapseDelimiters', false));
 
     % Drop leading empty / "Comment" column
     if strcmpi(strtrim(allHeaders{1}), 'comment') || isempty(strtrim(allHeaders{1}))
@@ -172,7 +179,7 @@ function data = importPPMS(filepath, options)
     rawMatrix = NaN(numRows, numCols);
 
     for r = 1:numRows
-        parts = strsplit(rawLines{r}, ',', 'CollapseDelimiters', false);
+        parts = strsplit(rawLines{r}, delim, 'CollapseDelimiters', false);
         % Offset to skip the Comment column if present
         for c = 1:numCols
             srcIdx = c + firstDataCol - 1;
@@ -240,6 +247,7 @@ function data = importPPMS(filepath, options)
     meta.yColumnIndices  = yColIdx;
     meta.numRawRows      = numel(allLines);
     meta.headerRow       = headerRowIdx;
+    meta.delimiter       = delim;
 
     data = parser.createDataStruct(timeVec, valuesMatrix, ...
         'labels', labels, 'units', units, 'metadata', meta);

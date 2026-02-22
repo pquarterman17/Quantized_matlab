@@ -1,10 +1,21 @@
 function setupToolbox(options)
-%SETUPTOOLBOX Add all toolbox subdirectories to the MATLAB path.
+%SETUPTOOLBOX Add the toolbox root to the MATLAB path.
 %
-%   setupToolbox()              - Adds parsers, scripts, and utils to path
+%   setupToolbox()              - Adds toolbox root to path (all packages accessible)
 %   setupToolbox('save', true)  - Also saves the path for future sessions
 %   setupToolbox('verbose', true) - Prints each directory added
 %   setupToolbox('remove', true)  - Removes toolbox from path instead
+%
+%   Packages available after running setupToolbox:
+%       parser.*    - Data importers (importAuto, importQDVSM, importCSV, ...)
+%       plotting.*  - Plot helpers (formatAxes, lineColors, saveFigure)
+%       styles.*    - Visual themes (default)
+%       utilities.* - Data helpers (normalize, smoothData, convertUnits)
+%       scripts.*   - Batch scripts (batchImport)
+%
+%   MATLAB package directories (+parser, +plotting, ...) are resolved
+%   automatically once the toolbox root is on the path — there is no need
+%   to add the package subdirectories themselves.
 %
 %   Example:
 %       setupToolbox()
@@ -19,38 +30,9 @@ function setupToolbox(options)
     % Resolve the root directory of this toolbox
     toolboxRoot = fileparts(mfilename('fullpath'));
 
-    % Define subdirectories to add (edit this list to include your folders)
-    subdirs = {
-        'parsers'
-        'plotting'
-        'styles'
-        'scripts'
-        'utils'
-    };
-
-    % Gather all directories (including nested subdirectories)
+    % Only the root directory needs to be on the path.
+    % MATLAB resolves +package directories automatically from the parent.
     dirsToAdd = {toolboxRoot};
-    for i = 1:numel(subdirs)
-        folder = fullfile(toolboxRoot, subdirs{i});
-        if isfolder(folder)
-            dirsToAdd{end+1} = folder; %#ok<AGROW>
-            % Recursively find all subdirectories
-            subfolders = genpath(folder);
-            if ~isempty(subfolders)
-                parts = strsplit(subfolders, pathsep);
-                parts = parts(~cellfun('isempty', parts));
-                dirsToAdd = [dirsToAdd, parts]; %#ok<AGROW>
-            end
-        else
-            if options.verbose
-                warning('setupToolbox:missingDir', ...
-                    'Directory not found: %s (skipping)', folder);
-            end
-        end
-    end
-
-    % Remove duplicates
-    dirsToAdd = unique(dirsToAdd, 'stable');
 
     % Add or remove from path
     if options.remove

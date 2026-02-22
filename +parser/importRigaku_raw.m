@@ -94,7 +94,13 @@ function data = importRigaku_raw(filepath, options)
     numPoints    = double(typecast(raw(3155:3158), 'uint32'));
 
     % Guard against nonsensical header values
-    if stepSize <= 0 || stepSize > 10
+    if stepSize == 0
+        error('importRigaku_raw:variableStep', ...
+            ['Step size is zero — this may be a variable-step scan, which is not ' ...
+             'supported by this parser. Export the file as fixed-step or use the ' ...
+             'Rigaku software to convert it first.']);
+    end
+    if stepSize < 0 || stepSize > 10
         error('importRigaku_raw:badHeader', ...
             'Implausible step size (%.6g °) — file may not be a Rigaku SmartLab .raw.', ...
             stepSize);
@@ -111,6 +117,18 @@ function data = importRigaku_raw(filepath, options)
             'Header numPoints (%d) exceeds available float32 words (%d); using file size.', ...
             numPoints, nAvail);
         numPoints = nAvail;
+    end
+
+    % ── Detect multi-range files ──────────────────────────────────────
+    % After the first range's data block, any remaining bytes indicate
+    % additional scan ranges. Only the first range is imported.
+    firstRangeEnd = 3158 + numPoints * 4;
+    if nBytes > firstRangeEnd + 3
+        warning('importRigaku_raw:multiRange', ...
+            ['Multi-range .raw file detected (%d bytes remain after first range). ' ...
+             'Only the first scan range (%.4f\xB0\x2013%.4f\xB0) is imported. ' ...
+             'Use Rigaku software to split ranges if full data is required.'], ...
+            nBytes - firstRangeEnd, startAngle, endAngle);
     end
 
     % ════════════════════════════════════════════════════════════════
