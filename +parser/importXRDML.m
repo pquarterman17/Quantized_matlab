@@ -227,14 +227,15 @@ function data = importXRDML(filepath, options)
     end
     [~, sortIdx] = sort(appendNums);   % ascending appendNumber order
 
-    twoTheta_all   = [];
-    counts_all     = [];
-    countingTime   = NaN;    % seconds per point (from first valid scan)
-    scanMode       = '';
-    scanAxis       = '';
-    startTimeStamp = NaT;
-    endTimeStamp   = NaT;
-    intensityTag   = '';     % 'counts' (schema 2.x) or 'intensities' (schema 1.x)
+    twoTheta_all      = [];
+    counts_all        = [];
+    countingTime      = NaN;    % seconds per point (from first valid scan)
+    countingTimes_all = [];     % all per-scan counting times (for consistency check)
+    scanMode          = '';
+    scanAxis          = '';
+    startTimeStamp    = NaT;
+    endTimeStamp      = NaT;
+    intensityTag      = '';     % 'counts' (schema 2.x) or 'intensities' (schema 1.x)
 
     for si = 1 : nScans
         scanNode = scanNodes.item(sortIdx(si) - 1);
@@ -282,10 +283,14 @@ function data = importXRDML(filepath, options)
         if dpNodes.getLength == 0; continue; end
         dp = dpNodes.item(0);
 
-        % Counting time (use value from first valid scan for cps normalisation)
+        % Counting time — collect from every scan for consistency check.
+        % The first valid value is used for cps normalisation of all data.
         ct = nodeDouble(dp, 'commonCountingTime');
-        if ~isnan(ct) && isnan(countingTime)
-            countingTime = ct;
+        if ~isnan(ct)
+            countingTimes_all(end+1) = ct; %#ok<AGROW>
+            if isnan(countingTime)
+                countingTime = ct;
+            end
         end
 
         % 2θ axis: XRDML stores only startPosition / endPosition; angles are
@@ -305,12 +310,43 @@ function data = importXRDML(filepath, options)
         if cntNodes.getLength == 0; continue; end
         if isempty(intensityTag); intensityTag = thisTag; end   % record first found
         cntStr  = strtrim(char(cntNodes.item(0).getTextContent()));
+
+        % Guard: strsplit('') returns {''} → str2double gives [NaN] → nPts=1.
+        % An empty text node means this scan has no data — skip it.
+        if isempty(cntStr); continue; end
+
         cntVals = str2double(strsplit(cntStr));
         nPts    = numel(cntVals);
         if nPts < 1; continue; end
 
-        twoTheta_all = [twoTheta_all, linspace(ttRange(1), ttRange(2), nPts)]; %#ok<AGROW>
-        counts_all   = [counts_all,   cntVals];                                %#ok<AGROW>
+        % Build this scan's 2θ vector then trim its first point if it exactly
+        % overlaps the last already-accumulated angle (common at range boundaries
+        % in multi-range measurements, e.g. two scans both including 40.000°).
+        ttVec = linspace(ttRange(1), ttRange(2), nPts);
+        if ~isempty(twoTheta_all) && ttVec(1) == twoTheta_all(end)
+            ttVec   = ttVec(2:end);
+            cntVals = cntVals(2:end);
+        end
+        if isempty(ttVec); continue; end
+
+        twoTheta_all = [twoTheta_all, ttVec];    %#ok<AGROW>
+        counts_all   = [counts_all,   cntVals];  %#ok<AGROW>
+    end
+
+    % Warn if different scan ranges were measured with different counting times —
+    % cps normalisation uses only the first value, so the result is incorrect for
+    % any range whose counting time differs.
+    if numel(countingTimes_all) > 1
+        uniqueCT = unique(countingTimes_all);
+        if numel(uniqueCT) > 1
+            warning('parser:importXRDML:mixedCountingTimes', ...
+                ['Multi-range file has inconsistent counting times across scans ' ...
+                 '(%s s).  cps normalisation uses the first value (%.3g s); ' ...
+                 'intensities from other ranges will be incorrectly scaled.'], ...
+                strjoin(arrayfun(@(x) sprintf('%.3g',x), uniqueCT, ...
+                    'UniformOutput', false), ', '), ...
+                countingTime);
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════════
@@ -371,7 +407,13 @@ function data = importXRDML(filepath, options)
     ps.startTime               = startTimeStamp;
     ps.endTime                 = endTimeStamp;
     ps.comments                = comments;
-    ps.countingTime            = countingTime;   % mirrored here for guiCountingTime()
+    % Scan summary — mirrored into parserSpecific so guiMetaLines can display
+    % them (it only iterates parserSpecific fields, not top-level meta).
+    ps.countingTime            = countingTime;
+    ps.numPoints               = numel(twoTheta_col);
+    ps.startAngle              = twoTheta_col(1);
+    ps.endAngle                = twoTheta_col(end);
+    ps.stepSize                = mean(diff(twoTheta_col), 'omitnan');
 
     meta = struct();
     meta.source       = char(filepath);
@@ -379,10 +421,10 @@ function data = importXRDML(filepath, options)
     meta.parserName   = 'importXRDML';
     meta.xColumnName  = '2-Theta';
     meta.xColumnUnit  = 'deg';
-    meta.numPoints    = numel(twoTheta_col);
-    meta.startAngle   = twoTheta_col(1);
-    meta.endAngle     = twoTheta_col(end);
-    meta.stepSize     = mean(diff(twoTheta_col), 'omitnan');
+    meta.numPoints    = ps.numPoints;
+    meta.startAngle   = ps.startAngle;
+    meta.endAngle     = ps.endAngle;
+    meta.stepSize     = ps.stepSize;
     meta.countingTime = countingTime;
     meta.parserSpecific = ps;
 

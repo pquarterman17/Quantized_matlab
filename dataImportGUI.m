@@ -54,16 +54,25 @@ function dataImportGUI()
     fig = uifigure('Name','Data Import & Preview', ...
                    'Position',[80 80 1080 915]);
 
+    % ── Dataset-colour palette (shared by widget and callbacks) ──────────
+    DS_COLOR_NAMES = {'Auto','Blue','Orange','Red','Green', ...
+                      'Purple','Teal','Brown','Black','Grey'};
+    DS_COLOR_RGBS  = {[], [0.00 0.45 0.74], [0.85 0.33 0.10], ...
+                      [0.80 0.07 0.07], [0.47 0.67 0.19], ...
+                      [0.49 0.18 0.56], [0.30 0.75 0.93], ...
+                      [0.64 0.35 0.10], [0.00 0.00 0.00], ...
+                      [0.50 0.50 0.50]};
+
     % Root grid  (3 rows: dataset toolbar | content | analysis)
     rootGL = uigridlayout(fig,[3 1], ...
-        'RowHeight',   {96,'1x',420}, ...
+        'RowHeight',   {128,'1x',420}, ...
         'ColumnWidth', {'1x'}, ...
         'Padding',     [8 8 8 8], ...
         'RowSpacing',  6);
 
-    % ── Toolbar row: Add / Remove buttons (top) + dataset listbox (bottom) ─
-    tbGL = uigridlayout(rootGL,[2 2], ...
-        'RowHeight',    {26,60}, ...
+    % ── Toolbar row: Add / Remove buttons (top) + dataset listbox (middle) + colour (bottom) ─
+    tbGL = uigridlayout(rootGL,[3 2], ...
+        'RowHeight',    {26,60,26}, ...
         'ColumnWidth',  {'1x','1x'}, ...
         'Padding',      [0 0 0 0], ...
         'RowSpacing',   4, ...
@@ -89,6 +98,19 @@ function dataImportGUI()
         'ValueChangedFcn',@onSelectDataset, ...
         'Tooltip','Loaded datasets — click to make a dataset active for editing / corrections');
     lbDatasets.Layout.Row = 2; lbDatasets.Layout.Column = [1 2];
+
+    lblDSColor = uibutton(tbGL,'Text','Dataset Color:', ...
+        'Enable','off','FontSize',10);
+    lblDSColor.Layout.Row = 3; lblDSColor.Layout.Column = 1;
+
+    ddDatasetColor = uidropdown(tbGL, ...
+        'Items',     DS_COLOR_NAMES, ...
+        'ItemsData', DS_COLOR_RGBS, ...
+        'Value',     [], ...
+        'Enable',    'off', ...
+        'Tooltip',   'Override the colour used to plot this dataset. "Auto" uses the automatic palette.', ...
+        'ValueChangedFcn', @onDatasetColorChanged);
+    ddDatasetColor.Layout.Row = 3; ddDatasetColor.Layout.Column = 2;
 
     % ── Content: controls panel (left) | preview axes (right) ────────────
     contentGL = uigridlayout(rootGL,[1 2], ...
@@ -596,6 +618,15 @@ function dataImportGUI()
         onPlot([],[]);
     end
 
+    function onDatasetColorChanged(~,~)
+    %ONDATASETCOLORCHANGED  Store colour override on the active dataset and replot.
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        ds       = appData.datasets{appData.activeIdx};
+        ds.color = ddDatasetColor.Value;   % [] = Auto; [r g b] = named colour
+        appData.datasets{appData.activeIdx} = ds;
+        onPlot([],[]);
+    end
+
     function onRemoveDataset(~,~)
     %ONREMOVEDATASET  Remove the active dataset from the list.
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
@@ -617,6 +648,8 @@ function dataImportGUI()
             efBGSlope.Value = 0;  efBGIntercept.Value = 0;
             efSavePath.Value = '';
             analysisPanel.Title = 'Analysis & Corrections';
+            ddDatasetColor.Enable = 'off';
+            ddDatasetColor.Value  = [];
             cla(ax);
             title(ax,'Load a file to preview data','Interpreter','none');
         else
@@ -747,6 +780,10 @@ function dataImportGUI()
         if ct == 0
             cbCountsPerSec.Value = false;
         end
+
+        % Restore this dataset's colour override ([] = Auto)
+        ddDatasetColor.Enable = 'on';
+        ddDatasetColor.Value  = ds.color;
 
         % Restore this dataset's correction parameter values
         efXOffset.Value     = ds.xOff;
@@ -1864,9 +1901,15 @@ function dataImportGUI()
                     ctFactor = guiCountingTime(ds);
                 end
 
+                % Per-dataset colour override ([] = Auto → fall back to lines() palette)
+                dsColorOverride = [];
+                if isfield(ds,'color') && ~isempty(ds.color)
+                    dsColorOverride = ds.color;
+                end
+
                 for k = 1:nY
                     colorIdx  = (di-1)*nY + k;
-                    baseColor = colors(colorIdx, :);
+                    baseColor = guiTernary(~isempty(dsColorOverride), dsColorOverride, colors(colorIdx,:));
 
                     idx = find(strcmp(d.labels, ySel{k}), 1);
                     if isempty(idx), continue; end
@@ -2170,6 +2213,7 @@ function ds = buildDs(fp, data, parserName)
     ds.yOff        = 0;
     ds.bgSlope     = 0;
     ds.bgInt       = 0;
+    ds.color       = [];          % [] = Auto (lines() palette); [r g b] = override
     ds.peaks       = struct('center',{},'fwhm',{},'height',{}, ...
                             'xRange',{},'status',{},'bg',{},'model',{});
     ds.axLims      = struct('xMin','','xMax','','xStep','', ...
