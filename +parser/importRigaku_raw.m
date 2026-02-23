@@ -61,7 +61,7 @@ function data = importRigaku_raw(filepath, options)
     % ════════════════════════════════════════════════════════════════
     fid = fopen(filepath, 'r');
     if fid == -1
-        error('importRigaku_raw:cannotOpen', 'Cannot open file: %s', filepath);
+        error('parser:importRigaku_raw:cannotOpen', 'Cannot open file: %s', filepath);
     end
     cleanObj = onCleanup(@() fclose(fid));   %#ok<NASGU> — closes on error or normal exit
     raw = fread(fid, '*uint8');
@@ -72,14 +72,14 @@ function data = importRigaku_raw(filepath, options)
     %  STEP 2: Validate format
     % ════════════════════════════════════════════════════════════════
     if nBytes < 3162   % 3158-byte header + at least one float32 (4 bytes)
-        error('importRigaku_raw:fileTooSmall', ...
+        error('parser:importRigaku_raw:fileTooSmall', ...
             'File too small to be a valid Rigaku SmartLab .raw (%d bytes): %s', ...
             nBytes, filepath);
     end
 
     magic = char(raw(1:2)');
     if ~strcmp(magic, 'FI')
-        error('importRigaku_raw:badMagic', ...
+        error('parser:importRigaku_raw:badMagic', ...
             ['Unrecognised magic bytes "%s" (expected "FI").\n' ...
              'This file may not be a Rigaku SmartLab .raw: %s'], magic, filepath);
     end
@@ -95,13 +95,13 @@ function data = importRigaku_raw(filepath, options)
 
     % Guard against nonsensical header values
     if stepSize == 0
-        error('importRigaku_raw:variableStep', ...
+        error('parser:importRigaku_raw:variableStep', ...
             ['Step size is zero — this may be a variable-step scan, which is not ' ...
              'supported by this parser. Export the file as fixed-step or use the ' ...
              'Rigaku software to convert it first.']);
     end
     if stepSize < 0 || stepSize > 10
-        error('importRigaku_raw:badHeader', ...
+        error('parser:importRigaku_raw:badHeader', ...
             'Implausible step size (%.6g °) — file may not be a Rigaku SmartLab .raw.', ...
             stepSize);
     end
@@ -110,10 +110,10 @@ function data = importRigaku_raw(filepath, options)
     nAvail = floor((nBytes - 3158) / 4);   % complete float32 words after header
     if numPoints == 0 || numPoints > nAvail
         if nAvail == 0
-            error('importRigaku_raw:noData', ...
+            error('parser:importRigaku_raw:noData', ...
                 'No data bytes found after the header block in: %s', filepath);
         end
-        warning('importRigaku_raw:pointsMismatch', ...
+        warning('parser:importRigaku_raw:pointsMismatch', ...
             'Header numPoints (%d) exceeds available float32 words (%d); using file size.', ...
             numPoints, nAvail);
         numPoints = nAvail;
@@ -124,7 +124,7 @@ function data = importRigaku_raw(filepath, options)
     % additional scan ranges. Only the first range is imported.
     firstRangeEnd = 3158 + numPoints * 4;
     if nBytes > firstRangeEnd + 3
-        warning('importRigaku_raw:multiRange', ...
+        warning('parser:importRigaku_raw:multiRange', ...
             ['Multi-range .raw file detected (%d bytes remain after first range). ' ...
              'Only the first scan range (%.4f\xB0\x2013%.4f\xB0) is imported. ' ...
              'Use Rigaku software to split ranges if full data is required.'], ...
@@ -156,13 +156,17 @@ function data = importRigaku_raw(filepath, options)
     % ════════════════════════════════════════════════════════════════
     %  STEP 7: Assemble output struct
     % ════════════════════════════════════════════════════════════════
-    meta.source       = char(filepath);
-    meta.importDate   = datetime('now');
-    meta.numPoints    = numPoints;
-    meta.startAngle   = startAngle;
-    meta.endAngle     = endAngle;
-    meta.stepSize     = stepSize;
-    meta.countingTime = countingTime;
+    meta.source      = char(filepath);
+    meta.importDate  = datetime('now');
+    meta.parserName  = 'importRigaku_raw';
+    meta.xColumnName = '2-Theta';
+    meta.xColumnUnit = 'deg';
+
+    meta.parserSpecific.numPoints    = numPoints;
+    meta.parserSpecific.startAngle   = startAngle;
+    meta.parserSpecific.endAngle     = endAngle;
+    meta.parserSpecific.stepSize     = stepSize;
+    meta.parserSpecific.countingTime = countingTime;
 
     data = parser.createDataStruct(twoTheta, yValues, ...
         'labels',   {'Intensity'}, ...

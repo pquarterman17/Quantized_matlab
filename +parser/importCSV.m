@@ -70,6 +70,7 @@ function data = importCSV(filepath, options)
         options.TreatAs      (1,1) string  = "auto"
         options.Labels       (1,:) cell    = {}
         options.Units        (1,:) cell    = {}
+        options.Verbose      (1,1) logical = false
     end
 
     % ════════════════════════════════════════════════════════════════
@@ -77,7 +78,7 @@ function data = importCSV(filepath, options)
     % ════════════════════════════════════════════════════════════════
     rawLines = readRawLines(filepath, options.CommentChar);
     if isempty(rawLines)
-        error('importCSV:emptyFile', 'File is empty or contains only comments: %s', filepath);
+        error('parser:importCSV:emptyFile', 'File is empty or contains only comments: %s', filepath);
     end
 
     % ════════════════════════════════════════════════════════════════
@@ -170,7 +171,7 @@ function data = importCSV(filepath, options)
     end
 
     if isempty(dataColIdx)
-        error('importCSV:noDataColumns', ...
+        error('parser:importCSV:noDataColumns', ...
             'No valid numeric data columns found in: %s', filepath);
     end
 
@@ -203,29 +204,43 @@ function data = importCSV(filepath, options)
     % ════════════════════════════════════════════════════════════════
     %  STEP 10: Assemble unified struct
     % ════════════════════════════════════════════════════════════════
-    meta.source     = char(filepath);
-    meta.importDate = datetime('now');
-    meta.delimiter  = char(delim);
-    meta.headerRow  = headerRow;
-    meta.numRawRows = numel(rawLines);
-
-    % X-axis label (used by importAuto summary)
+    % X-axis label (core metadata field)
     if timeColIdx > 0
         rawXHeader = colHeaders{timeColIdx};
         [xUnit, xName] = extractUnitsFromHeader(rawXHeader);
         if isempty(xName), xName = rawXHeader; end
-        meta.xColumnName = xName;
-        meta.xColumnUnit = xUnit;
     else
-        meta.xColumnName = 'Sample Index';
-        meta.xColumnUnit = '';
+        xName = 'Sample Index';
+        xUnit = '';
     end
+
+    % Build allColumnNames / allColumnUnits across ALL columns for parserSpecific
+    allColNames = cell(1, numel(colHeaders));
+    allColUnits = cell(1, numel(colHeaders));
+    for ci = 1:numel(colHeaders)
+        [allColUnits{ci}, allColNames{ci}] = extractUnitsFromHeader(colHeaders{ci});
+        if isempty(allColNames{ci}), allColNames{ci} = colHeaders{ci}; end
+    end
+
+    meta.source      = char(filepath);
+    meta.importDate  = datetime('now');
+    meta.parserName  = 'importCSV';
+    meta.xColumnName = xName;
+    meta.xColumnUnit = xUnit;
+
+    meta.parserSpecific.delimiter      = char(delim);
+    meta.parserSpecific.headerRow      = headerRow;
+    meta.parserSpecific.numRawRows     = numel(rawLines);
+    meta.parserSpecific.allColumnNames = allColNames;
+    meta.parserSpecific.allColumnUnits = allColUnits;
 
     data = parser.createDataStruct(timeVec, valuesMatrix, ...
         'labels', labels, 'units', units, 'metadata', meta);
 
-    fprintf('Imported %d samples x %d channels from %s\n', ...
-        size(valuesMatrix,1), M, filepath);
+    if options.Verbose
+        fprintf('Imported %d samples x %d channels from %s\n', ...
+            size(valuesMatrix,1), M, filepath);
+    end
 end
 
 
@@ -361,7 +376,7 @@ function idx = resolveColumnIndex(spec, colHeaders)
     elseif ischar(spec) || isstring(spec)
         idx = find(strcmpi(colHeaders, spec), 1);
         if isempty(idx)
-            error('importCSV:columnNotFound', ...
+            error('parser:importCSV:columnNotFound', ...
                 'Column "%s" not found. Available: %s', ...
                 spec, strjoin(colHeaders, ', '));
         end

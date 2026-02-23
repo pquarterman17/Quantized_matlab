@@ -87,7 +87,7 @@ function data = importPPMS(filepath, options)
     % ════════════════════════════════════════════════════════════════
     fid = fopen(filepath, 'r');
     if fid == -1
-        error('importPPMS:cannotOpen', 'Cannot open file: %s', filepath);
+        error('parser:importPPMS:cannotOpen', 'Cannot open file: %s', filepath);
     end
     cleanObj = onCleanup(@() fclose(fid));
 
@@ -100,7 +100,7 @@ function data = importPPMS(filepath, options)
     end
 
     if isempty(allLines)
-        error('importPPMS:emptyFile', 'File is empty: %s', filepath);
+        error('parser:importPPMS:emptyFile', 'File is empty: %s', filepath);
     end
 
     % Resolve header row
@@ -115,7 +115,7 @@ function data = importPPMS(filepath, options)
             end
         end
         if headerRowIdx == 0
-            error('importPPMS:noHeader', ...
+            error('parser:importPPMS:noHeader', ...
                 'No non-comment header line found in: %s', filepath);
         end
     else
@@ -140,7 +140,7 @@ function data = importPPMS(filepath, options)
     end
 
     if isempty(rawLines)
-        error('importPPMS:noData', 'No data rows found in: %s', filepath);
+        error('parser:importPPMS:noData', 'No data rows found in: %s', filepath);
     end
 
     % ════════════════════════════════════════════════════════════════
@@ -195,7 +195,7 @@ function data = importPPMS(filepath, options)
     numRows   = size(rawMatrix, 1);
 
     if numRows == 0
-        error('importPPMS:noValidRows', 'No valid numeric rows in: %s', filepath);
+        error('parser:importPPMS:noValidRows', 'No valid numeric rows in: %s', filepath);
     end
 
     % ════════════════════════════════════════════════════════════════
@@ -227,7 +227,7 @@ function data = importPPMS(filepath, options)
     end
 
     if isempty(yColIdx)
-        error('importPPMS:noYColumns', 'No valid y-axis columns found.');
+        error('parser:importPPMS:noYColumns', 'No valid y-axis columns found.');
     end
 
     % ════════════════════════════════════════════════════════════════
@@ -238,16 +238,19 @@ function data = importPPMS(filepath, options)
     labels       = colNames(yColIdx);
     units        = colUnits(yColIdx);
 
-    meta.source          = char(filepath);
-    meta.importDate      = datetime('now');
-    meta.allColumnNames  = colNames;
-    meta.allColumnUnits  = colUnits;
-    meta.xColumnName     = colNames{xColIdx};
-    meta.xColumnUnit     = colUnits{xColIdx};
-    meta.yColumnIndices  = yColIdx;
-    meta.numRawRows      = numel(allLines);
-    meta.headerRow       = headerRowIdx;
-    meta.delimiter       = delim;
+    meta.source      = char(filepath);
+    meta.importDate  = datetime('now');
+    meta.parserName  = 'importPPMS';
+    meta.xColumnName = colNames{xColIdx};
+    meta.xColumnUnit = colUnits{xColIdx};
+
+    meta.parserSpecific.allColumnNames  = colNames;
+    meta.parserSpecific.allColumnUnits  = colUnits;
+    meta.parserSpecific.headerRow       = headerRowIdx;
+    meta.parserSpecific.delimiter       = delim;
+    meta.parserSpecific.numRawRows      = numel(allLines);
+    meta.parserSpecific.xColumnIndex    = xColIdx;
+    meta.parserSpecific.yColumnIndices  = yColIdx;
 
     data = parser.createDataStruct(timeVec, valuesMatrix, ...
         'labels', labels, 'units', units, 'metadata', meta);
@@ -294,7 +297,7 @@ function idx = resolvePPMSColumn(spec, colNames, role)
 
     if isnumeric(spec)
         if spec < 1 || spec > numel(colNames)
-            error('importPPMS:badIndex', ...
+            error('parser:importPPMS:badIndex', ...
                 '%s index %d out of range (1-%d).', role, spec, numel(colNames));
         end
         idx = spec;
@@ -326,7 +329,7 @@ function idx = resolvePPMSColumn(spec, colNames, role)
         return;
     end
 
-    error('importPPMS:columnNotFound', ...
+    error('parser:importPPMS:columnNotFound', ...
         'Cannot find %s column "%s".\nAvailable: %s\nShorthands: field, moment, temp, time, stderr', ...
         role, spec, strjoin(colNames, ', '));
 end

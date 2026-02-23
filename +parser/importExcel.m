@@ -86,14 +86,14 @@ function data = importExcel(filepath, options)
         sheetName = char(options.Sheet);
         sheetIdx  = find(strcmpi(allSheets, sheetName), 1);
         if isempty(sheetIdx)
-            error('importExcel:sheetNotFound', ...
+            error('parser:importExcel:sheetNotFound', ...
                 'Sheet "%s" not found. Available sheets: %s', ...
                 sheetName, strjoin(allSheets, ', '));
         end
     else
         sheetIdx  = options.Sheet;
         if sheetIdx < 1 || sheetIdx > numel(allSheets)
-            error('importExcel:sheetOutOfRange', ...
+            error('parser:importExcel:sheetOutOfRange', ...
                 'Sheet index %d is out of range (1-%d).', ...
                 sheetIdx, numel(allSheets));
         end
@@ -119,7 +119,7 @@ function data = importExcel(filepath, options)
     raw = trimRaw(raw);
 
     if isempty(raw)
-        error('importExcel:emptySheet', ...
+        error('parser:importExcel:emptySheet', ...
             'Sheet "%s" contains no data in file: %s', sheetName, filepath);
     end
 
@@ -178,7 +178,7 @@ function data = importExcel(filepath, options)
     numDataRows = size(dataNumMat, 1);
 
     if numDataRows == 0
-        error('importExcel:noDataRows', ...
+        error('parser:importExcel:noDataRows', ...
             'No numeric data rows found on sheet "%s".', sheetName);
     end
 
@@ -212,7 +212,7 @@ function data = importExcel(filepath, options)
     end
 
     if isempty(dataColIdx)
-        error('importExcel:noDataColumns', ...
+        error('parser:importExcel:noDataColumns', ...
             'No valid numeric data columns found on sheet "%s".', sheetName);
     end
 
@@ -244,25 +244,37 @@ function data = importExcel(filepath, options)
     % ════════════════════════════════════════════════════════════════
     %  STEP 10: Assemble metadata and output struct
     % ════════════════════════════════════════════════════════════════
-    meta.source     = char(filepath);
-    meta.importDate = datetime('now');
-    meta.sheet      = sheetIdx;
-    meta.sheetName  = sheetName;
-    meta.allSheets  = allSheets;
-    meta.headerRow  = headerRow;
-    meta.numRawRows = numDataRows;
-
-    % X-axis label (used by importAuto summary)
+    % X-axis label (core metadata field)
     if timeColIdx > 0
         rawXHeader = colHeaders{timeColIdx};
         [xUnit, xName] = extractUnitsFromHeader(rawXHeader);
         if isempty(xName), xName = rawXHeader; end
-        meta.xColumnName = xName;
-        meta.xColumnUnit = xUnit;
     else
-        meta.xColumnName = 'Sample Index';
-        meta.xColumnUnit = '';
+        xName = 'Sample Index';
+        xUnit = '';
     end
+
+    % Build allColumnNames / allColumnUnits across ALL columns for parserSpecific
+    allColNames = cell(1, nCols);
+    allColUnits = cell(1, nCols);
+    for ci = 1:nCols
+        [allColUnits{ci}, allColNames{ci}] = extractUnitsFromHeader(colHeaders{ci});
+        if isempty(allColNames{ci}), allColNames{ci} = colHeaders{ci}; end
+    end
+
+    meta.source      = char(filepath);
+    meta.importDate  = datetime('now');
+    meta.parserName  = 'importExcel';
+    meta.xColumnName = xName;
+    meta.xColumnUnit = xUnit;
+
+    meta.parserSpecific.sheet          = sheetIdx;
+    meta.parserSpecific.sheetName      = sheetName;
+    meta.parserSpecific.allSheets      = allSheets;
+    meta.parserSpecific.headerRow      = headerRow;
+    meta.parserSpecific.numRawRows     = numDataRows;
+    meta.parserSpecific.allColumnNames = allColNames;
+    meta.parserSpecific.allColumnUnits = allColUnits;
 
     data = parser.createDataStruct(timeVec, valuesMatrix, ...
         'labels', labels, 'units', units, 'metadata', meta);
@@ -332,7 +344,7 @@ function idx = resolveColumnIndex(spec, colHeaders)
     elseif ischar(spec) || isstring(spec)
         idx = find(strcmpi(colHeaders, spec), 1);
         if isempty(idx)
-            error('importExcel:columnNotFound', ...
+            error('parser:importExcel:columnNotFound', ...
                 'Column "%s" not found. Available: %s', ...
                 spec, strjoin(colHeaders, ', '));
         end

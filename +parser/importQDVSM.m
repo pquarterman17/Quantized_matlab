@@ -85,7 +85,7 @@ function data = importQDVSM(filepath, options)
         options.XAxis            = ''
         options.YAxis            = ''
         options.IncludeRaw (1,1) logical = false
-        options.Verbose    (1,1) logical = true
+        options.Verbose    (1,1) logical = false
     end
 
     % Handle XAxis/YAxis aliases
@@ -106,7 +106,7 @@ function data = importQDVSM(filepath, options)
     % ════════════════════════════════════════════════════════════════
     fid = fopen(filepath, 'r');
     if fid == -1
-        error('importQDVSM:cannotOpen', 'Cannot open file: %s', filepath);
+        error('parser:importQDVSM:cannotOpen', 'Cannot open file: %s', filepath);
     end
     cleanObj = onCleanup(@() fclose(fid));
 
@@ -187,7 +187,7 @@ function data = importQDVSM(filepath, options)
     end
 
     if dataStartLine == 0
-        error('importQDVSM:noData', ...
+        error('parser:importQDVSM:noData', ...
             '[Data] section not found in file: %s', filepath);
     end
 
@@ -240,7 +240,7 @@ function data = importQDVSM(filepath, options)
     numRows = size(rawMatrix, 1);
 
     if numRows == 0
-        error('importQDVSM:noRows', 'No valid data rows in file: %s', filepath);
+        error('parser:importQDVSM:noRows', 'No valid data rows in file: %s', filepath);
     end
 
     % ════════════════════════════════════════════════════════════════
@@ -280,7 +280,7 @@ function data = importQDVSM(filepath, options)
     end
 
     if isempty(yColIdx)
-        error('importQDVSM:noYCols', 'No valid data columns resolved.');
+        error('parser:importQDVSM:noYCols', 'No valid data columns resolved.');
     end
 
     % ════════════════════════════════════════════════════════════════
@@ -292,14 +292,16 @@ function data = importQDVSM(filepath, options)
     labels = colNames(yColIdx);
     units  = colUnits(yColIdx);
 
-    % Build metadata
-    meta = headerInfo;
-    meta.source     = char(filepath);
-    meta.importDate = datetime('now');
+    % Build metadata — core fields at top level, parser-specific in sub-struct
+    meta.source      = char(filepath);
+    meta.importDate  = datetime('now');
+    meta.parserName  = 'importQDVSM';
     meta.xColumnName = colNames{xColIdx};
     meta.xColumnUnit = colUnits{xColIdx};
-    meta.xColumnIndex = xColIdx;
-    meta.yColumnIndices = yColIdx;
+
+    meta.parserSpecific              = headerInfo;   % title, app, instrument, dataTypes, allColumnNames/Units, startupAxisX/Y
+    meta.parserSpecific.xColumnIndex = xColIdx;
+    meta.parserSpecific.yColumnIndices = yColIdx;
 
     data = parser.createDataStruct(timeVec, valuesMatrix, ...
         'labels', labels, 'units', units, 'metadata', meta);
@@ -366,7 +368,7 @@ function idx = resolveQDColumn(spec, colNames, label)
     % Handle numeric index
     if isnumeric(spec)
         if spec < 1 || spec > numel(colNames)
-            error('importQDVSM:badIndex', ...
+            error('parser:importQDVSM:badIndex', ...
                 '%s column index %d is out of range (1-%d).', ...
                 label, spec, numel(colNames));
         end
@@ -421,7 +423,7 @@ function idx = resolveQDColumn(spec, colNames, label)
     % ── Failed ───────────────────────────────────────────────────
     % Build helpful error message
     validNames = colNames(~cellfun('isempty', colNames));
-    error('importQDVSM:columnNotFound', ...
+    error('parser:importQDVSM:columnNotFound', ...
         'Cannot resolve %s column "%s".\nAvailable columns:\n  %s\n\nShorthands: field, moment, temp, time, stderr, mass, pressure', ...
         label, spec, strjoin(validNames, '\n  '));
 end
