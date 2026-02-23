@@ -432,45 +432,51 @@ function dataImportGUI()
         'Tooltip','Detected peaks — select a row to highlight it on the plot');
     peakTable.Layout.Column = 1;
 
-    peakBtnGL = uigridlayout(peakGL,[7 1], ...
-        'RowHeight',    {32,32,32,32,22,32,'1x'}, ...
+    peakBtnGL = uigridlayout(peakGL,[8 1], ...
+        'RowHeight',    {22,32,32,32,32,22,32,'1x'}, ...
         'Padding',      [0 0 0 0], ...
         'RowSpacing',   4);
     peakBtnGL.Layout.Column = 2;
 
-    btnFitPeaks = uibutton(peakBtnGL,'Text','Fit Peaks (Lorentzian)', ...
+    ddFitModel = uidropdown(peakBtnGL, ...
+        'Items',   {'Lorentzian', 'Gaussian'}, ...
+        'Value',   'Lorentzian', ...
+        'Tooltip', 'Peak shape model used by Fit Peaks');
+    ddFitModel.Layout.Row = 1;
+
+    btnFitPeaks = uibutton(peakBtnGL,'Text','Fit Peaks', ...
         'ButtonPushedFcn',@onFitPeaks, ...
         'BackgroundColor',[0.15 0.37 0.63],'FontColor',[1 1 1], ...
-        'Tooltip','Fit a Lorentzian to each listed peak and extract precise center and FWHM');
-    btnFitPeaks.Layout.Row = 1;
+        'Tooltip','Fit the selected model to each listed peak and extract precise center and FWHM');
+    btnFitPeaks.Layout.Row = 2;
 
     btnClearPeaks = uibutton(peakBtnGL,'Text','Clear All Peaks', ...
         'ButtonPushedFcn',@onClearPeaks, ...
         'Tooltip','Remove all peaks for the active dataset');
-    btnClearPeaks.Layout.Row = 2;
+    btnClearPeaks.Layout.Row = 3;
 
     btnRemovePeak = uibutton(peakBtnGL,'Text','Remove Selected', ...
         'ButtonPushedFcn',@onRemoveSelectedPeak, ...
         'Tooltip','Remove the currently highlighted peak from the list');
-    btnRemovePeak.Layout.Row = 3;
+    btnRemovePeak.Layout.Row = 4;
 
     btnSavePeaks = uibutton(peakBtnGL,'Text','Export Summary CSV', ...
         'ButtonPushedFcn',@onSavePeakSummary, ...
         'BackgroundColor',[0.30 0.30 0.60],'FontColor',[1 1 1], ...
         'Tooltip','Save peak centers and FWHM values to a CSV file');
-    btnSavePeaks.Layout.Row = 4;
+    btnSavePeaks.Layout.Row = 5;
 
     chkShowFit = uicheckbox(peakBtnGL, ...
         'Text',              'Show fit curves', ...
         'Value',             true, ...
-        'Tooltip',           'Overlay Lorentzian fit curves on the plot', ...
+        'Tooltip',           'Overlay fit curves on the plot', ...
         'ValueChangedFcn',   @onToggleFitCurves);
-    chkShowFit.Layout.Row = 5;
+    chkShowFit.Layout.Row = 6;
 
     btnFitColor = uibutton(peakBtnGL, 'Text', 'Fit curve color...', ...
-        'Tooltip',           'Pick the color used for Lorentzian fit overlays', ...
+        'Tooltip',           'Pick the color used for fit curve overlays', ...
         'ButtonPushedFcn',   @onPickFitColor);
-    btnFitColor.Layout.Row = 6;
+    btnFitColor.Layout.Row = 7;
     btnFitColor.BackgroundColor = appData.fitCurveColor;
 
     % ════════════════════════════════════════════════════════════════════
@@ -500,20 +506,53 @@ function dataImportGUI()
         nLoaded = 0;
         for fi = 1:numel(fnames)
             fp = fullfile(fpath, fnames{fi});
+            [~, fnBase, fExt] = fileparts(fp);
+
+            % ── Excel: offer sheet selection when file has multiple sheets ──
+            excelExts = {'.xlsx','.xls','.xlsm','.xlsb','.ods'};
+            if any(strcmpi(fExt, excelExts))
+                try
+                    allSheetNames = sheetnames(fp);
+                catch
+                    allSheetNames = {'Sheet1'};
+                end
+                if numel(allSheetNames) > 1
+                    selIdx = listdlg( ...
+                        'PromptString', {sprintf('Sheets in  %s:', [fnBase fExt]), ...
+                                         'Select sheets to import:'}, ...
+                        'ListString',   allSheetNames, ...
+                        'SelectionMode','multiple', ...
+                        'InitialValue', 1:numel(allSheetNames), ...
+                        'Name',         'Import Excel Sheets', ...
+                        'ListSize',     [220 160]);
+                    if isempty(selIdx), continue; end   % user cancelled this file
+                    selectedSheets = allSheetNames(selIdx);
+                else
+                    selectedSheets = allSheetNames;
+                end
+                for si = 1:numel(selectedSheets)
+                    shName = selectedSheets{si};
+                    try
+                        data       = parser.importExcel(fp, 'Sheet', shName);
+                        parserName = 'importExcel';
+                        ds = buildDs(fp, data, parserName);
+                        ds.displayName = sprintf('%s%s [%s]', fnBase, fExt, shName);
+                        appData.datasets{end+1} = ds;
+                        nLoaded = nLoaded + 1;
+                    catch ME
+                        fprintf(2, '\n[dataImportGUI] Import error (%s [%s]): %s\n', ...
+                            fnBase, shName, ME.message);
+                        uialert(fig, sprintf('%s [%s]\n\n%s', fnBase, shName, ME.message), ...
+                            'Import error');
+                    end
+                end
+                continue   % skip normal single-parser path
+            end
+
+            % ── Normal single-parser import ──────────────────────────────
             try
                 [data, parserName] = guiImport(fp);
-                ds.data       = data;
-                ds.filepath   = fp;
-                ds.parserName = parserName;
-                ds.corrData   = [];
-                ds.xOff       = 0;
-                ds.yOff       = 0;
-                ds.bgSlope    = 0;
-                ds.bgInt      = 0;
-                ds.peaks      = struct('center',{},'fwhm',{},'height',{}, ...
-                                       'xRange',{},'status',{},'bg',{});
-                ds.axLims     = struct('xMin','','xMax','','xStep','', ...
-                                       'yMin','','yMax','','yStep','');
+                ds = buildDs(fp, data, parserName);
                 appData.datasets{end+1} = ds;
                 nLoaded = nLoaded + 1;
             catch ME
@@ -608,8 +647,13 @@ function dataImportGUI()
         end
         items = cell(1, N);
         for i = 1:N
-            [~, fn, fext] = fileparts(appData.datasets{i}.filepath);
-            items{i} = sprintf('[%d]  %s%s', i, fn, fext);
+            dsI = appData.datasets{i};
+            if isfield(dsI,'displayName') && ~isempty(dsI.displayName)
+                items{i} = sprintf('[%d]  %s', i, dsI.displayName);
+            else
+                [~, fn, fext] = fileparts(dsI.filepath);
+                items{i} = sprintf('[%d]  %s%s', i, fn, fext);
+            end
         end
         lbDatasets.Items     = items;
         lbDatasets.ItemsData = num2cell(1:N);
@@ -681,8 +725,7 @@ function dataImportGUI()
         % Y listbox: rebuild; keep any channels that exist in this dataset
         lbY.Items = d.labels;
         if ~isempty(d.labels)
-            curSel = lbY.Value;
-            if ischar(curSel) || isstring(curSel), curSel = cellstr(curSel); end
+            curSel = ensureCell(lbY.Value);
             validSel = curSel(ismember(curSel, d.labels));
             if isempty(validSel)
                 lbY.Value = d.labels(1);
@@ -913,8 +956,7 @@ function dataImportGUI()
             idx2 = find(strcmp(d.labels, xSel), 1);
             xv   = guiTernary(isempty(idx2), double(d.time), d.values(:,idx2));
         end
-        ySel = lbY.Value;
-        if ischar(ySel) || isstring(ySel), ySel = cellstr(ySel); end
+        ySel = ensureCell(lbY.Value);
         yIdx = find(strcmp(d.labels, ySel{1}), 1);
         if isempty(yIdx)
             uialert(fig,'Could not find selected Y channel.','Auto Peaks'); return;
@@ -927,6 +969,10 @@ function dataImportGUI()
         end
         xSpan = diff([min(xv), max(xv)]);
 
+        PEAK_MIN_PROM_FRAC  = 0.05;   % min prominence as fraction of y-range
+        PEAK_SEP_TOL_FRAC   = 0.005;  % seeds closer than this fraction of x-span are merged
+        PEAK_LOCAL_WIN_FRAC = 0.02;   % ±fraction of x-span for missed-seed local search
+
         % ── Save existing manual seeds BEFORE rebuilding the list ─────────
         if ~isempty(ds.peaks) && isfield(ds.peaks, 'status')
             isManual     = strcmp({ds.peaks.status}, 'manual');
@@ -937,7 +983,7 @@ function dataImportGUI()
         end
 
         % ── Pass 1: global auto-detection ────────────────────────────────
-        minProm = (max(yv) - min(yv)) * 0.05;   % 5% of y-range
+        minProm = (max(yv) - min(yv)) * PEAK_MIN_PROM_FRAC;
         try
             [pkH, pkX, pkW, ~] = findpeaks(yv, xv, ...
                 'MinPeakProminence', minProm, ...
@@ -947,7 +993,7 @@ function dataImportGUI()
         end
 
         % Build initial merged list from auto results
-        merged = struct('center',{},'fwhm',{},'height',{},'xRange',{},'status',{},'bg',{});
+        merged = struct('center',{},'fwhm',{},'height',{},'xRange',{},'status',{},'bg',{},'model',{});
         for pi = 1:numel(pkX)
             newPk.center = pkX(pi);
             newPk.fwhm   = pkW(pi);
@@ -955,13 +1001,14 @@ function dataImportGUI()
             newPk.xRange = [];
             newPk.status = 'auto';
             newPk.bg     = NaN;
+            newPk.model  = '';
             merged(end+1) = newPk;  %#ok<AGROW>
         end
 
         % ── Pass 2: force local search at missed manual seeds ─────────────
         % "Missed" = no auto peak within minSep of the seed's centre.
-        minSep  = xSpan * 0.005;   % 0.5 % of x-span  — duplicate tolerance
-        halfWin = xSpan * 0.02;    % ±2 % of x-span  — local search window
+        minSep  = xSpan * PEAK_SEP_TOL_FRAC;
+        halfWin = xSpan * PEAK_LOCAL_WIN_FRAC;
 
         for si = 1:numel(manualSeeds)
             seedX = manualSeeds(si).center;
@@ -1001,6 +1048,7 @@ function dataImportGUI()
             newPk.xRange = [];
             newPk.status = 'manual';   % retains 'manual' — forced by seed
             newPk.bg     = NaN;
+            newPk.model  = '';
             merged(end+1) = newPk;  %#ok<AGROW>
         end
 
@@ -1062,8 +1110,7 @@ function dataImportGUI()
             idx2 = find(strcmp(d.labels, xSel), 1);
             xv   = guiTernary(isempty(idx2), double(d.time), d.values(:,idx2));
         end
-        ySel = lbY.Value;
-        if ischar(ySel) || isstring(ySel), ySel = cellstr(ySel); end
+        ySel = ensureCell(lbY.Value);
         yIdx = find(strcmp(d.labels, ySel{1}), 1);
         if isempty(yIdx), return; end
         yv = d.values(:, yIdx);
@@ -1086,6 +1133,7 @@ function dataImportGUI()
         newPk.xRange = [];
         newPk.status = 'manual';
         newPk.bg     = NaN;
+        newPk.model  = '';
         ds.peaks(end+1) = newPk;
         appData.datasets{appData.activeIdx} = ds;
 
@@ -1117,8 +1165,7 @@ function dataImportGUI()
             idx2 = find(strcmp(d.labels, xSel), 1);
             xv   = guiTernary(isempty(idx2), double(d.time), d.values(:,idx2));
         end
-        ySel = lbY.Value;
-        if ischar(ySel) || isstring(ySel), ySel = cellstr(ySel); end
+        ySel = ensureCell(lbY.Value);
         yIdx = find(strcmp(d.labels, ySel{1}), 1);
         if isempty(yIdx), uialert(fig,'Could not find Y channel.','Fit Peaks'); return; end
         yv = d.values(:, yIdx);
@@ -1127,8 +1174,19 @@ function dataImportGUI()
         xv = xv(valid);  yv = yv(valid);
         xSpan = diff([min(xv), max(xv)]);
 
-        lorentzFun = @(p,x) p(1) ./ (1 + 4.*((x - p(2))./p(3)).^2) + p(4);
-        opts       = optimset('Display','off','MaxIter',8000,'TolX',1e-10,'TolFun',1e-14);
+        FIT_HALFWIDTH_MULT  = 3.0;    % fit window = ±(this × FWHM)
+        FIT_FALLBACK_WIN    = 0.03;   % fallback half-window as fraction of x-span
+        FIT_INIT_WIDTH_FRAC = 0.3;    % initial FWHM guess: this × window width
+        FIT_MAX_FWHM_FRAC   = 0.5;    % reject fit if FWHM exceeds this × x-span
+        FIT_EXPAND_WIN      = 0.025;  % expanded window fraction when < 5 pts in window
+
+        switch ddFitModel.Value
+            case 'Gaussian'
+                modelFun = @(p,x) p(1) .* exp(-4.*log(2).*((x-p(2))./p(3)).^2) + p(4);
+            otherwise  % 'Lorentzian' (default)
+                modelFun = @(p,x) p(1) ./ (1 + 4.*((x - p(2))./p(3)).^2) + p(4);
+        end
+        opts = optimset('Display','off','MaxIter',8000,'TolX',1e-10,'TolFun',1e-14);
 
         nFailed = 0;
         for pi = 1:numel(ds.peaks)
@@ -1138,41 +1196,42 @@ function dataImportGUI()
             if ~isempty(pk.xRange) && numel(pk.xRange) == 2
                 xLo = pk.xRange(1);  xHi = pk.xRange(2);
             elseif ~isnan(pk.fwhm) && pk.fwhm > 0
-                hw   = 3.0 * pk.fwhm;
+                hw   = FIT_HALFWIDTH_MULT * pk.fwhm;
                 xLo  = pk.center - hw;
                 xHi  = pk.center + hw;
             else
-                hw   = xSpan * 0.03;
+                hw   = xSpan * FIT_FALLBACK_WIN;
                 xLo  = pk.center - hw;
                 xHi  = pk.center + hw;
             end
 
             inWin = xv >= xLo & xv <= xHi;
             if sum(inWin) < 5
-                % Expand to 5% of span
-                inWin = xv >= (pk.center - xSpan*0.025) & ...
-                        xv <= (pk.center + xSpan*0.025);
+                % Expand window
+                inWin = xv >= (pk.center - xSpan*FIT_EXPAND_WIN) & ...
+                        xv <= (pk.center + xSpan*FIT_EXPAND_WIN);
             end
             if sum(inWin) < 4, nFailed = nFailed + 1; continue; end
 
             xFit = xv(inWin);  yFit = yv(inWin);
             [H0, maxI] = max(yFit);
             x0_0  = xFit(maxI);
-            fw0   = max(diff([min(xFit), max(xFit)]) * 0.3, (xFit(2)-xFit(1))*2);
+            fw0   = max(diff([min(xFit), max(xFit)]) * FIT_INIT_WIDTH_FRAC, (xFit(2)-xFit(1))*2);
             bg0   = min(yFit);
 
-            objFun = @(p) sum((lorentzFun(p, xFit) - yFit).^2);
+            objFun = @(p) sum((modelFun(p, xFit) - yFit).^2);
             try
                 pFit = fminsearch(objFun, [H0, x0_0, fw0, bg0], opts);
                 fwhmFit = abs(pFit(3));
                 % Accept only if center is inside fit window and fwhm is sane
                 if pFit(2) >= xLo && pFit(2) <= xHi && ...
-                   fwhmFit > 0     && fwhmFit < xSpan * 0.5
+                   fwhmFit > 0     && fwhmFit < xSpan * FIT_MAX_FWHM_FRAC
                     ds.peaks(pi).center = pFit(2);
                     ds.peaks(pi).fwhm   = fwhmFit;
                     ds.peaks(pi).height = pFit(1);   % amplitude H above background
                     ds.peaks(pi).bg     = pFit(4);   % background level at peak
                     ds.peaks(pi).status = 'fitted';
+                    ds.peaks(pi).model  = ddFitModel.Value;
                 else
                     nFailed = nFailed + 1;
                 end
@@ -1195,7 +1254,7 @@ function dataImportGUI()
     function onClearPeaks(~,~)
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
         ds       = appData.datasets{appData.activeIdx};
-        ds.peaks = struct('center',{},'fwhm',{},'height',{},'xRange',{},'status',{},'bg',{});
+        ds.peaks = struct('center',{},'fwhm',{},'height',{},'xRange',{},'status',{},'bg',{},'model',{});
         appData.datasets{appData.activeIdx} = ds;
         appData.selectedPeakIdx = 0;
         refreshPeakTable();
@@ -1512,8 +1571,7 @@ function dataImportGUI()
         d       = appData.datasets{appData.activeIdx}.data;
         xVecRaw = appData.bgXVecRaw;
 
-        ySel = lbY.Value;
-        if ischar(ySel) || isstring(ySel), ySel = cellstr(ySel); end
+        ySel = ensureCell(lbY.Value);
 
         xPool = [];
         yPool = [];
@@ -1593,8 +1651,7 @@ function dataImportGUI()
         end
 
         % ── Snap to nearest plotted point ─────────────────────────────────
-        ySel = lbY.Value;
-        if ischar(ySel) || isstring(ySel), ySel = cellstr(ySel); end
+        ySel = ensureCell(lbY.Value);
 
         xRange = max(diff(ax.XLim), eps);
         yRange = max(diff(ax.YLim), eps);
@@ -1732,8 +1789,7 @@ function dataImportGUI()
             xUnit  = guiXUnit(activeDs.data.metadata);
             xLabel = guiLabel(xName, xUnit);
 
-            ySel = lbY.Value;
-            if ischar(ySel) || isstring(ySel), ySel = cellstr(ySel); end
+            ySel = ensureCell(lbY.Value);
             nY = numel(ySel);
 
             % ── Colour allocation ─────────────────────────────────────────
@@ -1870,6 +1926,16 @@ function dataImportGUI()
             yMaxV  = str2double(efYMax.Value);
             yStepV = str2double(efYStep.Value);
 
+            % Highlight invalid limit pairs (both parsed but min >= max)
+            xLimsInvalid = ~isnan(xMinV) && ~isnan(xMaxV) && xMinV >= xMaxV;
+            yLimsInvalid = ~isnan(yMinV) && ~isnan(yMaxV) && yMinV >= yMaxV;
+            warnColor  = [1.00 0.88 0.88];
+            clearColor = [1.00 1.00 1.00];
+            efXMin.BackgroundColor = guiTernary(xLimsInvalid, warnColor, clearColor);
+            efXMax.BackgroundColor = guiTernary(xLimsInvalid, warnColor, clearColor);
+            efYMin.BackgroundColor = guiTernary(yLimsInvalid, warnColor, clearColor);
+            efYMax.BackgroundColor = guiTernary(yLimsInvalid, warnColor, clearColor);
+
             if ~isnan(xMinV) && ~isnan(xMaxV) && xMinV < xMaxV
                 targetAx.XLim = [xMinV, xMaxV];
             end
@@ -1921,8 +1987,15 @@ function dataImportGUI()
                                 gxHi = pk.center + 3*pk.fwhm;
                             end
                             xFitPlot = linspace(gxLo, gxHi, 300);
-                            yFitPlot = pk.height ./ ...
-                                (1 + 4.*((xFitPlot - pk.center)./pk.fwhm).^2) + pk.bg;
+                            pkModel = '';
+                            if isfield(pk,'model'), pkModel = pk.model; end
+                            if strcmp(pkModel, 'Gaussian')
+                                yFitPlot = pk.height .* ...
+                                    exp(-4.*log(2).*((xFitPlot-pk.center)./pk.fwhm).^2) + pk.bg;
+                            else   % Lorentzian (default)
+                                yFitPlot = pk.height ./ ...
+                                    (1 + 4.*((xFitPlot - pk.center)./pk.fwhm).^2) + pk.bg;
+                            end
 
                             isSel = (pi == appData.selectedPeakIdx);
                             plot(targetAx, xFitPlot, yFitPlot, '-', ...
@@ -2057,6 +2130,24 @@ function [pkX, pkH, pkW] = simplePeakFind(xv, yv, minProm)
     pkW = ones(size(pkX)) * diff([min(xv) max(xv)]) * 0.02;
 end
 
+function ds = buildDs(fp, data, parserName)
+%BUILDDS  Assemble the standard dataset struct from a parsed data struct.
+    ds.data        = data;
+    ds.filepath    = fp;
+    ds.parserName  = parserName;
+    ds.displayName = '';          % '' = use filepath-derived name in rebuildDatasetList
+    ds.corrData    = [];
+    ds.xOff        = 0;
+    ds.yOff        = 0;
+    ds.bgSlope     = 0;
+    ds.bgInt       = 0;
+    ds.peaks       = struct('center',{},'fwhm',{},'height',{}, ...
+                            'xRange',{},'status',{},'bg',{},'model',{});
+    ds.axLims      = struct('xMin','','xMax','','xStep','', ...
+                            'yMin','','yMax','','yStep','');
+end
+
+
 function [data, parserName] = guiImport(fp)
 %GUIIMPORT  Dispatch to the correct parser and return both data and parser name.
     [~,~,ext] = fileparts(fp);
@@ -2099,8 +2190,6 @@ end
 function name = guiXName(meta)
     if isfield(meta,'xColumnName') && ~isempty(meta.xColumnName)
         name = meta.xColumnName;
-    elseif isfield(meta,'startAngle')
-        name = '2-Theta';
     else
         name = 'X';
     end
@@ -2108,10 +2197,8 @@ end
 
 
 function u = guiXUnit(meta)
-    if isfield(meta,'xColumnUnit')
+    if isfield(meta,'xColumnUnit') && ~isempty(meta.xColumnUnit)
         u = meta.xColumnUnit;
-    elseif isfield(meta,'startAngle')
-        u = 'deg';
     else
         u = '';
     end
@@ -2154,6 +2241,16 @@ end
 
 function v = guiTernary(cond, a, b)
     if cond, v = a; else, v = b; end
+end
+
+
+function c = ensureCell(v)
+%ENSURECELL  Wrap a char/string scalar in a cell array; pass cell arrays through.
+    if ischar(v) || isstring(v)
+        c = cellstr(v);
+    else
+        c = v;
+    end
 end
 
 
@@ -2204,62 +2301,58 @@ end
 
 
 function out = guiMetaLines(d, parserName, fp)
-%GUIMETALINES Build metadata summary lines, with parser-specific sections.
+%GUIMETALINES Build metadata summary lines using the unified metadata schema.
     [~,fn,ex] = fileparts(fp);
     m   = d.metadata;
     out = {};
 
-    % ── Header ───────────────────────────────────────────────────────
+    % ── Core fields ────────────────────────────────────────────────────
     out{end+1} = sprintf('File:    %s%s', fn, ex);
     out{end+1} = sprintf('Parser:  %s  [%s]', guiParserLabel(parserName), parserName);
 
-    % ── Parser-specific info ──────────────────────────────────────────
-    switch parserName
+    xName = guiXName(m);
+    xUnit = guiXUnit(m);
+    if ~isempty(xUnit)
+        out{end+1} = sprintf('X axis:  %s (%s)', xName, xUnit);
+    else
+        out{end+1} = sprintf('X axis:  %s', xName);
+    end
 
-        case 'importRigaku_raw'
-            out{end+1} = sprintf('Points:  %d', m.numPoints);
-            out{end+1} = sprintf('Start:   %.4g deg', m.startAngle);
-            out{end+1} = sprintf('End:     %.4g deg', m.endAngle);
-            out{end+1} = sprintf('Step:    %.4g deg', m.stepSize);
-            out{end+1} = sprintf('Count:   %.4g s/step', m.countingTime);
-
-        case 'importExcel'
-            if isfield(m,'sheetName')
-                if isfield(m,'allSheets') && numel(m.allSheets) > 1
-                    out{end+1} = sprintf('Sheet:   %s  (%d of %d)', ...
-                        m.sheetName, m.sheet, numel(m.allSheets));
-                else
-                    out{end+1} = sprintf('Sheet:   %s', m.sheetName);
+    % ── Parser-specific fields ─────────────────────────────────────────
+    if isfield(m, 'parserSpecific')
+        ps = m.parserSpecific;
+        out{end+1} = '---';
+        psFields = fieldnames(ps);
+        for fi = 1:numel(psFields)
+            fname = psFields{fi};
+            val   = ps.(fname);
+            % Scalar numeric or short char
+            if isnumeric(val) && isscalar(val)
+                out{end+1} = sprintf('%-14s %g', [fname ':'], val);
+            elseif (ischar(val) || (isstring(val) && isscalar(val))) && ~isempty(val)
+                out{end+1} = sprintf('%-14s %s', [fname ':'], char(val));
+            elseif iscell(val) && ~isempty(val) && numel(val) <= 4
+                out{end+1} = sprintf('%-14s %s', [fname ':'], strjoin(val, ', '));
+            elseif isstruct(val)
+                % Sub-struct: show up to 4 scalar fields
+                subFn = fieldnames(val);
+                out{end+1} = sprintf('%s:', fname);
+                shown = 0;
+                for sfi = 1:numel(subFn)
+                    sv = val.(subFn{sfi});
+                    if (ischar(sv) || (isnumeric(sv) && isscalar(sv))) && shown < 4
+                        out{end+1} = sprintf('  %-12s %s', [subFn{sfi} ':'], num2str(sv));
+                        shown = shown + 1;
+                    end
+                end
+            elseif iscell(val) && ~isempty(val)
+                % Cell array (allColumnNames etc.) — list items
+                out{end+1} = sprintf('%s  (%d):', fname, numel(val));
+                for ci = 1:numel(val)
+                    out{end+1} = sprintf('  %s', val{ci});
                 end
             end
-
-        case 'importCSV'
-            if isfield(m,'delimiter')
-                out{end+1} = sprintf('Delim:   %s', delimLabel(m.delimiter));
-            end
-
-        case 'importQDVSM'
-            if isfield(m,'title') && ~isempty(m.title)
-                out{end+1} = sprintf('Title:   %s', m.title);
-            end
-            if isfield(m,'fileOpenDate') && ~isempty(m.fileOpenDate)
-                if isfield(m,'fileOpenTimeStr')
-                    out{end+1} = sprintf('Date:    %s  %s', m.fileOpenDate, m.fileOpenTimeStr);
-                else
-                    out{end+1} = sprintf('Date:    %s', m.fileOpenDate);
-                end
-            end
-            if isfield(m,'app') && ~isempty(m.app)
-                out{end+1} = sprintf('App:     %s', m.app);
-            end
-            if isfield(m,'instrument') && isstruct(m.instrument)
-                fn2 = fieldnames(m.instrument);
-                for fi = 1:min(3, numel(fn2))
-                    out{end+1} = sprintf('  %s: %s', fn2{fi}, m.instrument.(fn2{fi}));
-                end
-            end
-
-        % importPPMS: no extra header info beyond what's shown below
+        end
     end
 
     % ── Summary counts ────────────────────────────────────────────────
@@ -2269,9 +2362,7 @@ function out = guiMetaLines(d, parserName, fp)
 
     % ── X-axis range ─────────────────────────────────────────────────
     out{end+1} = '---';
-    xName = guiXName(m);
-    xUnit = guiXUnit(m);
-    xLbl  = guiLabel(xName, xUnit);
+    xLbl = guiLabel(xName, xUnit);
     if isdatetime(d.time)
         out{end+1} = sprintf('X: %s  (datetime)', xLbl);
     else
@@ -2279,22 +2370,6 @@ function out = guiMetaLines(d, parserName, fp)
         if ~isempty(t)
             out{end+1} = sprintf('X: %s', xLbl);
             out{end+1} = sprintf('   [%.4g, %.4g]', min(t), max(t));
-        end
-    end
-
-    % ── All columns available in file (QDVSM / PPMS) ─────────────────
-    if isfield(m,'allColumnNames') && numel(m.allColumnNames) > 0
-        out{end+1} = '';
-        out{end+1} = 'All file columns:';
-        allCols  = m.allColumnNames;
-        allUnits = {};
-        if isfield(m,'allColumnUnits'), allUnits = m.allColumnUnits; end
-        for k = 1:numel(allCols)
-            if k <= numel(allUnits) && ~isempty(allUnits{k})
-                out{end+1} = sprintf('  %s (%s)', allCols{k}, allUnits{k});
-            else
-                out{end+1} = sprintf('  %s', allCols{k});
-            end
         end
     end
 
