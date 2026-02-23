@@ -238,8 +238,93 @@ end
 if isfile(tmpXlsx), delete(tmpXlsx); end
 
 % ════════════════════════════════════════════════════════════════════════
+%  7. importXRDML  –  PANalytical .xrdml file
+% ════════════════════════════════════════════════════════════════════════
+XRDML_FILE = 'C:\Users\patri\Downloads\La2NiO4_1.xrdml';
+fprintf('\n══ TEST 7: parser.importXRDML ══\n');
+if ~isfile(XRDML_FILE)
+    fprintf('  SKIP – XRDML_FILE not found. Update XRDML_FILE at top of script to enable.\n');
+else
+    try
+        % ── 7a: default (cps output, Verbose summary) ────────────────────
+        d = parser.importXRDML(XRDML_FILE, Intensity='cps', Verbose=true);
+
+        assert(isstruct(d),                        'output must be a struct');
+        assert(isfield(d, 'time'),                 'missing field: time');
+        assert(isfield(d, 'values'),               'missing field: values');
+        assert(isfield(d, 'labels'),               'missing field: labels');
+        assert(isfield(d, 'units'),                'missing field: units');
+        assert(isfield(d, 'metadata'),             'missing field: metadata');
+        assert(~isempty(d.time),                   '2θ vector is empty');
+        assert(size(d.values, 2) == 1,             'expected exactly 1 intensity channel');
+        assert(strcmp(d.units{1}, 'cps'),          'default Intensity=cps should yield units "cps"');
+
+        % Metadata scalar fields (should be directly on metadata, not nested)
+        assert(isfield(d.metadata, 'startAngle'),  'missing metadata.startAngle');
+        assert(isfield(d.metadata, 'endAngle'),    'missing metadata.endAngle');
+        assert(isfield(d.metadata, 'stepSize'),    'missing metadata.stepSize');
+        assert(isfield(d.metadata, 'countingTime'),'missing metadata.countingTime');
+        assert(isfield(d.metadata, 'numPoints'),   'missing metadata.numPoints');
+        assert(strcmp(d.metadata.xColumnName, '2-Theta'), 'xColumnName should be "2-Theta"');
+        assert(strcmp(d.metadata.xColumnUnit, 'deg'),     'xColumnUnit should be "deg"');
+        assert(strcmp(d.metadata.parserName, 'importXRDML'), 'parserName wrong');
+
+        % Sanity-check geometry: 2θ range and point count
+        assert(d.metadata.startAngle > 0,          'startAngle should be positive');
+        assert(d.metadata.endAngle > d.metadata.startAngle, 'endAngle must exceed startAngle');
+        assert(d.metadata.stepSize  > 0,           'stepSize should be positive');
+        assert(d.metadata.numPoints == numel(d.time), 'numPoints mismatch with time vector');
+
+        % parserSpecific instrument fields
+        ps = d.metadata.parserSpecific;
+        assert(isstruct(ps),                       'parserSpecific must be a struct');
+        assert(isfield(ps, 'wavelength'),          'missing parserSpecific.wavelength');
+        assert(isfield(ps, 'anodeMaterial'),       'missing parserSpecific.anodeMaterial');
+        assert(isfield(ps, 'detectorName'),        'missing parserSpecific.detectorName');
+        assert(isfield(ps, 'comments'),            'missing parserSpecific.comments');
+        assert(~isnan(ps.wavelength.kAlpha1),      'kAlpha1 should be a number');
+
+        fprintf('  Points        : %d\n',   numel(d.time));
+        fprintf('  2\xB0 range     : %.4f to %.4f deg\n', d.metadata.startAngle, d.metadata.endAngle);
+        fprintf('  Step size     : %.6f deg\n',  d.metadata.stepSize);
+        fprintf('  Counting time : %.3f s\n',    d.metadata.countingTime);
+        fprintf('  Peak cps      : %.2f\n',       max(d.values));
+        fprintf('  Anode         : %s\n',         ps.anodeMaterial);
+        fprintf('  K\xCE\xB11           : %.7f \xC3\x85\n', ps.wavelength.kAlpha1);
+
+        % ── 7b: counts output — ratio to cps should equal countingTime ────
+        dCts = parser.importXRDML(XRDML_FILE, Intensity='counts');
+        assert(strcmp(dCts.units{1}, 'counts'),    'Intensity=counts should yield units "counts"');
+
+        ct  = d.metadata.countingTime;
+        tol = 1e-9;
+        assert(abs(max(dCts.values) / max(d.values) - ct) < tol, ...
+            sprintf('counts / cps ratio (%.6f) should equal countingTime (%.3f)', ...
+                max(dCts.values)/max(d.values), ct));
+        fprintf('  counts/cps ratio: %.3f (expected %.3f) — OK\n', ...
+            max(dCts.values) / max(d.values), ct);
+
+        % ── 7c: importAuto dispatch ────────────────────────────────────────
+        [dAuto, pName] = parser.importAuto(XRDML_FILE);
+        assert(strcmp(pName, 'importXRDML'),       'importAuto should dispatch to importXRDML');
+        assert(numel(dAuto.time) == numel(d.time), 'importAuto point count mismatch');
+        fprintf('  importAuto dispatch: %s  — OK\n', pName);
+
+        fprintf('  PASS\n');
+        passed = passed + 1;
+    catch ME
+        fprintf('  FAIL: %s\n', ME.message);
+        failed = failed + 1;
+    end
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  Summary
 % ════════════════════════════════════════════════════════════════════════
+total = passed + failed;
 fprintf('\n════════════════════════════════════════════════════════════════\n');
-fprintf('  Results: %d passed, %d failed\n', passed, failed);
-fprintf('════════════════════════════════════════════════════════════════\n');
+fprintf('  Results: %d / %d passed', passed, total);
+if failed > 0
+    fprintf('  (%d FAILED)', failed);
+end
+fprintf('\n════════════════════════════════════════════════════════════════\n');

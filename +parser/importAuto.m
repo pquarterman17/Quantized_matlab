@@ -11,6 +11,7 @@ function [data, parserName] = importAuto(filepath, varargin)
 %   underlying parser unchanged.
 %
 %   DISPATCH RULES:
+%     .xrdml            → parser.importXRDML
 %     .raw              → parser.importRigaku_raw
 %     .xlsx .xls .xlsm
 %       .ods .xlsb      → parser.importExcel
@@ -36,7 +37,7 @@ function [data, parserName] = importAuto(filepath, varargin)
 %       % Inspect the result
 %       parser.importAuto('log.csv')
 %
-%   See also IMPORTRIGAKU_RAW, IMPORTCSV, IMPORTEXCEL, IMPORTPPMS, IMPORTQDVSM
+%   See also IMPORTXRDML, IMPORTRIGAKU_RAW, IMPORTCSV, IMPORTEXCEL, IMPORTPPMS, IMPORTQDVSM
 
     arguments
         filepath (1,1) string {mustBeFile}
@@ -60,6 +61,10 @@ function [data, parserName] = importAuto(filepath, varargin)
     %  Dispatch by extension
     % ════════════════════════════════════════════════════════════════
     switch ext
+        case '.xrdml'
+            parserName = 'importXRDML';
+            data = parser.importXRDML(filepath, varargin{:});
+
         case '.raw'
             parserName = 'importRigaku_raw';
             data = parser.importRigaku_raw(filepath, varargin{:});
@@ -90,7 +95,7 @@ function [data, parserName] = importAuto(filepath, varargin)
         otherwise
             error('parser:importAuto:unknownExtension', ...
                 ['No parser registered for extension "%s".\n' ...
-                 'Supported: .raw, .xlsx/.xls/.xlsm, .csv/.tsv/.txt, .dat'], ext);
+                 'Supported: .xrdml, .raw, .xlsx/.xls/.xlsm, .csv/.tsv/.txt, .dat'], ext);
     end
 
     % ════════════════════════════════════════════════════════════════

@@ -4,7 +4,13 @@
       "Bash(dir:*)",
       "Bash(winget upgrade:*)",
       "WebFetch(domain:scholar.google.com)",
-      "WebFetch(domain:www.nist.gov)"
+      "WebFetch(domain:www.nist.gov)",
+      "Bash(cd:*)",
+      "WebSearch",
+      "WebFetch(domain:arxiv.org)",
+      "WebFetch(domain:mres.uni-potsdam.de)",
+      "WebFetch(domain:xrayutilities.sourceforge.io)",
+      "WebFetch(domain:www.researchgate.net)"
     ]
   }
 }

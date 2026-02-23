@@ -145,13 +145,18 @@ function dataImportGUI()
         'ButtonPushedFcn',@(~,~) onStylePick('Line+Pts'));
     btnStyleLineMarkers.Layout.Column = 3;
 
-    chkGL = uigridlayout(ctrlGL,[1 2], ...
-        'Padding',[0 0 0 0],'ColumnWidth',{'1x','1x'},'ColumnSpacing',4);
+    chkGL = uigridlayout(ctrlGL,[1 3], ...
+        'Padding',[0 0 0 0],'ColumnWidth',{'1x','1x','1x'},'ColumnSpacing',4);
     chkGL.Layout.Row = 6;
     cbLogX = uicheckbox(chkGL,'Text','Log X','ValueChangedFcn',@onAxisChanged);
     cbLogX.Layout.Column = 1;
     cbLogY = uicheckbox(chkGL,'Text','Log Y','ValueChangedFcn',@onAxisChanged);
     cbLogY.Layout.Column = 2;
+    cbCountsPerSec = uicheckbox(chkGL,'Text','Cts/s', ...
+        'Value', false, 'Enable', 'off', ...
+        'Tooltip', 'Divide intensity by counting time (counts → counts/s). XRD files only.', ...
+        'ValueChangedFcn', @onAxisChanged);
+    cbCountsPerSec.Layout.Column = 3;
 
     btnPlot = uibutton(ctrlGL,'Text','Replot','ButtonPushedFcn',@onPlot);
     btnPlot.Layout.Row = 8;
@@ -489,8 +494,8 @@ function dataImportGUI()
     %ONADDFILES  Open a multi-select file dialog; load every chosen file.
         startDir = guiTernary(isempty(appData.lastDir), pwd, appData.lastDir);
         [fnames, fpath] = uigetfile( ...
-            {'*.dat;*.csv;*.tsv;*.txt;*.xlsx;*.xls;*.xlsm;*.xlsb;*.ods;*.raw', ...
-             'Supported data files (*.dat, *.csv, *.xlsx, *.ods, *.raw)'; ...
+            {'*.dat;*.csv;*.tsv;*.txt;*.xlsx;*.xls;*.xlsm;*.xlsb;*.ods;*.raw;*.xrdml', ...
+             'Supported data files (*.dat, *.csv, *.xlsx, *.ods, *.raw, *.xrdml)'; ...
              '*.*','All files (*.*)'}, ...
             'Select data file(s)', startDir, ...
             'MultiSelect', 'on');
@@ -736,6 +741,13 @@ function dataImportGUI()
 
         txtMeta.Value = guiMetaLines(d, ds.parserName, ds.filepath);
 
+        % Enable Counts/s only for Rigaku files with a valid counting time
+        ct = guiCountingTime(ds);
+        cbCountsPerSec.Enable = guiTernary(ct > 0, 'on', 'off');
+        if ct == 0
+            cbCountsPerSec.Value = false;
+        end
+
         % Restore this dataset's correction parameter values
         efXOffset.Value     = ds.xOff;
         efYOffset.Value     = ds.yOff;
@@ -782,7 +794,7 @@ function dataImportGUI()
     function applyParserAnalysisConfig(pName)
     %APPLYPARSERANALYSISCONFIG  Relabel Analysis panel controls for data type.
         switch pName
-            case 'importRigaku_raw'
+            case {'importRigaku_raw', 'importXRDML'}
                 analysisPanel.Title   = 'Analysis & Corrections  —  XRD';
                 lblXOff.Text          = '2θ Offset (°):';
                 efXOffset.Tooltip     = '2θ-offset: 2θ_corrected = 2θ − this value  (0 = no shift)';
@@ -1253,6 +1265,7 @@ function dataImportGUI()
 
     function onClearPeaks(~,~)
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        cancelInteractions();
         ds       = appData.datasets{appData.activeIdx};
         ds.peaks = struct('center',{},'fwhm',{},'height',{},'xRange',{},'status',{},'bg',{},'model',{});
         appData.datasets{appData.activeIdx} = ds;
@@ -1265,6 +1278,7 @@ function dataImportGUI()
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
         pi = appData.selectedPeakIdx;
         if pi < 1, return; end
+        cancelInteractions();
         ds = appData.datasets{appData.activeIdx};
         if pi > numel(ds.peaks), return; end
         ds.peaks(pi) = [];
@@ -1446,10 +1460,14 @@ function dataImportGUI()
             ds.yOff       = 0;
             ds.bgSlope    = 0;
             ds.bgInt      = 0;
+            ds.peaks      = struct('center',{},'fwhm',{},'height',{}, ...
+                                   'xRange',{},'status',{},'bg',{},'model',{});
             appData.datasets{appData.activeIdx} = ds;
+            appData.selectedPeakIdx = 0;
         end
 
         cancelInteractions();
+        refreshPeakTable();
         onPlot([],[]);
     end
 
@@ -1840,6 +1858,12 @@ function dataImportGUI()
                     fileSuffix = '';
                 end
 
+                % Counts/s normalisation factor (0 = disabled)
+                ctFactor = 0;
+                if cbCountsPerSec.Value
+                    ctFactor = guiCountingTime(ds);
+                end
+
                 for k = 1:nY
                     colorIdx  = (di-1)*nY + k;
                     baseColor = colors(colorIdx, :);
@@ -1853,6 +1877,7 @@ function dataImportGUI()
                     if showRawOver
                         anyRawShown = true;
                         yRaw     = d.values(:, idx);
+                        if ctFactor > 0, yRaw = yRaw / ctFactor; end
                         rawColor = 0.5 * baseColor + 0.5 * [1 1 1];
                         if isdatetime(xVecRaw)
                             good = ~isnat(xVecRaw) & ~isnan(yRaw);
@@ -1866,6 +1891,7 @@ function dataImportGUI()
 
                     % Primary trace
                     yPrimary = primaryD.values(:, idx);
+                    if ctFactor > 0, yPrimary = yPrimary / ctFactor; end
                     if isdatetime(xVecPrimary)
                         good = ~isnat(xVecPrimary) & ~isnan(yPrimary);
                     else
@@ -1891,8 +1917,11 @@ function dataImportGUI()
             if nY == 1 && nDS == 1
                 idx = find(strcmp(activeDs.data.labels, ySel{1}), 1);
                 if ~isempty(idx)
-                    ylabel(targetAx, ...
-                        guiLabel(activeDs.data.labels{idx}, activeDs.data.units{idx}));
+                    unitStr = activeDs.data.units{idx};
+                    if cbCountsPerSec.Value && guiCountingTime(activeDs) > 0
+                        unitStr = 'counts/s';
+                    end
+                    ylabel(targetAx, guiLabel(activeDs.data.labels{idx}, unitStr));
                 end
             else
                 ylabel(targetAx,'');
@@ -2157,6 +2186,11 @@ function [data, parserName] = guiImport(fp)
             data       = parser.importRigaku_raw(fp);
             parserName = 'importRigaku_raw';
 
+        case '.xrdml'
+            % Load raw counts; the GUI's Cts/s toggle handles cps conversion.
+            data       = parser.importXRDML(fp, Intensity='counts');
+            parserName = 'importXRDML';
+
         case {'.xlsx','.xls','.xlsm','.xlsb','.ods'}
             data       = parser.importExcel(fp);
             parserName = 'importExcel';
@@ -2393,6 +2427,7 @@ function lbl = guiParserLabel(parserName)
 %GUIPARSERLABEL Human-readable description for each parser function.
     switch parserName
         case 'importRigaku_raw', lbl = 'Rigaku SmartLab XRD';
+        case 'importXRDML',   lbl = 'PANalytical XRDML';
         case 'importExcel',   lbl = 'Excel Spreadsheet';
         case 'importCSV',     lbl = 'Delimited Text';
         case 'importQDVSM',   lbl = 'Quantum Design VSM';
@@ -2410,5 +2445,20 @@ function s = delimLabel(d)
         case ';',          s = 'semicolon (;)';
         case ' ',          s = 'space';
         otherwise,         s = sprintf('"%s"', d);
+    end
+end
+
+
+function ct = guiCountingTime(ds)
+%GUICOUNTINGTIME  Return counting time (s) for a dataset, or 0 if unavailable.
+%   Uses try/catch to safely traverse the nested struct path without
+%   a chain of isfield checks on each level.
+    ct = 0;
+    try
+        ct = ds.data.metadata.parserSpecific.countingTime;
+        if ~isnumeric(ct) || ~isscalar(ct) || ct <= 0
+            ct = 0;
+        end
+    catch
     end
 end
