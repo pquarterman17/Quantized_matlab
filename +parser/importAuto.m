@@ -1,4 +1,4 @@
-function data = importAuto(filepath, varargin)
+function [data, parserName] = importAuto(filepath, varargin)
 %IMPORTAUTO Auto-detect file type and import with the appropriate parser.
 %
 %   data = parser.importAuto('results.xlsx')
@@ -22,9 +22,11 @@ function data = importAuto(filepath, varargin)
 %       filepath  - Path to the data file (string or char).
 %       varargin  - Any name-value pairs accepted by the chosen parser.
 %
-%   OUTPUT:
-%       data - Unified data struct (.time, .values, .labels, .units,
-%              .metadata) as returned by the underlying parser.
+%   OUTPUTS:
+%       data       - Unified data struct (.time, .values, .labels, .units,
+%                    .metadata) as returned by the underlying parser.
+%       parserName - (optional) Name of the parser that was used, e.g.
+%                    'importQDVSM', 'importCSV', 'importRigaku_raw'.
 %
 %   EXAMPLES:
 %       % Let importAuto pick the parser
@@ -45,6 +47,14 @@ function data = importAuto(filepath, varargin)
 
     [~, ~, ext] = fileparts(filepath);
     ext = lower(ext);
+
+    % Extract Verbose flag from varargin (default false — callers opt in)
+    verbIdx = find(strcmpi(varargin(1:2:end), 'Verbose'), 1);
+    if ~isempty(verbIdx)
+        verboseFlag = varargin{verbIdx * 2};
+    else
+        verboseFlag = false;
+    end
 
     % ════════════════════════════════════════════════════════════════
     %  Dispatch by extension
@@ -78,15 +88,17 @@ function data = importAuto(filepath, varargin)
             end
 
         otherwise
-            error('importAuto:unknownExtension', ...
+            error('parser:importAuto:unknownExtension', ...
                 ['No parser registered for extension "%s".\n' ...
                  'Supported: .raw, .xlsx/.xls/.xlsm, .csv/.tsv/.txt, .dat'], ext);
     end
 
     % ════════════════════════════════════════════════════════════════
-    %  Summary
+    %  Summary (opt-in via 'Verbose', true)
     % ════════════════════════════════════════════════════════════════
-    printSummary(data, parserName, filepath);
+    if verboseFlag
+        printSummary(data, parserName, filepath);
+    end
 end
 
 
@@ -137,25 +149,11 @@ end
 
 
 function label = resolveXLabel(meta)
-%RESOLVEXLABEL Extract a human-readable x-axis name from any parser's metadata.
-    candidates = {'xColumnName', 'delimiter'};   % delimiter = importCSV marker
-    for f = {'xColumnName'}
-        if isfield(meta, f{1}) && ~isempty(meta.(f{1}))
-            label = meta.(f{1});
-            return;
-        end
+%RESOLVEXLABEL Extract a human-readable x-axis name from unified metadata.
+%   All parsers now set meta.xColumnName directly.
+    if isfield(meta, 'xColumnName') && ~isempty(meta.xColumnName)
+        label = meta.xColumnName;
+    else
+        label = '';
     end
-    if isfield(meta, 'startAngle')   % importRigaku_raw
-        label = '2-Theta (deg)';
-        return;
-    end
-    if isfield(meta, 'delimiter')    % importCSV — no explicit x label stored
-        label = 'col 1';
-        return;
-    end
-    if isfield(meta, 'sheetName')    % importExcel — no explicit x label
-        label = 'col 1';
-        return;
-    end
-    label = '';
 end
