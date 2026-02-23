@@ -47,6 +47,8 @@ function dataImportGUI()
     appData.yTranslateOff0    = 0;    % efYOffset value at start of drag
     appData.peakPickMode      = false;
     appData.selectedPeakIdx   = 0;    % row highlighted in peakTable (0 = none)
+    appData.showFitCurves     = true;               % toggle Lorentzian fit overlay on/off
+    appData.fitCurveColor     = [0.85 0.20 0.00];   % default warm red-orange
 
     % ── Figure ───────────────────────────────────────────────────────────
     fig = uifigure('Name','Data Import & Preview', ...
@@ -430,8 +432,8 @@ function dataImportGUI()
         'Tooltip','Detected peaks — select a row to highlight it on the plot');
     peakTable.Layout.Column = 1;
 
-    peakBtnGL = uigridlayout(peakGL,[5 1], ...
-        'RowHeight',    {32,32,32,32,'1x'}, ...
+    peakBtnGL = uigridlayout(peakGL,[7 1], ...
+        'RowHeight',    {32,32,32,32,22,32,'1x'}, ...
         'Padding',      [0 0 0 0], ...
         'RowSpacing',   4);
     peakBtnGL.Layout.Column = 2;
@@ -457,6 +459,19 @@ function dataImportGUI()
         'BackgroundColor',[0.30 0.30 0.60],'FontColor',[1 1 1], ...
         'Tooltip','Save peak centers and FWHM values to a CSV file');
     btnSavePeaks.Layout.Row = 4;
+
+    chkShowFit = uicheckbox(peakBtnGL, ...
+        'Text',              'Show fit curves', ...
+        'Value',             true, ...
+        'Tooltip',           'Overlay Lorentzian fit curves on the plot', ...
+        'ValueChangedFcn',   @onToggleFitCurves);
+    chkShowFit.Layout.Row = 5;
+
+    btnFitColor = uibutton(peakBtnGL, 'Text', 'Fit curve color...', ...
+        'Tooltip',           'Pick the color used for Lorentzian fit overlays', ...
+        'ButtonPushedFcn',   @onPickFitColor);
+    btnFitColor.Layout.Row = 6;
+    btnFitColor.BackgroundColor = appData.fitCurveColor;
 
     % ════════════════════════════════════════════════════════════════════
     %  NESTED CALLBACKS  (share appData + all control handles via closure)
@@ -1270,6 +1285,24 @@ function dataImportGUI()
         end
     end
 
+    % ── Fit curve visibility / color ─────────────────────────────────────
+
+    function onToggleFitCurves(src, ~)
+    %ONTOGGLEFITCURVES  Show or hide Lorentzian fit overlays on the plot.
+        appData.showFitCurves = src.Value;
+        onPlot([],[]);
+    end
+
+    function onPickFitColor(~, ~)
+    %ONPICKFITCOLOR  Open a colour picker and apply the chosen colour to fit overlays.
+        c = uisetcolor(appData.fitCurveColor, 'Fit Curve Color');
+        if numel(c) == 3          % user didn't cancel (cancel returns 0)
+            appData.fitCurveColor       = c;
+            btnFitColor.BackgroundColor = c;
+            onPlot([],[]);
+        end
+    end
+
     function onStylePick(styleName)
         appData.style = styleName;
         allBtns   = {btnStyleLine, btnStyleScatter, btnStyleLineMarkers};
@@ -1870,31 +1903,33 @@ function dataImportGUI()
                     yLo   = targetAx.YLim(1);
                     yHi   = targetAx.YLim(2);
                     ySpan = yHi - yLo;
-                    fitColor = [0.85 0.20 0.00];   % warm red-orange for all Lorentzian overlays
+                    fitColor = appData.fitCurveColor;
 
                     % ── (1) Lorentzian fit overlays ───────────────────────
-                    for pi = 1:numel(dsPk.peaks)
-                        pk       = dsPk.peaks(pi);
-                        hasBg    = isfield(pk,'bg') && ~isempty(pk.bg) && ~isnan(pk.bg);
-                        isFitted = strcmp(pk.status,'fitted') && ~isnan(pk.fwhm) && pk.fwhm > 0;
-                        if ~isFitted || ~hasBg, continue; end
+                    if appData.showFitCurves
+                        for pi = 1:numel(dsPk.peaks)
+                            pk       = dsPk.peaks(pi);
+                            hasBg    = isfield(pk,'bg') && ~isempty(pk.bg) && ~isnan(pk.bg);
+                            isFitted = strcmp(pk.status,'fitted') && ~isnan(pk.fwhm) && pk.fwhm > 0;
+                            if ~isFitted || ~hasBg, continue; end
 
-                        % X range for the smooth curve: stored xRange or ±3·FWHM
-                        if ~isempty(pk.xRange) && numel(pk.xRange) == 2
-                            gxLo = pk.xRange(1);  gxHi = pk.xRange(2);
-                        else
-                            gxLo = pk.center - 3*pk.fwhm;
-                            gxHi = pk.center + 3*pk.fwhm;
+                            % X range for the smooth curve: stored xRange or ±3·FWHM
+                            if ~isempty(pk.xRange) && numel(pk.xRange) == 2
+                                gxLo = pk.xRange(1);  gxHi = pk.xRange(2);
+                            else
+                                gxLo = pk.center - 3*pk.fwhm;
+                                gxHi = pk.center + 3*pk.fwhm;
+                            end
+                            xFitPlot = linspace(gxLo, gxHi, 300);
+                            yFitPlot = pk.height ./ ...
+                                (1 + 4.*((xFitPlot - pk.center)./pk.fwhm).^2) + pk.bg;
+
+                            isSel = (pi == appData.selectedPeakIdx);
+                            plot(targetAx, xFitPlot, yFitPlot, '-', ...
+                                'Color',            fitColor, ...
+                                'LineWidth',        guiTernary(isSel, 2.5, 1.5), ...
+                                'HandleVisibility', 'off');
                         end
-                        xFitPlot = linspace(gxLo, gxHi, 300);
-                        yFitPlot = pk.height ./ ...
-                            (1 + 4.*((xFitPlot - pk.center)./pk.fwhm).^2) + pk.bg;
-
-                        isSel = (pi == appData.selectedPeakIdx);
-                        plot(targetAx, xFitPlot, yFitPlot, '-', ...
-                            'Color',            fitColor, ...
-                            'LineWidth',        guiTernary(isSel, 2.5, 1.5), ...
-                            'HandleVisibility', 'off');
                     end
 
                     % ── (2) Vertical markers, labels and FWHM bars ────────
@@ -2137,6 +2172,11 @@ function guiSaveCSV(d, fp)
         end
     end
     allHdrs = [{xHdr}, yHdrs];
+
+    dirPart = fileparts(fp);
+    if ~isempty(dirPart) && ~isfolder(dirPart)
+        error('guiSaveCSV:badDir', 'Output directory does not exist:\n%s', dirPart);
+    end
 
     fid = fopen(fp, 'w');
     if fid < 0

@@ -63,8 +63,8 @@ function data = importRigaku_raw(filepath, options)
     if fid == -1
         error('importRigaku_raw:cannotOpen', 'Cannot open file: %s', filepath);
     end
+    cleanObj = onCleanup(@() fclose(fid));   %#ok<NASGU> — closes on error or normal exit
     raw = fread(fid, '*uint8');
-    fclose(fid);
 
     nBytes = numel(raw);
 

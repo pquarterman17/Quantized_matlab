@@ -390,7 +390,7 @@ function idx = resolveQDColumn(spec, colNames, label)
         'amplitude',  'Peak Amplitude'
         'range',      'Range'
         'motorcurrent','Motor Current'
-        'coilsignal', 'Coil Signal'''
+        'coilsignal', 'Coil Signal'
     };
 
     resolvedName = spec;
