@@ -10,7 +10,10 @@
       "WebFetch(domain:arxiv.org)",
       "WebFetch(domain:mres.uni-potsdam.de)",
       "WebFetch(domain:xrayutilities.sourceforge.io)",
-      "WebFetch(domain:www.researchgate.net)"
+      "WebFetch(domain:www.researchgate.net)",
+      "Bash(wc:*)",
+      "Bash(cut:*)",
+      "Bash(find:*)"
     ]
   }
 }

@@ -46,13 +46,18 @@ function dataImportGUI()
     appData.yTranslateY0      = [];   % y-coord of mouse-down during Y-translate drag
     appData.yTranslateOff0    = 0;    % efYOffset value at start of drag
     appData.peakPickMode      = false;
+    appData.peakRemoveMode    = false;
     appData.selectedPeakIdx   = 0;    % row highlighted in peakTable (0 = none)
+    appData.zoomStartPt       = [];   % [x y] data coords where drag-zoom began
+    appData.zoomRectPatch     = [];   % patch handle for the rubber-band rectangle
     appData.showFitCurves     = true;               % toggle Lorentzian fit overlay on/off
     appData.fitCurveColor     = [0.85 0.20 0.00];   % default warm red-orange
 
     % ── Figure ───────────────────────────────────────────────────────────
     fig = uifigure('Name','Data Import & Preview', ...
-                   'Position',[80 80 1080 915]);
+                   'Position',[80 80 1080 980]);
+    MIN_FIG_H = 720;   % minimum height so the analysis panel is never clipped
+    fig.SizeChangedFcn = @onFigSizeChanged;
 
     % ── Dataset-colour palette (shared by widget and callbacks) ──────────
     DS_COLOR_NAMES = {'Auto','Blue','Orange','Red','Green', ...
@@ -63,21 +68,23 @@ function dataImportGUI()
                       [0.64 0.35 0.10], [0.00 0.00 0.00], ...
                       [0.50 0.50 0.50]};
 
-    % Root grid  (3 rows: dataset toolbar | content | analysis)
-    rootGL = uigridlayout(fig,[3 1], ...
-        'RowHeight',   {128,'1x',420}, ...
-        'ColumnWidth', {'1x'}, ...
-        'Padding',     [8 8 8 8], ...
-        'RowSpacing',  6);
+    % Root grid  (3 rows × 2 cols: toolbar occupies left half of row 1 only;
+    %             content and analysis span both columns at full width)
+    rootGL = uigridlayout(fig,[3 2], ...
+        'RowHeight',    {128,'1x',500}, ...
+        'ColumnWidth',  {'1x','1x'}, ...
+        'Padding',      [8 8 8 8], ...
+        'RowSpacing',   6, ...
+        'ColumnSpacing', 0);
 
-    % ── Toolbar row: Add / Remove buttons (top) + dataset listbox (middle) + colour (bottom) ─
-    tbGL = uigridlayout(rootGL,[3 2], ...
-        'RowHeight',    {26,60,26}, ...
+    % ── Toolbar row: Add / Remove buttons (top) + dataset listbox (bottom) ─
+    tbGL = uigridlayout(rootGL,[2 2], ...
+        'RowHeight',    {26,'1x'}, ...
         'ColumnWidth',  {'1x','1x'}, ...
         'Padding',      [0 0 0 0], ...
         'RowSpacing',   4, ...
         'ColumnSpacing', 6);
-    tbGL.Layout.Row = 1;
+    tbGL.Layout.Row = 1; tbGL.Layout.Column = 1;
 
     btnBrowse = uibutton(tbGL,'Text','Add File(s)...', ...
         'ButtonPushedFcn',@onAddFiles, ...
@@ -99,25 +106,70 @@ function dataImportGUI()
         'Tooltip','Loaded datasets — click to make a dataset active for editing / corrections');
     lbDatasets.Layout.Row = 2; lbDatasets.Layout.Column = [1 2];
 
-    lblDSColor = uibutton(tbGL,'Text','Dataset Color:', ...
-        'Enable','off','FontSize',10);
-    lblDSColor.Layout.Row = 3; lblDSColor.Layout.Column = 1;
+    % ── Appearance panel (top right): colour, legend, axis labels, title ────
+    apGL = uigridlayout(rootGL,[5 2], ...
+        'RowHeight',    {22,22,22,22,22}, ...
+        'ColumnWidth',  {60,'1x'}, ...
+        'Padding',      [6 5 6 5], ...
+        'RowSpacing',   2, ...
+        'ColumnSpacing', 6);
+    apGL.Layout.Row = 1; apGL.Layout.Column = 2;
 
-    ddDatasetColor = uidropdown(tbGL, ...
+    lblApColor = uibutton(apGL,'Text','Color:','Enable','off','FontSize',10);
+    lblApColor.Layout.Row = 1; lblApColor.Layout.Column = 1;
+
+    ddDatasetColor = uidropdown(apGL, ...
         'Items',     DS_COLOR_NAMES, ...
         'ItemsData', DS_COLOR_RGBS, ...
         'Value',     [], ...
         'Enable',    'off', ...
-        'Tooltip',   'Override the colour used to plot this dataset. "Auto" uses the automatic palette.', ...
+        'Tooltip',   'Override the line colour for this dataset ("Auto" uses the palette)', ...
         'ValueChangedFcn', @onDatasetColorChanged);
-    ddDatasetColor.Layout.Row = 3; ddDatasetColor.Layout.Column = 2;
+    ddDatasetColor.Layout.Row = 1; ddDatasetColor.Layout.Column = 2;
+
+    lblApLegend = uibutton(apGL,'Text','Legend:','Enable','off','FontSize',10);
+    lblApLegend.Layout.Row = 2; lblApLegend.Layout.Column = 1;
+
+    efLegendName = uieditfield(apGL,'text','Value','', ...
+        'Enable',          'off', ...
+        'Placeholder',     'auto (channel name)', ...
+        'Tooltip',         'Override the legend label for this dataset — blank = auto', ...
+        'ValueChangedFcn', @onLegendNameChanged);
+    efLegendName.Layout.Row = 2; efLegendName.Layout.Column = 2;
+
+    lblApXLabel = uibutton(apGL,'Text','X Label:','Enable','off','FontSize',10);
+    lblApXLabel.Layout.Row = 3; lblApXLabel.Layout.Column = 1;
+
+    efCustomXLabel = uieditfield(apGL,'text','Value','', ...
+        'Placeholder',     'auto (from data)', ...
+        'Tooltip',         'Override the X-axis label — blank = auto', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    efCustomXLabel.Layout.Row = 3; efCustomXLabel.Layout.Column = 2;
+
+    lblApYLabel = uibutton(apGL,'Text','Y Label:','Enable','off','FontSize',10);
+    lblApYLabel.Layout.Row = 4; lblApYLabel.Layout.Column = 1;
+
+    efCustomYLabel = uieditfield(apGL,'text','Value','', ...
+        'Placeholder',     'auto (from data)', ...
+        'Tooltip',         'Override the Y-axis label — blank = auto', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    efCustomYLabel.Layout.Row = 4; efCustomYLabel.Layout.Column = 2;
+
+    lblApTitle = uibutton(apGL,'Text','Title:','Enable','off','FontSize',10);
+    lblApTitle.Layout.Row = 5; lblApTitle.Layout.Column = 1;
+
+    efCustomTitle = uieditfield(apGL,'text','Value','', ...
+        'Placeholder',     'auto (from filename)', ...
+        'Tooltip',         'Override the plot title — blank = auto', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    efCustomTitle.Layout.Row = 5; efCustomTitle.Layout.Column = 2;
 
     % ── Content: controls panel (left) | preview axes (right) ────────────
     contentGL = uigridlayout(rootGL,[1 2], ...
         'ColumnWidth',  {215,'1x'}, ...
         'Padding',      [0 0 0 0], ...
         'ColumnSpacing', 8);
-    contentGL.Layout.Row = 2;
+    contentGL.Layout.Row = 2; contentGL.Layout.Column = [1 2];
 
     % Left controls panel
     % Title updates to show parser name after each load.
@@ -197,14 +249,15 @@ function dataImportGUI()
     title(ax,'Load a file to preview data','Interpreter','none');
     xlabel(ax,'');
     ylabel(ax,'');
+    ax.ButtonDownFcn = @onAxesButtonDown;
 
     % ── Analysis & Corrections panel (row 3, full width) ─────────────────
     analysisPanel = uipanel(rootGL,'Title','Analysis & Corrections');
-    analysisPanel.Layout.Row = 3;
+    analysisPanel.Layout.Row = 3; analysisPanel.Layout.Column = [1 2];
 
     analysisGL = uigridlayout(analysisPanel,[2 3], ...
-        'ColumnWidth', {420,204,'1x'}, ...
-        'RowHeight',   {210,'1x'}, ...
+        'ColumnWidth', {420,'1x',160}, ...
+        'RowHeight',   {268,'1x'}, ...
         'Padding',     [6 6 6 6], ...
         'ColumnSpacing', 10, ...
         'RowSpacing', 6);
@@ -217,8 +270,8 @@ function dataImportGUI()
     corrPanel = uipanel(analysisGL,'Title','Corrections');
     corrPanel.Layout.Row = 1; corrPanel.Layout.Column = 1;
 
-    corrGL = uigridlayout(corrPanel,[5 4], ...
-        'RowHeight',    {26,26,26,26,32}, ...
+    corrGL = uigridlayout(corrPanel,[7 4], ...
+        'RowHeight',    {26,26,26,26,26,26,32}, ...
         'ColumnWidth',  {70,'1x',88,'1x'}, ...
         'Padding',      [6 6 6 6], ...
         'RowSpacing',   4, ...
@@ -229,7 +282,7 @@ function dataImportGUI()
     lblCorrStyle.Layout.Row = 1; lblCorrStyle.Layout.Column = 1;
 
     ddCorrStyle = uidropdown(corrGL, ...
-        'Items',           {'Auto (from file)', 'Generic', 'VSM — Diamagnetic', 'PPMS', 'XRD — 2\theta + BG'}, ...
+        'Items',           {'Auto (from file)', 'Generic', 'Magnetometry', 'PPMS', 'XRD — 2\theta + BG'}, ...
         'Value',           'Auto (from file)', ...
         'Tooltip',         'Choose correction labels; Auto detects from the loaded file type', ...
         'ValueChangedFcn', @onCorrStyleChanged);
@@ -269,7 +322,27 @@ function dataImportGUI()
         'Limits',[-Inf Inf],'LowerLimitInclusive','off','UpperLimitInclusive','off');
     efBGIntercept.Layout.Row = 3; efBGIntercept.Layout.Column = 4;
 
-    % Row 4: Fit BG from Box | Est. Y Offset 2-click
+    % Row 4: Smoothing controls (all data types)
+    cbSmooth = uicheckbox(corrGL, 'Text', 'Smooth', 'Value', false, ...
+        'Tooltip', 'Apply smoothing to corrected data when Apply Corrections is pressed', ...
+        'ValueChangedFcn', @onSmoothingChanged);
+    cbSmooth.Layout.Row = 4; cbSmooth.Layout.Column = 1;
+
+    efSmoothWin = uieditfield(corrGL, 'numeric', 'Value', 5, ...
+        'Limits', [1 Inf], 'LowerLimitInclusive', 'on', ...
+        'RoundFractionalValues', 'on', ...
+        'Tooltip', 'Smoothing half-window in samples (total width = 2W+1 points)', ...
+        'ValueChangedFcn', @onSmoothingChanged);
+    efSmoothWin.Layout.Row = 4; efSmoothWin.Layout.Column = 2;
+
+    ddSmoothMethod = uidropdown(corrGL, ...
+        'Items',   {'Moving', 'Gaussian'}, ...
+        'Value',   'Moving', ...
+        'Tooltip', 'Moving: uniform average  |  Gaussian: bell-curve weighted average', ...
+        'ValueChangedFcn', @onSmoothingChanged);
+    ddSmoothMethod.Layout.Row = 4; ddSmoothMethod.Layout.Column = [3 4];
+
+    % Row 5: Fit BG from Box | Est. Y Offset 2-click
     btnFitBG = uibutton(corrGL,'Text','Fit Linear BG from Box', ...
         'ButtonPushedFcn',@onFitBGRegion, ...
         'BackgroundColor',[0.50 0.28 0.05], ...
@@ -278,7 +351,7 @@ function dataImportGUI()
                     'All selected-Y data points inside the box are used to fit ' ...
                     'a linear background (polyfit deg-1).  ' ...
                     'BG Slope and Intercept are auto-populated then corrections are applied.']);
-    btnFitBG.Layout.Row = 4; btnFitBG.Layout.Column = [1 2];
+    btnFitBG.Layout.Row = 5; btnFitBG.Layout.Column = [1 2];
 
     btnPickY = uibutton(corrGL,'Text','Est. Y Offset  (2 pts)', ...
         'ButtonPushedFcn',@onPickYOrigin, ...
@@ -288,9 +361,9 @@ function dataImportGUI()
                     'The Y Offset is updated so that y = 0 falls halfway ' ...
                     'between their y-values.  Works on whichever data is ' ...
                     'currently displayed (raw or corrected).']);
-    btnPickY.Layout.Row = 4; btnPickY.Layout.Column = [3 4];
+    btnPickY.Layout.Row = 5; btnPickY.Layout.Column = [3 4];
 
-    % XRD-mode interactive tools — same row 4 cells, hidden by default.
+    % XRD-mode interactive tools — same row 5 cells, hidden by default.
     % applyParserAnalysisConfig() swaps visibility between these and the
     % generic (btnFitBG / btnPickY) buttons when the correction style changes.
     btnYTranslate = uibutton(corrGL,'Text','Y Translate (drag)', ...
@@ -299,39 +372,47 @@ function dataImportGUI()
         'Tooltip',['Click and drag up/down on the plot to shift the data ' ...
                    'vertically — updates Y Offset live on each mouse move.'], ...
         'Visible','off');
-    btnYTranslate.Layout.Row = 4; btnYTranslate.Layout.Column = [1 2];
+    btnYTranslate.Layout.Row = 5; btnYTranslate.Layout.Column = [1 2];
 
     btnAutoPeak = uibutton(corrGL,'Text','Auto Find Peaks', ...
         'ButtonPushedFcn',@onAutoPeak, ...
         'BackgroundColor',[0.55 0.20 0.05],'FontColor',[1 1 1], ...
         'Tooltip','Detect peaks automatically using findpeaks (Signal Processing Toolbox) or a built-in local-max fallback', ...
         'Visible','off');
-    btnAutoPeak.Layout.Row = 4; btnAutoPeak.Layout.Column = 3;
+    btnAutoPeak.Layout.Row = 5; btnAutoPeak.Layout.Column = 3;
 
     btnManualPeak = uibutton(corrGL,'Text','Add Peak', ...
         'ButtonPushedFcn',@onManualPeakAdd, ...
         'BackgroundColor',[0.45 0.20 0.55],'FontColor',[1 1 1], ...
         'Tooltip','Click once on a peak in the plot to add it to the peak list (click button again to finish)', ...
         'Visible','off');
-    btnManualPeak.Layout.Row = 4; btnManualPeak.Layout.Column = 4;
+    btnManualPeak.Layout.Row = 5; btnManualPeak.Layout.Column = 4;
 
-    % Row 5: Apply | Reset | Show Raw
+    % Row 6: Remove Peak (click-to-remove mode; only visible for XRD data)
+    btnRemovePeakClick = uibutton(corrGL,'Text','Remove Peak', ...
+        'ButtonPushedFcn',@onRemovePeakClickMode, ...
+        'BackgroundColor',[0.55 0.15 0.15],'FontColor',[1 1 1], ...
+        'Tooltip','Click on a peak marker in the plot to remove it (click button again to finish)', ...
+        'Visible','off');
+    btnRemovePeakClick.Layout.Row = 6; btnRemovePeakClick.Layout.Column = 4;
+
+    % Row 7: Apply | Reset | Show Raw
     btnApply = uibutton(corrGL,'Text','Apply Corrections', ...
         'ButtonPushedFcn',@onApplyCorrections, ...
         'BackgroundColor',[0.18 0.52 0.18], ...
         'FontColor',[1 1 1],'FontWeight','bold', ...
         'Tooltip','Compute corrected data and update plot');
-    btnApply.Layout.Row = 5; btnApply.Layout.Column = [1 2];
+    btnApply.Layout.Row = 7; btnApply.Layout.Column = [1 2];
 
     btnReset = uibutton(corrGL,'Text','Reset', ...
         'ButtonPushedFcn',@onResetCorrections, ...
         'Tooltip','Zero all correction fields and discard corrected data for the active dataset');
-    btnReset.Layout.Row = 5; btnReset.Layout.Column = 3;
+    btnReset.Layout.Row = 7; btnReset.Layout.Column = 3;
 
     cbShowRaw = uicheckbox(corrGL,'Text','Show Raw','Value',true, ...
         'Tooltip','When corrected data exists, also overlay raw data (dashed, desaturated)', ...
         'ValueChangedFcn',@(~,~) onPlot([],[]));
-    cbShowRaw.Layout.Row = 5; cbShowRaw.Layout.Column = 4;
+    cbShowRaw.Layout.Row = 7; cbShowRaw.Layout.Column = 4;
 
     % ── Axis Limits sub-panel (middle column) ────────────────────────────
     % All six fields are text-type: blank = auto-scale, any number = manual.
@@ -358,21 +439,27 @@ function dataImportGUI()
     lblXLim = uibutton(axLimGL,'Text','X:','Enable','off');
     lblXLim.Layout.Row = 2; lblXLim.Layout.Column = 1;
 
+    AXLIM_BG = [0.17 0.17 0.17];   % dark field background matching GUI theme
+    AXLIM_FG = [0.92 0.92 0.92];   % light text for readability on dark background
+
     efXMin = uieditfield(axLimGL,'text','Value','', ...
         'Placeholder','auto', ...
         'Tooltip','X axis minimum — blank = auto-scale', ...
+        'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, ...
         'ValueChangedFcn',@(~,~) onPlot([],[]));
     efXMin.Layout.Row = 2; efXMin.Layout.Column = 2;
 
     efXMax = uieditfield(axLimGL,'text','Value','', ...
         'Placeholder','auto', ...
         'Tooltip','X axis maximum — blank = auto-scale', ...
+        'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, ...
         'ValueChangedFcn',@(~,~) onPlot([],[]));
     efXMax.Layout.Row = 2; efXMax.Layout.Column = 3;
 
     efXStep = uieditfield(axLimGL,'text','Value','', ...
         'Placeholder','auto', ...
         'Tooltip','X axis major tick spacing — blank = auto ticks', ...
+        'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, ...
         'ValueChangedFcn',@(~,~) onPlot([],[]));
     efXStep.Layout.Row = 2; efXStep.Layout.Column = 4;
 
@@ -383,18 +470,21 @@ function dataImportGUI()
     efYMin = uieditfield(axLimGL,'text','Value','', ...
         'Placeholder','auto', ...
         'Tooltip','Y axis minimum — blank = auto-scale', ...
+        'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, ...
         'ValueChangedFcn',@(~,~) onPlot([],[]));
     efYMin.Layout.Row = 3; efYMin.Layout.Column = 2;
 
     efYMax = uieditfield(axLimGL,'text','Value','', ...
         'Placeholder','auto', ...
         'Tooltip','Y axis maximum — blank = auto-scale', ...
+        'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, ...
         'ValueChangedFcn',@(~,~) onPlot([],[]));
     efYMax.Layout.Row = 3; efYMax.Layout.Column = 3;
 
     efYStep = uieditfield(axLimGL,'text','Value','', ...
         'Placeholder','auto', ...
         'Tooltip','Y axis major tick spacing — blank = auto ticks', ...
+        'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, ...
         'ValueChangedFcn',@(~,~) onPlot([],[]));
     efYStep.Layout.Row = 3; efYStep.Layout.Column = 4;
 
@@ -408,8 +498,8 @@ function dataImportGUI()
     savePanel = uipanel(analysisGL,'Title','Save Corrected Data');
     savePanel.Layout.Row = 1; savePanel.Layout.Column = 3;
 
-    saveGL = uigridlayout(savePanel,[3 2], ...
-        'RowHeight',    {26,32,32}, ...
+    saveGL = uigridlayout(savePanel,[4 2], ...
+        'RowHeight',    {26,32,32,32}, ...
         'ColumnWidth',  {'1x',100}, ...
         'Padding',      [6 6 6 6], ...
         'RowSpacing',   4, ...
@@ -432,12 +522,19 @@ function dataImportGUI()
         'Tooltip','Write corrected data to CSV file');
     btnSave.Layout.Row = 2; btnSave.Layout.Column = 2;
 
+    btnExportHDF5 = uibutton(saveGL,'Text','Export HDF5...', ...
+        'ButtonPushedFcn',@onExportHDF5, ...
+        'BackgroundColor',[0.10 0.45 0.45], ...
+        'FontColor',[1 1 1], ...
+        'Tooltip','Export data, corrections, and peaks to a self-describing HDF5 file (.h5)');
+    btnExportHDF5.Layout.Row = 3; btnExportHDF5.Layout.Column = [1 2];
+
     btnExportFig = uibutton(saveGL,'Text','Export to Figure', ...
         'ButtonPushedFcn',@onExportFigure, ...
         'BackgroundColor',[0.30 0.30 0.60], ...
         'FontColor',[1 1 1], ...
         'Tooltip','Open a new figure window with the current plot (full MATLAB toolbar — ideal for publication-quality editing)');
-    btnExportFig.Layout.Row = 3; btnExportFig.Layout.Column = [1 2];
+    btnExportFig.Layout.Row = 4; btnExportFig.Layout.Column = [1 2];
 
     % ── Peak Analysis sub-panel (row 2, full width) ───────────────────────
     % Always visible; XRD buttons in corrGL activate it contextually.
@@ -460,7 +557,7 @@ function dataImportGUI()
     peakTable.Layout.Column = 1;
 
     peakBtnGL = uigridlayout(peakGL,[8 1], ...
-        'RowHeight',    {22,32,32,32,32,22,32,'1x'}, ...
+        'RowHeight',    {22,28,28,28,28,22,28,'1x'}, ...
         'Padding',      [0 0 0 0], ...
         'RowSpacing',   4);
     peakBtnGL.Layout.Column = 2;
@@ -627,6 +724,15 @@ function dataImportGUI()
         onPlot([],[]);
     end
 
+    function onLegendNameChanged(~,~)
+    %ONLEGENDNAMECHANGED  Store custom legend label on the active dataset and replot.
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        ds            = appData.datasets{appData.activeIdx};
+        ds.legendName = efLegendName.Value;   % '' = auto (channel name)
+        appData.datasets{appData.activeIdx} = ds;
+        onPlot([],[]);
+    end
+
     function onRemoveDataset(~,~)
     %ONREMOVEDATASET  Remove the active dataset from the list.
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
@@ -650,6 +756,8 @@ function dataImportGUI()
             analysisPanel.Title = 'Analysis & Corrections';
             ddDatasetColor.Enable = 'off';
             ddDatasetColor.Value  = [];
+            efLegendName.Enable   = 'off';
+            efLegendName.Value    = '';
             cla(ax);
             title(ax,'Load a file to preview data','Interpreter','none');
         else
@@ -704,7 +812,7 @@ function dataImportGUI()
     end
 
     function cancelInteractions()
-    %CANCELINTERACTIONS  Abort any in-progress BG-fit or y-origin pick.
+    %CANCELINTERACTIONS  Abort any in-progress interaction (BG-fit, zoom, etc.).
         fig.WindowButtonDownFcn   = '';
         fig.WindowButtonMotionFcn = '';
         fig.WindowButtonUpFcn     = '';
@@ -713,6 +821,12 @@ function dataImportGUI()
         end
         appData.bgRectPatch       = [];
         appData.bgStartPt         = [];
+        % Abort any in-progress drag-zoom
+        if ~isempty(appData.zoomRectPatch) && isvalid(appData.zoomRectPatch)
+            delete(appData.zoomRectPatch);
+        end
+        appData.zoomRectPatch     = [];
+        appData.zoomStartPt       = [];
         if ~isempty(appData.yOriginMarker) && isvalid(appData.yOriginMarker)
             delete(appData.yOriginMarker);
         end
@@ -738,6 +852,13 @@ function dataImportGUI()
             btnManualPeak.BackgroundColor = [0.45 0.20 0.55];
         end
         btnManualPeak.Enable = 'on';
+        % Reset peak-remove click mode
+        if appData.peakRemoveMode
+            appData.peakRemoveMode = false;
+            btnRemovePeakClick.Text            = 'Remove Peak';
+            btnRemovePeakClick.BackgroundColor = [0.55 0.15 0.15];
+        end
+        btnRemovePeakClick.Enable = 'on';
     end
 
     function updateControlsForActiveDataset()
@@ -781,15 +902,20 @@ function dataImportGUI()
             cbCountsPerSec.Value = false;
         end
 
-        % Restore this dataset's colour override ([] = Auto)
+        % Restore this dataset's per-dataset appearance overrides
         ddDatasetColor.Enable = 'on';
         ddDatasetColor.Value  = ds.color;
+        efLegendName.Enable   = 'on';
+        efLegendName.Value    = guiTernary(isfield(ds,'legendName'), ds.legendName, '');
 
         % Restore this dataset's correction parameter values
-        efXOffset.Value     = ds.xOff;
-        efYOffset.Value     = ds.yOff;
-        efBGSlope.Value     = ds.bgSlope;
-        efBGIntercept.Value = ds.bgInt;
+        efXOffset.Value      = ds.xOff;
+        efYOffset.Value      = ds.yOff;
+        efBGSlope.Value      = ds.bgSlope;
+        efBGIntercept.Value  = ds.bgInt;
+        cbSmooth.Value       = guiTernary(isfield(ds,'smoothEnabled'), ds.smoothEnabled, false);
+        efSmoothWin.Value    = guiTernary(isfield(ds,'smoothWindow'),  ds.smoothWindow,  5);
+        ddSmoothMethod.Value = guiTernary(isfield(ds,'smoothMethod'),  ds.smoothMethod,  'Moving');
 
         % Restore per-dataset axis limits (auto-scale if not yet saved)
         if isfield(ds, 'axLims')
@@ -843,11 +969,15 @@ function dataImportGUI()
                 lblBGInt.Text         = 'BG Intercept:';
                 efBGIntercept.Tooltip = 'Linear BG intercept b: I_BG = m·2θ + b  (0 = no BG subtraction)';
                 % Row 4: show XRD interactive tools, hide generic ones
-                btnFitBG.Visible      = 'off';
-                btnPickY.Visible      = 'off';
-                btnYTranslate.Visible = 'on';
-                btnAutoPeak.Visible   = 'on';
-                btnManualPeak.Visible = 'on';
+                btnFitBG.Visible           = 'off';
+                btnPickY.Visible           = 'off';
+                btnYTranslate.Visible      = 'on';
+                btnAutoPeak.Visible        = 'on';
+                btnManualPeak.Visible      = 'on';
+                btnRemovePeakClick.Visible = 'on';
+                % Peak analysis panel — visible for XRD
+                peakPanel.Visible          = 'on';
+                analysisGL.RowHeight       = {210, '1x'};
 
             case 'importQDVSM'
                 analysisPanel.Title   = 'Analysis & Corrections  —  VSM';
@@ -861,11 +991,15 @@ function dataImportGUI()
                                          '  (0 = no subtraction)'];
                 lblBGInt.Text         = 'BG Intercept:';
                 efBGIntercept.Tooltip = 'Diamagnetic intercept b: M_BG = χ·H + b  (0 = no subtraction)';
-                btnFitBG.Visible      = 'on';
-                btnPickY.Visible      = 'on';
-                btnYTranslate.Visible = 'off';
-                btnAutoPeak.Visible   = 'off';
-                btnManualPeak.Visible = 'off';
+                btnFitBG.Visible           = 'on';
+                btnPickY.Visible           = 'on';
+                btnYTranslate.Visible      = 'off';
+                btnAutoPeak.Visible        = 'off';
+                btnManualPeak.Visible      = 'off';
+                btnRemovePeakClick.Visible = 'off';
+                % Peak analysis panel — hidden for VSM
+                peakPanel.Visible          = 'off';
+                analysisGL.RowHeight       = {'1x', 0};
 
             case 'importPPMS'
                 analysisPanel.Title   = 'Analysis & Corrections  —  PPMS';
@@ -877,11 +1011,15 @@ function dataImportGUI()
                 efBGSlope.Tooltip     = 'Linear BG slope m: y_BG = m·x + b  (0 = no BG subtraction)';
                 lblBGInt.Text         = 'BG Intercept:';
                 efBGIntercept.Tooltip = 'Linear BG intercept b: y_BG = m·x + b  (0 = no BG subtraction)';
-                btnFitBG.Visible      = 'on';
-                btnPickY.Visible      = 'on';
-                btnYTranslate.Visible = 'off';
-                btnAutoPeak.Visible   = 'off';
-                btnManualPeak.Visible = 'off';
+                btnFitBG.Visible           = 'on';
+                btnPickY.Visible           = 'on';
+                btnYTranslate.Visible      = 'off';
+                btnAutoPeak.Visible        = 'off';
+                btnManualPeak.Visible      = 'off';
+                btnRemovePeakClick.Visible = 'off';
+                % Peak analysis panel — hidden for PPMS
+                peakPanel.Visible          = 'off';
+                analysisGL.RowHeight       = {'1x', 0};
 
             otherwise  % importCSV, importExcel, unknown — generic labels
                 analysisPanel.Title   = 'Analysis & Corrections';
@@ -893,11 +1031,15 @@ function dataImportGUI()
                 efBGSlope.Tooltip     = 'Linear BG slope m: y_BG = m·x + b  (0 = no BG subtraction)';
                 lblBGInt.Text         = 'BG Intercept:';
                 efBGIntercept.Tooltip = 'Linear BG intercept b: y_BG = m·x + b  (0 = no BG subtraction)';
-                btnFitBG.Visible      = 'on';
-                btnPickY.Visible      = 'on';
-                btnYTranslate.Visible = 'off';
-                btnAutoPeak.Visible   = 'off';
-                btnManualPeak.Visible = 'off';
+                btnFitBG.Visible           = 'on';
+                btnPickY.Visible           = 'on';
+                btnYTranslate.Visible      = 'off';
+                btnAutoPeak.Visible        = 'off';
+                btnManualPeak.Visible      = 'off';
+                btnRemovePeakClick.Visible = 'off';
+                % Peak analysis panel — hidden for generic data
+                peakPanel.Visible          = 'off';
+                analysisGL.RowHeight       = {'1x', 0};
         end
     end
 
@@ -906,7 +1048,7 @@ function dataImportGUI()
     %  'Auto (from file)' → use the active dataset's actual parserName.
     %  All other choices → return a fixed parser name that drives the labels.
         switch ddCorrStyle.Value
-            case 'VSM — Diamagnetic'
+            case 'Magnetometry'
                 pName = 'importQDVSM';
             case 'PPMS'
                 pName = 'importPPMS';
@@ -1016,9 +1158,24 @@ function dataImportGUI()
         if numel(xv) < 5
             uialert(fig,'Too few valid data points for peak detection.','Auto Peaks'); return;
         end
+
+        % ── Restrict to visible x-range if limits are set ─────────────────
+        % This lets users exclude sloping background regions (e.g., low-angle
+        % XRD background) simply by zooming into the region of interest first.
+        xMinLim = str2double(efXMin.Value);
+        xMaxLim = str2double(efXMax.Value);
+        if ~isnan(xMinLim) && ~isnan(xMaxLim) && xMinLim < xMaxLim
+            inView = xv >= xMinLim & xv <= xMaxLim;
+            if sum(inView) >= 5   % only restrict if the window contains enough data
+                xv = xv(inView);
+                yv = yv(inView);
+            end
+        end
+
         xSpan = diff([min(xv), max(xv)]);
 
         PEAK_MIN_PROM_FRAC  = 0.05;   % min prominence as fraction of y-range
+        PEAK_MIN_DIST_FRAC  = 0.01;   % min separation as fraction of x-span
         PEAK_SEP_TOL_FRAC   = 0.005;  % seeds closer than this fraction of x-span are merged
         PEAK_LOCAL_WIN_FRAC = 0.02;   % ±fraction of x-span for missed-seed local search
 
@@ -1033,12 +1190,14 @@ function dataImportGUI()
 
         % ── Pass 1: global auto-detection ────────────────────────────────
         minProm = (max(yv) - min(yv)) * PEAK_MIN_PROM_FRAC;
+        minDist = xSpan * PEAK_MIN_DIST_FRAC;
         try
             [pkH, pkX, pkW, ~] = findpeaks(yv, xv, ...
                 'MinPeakProminence', minProm, ...
+                'MinPeakDistance',   minDist, ...
                 'WidthReference',    'halfprom');
         catch
-            [pkX, pkH, pkW] = simplePeakFind(xv, yv, minProm);
+            [pkX, pkH, pkW] = simplePeakFind(xv, yv, minProm, minDist);
         end
 
         % Build initial merged list from auto results
@@ -1189,6 +1348,54 @@ function dataImportGUI()
         refreshPeakTable();
         onPlot([],[]);
         % Stay in pick mode — user presses button again to stop
+    end
+
+    function onRemovePeakClickMode(~,~)
+    %ONREMOVEPEAKCLICKMODE  Toggle click-to-remove-peak mode.
+        if appData.peakRemoveMode
+            % Already active — cancel
+            cancelInteractions(); return;
+        end
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig,'Load a file first.','No data'); return;
+        end
+        ds = appData.datasets{appData.activeIdx};
+        if isempty(ds.peaks)
+            uialert(fig,'No peaks to remove.','No peaks'); return;
+        end
+        cancelInteractions();
+        appData.peakRemoveMode          = true;
+        btnRemovePeakClick.Text            = 'Done Removing (click again)';
+        btnRemovePeakClick.BackgroundColor = [0.80 0.10 0.10];
+        fig.WindowButtonDownFcn            = @onRemovePeakClick;
+    end
+
+    function onRemovePeakClick(~,~)
+    %ONREMOVEPEAKCLICK  Remove the peak whose centre is closest to the click.
+        cp     = ax.CurrentPoint;
+        xClick = cp(1,1);  yClick = cp(1,2);
+        if xClick < ax.XLim(1) || xClick > ax.XLim(2) || ...
+           yClick < ax.YLim(1) || yClick > ax.YLim(2)
+            return;
+        end
+
+        ds = appData.datasets{appData.activeIdx};
+        if isempty(ds.peaks), return; end
+
+        % Find the peak whose centre is nearest to the click x-position.
+        % Tolerance: 3 % of the visible x-axis width.
+        centers = [ds.peaks.center];
+        dists   = abs(centers - xClick);
+        [minD, idx] = min(dists);
+        tol = diff(ax.XLim) * 0.03;
+        if minD > tol, return; end  % click is not near any peak — ignore
+
+        ds.peaks(idx) = [];
+        appData.datasets{appData.activeIdx} = ds;
+        appData.selectedPeakIdx = 0;
+        refreshPeakTable();
+        onPlot([],[]);
+        % Stay in remove mode — user presses button again to stop
     end
 
     % ── Peak fitter ───────────────────────────────────────────────────────
@@ -1469,11 +1676,21 @@ function dataImportGUI()
             corrData.values(:, k) = yRaw - yBG - yOff;
         end
 
-        ds.corrData = corrData;
-        ds.xOff     = xOff;
-        ds.yOff     = yOff;
-        ds.bgSlope  = bgSlope;
-        ds.bgInt    = bgIntcpt;
+        % Apply smoothing (after all other corrections, on all Y channels)
+        if cbSmooth.Value
+            win = max(1, round(efSmoothWin.Value));
+            corrData.values = utilities.smoothData(corrData.values, ...
+                'Window', win, 'Method', lower(ddSmoothMethod.Value));
+        end
+
+        ds.corrData      = corrData;
+        ds.xOff          = xOff;
+        ds.yOff          = yOff;
+        ds.bgSlope       = bgSlope;
+        ds.bgInt         = bgIntcpt;
+        ds.smoothEnabled = cbSmooth.Value;
+        ds.smoothWindow  = efSmoothWin.Value;
+        ds.smoothMethod  = ddSmoothMethod.Value;
         appData.datasets{appData.activeIdx} = ds;
 
         % Auto-set the save path for the active dataset
@@ -1488,17 +1705,23 @@ function dataImportGUI()
         efYOffset.Value     = 0;
         efBGSlope.Value     = 0;
         efBGIntercept.Value = 0;
+        cbSmooth.Value      = false;
+        efSmoothWin.Value   = 5;
+        ddSmoothMethod.Value = 'Moving';
         efSavePath.Value    = '';
 
         if appData.activeIdx >= 1 && ~isempty(appData.datasets)
-            ds            = appData.datasets{appData.activeIdx};
-            ds.corrData   = [];
-            ds.xOff       = 0;
-            ds.yOff       = 0;
-            ds.bgSlope    = 0;
-            ds.bgInt      = 0;
-            ds.peaks      = struct('center',{},'fwhm',{},'height',{}, ...
-                                   'xRange',{},'status',{},'bg',{},'model',{});
+            ds               = appData.datasets{appData.activeIdx};
+            ds.corrData      = [];
+            ds.xOff          = 0;
+            ds.yOff          = 0;
+            ds.bgSlope       = 0;
+            ds.bgInt         = 0;
+            ds.smoothEnabled = false;
+            ds.smoothWindow  = 5;
+            ds.smoothMethod  = 'Moving';
+            ds.peaks         = struct('center',{},'fwhm',{},'height',{}, ...
+                                      'xRange',{},'status',{},'bg',{},'model',{});
             appData.datasets{appData.activeIdx} = ds;
             appData.selectedPeakIdx = 0;
         end
@@ -1506,6 +1729,13 @@ function dataImportGUI()
         cancelInteractions();
         refreshPeakTable();
         onPlot([],[]);
+    end
+
+    function onSmoothingChanged(~,~)
+    %ONSMOOTHINGCHANGED  Re-apply corrections whenever smoothing controls change.
+        if ~isempty(appData.datasets) && appData.activeIdx >= 1
+            onApplyCorrections([],[]);
+        end
     end
 
     % ── BG rubber-band fit ────────────────────────────────────────────────
@@ -1809,7 +2039,7 @@ function dataImportGUI()
             return;
         end
         try
-            guiSaveCSV(ds.corrData, fp);
+            guiSaveCSV(ds.corrData, fp, ds.data);
             uialert(fig, sprintf('Saved:\n%s', fp), 'Saved');
         catch ME
             fprintf(2, '\n[dataImportGUI] Save error: %s\n', ME.message);
@@ -1817,6 +2047,37 @@ function dataImportGUI()
                 fprintf(2, '  at %s  (line %d)\n', ME.stack(si).name, ME.stack(si).line);
             end
             uialert(fig, ME.message, 'Save error');
+        end
+    end
+
+    function onExportHDF5(~,~)
+    %ONEXPORTHDF5  Export the active dataset to HDF5 via a browse-and-save dialog.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig,'Load a file first.','No data');
+            return;
+        end
+        ds = appData.datasets{appData.activeIdx};
+        [~, fn, ~] = fileparts(ds.filepath);
+        defName    = fullfile(fileparts(ds.filepath), [fn, '.h5']);
+        [fname, fpath] = uiputfile( ...
+            {'*.h5','HDF5 files (*.h5)'; '*.hdf5','HDF5 files (*.hdf5)'}, ...
+            'Export to HDF5 as...', defName);
+        if isequal(fname, 0), return; end
+        outPath = fullfile(fpath, fname);
+        try
+            utilities.exportHDF5(ds.data, outPath, ...
+                'CorrData',    ds.corrData, ...
+                'Corrections', struct('xOff', ds.xOff, 'yOff', ds.yOff, ...
+                                      'bgSlope', ds.bgSlope, 'bgInt', ds.bgInt), ...
+                'IncludePeaks', ~isempty(ds.peaks), ...
+                'Peaks',        ds.peaks);
+            uialert(fig, sprintf('Saved:\n%s', outPath), 'HDF5 Exported');
+        catch ME
+            fprintf(2, '\n[dataImportGUI] HDF5 export error: %s\n', ME.message);
+            for si = 1:numel(ME.stack)
+                fprintf(2, '  at %s  (line %d)\n', ME.stack(si).name, ME.stack(si).line);
+            end
+            uialert(fig, ME.message, 'Export error');
         end
     end
 
@@ -1854,8 +2115,10 @@ function dataImportGUI()
             colors = lines(max(nDS * nY, 1));
 
             % ── Draw ──────────────────────────────────────────────────────
-            % delete() removes ALL children including HandleVisibility='off' objects
-            % (peak markers); cla() alone misses those and leaves them on screen.
+            % Peak markers and zoom rect use HandleVisibility='off' so ax.Children may
+            % omit them in some MATLAB releases. findall() bypasses this filter.
+            delete(findall(targetAx, 'Tag', 'GUIPeakAnnotation'));
+            delete(findall(targetAx, 'Tag', 'GUIZoomBox'));
             delete(targetAx.Children);
             cla(targetAx);
             hold(targetAx,'on');
@@ -1941,6 +2204,9 @@ function dataImportGUI()
                         good = ~isnan(xVecPrimary) & ~isnan(yPrimary);
                     end
                     dispName = guiTernary(hasCorrData, [baseLabel, ' (corr)'], baseLabel);
+                    if isfield(ds,'legendName') && ~isempty(ds.legendName)
+                        dispName = ds.legendName;
+                    end
                     plot(targetAx, xVecPrimary(good), yPrimary(good), lsPrimary{:}, ...
                         'Color',       baseColor, ...
                         'DisplayName', dispName);
@@ -1955,9 +2221,17 @@ function dataImportGUI()
                 legend(targetAx,'off');
             end
 
-            xlabel(targetAx, xLabel);
-            % Y-axis label only when single channel + single dataset
-            if nY == 1 && nDS == 1
+            % X label: custom override takes priority over auto-generated label
+            if ~isempty(efCustomXLabel.Value)
+                xlabel(targetAx, efCustomXLabel.Value);
+            else
+                xlabel(targetAx, xLabel);
+            end
+
+            % Y label: custom override, else auto (single channel+dataset only)
+            if ~isempty(efCustomYLabel.Value)
+                ylabel(targetAx, efCustomYLabel.Value);
+            elseif nY == 1 && nDS == 1
                 idx = find(strcmp(activeDs.data.labels, ySel{1}), 1);
                 if ~isempty(idx)
                     unitStr = activeDs.data.units{idx};
@@ -1980,7 +2254,12 @@ function dataImportGUI()
                 titleStr = sprintf('%d datasets loaded  (active: [%d])', ...
                     nDS, appData.activeIdx);
             end
-            title(targetAx, titleStr, 'Interpreter','none');
+            % Title: custom override takes priority over auto-generated title
+            if ~isempty(efCustomTitle.Value)
+                title(targetAx, efCustomTitle.Value, 'Interpreter','none');
+            else
+                title(targetAx, titleStr, 'Interpreter','none');
+            end
 
             targetAx.XScale = guiTernary(cbLogX.Value,'log','linear');
             targetAx.YScale = guiTernary(cbLogY.Value,'log','linear');
@@ -2001,8 +2280,8 @@ function dataImportGUI()
             % Highlight invalid limit pairs (both parsed but min >= max)
             xLimsInvalid = ~isnan(xMinV) && ~isnan(xMaxV) && xMinV >= xMaxV;
             yLimsInvalid = ~isnan(yMinV) && ~isnan(yMaxV) && yMinV >= yMaxV;
-            warnColor  = [1.00 0.88 0.88];
-            clearColor = [1.00 1.00 1.00];
+            warnColor  = [0.45 0.10 0.10];   % dark red — legible on dark background
+            clearColor = [0.17 0.17 0.17];   % matches AXLIM_BG set at field creation
             efXMin.BackgroundColor = guiTernary(xLimsInvalid, warnColor, clearColor);
             efXMax.BackgroundColor = guiTernary(xLimsInvalid, warnColor, clearColor);
             efYMin.BackgroundColor = guiTernary(yLimsInvalid, warnColor, clearColor);
@@ -2073,6 +2352,7 @@ function dataImportGUI()
                             plot(targetAx, xFitPlot, yFitPlot, '-', ...
                                 'Color',            fitColor, ...
                                 'LineWidth',        guiTernary(isSel, 2.5, 1.5), ...
+                                'Tag',              'GUIPeakAnnotation', ...
                                 'HandleVisibility', 'off');
                         end
                     end
@@ -2088,6 +2368,7 @@ function dataImportGUI()
                         plot(targetAx, [pk.center, pk.center], [yLo, yHi], '--', ...
                             'Color',            lineColor, ...
                             'LineWidth',        lineWidth, ...
+                            'Tag',              'GUIPeakAnnotation', ...
                             'HandleVisibility', 'off');
 
                         % Peak index + centre label near the bottom
@@ -2096,6 +2377,7 @@ function dataImportGUI()
                             'FontSize',           7, ...
                             'HorizontalAlignment','center', ...
                             'Color',              lineColor, ...
+                            'Tag',                'GUIPeakAnnotation', ...
                             'HandleVisibility',   'off', ...
                             'Interpreter',        'none');
 
@@ -2110,6 +2392,7 @@ function dataImportGUI()
                                 [halfH, halfH], '-', ...
                                 'Color',            lineColor, ...
                                 'LineWidth',        2.0, ...
+                                'Tag',              'GUIPeakAnnotation', ...
                                 'HandleVisibility', 'off');
                         end
                     end
@@ -2132,6 +2415,98 @@ function dataImportGUI()
         efYMin.Value = '';  efYMax.Value = '';  efYStep.Value = '';
         saveAxisLimsToActiveDataset();
         onPlot([],[]);
+    end
+
+    function onAxesButtonDown(~,~)
+    %ONAXESBUTTONDOWN  Click on the axes: double-click resets zoom; drag draws zoom box.
+        if ~isempty(fig.WindowButtonDownFcn), return; end  % another mode active — ignore
+        if strcmp(fig.SelectionType, 'open')
+            % Double-click: reset zoom
+            onAutoLimits([],[]);
+            return;
+        end
+        % Single click — begin drag-zoom if data is loaded
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        cp = ax.CurrentPoint;
+        x0 = cp(1,1);  y0 = cp(1,2);
+        % Must start inside the current axes limits
+        if x0 < ax.XLim(1) || x0 > ax.XLim(2) || ...
+           y0 < ax.YLim(1) || y0 > ax.YLim(2)
+            return;
+        end
+        appData.zoomStartPt       = [x0, y0];
+        fig.WindowButtonMotionFcn = @onZoomMouseMove;
+        fig.WindowButtonUpFcn     = @onZoomMouseUp;
+    end
+
+    function onZoomMouseMove(~,~)
+    %ONZOOMMOUSEMOVE  Update the rubber-band rectangle while dragging.
+        if isempty(appData.zoomStartPt), return; end
+        cp = ax.CurrentPoint;
+        x1 = cp(1,1);  y1 = cp(1,2);
+        x0 = appData.zoomStartPt(1);
+        y0 = appData.zoomStartPt(2);
+        xLo = min(x0,x1);  xHi = max(x0,x1);
+        yLo = min(y0,y1);  yHi = max(y0,y1);
+        if ~isempty(appData.zoomRectPatch) && isvalid(appData.zoomRectPatch)
+            set(appData.zoomRectPatch, ...
+                'XData', [xLo xHi xHi xLo xLo], ...
+                'YData', [yLo yLo yHi yHi yLo]);
+        else
+            hold(ax,'on');
+            appData.zoomRectPatch = patch(ax, ...
+                [xLo xHi xHi xLo xLo], [yLo yLo yHi yHi yLo], ...
+                [0.20 0.55 0.90], ...
+                'FaceAlpha',       0.12, ...
+                'EdgeColor',       [0.20 0.55 0.90], ...
+                'LineWidth',       1.5, ...
+                'Tag',             'GUIZoomBox', ...
+                'HandleVisibility','off');
+            hold(ax,'off');
+        end
+    end
+
+    function onZoomMouseUp(~,~)
+    %ONZOOMMOUSEUP  Apply zoom to the drawn rectangle, then clean up.
+        fig.WindowButtonMotionFcn = '';
+        fig.WindowButtonUpFcn     = '';
+        if isempty(appData.zoomStartPt)
+            return;
+        end
+        cp = ax.CurrentPoint;
+        x1 = cp(1,1);  y1 = cp(1,2);
+        x0 = appData.zoomStartPt(1);
+        y0 = appData.zoomStartPt(2);
+        % Remove rubber-band rectangle
+        if ~isempty(appData.zoomRectPatch) && isvalid(appData.zoomRectPatch)
+            delete(appData.zoomRectPatch);
+        end
+        appData.zoomRectPatch = [];
+        appData.zoomStartPt   = [];
+        % Only zoom if drag is at least 1% of the current axis span in both axes
+        xDrag = abs(x1 - x0);
+        yDrag = abs(y1 - y0);
+        if xDrag < diff(ax.XLim) * 0.01 || yDrag < diff(ax.YLim) * 0.01
+            return;
+        end
+        xLo = min(x0,x1);  xHi = max(x0,x1);
+        yLo = min(y0,y1);  yHi = max(y0,y1);
+        efXMin.Value = sprintf('%.6g', xLo);
+        efXMax.Value = sprintf('%.6g', xHi);
+        efYMin.Value = sprintf('%.6g', yLo);
+        efYMax.Value = sprintf('%.6g', yHi);
+        saveAxisLimsToActiveDataset();
+        onPlot([],[]);
+    end
+
+    function onFigSizeChanged(~,~)
+    %ONFIGSIZECHANGED  Prevent the window from being resized below MIN_FIG_H so
+    %  the fixed-height analysis panel is never clipped by the window boundary.
+        if fig.Position(4) < MIN_FIG_H
+            fig.SizeChangedFcn = '';          % disable to avoid recursion
+            fig.Position(4) = MIN_FIG_H;
+            fig.SizeChangedFcn = @onFigSizeChanged;
+        end
     end
 
     function onExportFigure(~,~)
@@ -2182,10 +2557,14 @@ function merged = deduplicatePeaks(peaks, minSep)
     merged = peaks(keep);
 end
 
-function [pkX, pkH, pkW] = simplePeakFind(xv, yv, minProm)
+function [pkX, pkH, pkW] = simplePeakFind(xv, yv, minProm, minDist)
 %SIMPLEPEAKFIND  Minimal local-maxima detector (no Signal Processing Toolbox).
 %   Returns peak x-positions (pkX), heights (pkH) and estimated half-widths (pkW).
 %   Used as fallback when findpeaks is unavailable.
+%
+%   simplePeakFind(xv, yv, minProm)           – prominence filter only
+%   simplePeakFind(xv, yv, minProm, minDist)  – also enforce minimum x-separation
+    if nargin < 4, minDist = 0; end
     n   = numel(yv);
     if n < 3
         pkX = []; pkH = []; pkW = []; return;
@@ -2198,6 +2577,26 @@ function [pkX, pkH, pkW] = simplePeakFind(xv, yv, minProm)
     isMax = isMax & (yv > yMin + minProm);
     pkX = xv(isMax);
     pkH = yv(isMax);
+    % Minimum-distance suppression: greedy, highest peak wins
+    if minDist > 0 && numel(pkX) > 1
+        [pkH_s, ord] = sort(pkH, 'descend');
+        pkX_s = pkX(ord);
+        keep  = true(size(pkX_s));
+        for ii = 1:numel(pkX_s)
+            if ~keep(ii), continue; end
+            for jj = (ii+1):numel(pkX_s)
+                if ~keep(jj), continue; end
+                if abs(pkX_s(ii) - pkX_s(jj)) < minDist
+                    keep(jj) = false;
+                end
+            end
+        end
+        pkX = pkX_s(keep);
+        pkH = pkH_s(keep);
+        % Restore original x-order so downstream code sees sorted positions
+        [pkX, reord] = sort(pkX);
+        pkH = pkH(reord);
+    end
     % Rough width estimate: 2% of x-span per peak
     pkW = ones(size(pkX)) * diff([min(xv) max(xv)]) * 0.02;
 end
@@ -2213,7 +2612,11 @@ function ds = buildDs(fp, data, parserName)
     ds.yOff        = 0;
     ds.bgSlope     = 0;
     ds.bgInt       = 0;
-    ds.color       = [];          % [] = Auto (lines() palette); [r g b] = override
+    ds.color         = [];        % [] = Auto (lines() palette); [r g b] = override
+    ds.legendName    = '';        % '' = Auto (built from channel name)
+    ds.smoothEnabled = false;
+    ds.smoothWindow  = 5;
+    ds.smoothMethod  = 'Moving';
     ds.peaks       = struct('center',{},'fwhm',{},'height',{}, ...
                             'xRange',{},'status',{},'bg',{},'model',{});
     ds.axLims      = struct('xMin','','xMax','','xStep','', ...
@@ -2332,22 +2735,44 @@ function c = ensureCell(v)
 end
 
 
-function guiSaveCSV(d, fp)
+function guiSaveCSV(d, fp, dRaw)
 %GUISAVECSV  Write a data struct to a comma-delimited CSV file.
 %   Columns: x-axis (d.time) then all y-channels (d.values).
 %   A header row of column names (with units in parentheses) is written first.
-    % Build header row
-    xHdr = 'X';
-    yHdrs = cell(1, size(d.values, 2));
-    for k = 1:numel(yHdrs)
-        if ~isempty(d.units{k})
-            yHdrs{k} = sprintf('%s (%s)', d.labels{k}, d.units{k});
-        else
-            yHdrs{k} = d.labels{k};
-        end
+%
+%   guiSaveCSV(d, fp)        — write corrected data only
+%   guiSaveCSV(d, fp, dRaw)  — append raw data columns after corrected columns
+%
+%   When dRaw is supplied the headers are suffixed:
+%     corrected  →  'X [corr]', 'Label (unit) [corr]', ...
+%     raw        →  'X [raw]',  'Label (unit) [raw]',  ...
+
+    hasRaw = nargin >= 3 && ~isempty(dRaw) && isfield(dRaw, 'time');
+    suffix = guiTernary(hasRaw, ' [corr]', '');
+
+    % ── Header row ────────────────────────────────────────────────────
+    xHdr  = ['X', suffix];
+    nY    = size(d.values, 2);
+    yHdrs = cell(1, nY);
+    for k = 1:nY
+        base     = guiTernary(~isempty(d.units{k}), ...
+                       sprintf('%s (%s)', d.labels{k}, d.units{k}), d.labels{k});
+        yHdrs{k} = [base, suffix];
     end
     allHdrs = [{xHdr}, yHdrs];
 
+    if hasRaw
+        nYr       = size(dRaw.values, 2);
+        rawYHdrs  = cell(1, nYr);
+        for k = 1:nYr
+            base        = guiTernary(~isempty(dRaw.units{k}), ...
+                              sprintf('%s (%s)', dRaw.labels{k}, dRaw.units{k}), dRaw.labels{k});
+            rawYHdrs{k} = [base, ' [raw]'];
+        end
+        allHdrs = [allHdrs, {'X [raw]'}, rawYHdrs];
+    end
+
+    % ── Validate and open file ────────────────────────────────────────
     dirPart = fileparts(fp);
     if ~isempty(dirPart) && ~isfolder(dirPart)
         error('guiSaveCSV:badDir', 'Output directory does not exist:\n%s', dirPart);
@@ -2357,21 +2782,34 @@ function guiSaveCSV(d, fp)
     if fid < 0
         error('guiSaveCSV:cannotOpen', 'Cannot open file for writing:\n%s', fp);
     end
-    closeGuard = onCleanup(@() fclose(fid));
+    closeGuard = onCleanup(@() fclose(fid)); %#ok<NASGU>
 
-    % Header
+    % ── Header ────────────────────────────────────────────────────────
     fprintf(fid, '%s\n', strjoin(allHdrs, ','));
 
-    % Data rows
+    % ── Data rows ─────────────────────────────────────────────────────
     nRows = numel(d.time);
     for r = 1:nRows
+        % Corrected x
         if isdatetime(d.time)
-            fprintf(fid, '%s', datestr(d.time(r), 'yyyy-mm-dd HH:MM:SS'));
+            fprintf(fid, '%s', datestr(d.time(r), 'yyyy-mm-dd HH:MM:SS')); %#ok<DATST>
         else
             fprintf(fid, '%.10g', d.time(r));
         end
+        % Corrected y channels
         for c = 1:size(d.values, 2)
             fprintf(fid, ',%.10g', d.values(r, c));
+        end
+        % Raw columns (appended when available and row index is in range)
+        if hasRaw && r <= numel(dRaw.time)
+            if isdatetime(dRaw.time)
+                fprintf(fid, ',%s', datestr(dRaw.time(r), 'yyyy-mm-dd HH:MM:SS')); %#ok<DATST>
+            else
+                fprintf(fid, ',%.10g', dRaw.time(r));
+            end
+            for c = 1:size(dRaw.values, 2)
+                fprintf(fid, ',%.10g', dRaw.values(r, c));
+            end
         end
         fprintf(fid, '\n');
     end

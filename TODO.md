@@ -4,6 +4,7 @@
 - [x] `dataImportGUI`: "Clear All Peaks" did not remove peak markers from the plot
       (`cla()` skips children with `HandleVisibility='off'`; fixed with `delete(ax.Children)`)
 - [x] `dataImportGUI`: Peak fitter changed from Gaussian to Lorentzian for XRD data
+- [ ] `Reset zoom after zoom by draw box zoom broken
 
 ## Parser (`+parser`)
 - [x] `importRigaku_raw`: multi-range detection + warning; improved variable-step error message
