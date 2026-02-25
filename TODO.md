@@ -94,6 +94,14 @@ impl# TODO — thin_film_toolkit_matlab
 
 ---
 
+
+
+### File Handling
+
+- [ ] **Additional File Support** — support file types added into '+test_datasets' on a rolling basis
+
+---
+
 ### Bugs
 - [ ] **Drag and Drop Files** — does not work
 
