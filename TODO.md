@@ -71,13 +71,13 @@ impl# TODO — thin_film_toolkit_matlab
 
 ### Workflow / UX
 
-- [ ] **Drag-and-drop file loading** — use `fig.DropFcn` (MATLAB R2023a+) to accept
+- [x] **Drag-and-drop file loading** — use `fig.DropFcn` (MATLAB R2023a+) to accept
   files dragged from Explorer. Add a version guard; fall back gracefully on older MATLAB.
 
 - [ ] **Undo for corrections** — one-level undo: snapshot `ds.corrData`, offsets, etc.
   into `ds.undoState` before "Apply Corrections"; an "Undo" button restores it.
 
-- [ ] **Dataset reorder (drag in list)** — allow dragging rows in `lbDatasets` to
+- [x] **Dataset reorder (drag in list)** — allow dragging rows in `lbDatasets` to
   reorder datasets, affecting legend order and waterfall offset order.
 
 ---
@@ -103,5 +103,5 @@ impl# TODO — thin_film_toolkit_matlab
 ---
 
 ### Bugs
-- [ ] **Drag and Drop Files** — does not work
+- [x] **Drag and Drop Files** — fixed: added `AllowDrop=true` (R2024a+) and corrected string-array normalisation in `onDropFiles`
 

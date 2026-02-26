@@ -824,9 +824,10 @@ function dataImportGUI()
                     corrPanel, axLimPanel, savePanel, peakPanel, lbDatasets};
     for dsi = 1:numel(dropSurfaces)
         try
-            dropSurfaces{dsi}.DropFcn = @onDropFiles;
+            dropSurfaces{dsi}.AllowDrop = true;   % R2024a+: must opt-in before DropFcn fires
+            dropSurfaces{dsi}.DropFcn   = @onDropFiles;
         catch
-            % Component does not support DropFcn on this MATLAB version — skip
+            % Component does not support AllowDrop/DropFcn on this MATLAB version — skip
         end
     end
     clear dsi dropSurfaces;
@@ -856,13 +857,20 @@ function dataImportGUI()
 
     function onDropFiles(~, e)
     %ONDROPFILES  Handle files dragged from Explorer onto the figure (R2023a+).
-    %  e.Data may be a char (single file), a string, or a cell array (multiple
-    %  files) — normalise to a cell array before processing.
+    %  e.Data may be a string array, a char vector (newline-separated), or a
+    %  cell array of char vectors — normalise to a cell array before processing.
         try
             d = e.Data;
-            if ischar(d) || isstring(d)
-                % Single file or newline-separated list — wrap / split into cell
-                fpaths = cellstr(strsplit(strtrim(char(d)), newline));
+            if isstring(d)
+                % String scalar: may be newline-separated list; string array: one path per element.
+                if isscalar(d)
+                    fpaths = cellstr(strsplit(strtrim(d), newline));
+                else
+                    fpaths = cellstr(d);   % multi-element string array → cell of chars
+                end
+            elseif ischar(d)
+                % Char vector — may be newline-separated (legacy format)
+                fpaths = cellstr(strsplit(strtrim(d), newline));
             elseif iscell(d)
                 fpaths = d;
             else
@@ -987,7 +995,11 @@ function dataImportGUI()
         if val == appData.activeIdx, return; end   % no change
 
         saveAxisLimsToActiveDataset();   % persist zoom before leaving current dataset
-        cancelInteractions();
+        % Don't cancel while a listbox drag has been initiated: cancelInteractions()
+        % would clear the WindowButtonMotionFcn/UpFcn that onAxesButtonDown just set.
+        if appData.listDragSrcIdx == 0
+            cancelInteractions();
+        end
         appData.activeIdx = val;
         updateControlsForActiveDataset();
         onPlot([],[]);
