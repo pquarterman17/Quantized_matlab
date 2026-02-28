@@ -10,17 +10,17 @@ impl# TODO — thin_film_toolkit_matlab
   or thickness series. Needs a "stack spacing" field and per-dataset auto-offset in
   `drawToAxes`.
 
-- [ ] **Session save / load** — serialize full `appData` (datasets, corrections, peaks,
+- [/] **Session save / load** — serialize full `appData` (datasets, corrections, peaks,
   axis limits) to a `.mat` file and reload it. Lets the user close MATLAB and resume
-  exactly where they left off.
+  exactly where they left off. **Implemented, needs testing.**
 
-- [ ] **Data trim / crop** — click-drag to select an x-range to keep (discard noisy scan
+- [/] **Data trim / crop** — click-drag to select an x-range to keep (discard noisy scan
   edges). Reuse the rubber-band box mechanism; store `ds.xTrimMin` / `ds.xTrimMax` and
-  apply early in the corrections pipeline.
+  apply early in the corrections pipeline. **Implemented, needs testing.**
 
-- [ ] **Normalization control** — dropdown in corrections panel: None / Peak (max=1) /
+- [/] **Normalization control** — dropdown in corrections panel: None / Peak (max=1) /
   Area (integral=1) / Z-score. `utilities.normalize` already exists; just wire it into
-  the GUI corrections pipeline.
+  the GUI corrections pipeline. **Implemented, needs testing.**
 
 ---
 
@@ -40,24 +40,24 @@ impl# TODO — thin_film_toolkit_matlab
   `_corrected.csv` per loaded dataset using their auto-generated paths.
   **Implemented, needs testing.**
 
-- [ ] **Copy plot to clipboard** — button that copies the current plot as an image
-  (e.g. `print(fig, '-clipboard', '-dbitmap')`).
+- [x] **Copy plot to clipboard** — button that copies the current plot as an image
+  (e.g. `print(fig, '-clipboard', '-dbitmap')`). **Already implemented.**
 
 ---
 
 ### Analysis enhancements
 
-- [ ] **Region statistics readout** — when drawing the BG-fit box, display mean, std,
+- [/] **Region statistics readout** — when drawing the BG-fit box, display mean, std,
   min, max, and centroid of the enclosed data in a tooltip or status label. Reuses
-  the existing `onBGMouseUp` selection logic.
+  the existing `onBGMouseUp` selection logic. **Implemented, needs testing.**
 
-- [ ] **Peak area (integrated intensity)** — add an Area column to the peak table,
+- [/] **Peak area (integrated intensity)** — add an Area column to the peak table,
   calculated as the analytical integral of the fitted Lorentzian/Gaussian. Directly
-  useful for XRD film-thickness / crystallite-size estimates.
+  useful for XRD film-thickness / crystallite-size estimates. **Implemented, needs testing.**
 
-- [ ] **Multi-peak simultaneous fit** — "Fit All Together" option builds a
-  sum-of-Lorentzians/Gaussians model and fits it in one `lsqcurvefit` call to properly
-  handle overlapping peaks.
+- [/] **Multi-peak simultaneous fit** — "Fit All Together" option builds a
+  sum-of-Lorentzians/Gaussians model and fits it in one `fminsearch` call to properly
+  handle overlapping peaks. **Implemented, needs testing.**
 
 ---
 
@@ -100,32 +100,43 @@ impl# TODO — thin_film_toolkit_matlab
   10+ files are loaded and you want to isolate a subset without removing the others.
   **Implemented, needs testing.**
 
-- [ ] **Multi-select and merge datasets** — allow `lbDatasets` to support multi-select
+- [/] **Multi-select and merge datasets** — allow `lbDatasets` to support multi-select
   (Ctrl+click / Shift+click) with a "Merge Selected" button that concatenates selected
   datasets into a single combined dataset. Useful for aggregating repeated measurements
-  or temperature-sweep segments. Merged dataset stores `.sourceDatasetIndices` for traceability.
+  or temperature-sweep segments. **Implemented, needs testing.**
 
-- [ ] **Filter/search box above dataset list** — small text field that filters `lbDatasets`
+- [/] **Filter/search box above dataset list** — small text field that filters `lbDatasets`
   items by filename or legend name as you type. Rebuild `Items` from a filtered subset on
   each keystroke; restore full list on clear. Most useful with 20+ loaded files.
+  **Implemented, needs testing.**
 
 ---
 
 ### Export
 
-- [ ] **Publication-ready direct save** — "Save Figure..." button that calls
-  `exportgraphics` directly on the GUI axes with user-selectable format (PNG 300 dpi,
-  PDF vector, SVG). Avoids the current Export-to-Figure → manual-save workflow.
+- [/] **Publication-ready direct save** — "Save Figure..." button that calls
+  `exportgraphics` directly on the GUI axes with user-selectable format (PNG/TIFF 300 dpi,
+  PDF/SVG vector). Avoids the current Export-to-Figure → manual-save workflow.
+  **Implemented, needs testing.**
 
-- [ ] **Peak report export to Excel** — extend "Export Summary CSV" to write an `.xlsx`
-  file with one sheet per dataset, including fit parameters, R², and fitted curve values
-  for plotting in Origin / Excel.
+- [/] **Peak report export to Excel** — "Export Peaks XLSX" button writes an `.xlsx`
+  file with one sheet per dataset containing peak fit parameters (Center, FWHM, Height, Area, Status).
+  **Implemented, needs testing.**
 
 ---
 
 
 
 ### File Handling
+
+- [ ] **NCNR Neutron Data Files** — support file formats in `+parser/file_examples_implementation/NCNR/` directory (5 datasets with 98 files):
+  - **Raw Measurement Data:** `.refl` (11 files, neutron reflectivity from CANDOR/TRIP), `.pnr` (8 files, PNR spin-flip/non-spin-flip)
+  - **Polarized Variants:** `.datA`/`.datB`/`.datC`/`.datD` (26 total, polarization channels from spin-flip analysis)
+  - **Fitted/Model Data:** `.dat` (34 files: profile, slabs, steps - refl1d model layers and structure)
+  - **Metadata & Config:** `.json` (7 files, experiment info), `.par` (2 files, parameters), `.out` (2 files, fitting output)
+  - **Supporting Files:** `.pnr` (PNR format), `.pickle` (2 files, Python serialized data), `.py` (2 files, analysis scripts)
+  - **Datasets:** NR_Nickelate (La₂NiO₄ normal reflectivity), PNR_NoSpinFlip (YIG/Py no SF channel), PNR_SC_NSF (NbAu superconductor), PNR_SF (YIG/Co SF measurements)
+  - **Priority:** Implement parsers for `.refl` (primary), `.pnr` (secondary), `.datA`-`.datD` (polarization handling)
 
 - [ ] **Additional File Support** — support file types added into '+test_datasets' on a rolling basis
 
@@ -179,4 +190,8 @@ impl# TODO — thin_film_toolkit_matlab
 
 ### Bugs
 - [x] **Drag and Drop Files** — fixed: added `AllowDrop=true` (R2024a+) and corrected string-array normalisation in `onDropFiles`
+- [x] **uieditfield NaN error (line 681)** — fixed: changed trim min/max fields from numeric to text type with empty-string default, added helper functions `nan2str()` and `str2num_trim()`
+- [x] **Axes offset from center** — fixed: changed tbGL to span columns [1 2] instead of just [1] to align with content/analysis panels
+- [ ] **Missing GUI panels** — unclear which panels are missing; most are created but some hidden per data type
+
 

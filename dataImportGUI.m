@@ -64,6 +64,7 @@ function dataImportGUI()
     appData.listDragSrcIdx    = 0;    % source row being dragged in lbDatasets (0 = none)
     appData.listDragActive    = false; % true once mouse has moved > threshold after listbox down
     appData.listDragStartPt   = [];   % [x y] fig-pixel position at listbox mouse-down
+    appData.searchFilter      = '';   % dataset list search string (empty = show all)
 
     % ── Figure ───────────────────────────────────────────────────────────
     fig = uifigure('Name','Data Import & Preview', ...
@@ -107,14 +108,14 @@ function dataImportGUI()
         'RowSpacing',   6, ...
         'ColumnSpacing', 0);
 
-    % ── Toolbar row: Add / Remove buttons (top) + dataset listbox (bottom) ─
-    tbGL = uigridlayout(rootGL,[2 2], ...
-        'RowHeight',    {26,'1x'}, ...
+    % ── Toolbar row: Add / Remove buttons (top) + search/merge row + dataset listbox ─
+    tbGL = uigridlayout(rootGL,[3 2], ...
+        'RowHeight',    {26,26,'1x'}, ...
         'ColumnWidth',  {'1x','1x'}, ...
         'Padding',      [0 0 0 0], ...
         'RowSpacing',   4, ...
         'ColumnSpacing', 6);
-    tbGL.Layout.Row = 1; tbGL.Layout.Column = 1;
+    tbGL.Layout.Row = 1; tbGL.Layout.Column = [1 2];
 
     btnBrowse = uibutton(tbGL,'Text','Add File(s)...', ...
         'ButtonPushedFcn',@onAddFiles, ...
@@ -128,13 +129,27 @@ function dataImportGUI()
         'Tooltip','Remove the highlighted dataset from the list');
     btnRemoveDS.Layout.Row = 1; btnRemoveDS.Layout.Column = 2;
 
+    % Row 2: search box + merge button
+    efDatasetSearch = uieditfield(tbGL,'text','Value','', ...
+        'Placeholder','Filter datasets...', ...
+        'Tooltip','Filter the dataset list by name (case-insensitive substring match)', ...
+        'ValueChangedFcn',@onSearchChanged);
+    efDatasetSearch.Layout.Row = 2; efDatasetSearch.Layout.Column = 1;
+
+    btnMerge = uibutton(tbGL,'Text','Merge Selected', ...
+        'ButtonPushedFcn',@onMergeDatasets, ...
+        'BackgroundColor',[0.25 0.45 0.65], ...
+        'FontColor',[1 1 1], ...
+        'Tooltip','Concatenate 2+ selected datasets into a new merged dataset (sorted by X)');
+    btnMerge.Layout.Row = 2; btnMerge.Layout.Column = 2;
+
     lbDatasets = uilistbox(tbGL, ...
         'Items',     {'(no files loaded — click  Add File(s)...  to begin)'}, ...
         'ItemsData', {0}, ...
-        'Multiselect','off', ...
+        'Multiselect','on', ...
         'ValueChangedFcn',@onSelectDataset, ...
-        'Tooltip','Loaded datasets — click to make a dataset active for editing / corrections');
-    lbDatasets.Layout.Row = 2; lbDatasets.Layout.Column = [1 2];
+        'Tooltip','Loaded datasets — click to make active; Ctrl+click to select multiple for merging');
+    lbDatasets.Layout.Row = 3; lbDatasets.Layout.Column = [1 2];
 
     % ── Appearance panel (top right): colour, legend, axis labels, title ────
     % Column 3 (right-axis options) starts hidden (ColumnWidth{3}=0) and row 1
@@ -429,7 +444,7 @@ function dataImportGUI()
     analysisPanel.Layout.Row = 3; analysisPanel.Layout.Column = [1 2];
 
     analysisGL = uigridlayout(analysisPanel,[1 4], ...
-        'ColumnWidth', {350, 180, '2x', 150}, ...
+        'ColumnWidth', {350, 180, '1x', '1x'}, ...
         'RowHeight',   {'1x'}, ...
         'Padding',     [6 6 6 6], ...
         'ColumnSpacing', 10, ...
@@ -449,8 +464,8 @@ function dataImportGUI()
     corrPanel = uipanel(analysisGL,'Title','Corrections','FontSize',13);
     corrPanel.Layout.Row = 1; corrPanel.Layout.Column = 1;
 
-    corrGL = uigridlayout(corrPanel,[11 4], ...
-        'RowHeight',    {24,24,24,24,24,24,24,24,28,28,24}, ...
+    corrGL = uigridlayout(corrPanel,[14 4], ...
+        'RowHeight',    {24,24,24,24,24,24,24,24,28,28,24,20,24,24}, ...
         'ColumnWidth',  {70,'1x',88,'1x'}, ...
         'Padding',      [6 6 6 6], ...
         'RowSpacing',   4, ...
@@ -644,6 +659,33 @@ function dataImportGUI()
         'FontColor',[0.5 0.5 0.5]);
     btnToggleVis.Layout.Row = 11; btnToggleVis.Layout.Column = [1 2];
 
+    % Row 12: Region statistics readout (populated when BG box is drawn)
+    lblRegionStats = uibutton(corrGL,'Text','', 'Enable','off', 'FontSize',9, ...
+        'FontColor',[0.3 0.3 0.6]);
+    lblRegionStats.Layout.Row = 12; lblRegionStats.Layout.Column = [1 4];
+
+    % Row 13: Normalization control
+    lblNormalize = uibutton(corrGL,'Text','Normalize:','Enable','off');
+    lblNormalize.Layout.Row = 13; lblNormalize.Layout.Column = 1;
+
+    ddNormalize = uidropdown(corrGL, ...
+        'Items',   {'None', 'Range [0,1]', 'Peak (max=1)', 'Z-score', 'Area (integral=1)'}, ...
+        'Value',   'None', ...
+        'Tooltip', 'Normalize corrected data: Range = [0,1], Peak = max height = 1, Z-score = (x-mean)/std, Area = integrate to 1');
+    ddNormalize.Layout.Row = 13; ddNormalize.Layout.Column = [2 4];
+
+    % Row 14: Data trim / crop
+    lblXTrim = uibutton(corrGL,'Text','Trim X:','Enable','off');
+    lblXTrim.Layout.Row = 14; lblXTrim.Layout.Column = 1;
+
+    efXTrimMin = uieditfield(corrGL,'text','Value','', ...
+        'Tooltip','Trim x-range: keep only data from this minimum x-value (blank = no limit)');
+    efXTrimMin.Layout.Row = 14; efXTrimMin.Layout.Column = 2;
+
+    efXTrimMax = uieditfield(corrGL,'text','Value','', ...
+        'Tooltip','Trim x-range: keep only data up to this maximum x-value (blank = no limit)');
+    efXTrimMax.Layout.Row = 14; efXTrimMax.Layout.Column = [3 4];
+
     % ── Axis Limits sub-panel (middle column) ────────────────────────────
     % All six fields are text-type: blank = auto-scale, any number = manual.
     % str2double('') == NaN, so blank naturally means "do not apply".
@@ -753,8 +795,8 @@ function dataImportGUI()
     savePanel = uipanel(analysisGL,'Title','Save Corrected Data','FontSize',13);
     savePanel.Layout.Row = 1; savePanel.Layout.Column = 4;
 
-    saveGL = uigridlayout(savePanel,[6 2], ...
-        'RowHeight',    {26,32,32,32,32,32}, ...
+    saveGL = uigridlayout(savePanel,[8 2], ...
+        'RowHeight',    {26,32,32,32,32,32,32,32}, ...
         'ColumnWidth',  {'1x',100}, ...
         'Padding',      [6 6 6 6], ...
         'RowSpacing',   4, ...
@@ -805,6 +847,35 @@ function dataImportGUI()
         'Tooltip','Export all loaded datasets to separate CSV files (one per dataset)');
     btnBatchExport.Layout.Row = 6; btnBatchExport.Layout.Column = [1 2];
 
+    % Row 7: Publication figure save — format selector + save button
+    ddFigFormat = uidropdown(saveGL, ...
+        'Items',   {'PNG (300 dpi)', 'PDF (vector)', 'SVG (vector)', 'TIFF (300 dpi)'}, ...
+        'Value',   'PNG (300 dpi)', ...
+        'Tooltip', 'Output file format for publication-quality figure save');
+    ddFigFormat.Layout.Row = 7; ddFigFormat.Layout.Column = 1;
+
+    btnSaveFig = uibutton(saveGL,'Text','Save Figure', ...
+        'ButtonPushedFcn',@onSaveFigure, ...
+        'BackgroundColor',[0.55 0.20 0.55], ...
+        'FontColor',[1 1 1], ...
+        'Tooltip','Save the current plot to an image or vector file via exportgraphics');
+    btnSaveFig.Layout.Row = 7; btnSaveFig.Layout.Column = 2;
+
+    % Row 8: Session save / load
+    btnSaveSession = uibutton(saveGL,'Text','Save Session...', ...
+        'ButtonPushedFcn',@onSaveSession, ...
+        'BackgroundColor',[0.25 0.35 0.45], ...
+        'FontColor',[1 1 1], ...
+        'Tooltip','Save all loaded datasets, corrections, and peaks to a .mat session file');
+    btnSaveSession.Layout.Row = 8; btnSaveSession.Layout.Column = 1;
+
+    btnLoadSession = uibutton(saveGL,'Text','Load Session...', ...
+        'ButtonPushedFcn',@onLoadSession, ...
+        'BackgroundColor',[0.25 0.35 0.45], ...
+        'FontColor',[1 1 1], ...
+        'Tooltip','Restore a previously saved session from a .mat file');
+    btnLoadSession.Layout.Row = 8; btnLoadSession.Layout.Column = 2;
+
     % ── Peak Analysis sub-panel (row 2, full width) ───────────────────────
     % Always visible; XRD buttons in corrGL activate it contextually.
     peakPanel = uipanel(analysisGL,'Title','Peak Analysis','FontSize',13);
@@ -816,17 +887,17 @@ function dataImportGUI()
         'ColumnSpacing', 8);
 
     peakTable = uitable(peakGL, ...
-        'ColumnName',     {'#','Center (°)','FWHM (°)','Height','Status'}, ...
-        'ColumnWidth',    {28, 90, 78, 78, 62}, ...
+        'ColumnName',     {'#','Center (°)','FWHM (°)','Height','Area','Status'}, ...
+        'ColumnWidth',    {28, 85, 72, 68, 72, 60}, ...
         'Data',           {}, ...
         'RowName',        {}, ...
-        'ColumnEditable', [false false false false false], ...
+        'ColumnEditable', [false false false false false false], ...
         'CellSelectionCallback', @onPeakTableSelect, ...
         'Tooltip','Detected peaks — select a row to highlight it on the plot');
     peakTable.Layout.Column = 1;
 
-    peakBtnGL = uigridlayout(peakGL,[8 1], ...
-        'RowHeight',    {20,24,24,24,24,20,24,'1x'}, ...
+    peakBtnGL = uigridlayout(peakGL,[10 1], ...
+        'RowHeight',    {20,24,24,24,24,24,20,24,24,'1x'}, ...
         'Padding',      [0 0 0 0], ...
         'RowSpacing',   4);
     peakBtnGL.Layout.Column = 2;
@@ -843,33 +914,45 @@ function dataImportGUI()
         'Tooltip','Fit the selected model to each listed peak and extract precise center and FWHM');
     btnFitPeaks.Layout.Row = 2;
 
+    btnFitAllPeaks = uibutton(peakBtnGL,'Text','Fit All (global)', ...
+        'ButtonPushedFcn',@onFitAllPeaks, ...
+        'BackgroundColor',[0.10 0.28 0.55],'FontColor',[1 1 1], ...
+        'Tooltip','Fit all peaks simultaneously as a single multi-peak model (requires ≥2 peaks)');
+    btnFitAllPeaks.Layout.Row = 3;
+
     btnClearPeaks = uibutton(peakBtnGL,'Text','Clear All Peaks', ...
         'ButtonPushedFcn',@onClearPeaks, ...
         'Tooltip','Remove all peaks for the active dataset');
-    btnClearPeaks.Layout.Row = 3;
+    btnClearPeaks.Layout.Row = 4;
 
     btnRemovePeak = uibutton(peakBtnGL,'Text','Remove Selected', ...
         'ButtonPushedFcn',@onRemoveSelectedPeak, ...
         'Tooltip','Remove the currently highlighted peak from the list');
-    btnRemovePeak.Layout.Row = 4;
+    btnRemovePeak.Layout.Row = 5;
 
     btnSavePeaks = uibutton(peakBtnGL,'Text','Export Summary CSV', ...
         'ButtonPushedFcn',@onSavePeakSummary, ...
         'BackgroundColor',[0.30 0.30 0.60],'FontColor',[1 1 1], ...
         'Tooltip','Save peak centers and FWHM values to a CSV file');
-    btnSavePeaks.Layout.Row = 5;
+    btnSavePeaks.Layout.Row = 6;
+
+    btnExportPeakXLSX = uibutton(peakBtnGL,'Text','Export Peaks XLSX', ...
+        'ButtonPushedFcn',@onExportPeakXLSX, ...
+        'BackgroundColor',[0.20 0.40 0.20],'FontColor',[1 1 1], ...
+        'Tooltip','Export peak data from all datasets to an Excel file (.xlsx)');
+    btnExportPeakXLSX.Layout.Row = 7;
 
     chkShowFit = uicheckbox(peakBtnGL, ...
         'Text',              'Show fit curves', ...
         'Value',             true, ...
         'Tooltip',           'Overlay fit curves on the plot', ...
         'ValueChangedFcn',   @onToggleFitCurves);
-    chkShowFit.Layout.Row = 6;
+    chkShowFit.Layout.Row = 8;
 
     btnFitColor = uibutton(peakBtnGL, 'Text', 'Fit curve color...', ...
         'Tooltip',           'Pick the color used for fit curve overlays', ...
         'ButtonPushedFcn',   @onPickFitColor);
-    btnFitColor.Layout.Row = 7;
+    btnFitColor.Layout.Row = 9;
     btnFitColor.BackgroundColor = appData.fitCurveColor;
 
     % ── Drag-and-drop: register every major surface as a drop target (R2023a+) ──
@@ -1044,11 +1127,19 @@ function dataImportGUI()
 
     function onSelectDataset(~,~)
     %ONSELECTDATASET  Fires when the user clicks a row in lbDatasets.
-        val = lbDatasets.Value;
-        if isempty(val) || ~isnumeric(val) || val < 1 || ...
-           val > numel(appData.datasets)
-            return;
+    %  With Multiselect='on', lbDatasets.Value is a cell array of selected
+    %  ItemsData values.  The active dataset is the first (most-recently
+    %  clicked) element.
+        rawVal = lbDatasets.Value;
+        % Normalise to a numeric scalar (the "primary" selection)
+        if iscell(rawVal)
+            if isempty(rawVal), return; end
+            val = rawVal{1};   % first element is the active dataset
+        else
+            val = rawVal;
         end
+        if ~isnumeric(val) || numel(val) ~= 1, return; end
+        if val < 1 || val > numel(appData.datasets), return; end
         if val == appData.activeIdx, return; end   % no change
 
         saveAxisLimsToActiveDataset();   % persist zoom before leaving current dataset
@@ -1058,6 +1149,95 @@ function dataImportGUI()
             cancelInteractions();
         end
         appData.activeIdx = val;
+        updateControlsForActiveDataset();
+        onPlot([],[]);
+    end
+
+    function onSearchChanged(~,~)
+    %ONSEARCHCHANGED  Update dataset list filter when search box text changes.
+        appData.searchFilter = efDatasetSearch.Value;
+        rebuildDatasetList(true);
+    end
+
+    function onMergeDatasets(~,~)
+    %ONMERGEDATASETS  Concatenate the selected datasets into one new dataset.
+    %  Requires ≥ 2 datasets selected in lbDatasets (multi-select).
+    %  Uses corrData if available, otherwise raw data.
+    %  The merged x-vector is sorted ascending; y columns are concatenated
+    %  to match the first dataset's label/unit layout.
+        if isempty(appData.datasets)
+            uialert(fig,'Load files first.','No data'); return;
+        end
+
+        % Collect selected indices from multi-select listbox
+        rawVal = lbDatasets.Value;
+        if ~iscell(rawVal), rawVal = {rawVal}; end
+        selIdxList = cell2mat(rawVal);   % numeric vector of dataset indices
+        selIdxList = selIdxList(selIdxList >= 1 & selIdxList <= numel(appData.datasets));
+
+        if numel(selIdxList) < 2
+            uialert(fig, ...
+                sprintf(['Select at least 2 datasets in the list ' ...
+                         '(Ctrl+click or Shift+click).\n' ...
+                         'Currently selected: %d dataset(s).'], numel(selIdxList)), ...
+                'Merge: need ≥2 datasets');
+            return;
+        end
+
+        % Use corrData if available, else raw data
+        d1 = appData.datasets{selIdxList(1)};
+        baseData = guiTernary(~isempty(d1.corrData), d1.corrData, d1.data);
+
+        mergedTime   = double(baseData.time);
+        mergedValues = baseData.values;
+
+        ok = true;
+        for mi = 2:numel(selIdxList)
+            dsi  = appData.datasets{selIdxList(mi)};
+            di   = guiTernary(~isempty(dsi.corrData), dsi.corrData, dsi.data);
+
+            % Check column count compatibility
+            if size(di.values, 2) ~= size(baseData.values, 2)
+                uialert(fig, ...
+                    sprintf(['Dataset #%d has %d Y columns but dataset #%d has %d.\n' ...
+                             'All selected datasets must have the same number of channels.'], ...
+                             selIdxList(mi), size(di.values,2), ...
+                             selIdxList(1),  size(baseData.values,2)), ...
+                    'Merge: column mismatch');
+                ok = false;  break;
+            end
+
+            mergedTime   = [mergedTime;   double(di.time)];   %#ok<AGROW>
+            mergedValues = [mergedValues; di.values];           %#ok<AGROW>
+        end
+        if ~ok, return; end
+
+        % Sort by x (ascending)
+        [mergedTime, sortOrder] = sort(mergedTime, 'ascend');
+        mergedValues = mergedValues(sortOrder, :);
+
+        % Build merged data struct from the first dataset's metadata
+        mergedData          = baseData;
+        mergedData.time     = mergedTime;
+        mergedData.values   = mergedValues;
+
+        % Build display name from constituent filenames
+        nameStrs = cell(1, numel(selIdxList));
+        for mi = 1:numel(selIdxList)
+            [~, fn, ~] = fileparts(appData.datasets{selIdxList(mi)}.filepath);
+            nameStrs{mi} = fn;
+        end
+        mergedName = ['[merged] ', strjoin(nameStrs, ' + ')];
+
+        ds = buildDs(appData.datasets{selIdxList(1)}.filepath, mergedData, ...
+                     appData.datasets{selIdxList(1)}.parserName);
+        ds.displayName = mergedName;
+
+        appData.datasets{end+1} = ds;
+        appData.activeIdx       = numel(appData.datasets);
+
+        cancelInteractions();
+        rebuildDatasetList(true);
         updateControlsForActiveDataset();
         onPlot([],[]);
     end
@@ -1109,7 +1289,7 @@ function dataImportGUI()
             appData.activeIdx = 0;
             lbDatasets.Items     = {'(no files loaded — click  Add File(s)...  to begin)'};
             lbDatasets.ItemsData = {0};
-            lbDatasets.Value     = 0;
+            lbDatasets.Value     = {0};
             % Reset all controls to blank state
             ctrlPanel.Title = 'Controls';
             ddX.Items = {'(load file first)'};  ddX.Value = ddX.Items{1};
@@ -1150,21 +1330,23 @@ function dataImportGUI()
 
     function rebuildDatasetList(keepActiveIdx)
     %REBUILDDATASETLIST  Sync lbDatasets Items/ItemsData to appData.datasets.
+    %  Applies appData.searchFilter (case-insensitive substring) to the display
+    %  strings, but always keeps the active dataset visible regardless of filter.
         N = numel(appData.datasets);
         if N == 0
             lbDatasets.Items     = {'(no files loaded — click  Add File(s)...  to begin)'};
             lbDatasets.ItemsData = {0};
-            lbDatasets.Value     = 0;
+            lbDatasets.Value     = {0};
             appData.activeIdx    = 0;
             return;
         end
-        items = cell(1, N);
+
+        % Build full display strings for all datasets
+        allItems    = cell(1, N);
+        allIdxData  = num2cell(1:N);
         for i = 1:N
             dsI = appData.datasets{i};
-            % Get parser badge (short type tag like [XRD], [VSM], [CSV])
             badgeStr = getParserBadge(dsI.parserName);
-
-            % Use legend name if set; otherwise use filename
             if isfield(dsI,'legendName') && ~isempty(dsI.legendName)
                 displayStr = dsI.legendName;
             elseif isfield(dsI,'displayName') && ~isempty(dsI.displayName)
@@ -1173,16 +1355,40 @@ function dataImportGUI()
                 [~, fn, fext] = fileparts(dsI.filepath);
                 displayStr = [fn, fext];
             end
-
-            items{i} = sprintf('[%d]  %s  %s', i, badgeStr, displayStr);
+            allItems{i} = sprintf('[%d]  %s  %s', i, badgeStr, displayStr);
         end
-        lbDatasets.Items     = items;
-        lbDatasets.ItemsData = num2cell(1:N);
-        if keepActiveIdx && appData.activeIdx >= 1 && appData.activeIdx <= N
-            lbDatasets.Value = appData.activeIdx;
+
+        % Apply search filter (always keep active dataset visible)
+        filt = strtrim(appData.searchFilter);
+        if isempty(filt)
+            visIdx = 1:N;
         else
-            appData.activeIdx = 1;
-            lbDatasets.Value  = 1;
+            filtLC = lower(filt);
+            visIdx = find(cellfun(@(s) contains(lower(s), filtLC), allItems));
+            % Always include active dataset so it stays selectable
+            if keepActiveIdx && appData.activeIdx >= 1 && appData.activeIdx <= N
+                if ~ismember(appData.activeIdx, visIdx)
+                    visIdx = sort([visIdx, appData.activeIdx]);
+                end
+            end
+        end
+
+        if isempty(visIdx)
+            lbDatasets.Items     = {'(no matches)'};
+            lbDatasets.ItemsData = {0};
+            lbDatasets.Value     = {0};
+            return;
+        end
+
+        lbDatasets.Items     = allItems(visIdx);
+        lbDatasets.ItemsData = allIdxData(visIdx);
+
+        if keepActiveIdx && appData.activeIdx >= 1 && appData.activeIdx <= N && ...
+           ismember(appData.activeIdx, visIdx)
+            lbDatasets.Value = {appData.activeIdx};
+        else
+            appData.activeIdx = visIdx(1);
+            lbDatasets.Value  = {visIdx(1)};
         end
     end
 
@@ -1203,6 +1409,7 @@ function dataImportGUI()
         end
         appData.bgRectPatch       = [];
         appData.bgStartPt         = [];
+        lblRegionStats.Text       = '';  % Clear region statistics display
         % Abort any in-progress drag-zoom
         if ~isempty(appData.zoomRectPatch) && isvalid(appData.zoomRectPatch)
             delete(appData.zoomRectPatch);
@@ -1312,6 +1519,9 @@ function dataImportGUI()
         cbSmooth.Value       = guiTernary(isfield(ds,'smoothEnabled'), ds.smoothEnabled, false);
         efSmoothWin.Value    = guiTernary(isfield(ds,'smoothWindow'),  ds.smoothWindow,  5);
         ddSmoothMethod.Value = guiTernary(isfield(ds,'smoothMethod'),  ds.smoothMethod,  'Moving');
+        efXTrimMin.Value     = nan2str(guiTernary(isfield(ds,'xTrimMin'),      ds.xTrimMin,      NaN));
+        efXTrimMax.Value     = nan2str(guiTernary(isfield(ds,'xTrimMax'),      ds.xTrimMax,      NaN));
+        ddNormalize.Value    = guiTernary(isfield(ds,'normMethod'),    ds.normMethod,    'None');
 
         % Restore per-dataset axis limits (auto-scale if not yet saved)
         if isfield(ds, 'axLims')
@@ -1384,9 +1594,9 @@ function dataImportGUI()
                 btnAutoPeak.Visible        = 'on';
                 btnManualPeak.Visible      = 'on';
                 btnRemovePeakClick.Visible = 'on';
-                % Peak analysis panel — visible for XRD (col 3 gets flexible width)
+                % Peak analysis panel — visible for XRD (col 3 and col 4 split flexible width)
                 peakPanel.Visible          = 'on';
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, appData.axLimPanelWidth, '2x', 150};
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, appData.axLimPanelWidth, '1x', '1x'};
 
             case 'importQDVSM'
                 analysisPanel.Title   = 'Analysis & Corrections  —  VSM';
@@ -1593,7 +1803,7 @@ function dataImportGUI()
             isManual     = strcmp({ds.peaks.status}, 'manual');
             manualSeeds  = ds.peaks(isManual);
         else
-            manualSeeds  = struct('center',{},'fwhm',{},'height',{}, ...
+            manualSeeds  = struct('center',{},'fwhm',{},'height',{},'area',{}, ...
                                   'xRange',{},'status',{});
         end
 
@@ -1610,11 +1820,12 @@ function dataImportGUI()
         end
 
         % Build initial merged list from auto results
-        merged = struct('center',{},'fwhm',{},'height',{},'xRange',{},'status',{},'bg',{},'model',{});
+        merged = struct('center',{},'fwhm',{},'height',{},'area',{},'xRange',{},'status',{},'bg',{},'model',{});
         for pi = 1:numel(pkX)
             newPk.center = pkX(pi);
             newPk.fwhm   = pkW(pi);
             newPk.height = pkH(pi);
+            newPk.area   = NaN;
             newPk.xRange = [];
             newPk.status = 'auto';
             newPk.bg     = NaN;
@@ -1662,6 +1873,7 @@ function dataImportGUI()
             newPk.center = lX;
             newPk.fwhm   = lW;
             newPk.height = lH;
+            newPk.area   = NaN;
             newPk.xRange = [];
             newPk.status = 'manual';   % retains 'manual' — forced by seed
             newPk.bg     = NaN;
@@ -1747,6 +1959,7 @@ function dataImportGUI()
         newPk.center = pkX;
         newPk.fwhm   = NaN;
         newPk.height = pkH;
+        newPk.area   = NaN;
         newPk.xRange = [];
         newPk.status = 'manual';
         newPk.bg     = NaN;
@@ -1897,6 +2110,14 @@ function dataImportGUI()
                     ds.peaks(pi).bg     = pFit(4);   % background level at peak
                     ds.peaks(pi).status = 'fitted';
                     ds.peaks(pi).model  = ddFitModel.Value;
+                    % Compute area analytically
+                    switch ddFitModel.Value
+                        case 'Gaussian'
+                            fittedArea = pFit(1) * fwhmFit * sqrt(pi / log(2)) / 2;
+                        otherwise  % Lorentzian
+                            fittedArea = pFit(1) * fwhmFit * pi / 2;
+                    end
+                    ds.peaks(pi).area = fittedArea;
                 else
                     nFailed = nFailed + 1;
                 end
@@ -1914,13 +2135,111 @@ function dataImportGUI()
         end
     end
 
+    function onFitAllPeaks(~,~)
+    %ONFITALLPEAKS  Fit all listed peaks simultaneously as a single multi-peak model.
+    %  Builds a composite model (sum of N Lorentzian or Gaussian peaks + a
+    %  shared linear background) and optimises all parameters together with
+    %  fminsearch.  Requires ≥ 2 peaks.
+    %
+    %  Parameter vector layout (nP peaks):
+    %    p = [H1, x0_1, fwhm1, H2, x0_2, fwhm2, …, HnP, x0_nP, fwhmnP, m, b]
+    %  where m, b are the shared linear background slope and intercept.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig,'Load a file first.','No data'); return;
+        end
+        ds = appData.datasets{appData.activeIdx};
+        if numel(ds.peaks) < 2
+            uialert(fig, ...
+                'Need at least 2 peaks for a global fit.  Use "Fit Peaks" for a single peak.', ...
+                'Global Fit: need ≥2 peaks');
+            return;
+        end
+
+        d    = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
+        xSel = ddX.Value;
+        xName = guiXName(d.metadata);
+        if strcmp(xSel, xName)
+            xv = double(d.time);
+        else
+            idx2 = find(strcmp(d.labels, xSel), 1);
+            xv   = guiTernary(isempty(idx2), double(d.time), d.values(:,idx2));
+        end
+        ySel = ensureCell(lbY.Value);
+        yIdx = find(strcmp(d.labels, ySel{1}), 1);
+        if isempty(yIdx)
+            uialert(fig,'Could not find Y channel.','Global Fit'); return;
+        end
+        yv = d.values(:, yIdx);
+
+        valid = ~isnan(xv) & ~isnan(yv);
+        xv = xv(valid);  yv = yv(valid);
+        nP = numel(ds.peaks);
+
+        % Build composite model.
+        % Parameter vector: [H1,x0_1,fwhm1, H2,x0_2,fwhm2, ..., HnP,x0_nP,fwhmNP, m, b]
+        % The inner loop is compiled into a single anonymous function using a
+        % shared helper that iterates over peak blocks.
+        isGauss = strcmp(ddFitModel.Value,'Gaussian');
+        modelFun = @(p,x) evalMultiPeak(p, x, nP, isGauss);
+
+        % Build initial parameter vector from current peak seeds
+        xSpan = diff([min(xv), max(xv)]);
+        p0 = zeros(1, nP*3 + 2);
+        for k = 1:nP
+            pk = ds.peaks(k);
+            H0   = guiTernary(~isnan(pk.height) && pk.height > 0, pk.height, max(yv) - min(yv));
+            fwhm0 = guiTernary(~isnan(pk.fwhm) && pk.fwhm > 0, pk.fwhm, xSpan * 0.02);
+            p0((k-1)*3+1) = H0;
+            p0((k-1)*3+2) = pk.center;
+            p0((k-1)*3+3) = fwhm0;
+        end
+        % Linear BG initial guess: slope from first/last points
+        p0(end-1) = 0;   % slope
+        p0(end)   = min(yv);  % intercept
+
+        objFun = @(p) sum((modelFun(p, xv) - yv).^2);
+        opts   = optimset('Display','off','MaxIter',20000,'TolX',1e-10,'TolFun',1e-14);
+        try
+            pFit = fminsearch(objFun, p0, opts);
+        catch
+            uialert(fig,'Global fit optimisation failed.','Fit All Peaks');
+            return;
+        end
+
+        % Extract fitted parameters and update ds.peaks
+        mFit = pFit(end-1);  bFit = pFit(end);
+        for k = 1:nP
+            Hk    = pFit((k-1)*3+1);
+            x0k   = pFit((k-1)*3+2);
+            fwhmk = abs(pFit((k-1)*3+3));
+            if fwhmk > 0 && fwhmk < xSpan * 0.8
+                ds.peaks(k).center = x0k;
+                ds.peaks(k).fwhm   = fwhmk;
+                ds.peaks(k).height = Hk;
+                ds.peaks(k).bg     = mFit * x0k + bFit;
+                ds.peaks(k).status = 'fitted(global)';
+                ds.peaks(k).model  = ddFitModel.Value;
+                switch ddFitModel.Value
+                    case 'Gaussian'
+                        ds.peaks(k).area = Hk * fwhmk * sqrt(pi / log(2)) / 2;
+                    otherwise  % Lorentzian
+                        ds.peaks(k).area = Hk * fwhmk * pi / 2;
+                end
+            end
+        end
+
+        appData.datasets{appData.activeIdx} = ds;
+        refreshPeakTable();
+        onPlot([],[]);
+    end
+
     % ── Peak list management ─────────────────────────────────────────────
 
     function onClearPeaks(~,~)
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
         cancelInteractions();
         ds       = appData.datasets{appData.activeIdx};
-        ds.peaks = struct('center',{},'fwhm',{},'height',{},'xRange',{},'status',{},'bg',{},'model',{});
+        ds.peaks = struct('center',{},'fwhm',{},'height',{},'area',{},'xRange',{},'status',{},'bg',{},'model',{});
         appData.datasets{appData.activeIdx} = ds;
         appData.selectedPeakIdx = 0;
         refreshPeakTable();
@@ -1961,14 +2280,15 @@ function dataImportGUI()
         if n == 0
             peakTable.Data = {}; return;
         end
-        tbl = cell(n, 5);
+        tbl = cell(n, 6);
         for pi = 1:n
             pk        = ds.peaks(pi);
             tbl{pi,1} = pi;
             tbl{pi,2} = sprintf('%.4f', pk.center);
             tbl{pi,3} = guiTernary(isnan(pk.fwhm) || pk.fwhm <= 0, '—', sprintf('%.4f', pk.fwhm));
             tbl{pi,4} = sprintf('%.4g',  pk.height);
-            tbl{pi,5} = pk.status;
+            tbl{pi,5} = guiTernary(isnan(pk.area) || pk.area <= 0, '—', sprintf('%.4g', pk.area));
+            tbl{pi,6} = pk.status;
         end
         peakTable.Data = tbl;
     end
@@ -1996,18 +2316,115 @@ function dataImportGUI()
         try
             fid = fopen(fp, 'w');
             if fid < 0, error('Cannot open file for writing: %s', fp); end
-            fprintf(fid, 'Peak,Center_deg,FWHM_deg,Height,Status\n');
+            fprintf(fid, 'Peak,Center_deg,FWHM_deg,Height,Area,Status\n');
             for pi = 1:numel(ds.peaks)
-                pk     = ds.peaks(pi);
+                pk      = ds.peaks(pi);
                 fwhmStr = guiTernary(isnan(pk.fwhm), '', sprintf('%.6f', pk.fwhm));
-                fprintf(fid, '%d,%.6f,%s,%.6g,%s\n', ...
-                    pi, pk.center, fwhmStr, pk.height, pk.status);
+                areaStr = guiTernary(isnan(pk.area), '', sprintf('%.6g', pk.area));
+                fprintf(fid, '%d,%.6f,%s,%.6g,%s,%s\n', ...
+                    pi, pk.center, fwhmStr, pk.height, areaStr, pk.status);
             end
             fclose(fid);
             uialert(fig, sprintf('Saved:\n%s', fp), 'Peak Summary Exported');
         catch ME
             if fid >= 0, fclose(fid); end
             uialert(fig, ME.message, 'Save error');
+        end
+    end
+
+    function onExportPeakXLSX(~,~)
+    %ONEXPORTPEAKXLSX  Export peak data from all datasets with peaks to Excel.
+    %  One sheet per dataset; columns: Peak#, Center, FWHM, Height, Area, Status.
+    %  Datasets with no peaks are silently skipped.
+        if isempty(appData.datasets)
+            uialert(fig,'Load files first.','No data'); return;
+        end
+
+        % Check that at least one dataset has peaks
+        hasPeaks = false;
+        for chk = 1:numel(appData.datasets)
+            if ~isempty(appData.datasets{chk}.peaks)
+                hasPeaks = true;  break;
+            end
+        end
+        if ~hasPeaks
+            uialert(fig, ...
+                'No peaks found in any dataset.  Find or add peaks first.', ...
+                'No peaks to export');
+            return;
+        end
+
+        % Suggest save path based on first dataset
+        ds1 = appData.datasets{1};
+        [dPath, dName, ~] = fileparts(ds1.filepath);
+        defPath = fullfile(dPath, [dName, '_peaks.xlsx']);
+
+        [fname, fpath] = uiputfile({'*.xlsx','Excel Workbook (*.xlsx)'}, ...
+            'Export peaks to Excel...', defPath);
+        if isequal(fname, 0), return; end
+        outPath = fullfile(fpath, fname);
+
+        % Delete existing file so writecell starts fresh
+        if isfile(outPath)
+            try, delete(outPath); catch, end
+        end
+
+        nWritten = 0;
+        errMsgs  = {};
+        for di = 1:numel(appData.datasets)
+            ds = appData.datasets{di};
+            if isempty(ds.peaks), continue; end
+
+            % Build sheet name from display name (Excel limits: 31 chars, no special chars)
+            if isfield(ds,'legendName') && ~isempty(ds.legendName)
+                rawName = ds.legendName;
+            elseif isfield(ds,'displayName') && ~isempty(ds.displayName)
+                rawName = ds.displayName;
+            else
+                [~, fn, ~] = fileparts(ds.filepath);
+                rawName = fn;
+            end
+            % Sanitise: remove Excel-illegal characters, truncate to 31 chars
+            sheetName = regexprep(rawName, '[:\\/?*\[\]]', '_');
+            if numel(sheetName) > 28
+                sheetName = [sheetName(1:25), sprintf('_%02d', di)];
+            end
+            if isempty(strtrim(sheetName))
+                sheetName = sprintf('DS_%02d', di);
+            end
+
+            % Build cell array: header + data rows
+            nPk = numel(ds.peaks);
+            C   = cell(nPk + 1, 6);
+            C(1,:) = {'Peak #', 'Center', 'FWHM', 'Height', 'Area', 'Status'};
+            for pi = 1:nPk
+                pk       = ds.peaks(pi);
+                C{pi+1,1} = pi;
+                C{pi+1,2} = pk.center;
+                C{pi+1,3} = guiTernary(isnan(pk.fwhm) || pk.fwhm <= 0, '', pk.fwhm);
+                C{pi+1,4} = pk.height;
+                C{pi+1,5} = guiTernary(isnan(pk.area) || pk.area <= 0, '', pk.area);
+                C{pi+1,6} = pk.status;
+            end
+
+            try
+                writecell(C, outPath, 'Sheet', sheetName);
+                nWritten = nWritten + 1;
+            catch ME
+                errMsgs{end+1} = sprintf('%s: %s', sheetName, ME.message); %#ok<AGROW>
+            end
+        end
+
+        if nWritten == 0
+            uialert(fig, 'No peak data was written — check file permissions.', ...
+                'Export Failed');
+        elseif isempty(errMsgs)
+            uialert(fig, sprintf('Exported %d dataset(s) to:\n%s', nWritten, outPath), ...
+                'Peak Export Complete');
+        else
+            uialert(fig, sprintf('Exported %d dataset(s); %d error(s):\n%s', ...
+                nWritten, numel(errMsgs), strjoin(errMsgs,'\n')), ...
+                'Peak Export Partial');
         end
     end
 
@@ -2169,10 +2586,26 @@ function dataImportGUI()
         undoState.smoothEnabled  = ds.smoothEnabled;
         undoState.smoothWindow   = ds.smoothWindow;
         undoState.smoothMethod   = ds.smoothMethod;
+        undoState.xTrimMin       = ds.xTrimMin;
+        undoState.xTrimMax       = ds.xTrimMax;
+        undoState.normMethod     = ds.normMethod;
         ds.undoState = undoState;
 
         % Build corrected data struct (value-copy, then override time/values)
         corrData = d;
+
+        % ════════════════════════════════════════════════════════════════
+        %  Trim/crop data (FIRST step)
+        % ════════════════════════════════════════════════════════════════
+        xTrimMin = str2num_trim(efXTrimMin.Value);  xTrimMax = str2num_trim(efXTrimMax.Value);
+        if ~isnan(xTrimMin) || ~isnan(xTrimMax)
+            tVec = double(corrData.time);
+            mask = true(size(tVec));
+            if ~isnan(xTrimMin), mask = mask & tVec >= xTrimMin; end
+            if ~isnan(xTrimMax), mask = mask & tVec <= xTrimMax; end
+            corrData.time   = corrData.time(mask);
+            corrData.values = corrData.values(mask, :);
+        end
 
         % Correct x axis (datetime x-offset not supported — leave unchanged)
         if isdatetime(d.time)
@@ -2218,6 +2651,23 @@ function dataImportGUI()
                 'Window', win, 'Method', lower(ddSmoothMethod.Value));
         end
 
+        % ════════════════════════════════════════════════════════════════
+        %  Normalization (LAST step)
+        % ════════════════════════════════════════════════════════════════
+        switch ddNormalize.Value
+            case 'Range [0,1]'
+                corrData.values = utilities.normalize(corrData.values,'Method','range');
+            case 'Peak (max=1)'
+                corrData.values = utilities.normalize(corrData.values,'Method','peak');
+            case 'Z-score'
+                corrData.values = utilities.normalize(corrData.values,'Method','zscore');
+            case 'Area (integral=1)'
+                for k = 1:size(corrData.values,2)
+                    A = trapz(double(corrData.time), corrData.values(:,k));
+                    if A ~= 0, corrData.values(:,k) = corrData.values(:,k) / A; end
+                end
+        end
+
         ds.corrData      = corrData;
         ds.xOff          = xOff;
         ds.yOff          = yOff;
@@ -2226,6 +2676,9 @@ function dataImportGUI()
         ds.smoothEnabled = cbSmooth.Value;
         ds.smoothWindow  = efSmoothWin.Value;
         ds.smoothMethod  = ddSmoothMethod.Value;
+        ds.xTrimMin      = xTrimMin;
+        ds.xTrimMax      = xTrimMax;
+        ds.normMethod    = ddNormalize.Value;
         appData.datasets{appData.activeIdx} = ds;
 
         % Auto-set the save path for the active dataset
@@ -2243,6 +2696,9 @@ function dataImportGUI()
         cbSmooth.Value      = false;
         efSmoothWin.Value   = 5;
         ddSmoothMethod.Value = 'Moving';
+        efXTrimMin.Value    = '';
+        efXTrimMax.Value    = '';
+        ddNormalize.Value   = 'None';
         efSavePath.Value    = '';
 
         if appData.activeIdx >= 1 && ~isempty(appData.datasets)
@@ -2255,7 +2711,10 @@ function dataImportGUI()
             ds.smoothEnabled = false;
             ds.smoothWindow  = 5;
             ds.smoothMethod  = 'Moving';
-            ds.peaks         = struct('center',{},'fwhm',{},'height',{}, ...
+            ds.xTrimMin      = NaN;
+            ds.xTrimMax      = NaN;
+            ds.normMethod    = 'None';
+            ds.peaks         = struct('center',{},'fwhm',{},'height',{},'area',{}, ...
                                       'xRange',{},'status',{},'bg',{},'model',{});
             appData.datasets{appData.activeIdx} = ds;
             appData.selectedPeakIdx = 0;
@@ -2292,6 +2751,15 @@ function dataImportGUI()
         ds.smoothEnabled = undoState.smoothEnabled;
         ds.smoothWindow  = undoState.smoothWindow;
         ds.smoothMethod  = undoState.smoothMethod;
+        if isfield(undoState, 'xTrimMin')
+            ds.xTrimMin = undoState.xTrimMin;
+        end
+        if isfield(undoState, 'xTrimMax')
+            ds.xTrimMax = undoState.xTrimMax;
+        end
+        if isfield(undoState, 'normMethod')
+            ds.normMethod = undoState.normMethod;
+        end
 
         % Clear the undo state after restoring (one-level undo)
         ds.undoState = struct();
@@ -2307,6 +2775,9 @@ function dataImportGUI()
         cbSmooth.Value       = ds.smoothEnabled;
         efSmoothWin.Value    = ds.smoothWindow;
         ddSmoothMethod.Value = ds.smoothMethod;
+        efXTrimMin.Value     = nan2str(ds.xTrimMin);
+        efXTrimMax.Value     = nan2str(ds.xTrimMax);
+        ddNormalize.Value    = ds.normMethod;
 
         % Refresh the plot
         onPlot([],[]);
@@ -2629,6 +3100,15 @@ function dataImportGUI()
                     ~isnan(xVecRaw) & ~isnan(yVec);
             xPool = [xPool; xVecRaw(inBox)];  %#ok<AGROW>
             yPool = [yPool; yVec(inBox)];      %#ok<AGROW>
+        end
+
+        % Display region statistics
+        if numel(yPool) >= 1
+            lblRegionStats.Text = sprintf( ...
+                'Region: n=%d  mean=%.4g  std=%.4g  min=%.4g  max=%.4g', ...
+                numel(yPool), mean(yPool), std(yPool), min(yPool), max(yPool));
+        else
+            lblRegionStats.Text = '';
         end
 
         if numel(xPool) < 2
@@ -3630,6 +4110,194 @@ function dataImportGUI()
         delete(tmpFig);
     end
 
+    function onSaveFigure(~,~)
+    %ONSAVEFIGURE  Export the current plot to a file using exportgraphics.
+    %  The format and resolution are determined by the ddFigFormat dropdown.
+    %  Renders into a temporary hidden figure (like onCopyToClipboard) so the
+    %  GUI uiaxes is not disturbed.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig,'Load a file first.','No data'); return;
+        end
+
+        % Map dropdown choice to file extension and exportgraphics options
+        fmtStr = ddFigFormat.Value;
+        switch fmtStr
+            case 'PNG (300 dpi)'
+                ext      = '.png';
+                fmtFilter = {'*.png','PNG image (*.png)'};
+                egOpts   = {'ContentType','image','Resolution',300};
+            case 'PDF (vector)'
+                ext      = '.pdf';
+                fmtFilter = {'*.pdf','PDF vector (*.pdf)'};
+                egOpts   = {'ContentType','vector'};
+            case 'SVG (vector)'
+                ext      = '.svg';
+                fmtFilter = {'*.svg','SVG vector (*.svg)'};
+                egOpts   = {'ContentType','vector'};
+            case 'TIFF (300 dpi)'
+                ext      = '.tif';
+                fmtFilter = {'*.tif','TIFF image (*.tif)'};
+                egOpts   = {'ContentType','image','Resolution',300};
+            otherwise
+                ext      = '.png';
+                fmtFilter = {'*.png','PNG image (*.png)'};
+                egOpts   = {'ContentType','image','Resolution',300};
+        end
+
+        % Suggest a filename based on the active dataset
+        ds = appData.datasets{appData.activeIdx};
+        [dPath, dName, ~] = fileparts(ds.filepath);
+        defPath = fullfile(dPath, [dName, ext]);
+
+        [fname, fpath] = uiputfile(fmtFilter, 'Save figure as...', defPath);
+        if isequal(fname, 0), return; end
+        outPath = fullfile(fpath, fname);
+
+        % Render into a hidden figure
+        tmpFig = figure('Visible','off','Name','SaveFig','NumberTitle','off', ...
+                        'MenuBar','none','ToolBar','none', ...
+                        'Units','inches','Position',[0 0 7 5]);
+        tmpAx = axes(tmpFig);   %#ok<LAXES>
+        box(tmpAx,'on');
+        grid(tmpAx,'on');
+        drawToAxes(tmpAx);
+        try
+            exportgraphics(tmpFig, outPath, egOpts{:});
+            delete(tmpFig);
+            uialert(fig, sprintf('Saved:\n%s', outPath), 'Figure Saved');
+        catch ME
+            delete(tmpFig);
+            uialert(fig, sprintf('exportgraphics failed:\n%s', ME.message), 'Save error');
+        end
+    end
+
+    % ── Session save / load ───────────────────────────────────────────────
+
+    function onSaveSession(~,~)
+    %ONSAVESESSION  Save all datasets, corrections, peaks, and key UI settings
+    %  to a .mat file so the session can be restored later with onLoadSession.
+        if isempty(appData.datasets)
+            uialert(fig,'Nothing to save — load some files first.','No data'); return;
+        end
+
+        % Suggest path based on first dataset
+        ds1 = appData.datasets{1};
+        [dPath, dName, ~] = fileparts(ds1.filepath);
+        defPath = fullfile(dPath, [dName, '_session.mat']);
+
+        [fname, fpath] = uiputfile({'*.mat','MATLAB session (*.mat)'}, ...
+            'Save session as...', defPath);
+        if isequal(fname, 0), return; end
+        outPath = fullfile(fpath, fname);
+
+        % Collect datasets and current UI settings to persist
+        savedDatasets  = appData.datasets;
+        savedActiveIdx = appData.activeIdx;
+        savedBgFile    = appData.bgFile;
+        savedBgDataset = appData.bgDataset;
+        savedStyle     = appData.style;
+        savedLastDir   = appData.lastDir;
+        savedColormap  = ddColormap.Value;
+        savedXSel      = ddX.Value;
+        savedYSel      = ensureCell(lbY.Value);
+        savedY2Sel     = ensureCell(lbY2.Value);
+        savedLogX      = cbLogX.Value;
+        savedLogY      = cbLogY.Value;
+
+        try
+            save(outPath, 'savedDatasets', 'savedActiveIdx', ...
+                          'savedBgFile', 'savedBgDataset', ...
+                          'savedStyle', 'savedLastDir', ...
+                          'savedColormap', 'savedXSel', ...
+                          'savedYSel', 'savedY2Sel', ...
+                          'savedLogX', 'savedLogY', ...
+                          '-v7.3');
+            uialert(fig, sprintf('Session saved:\n%s', outPath), 'Session Saved');
+        catch ME
+            uialert(fig, sprintf('Save failed:\n%s', ME.message), 'Session Save Error');
+        end
+    end
+
+    function onLoadSession(~,~)
+    %ONLOADSESSION  Restore a previously saved session from a .mat file.
+    %  Replaces all current datasets with those from the file, then refreshes
+    %  all controls.
+        startDir = guiTernary(isempty(appData.lastDir), pwd, appData.lastDir);
+        [fname, fpath] = uigetfile({'*.mat','MATLAB session (*.mat)'}, ...
+            'Load session file...', startDir);
+        if isequal(fname, 0), return; end
+        matPath = fullfile(fpath, fname);
+
+        try
+            S = load(matPath, '-mat');
+        catch ME
+            uialert(fig, sprintf('Could not load file:\n%s', ME.message), 'Load Error');
+            return;
+        end
+
+        % Validate required field
+        if ~isfield(S, 'savedDatasets')
+            uialert(fig, 'File does not appear to be a valid session file.', 'Load Error');
+            return;
+        end
+
+        cancelInteractions();
+
+        % Restore core data
+        appData.datasets  = S.savedDatasets;
+        appData.activeIdx = guiTernary(isfield(S,'savedActiveIdx') && ...
+            S.savedActiveIdx >= 1 && S.savedActiveIdx <= numel(S.savedDatasets), ...
+            S.savedActiveIdx, 1);
+        appData.bgFile    = guiTernary(isfield(S,'savedBgFile'),    S.savedBgFile,    '');
+        appData.bgDataset = guiTernary(isfield(S,'savedBgDataset'), S.savedBgDataset, []);
+        appData.style     = guiTernary(isfield(S,'savedStyle'),     S.savedStyle,     'Line');
+        appData.lastDir   = guiTernary(isfield(S,'savedLastDir'),   S.savedLastDir,   '');
+
+        if isempty(appData.datasets)
+            rebuildDatasetList(false);
+            return;
+        end
+
+        % Restore UI settings
+        if isfield(S,'savedColormap') && ismember(S.savedColormap, ddColormap.Items)
+            ddColormap.Value = S.savedColormap;
+        end
+        if isfield(S,'savedLogX'), cbLogX.Value = S.savedLogX; end
+        if isfield(S,'savedLogY'), cbLogY.Value = S.savedLogY; end
+
+        % Restore plot style button appearance
+        onStylePick(appData.style);
+
+        % Restore BG file display
+        if ~isempty(appData.bgFile)
+            efBGFile.Value = appData.bgFile;
+        end
+
+        % Clear search filter so all datasets are visible on load
+        appData.searchFilter = '';
+        efDatasetSearch.Value = '';
+
+        rebuildDatasetList(true);
+        updateControlsForActiveDataset();
+
+        % Restore axis channel selections (best-effort — may not match new dataset)
+        if isfield(S,'savedXSel') && ismember(S.savedXSel, ddX.Items)
+            ddX.Value = S.savedXSel;
+        end
+        if isfield(S,'savedYSel')
+            validY = S.savedYSel(ismember(S.savedYSel, lbY.Items));
+            if ~isempty(validY), lbY.Value = validY; end
+        end
+        if isfield(S,'savedY2Sel')
+            validY2 = S.savedY2Sel(ismember(S.savedY2Sel, lbY2.Items));
+            if ~isempty(validY2), lbY2.Value = validY2; end
+        end
+
+        onPlot([],[]);
+        uialert(fig, sprintf('Session loaded: %d dataset(s)', numel(appData.datasets)), ...
+            'Session Loaded');
+    end
+
     % ── Panel drag-resize ────────────────────────────────────────────────
 
     function dir = detectResizeBorder()
@@ -3873,7 +4541,7 @@ function dataImportGUI()
         tgt = max(1, min(nDS, tgt));
         % Temporarily highlight target row without triggering onSelectDataset
         lbDatasets.ValueChangedFcn = [];
-        lbDatasets.Value           = tgt;
+        lbDatasets.Value           = {tgt};
         lbDatasets.ValueChangedFcn = @onSelectDataset;
     end
 
@@ -4016,7 +4684,10 @@ function ds = buildDs(fp, data, parserName)
     ds.smoothEnabled = false;
     ds.smoothWindow  = 5;
     ds.smoothMethod  = 'Moving';
-    ds.peaks       = struct('center',{},'fwhm',{},'height',{}, ...
+    ds.normMethod    = 'None';
+    ds.xTrimMin      = NaN;
+    ds.xTrimMax      = NaN;
+    ds.peaks       = struct('center',{},'fwhm',{},'height',{},'area',{}, ...
                             'xRange',{},'status',{},'bg',{},'model',{});
     ds.axLims      = struct('xMin','','xMax','','xStep','', ...
                             'yMin','','yMax','','yStep','', ...
@@ -4168,6 +4839,16 @@ end
 
 function v = guiTernary(cond, a, b)
     if cond, v = a; else, v = b; end
+end
+
+% Helper: convert NaN ↔ empty string for text-based trim fields
+function s = nan2str(x)
+    if isnan(x), s = ''; else, s = num2str(x); end
+end
+
+function x = str2num_trim(s)
+    x = str2double(s);
+    if isnan(x), x = NaN; end
 end
 
 
@@ -4531,4 +5212,23 @@ function colors = generateInferno(nColors)
     b = interp1([0 0.5 1], [0.014 0.612 0.120], t, 'pchip');
     colors = [r, g, b];
     colors = max(0, min(1, colors));  % Clamp to [0, 1]
+end
+
+
+function y = evalMultiPeak(p, x, nP, isGauss)
+%EVALMULTIPEAK  Evaluate a composite multi-peak model at x.
+%  p layout: [H1, x0_1, fwhm1,  H2, x0_2, fwhm2, …,  HnP, x0_nP, fwhmNP,  m, b]
+%  where m and b are the shared linear background slope and intercept.
+%  isGauss=true uses Gaussian peaks; false uses Lorentzian peaks.
+    y = p(end-1) .* x + p(end);   % linear background
+    for k = 1:nP
+        H    = p((k-1)*3 + 1);
+        x0   = p((k-1)*3 + 2);
+        fwhm = p((k-1)*3 + 3);
+        if isGauss
+            y = y + H .* exp(-4.*log(2) .* ((x - x0) ./ fwhm).^2);
+        else
+            y = y + H ./ (1 + 4.*((x - x0) ./ fwhm).^2);
+        end
+    end
 end
