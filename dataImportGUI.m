@@ -1319,10 +1319,22 @@ function dataImportGUI()
         selectedValues = ensureCell(lbDatasets.Value);
         indicesToRemove = [];
 
+        % Match selected display strings to dataset indices
         for i = 1:numel(appData.datasets)
             ds = appData.datasets{i};
-            displayName = getDisplayName(ds);
-            if any(strcmp(selectedValues, displayName))
+            % Build the same display string as rebuildDatasetList does
+            badgeStr = getParserBadge(ds.parserName);
+            if isfield(ds,'legendName') && ~isempty(ds.legendName)
+                displayStr = ds.legendName;
+            elseif isfield(ds,'displayName') && ~isempty(ds.displayName)
+                displayStr = ds.displayName;
+            else
+                [~, fn, fext] = fileparts(ds.filepath);
+                displayStr = [fn, fext];
+            end
+            fullDisplayStr = sprintf('[%d]  %s  %s', i, badgeStr, displayStr);
+
+            if any(strcmp(selectedValues, fullDisplayStr))
                 indicesToRemove = [indicesToRemove, i];
             end
         end
