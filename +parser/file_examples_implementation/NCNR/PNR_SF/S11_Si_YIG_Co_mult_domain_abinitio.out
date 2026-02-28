@@ -1,0 +1,605 @@
+-- Model 0 YFan_S11_20G_abinitio
+.probe
+  .Aguide = Aguide YFan_S11_20G_abinitio = 270
+  .H = H YFan_S11_20G_abinitio = 0
+  .mm
+    .back_absorption = back_absorption YFan_S11_20G_abinitio = 1
+    .background = background YFan_S11_20G_abinitio = 0
+    .intensity = intensity YFan_S11_20G_abinitio = 0.862773 in [0.5,5]
+    .sample_broadening = sample_broadening YFan_S11_20G_abinitio = 0.026
+    .theta_offset = theta_offset YFan_S11_20G_abinitio = -0.00263407 in [-0.008,0.008]
+  .mp
+    .back_absorption = back_absorption YFan_S11_20G_abinitio = 1
+    .background = background YFan_S11_20G_abinitio = 0
+    .intensity = intensity YFan_S11_20G_abinitio = 1
+    .sample_broadening = sample_broadening YFan_S11_20G_abinitio = 0.026
+    .theta_offset = theta_offset YFan_S11_20G_abinitio = 0
+  .pm
+    .back_absorption = back_absorption YFan_S11_20G_abinitio = 1
+    .background = background YFan_S11_20G_abinitio = 0
+    .intensity = intensity YFan_S11_20G_abinitio = 1
+    .sample_broadening = sample_broadening YFan_S11_20G_abinitio = 0.026
+    .theta_offset = theta_offset YFan_S11_20G_abinitio = 0
+  .pp
+    .back_absorption = back_absorption YFan_S11_20G_abinitio = 1
+    .background = background YFan_S11_20G_abinitio = 0
+    .intensity = intensity YFan_S11_20G_abinitio = 0.862773 in [0.5,5]
+    .sample_broadening = sample_broadening YFan_S11_5kOe_abinitio = 0.0175681 in [0,0.06]
+    .theta_offset = theta_offset YFan_S11_20G_abinitio = -0.00263407 in [-0.008,0.008]
+.ratio
+  [0] = (1 - ratio 1) = 0.979249
+  [1] = ratio 1 = 0.0207512 in [0.001,0.99]
+.samples
+  [0]
+    .layers
+      [0]
+        .interface = Si interface = 105.43 in [1,200]
+        .material
+          .irho = Si irho = 0
+          .rho = Si rho = 2.07
+        .thickness = Si thickness = 100
+      [1]
+        .interface = SiO interface = 7.6554 in [1,30]
+        .material
+          .irho = SiO irho = 0
+          .rho = SiO rho = 3.49
+        .thickness = SiO thickness = 252
+      [2]
+        .interface = Pt interface = 1.0016 in [1,20]
+        .material
+          .irho = Pt irho = 0
+          .rho = Pt rho = 6.68
+        .thickness = Pt thickness = 82.6
+      [3]
+        .interface = YIG interface = 6.00716 in [1,30]
+        .magnetism
+          .dead_above = YIG deadM above = 0.0408899 in [0,50]
+          .dead_below = YIG deadM below = 0
+          .interface_above = None
+          .interface_below = None
+          .rhoM = YIG rhoM = -0.221414 in [-0.5,0.5]
+          .thetaM = YIG thetaM = 270
+        .material
+          .irho = YIG irho = 0
+          .rho = YIG rho = 5.71
+        .thickness = YIG thickness = 359.9
+      [4]
+        .interface = Co interface = 9.42015 in [1,20]
+        .magnetism
+          .dead_above = Co deadM above = 20.6908 in [0,40]
+          .dead_below = Co deadM below = 1.50933 in [0,50]
+          .interface_above = None
+          .interface_below = None
+          .rhoM = Co rhoM = 3.94591 in [0,5]
+          .thetaM = Co thetaM = 270
+        .material
+          .irho = Co irho = 0.012
+          .rho = Co rho = 2.19
+        .thickness = Co thickness = 187
+      [5]
+        .interface = Ta interface = 1.00042 in [1,20]
+        .material
+          .irho = Ta irho = 0
+          .rho = Ta rho = 3.86
+        .thickness = Ta thickness = 47.9
+      [6]
+        .interface = air interface = 0
+        .material = None
+        .thickness = air thickness = 0
+    .thickness = stack thickness = 1029.4
+  [1]
+    .layers
+      [0]
+        .interface = Si interface = 105.43 in [1,200]
+        .material
+          .irho = Si irho = 0
+          .rho = Si rho = 2.07
+        .thickness = Si thickness = 100
+      [1]
+        .interface = SiO interface = 7.6554 in [1,30]
+        .material
+          .irho = SiO irho = 0
+          .rho = SiO rho = 3.49
+        .thickness = SiO thickness = 252
+      [2]
+        .interface = Pt interface = 1.0016 in [1,20]
+        .material
+          .irho = Pt irho = 0
+          .rho = Pt rho = 6.68
+        .thickness = Pt thickness = 82.6
+      [3]
+        .interface = YIG interface = 6.00716 in [1,30]
+        .magnetism
+          .dead_above = YIG deadM above = 0.168806 in [0,50]
+          .dead_below = YIG deadM below = 0
+          .interface_above = None
+          .interface_below = None
+          .rhoM = YIG rhoM = -0.499986 in [-0.5,0.5]
+          .thetaM = YIG thetaM = 180
+        .material
+          .irho = YIG irho = 0
+          .rho = YIG rho = 5.71
+        .thickness = YIG thickness = 359.9
+      [4]
+        .interface = Co interface = 9.42015 in [1,20]
+        .magnetism
+          .dead_above = Co deadM above = 20.6908 in [0,40]
+          .dead_below = Co deadM below = 0.193248 in [0,50]
+          .interface_above = None
+          .interface_below = None
+          .rhoM = Co rhoM = 3.57749 in [0,5]
+          .thetaM = Co thetaM = 180
+        .material
+          .irho = Co irho = 0.012
+          .rho = Co rho = 2.19
+        .thickness = Co thickness = 187
+      [5]
+        .interface = Ta interface = 1.00042 in [1,20]
+        .material
+          .irho = Ta irho = 0
+          .rho = Ta rho = 3.86
+        .thickness = Ta thickness = 47.9
+      [6]
+        .interface = air interface = 0
+        .material = None
+        .thickness = air thickness = 0
+    .thickness = stack thickness = 1029.4
+
+[chisq=8.550(56), nllf=1620.14]
+-- Model 1 YFan_S11_YIG-Co_40G_abinitio
+.probe
+  .Aguide = Aguide YFan_S11_YIG-Co_40G_abinitio = 270
+  .H = H YFan_S11_YIG-Co_40G_abinitio = 0
+  .mm
+    .back_absorption = back_absorption YFan_S11_YIG-Co_40G_abinitio = 1
+    .background = background YFan_S11_YIG-Co_40G_abinitio = 0
+    .intensity = intensity YFan_S11_YIG-Co_40G_abinitio = 1.14819 in [0.5,5]
+    .sample_broadening = sample_broadening YFan_S11_YIG-Co_40G_abinitio = 0.026
+    .theta_offset = theta_offset YFan_S11_YIG-Co_40G_abinitio = 0.000857238 in [-0.008,0.008]
+  .mp
+    .back_absorption = back_absorption YFan_S11_YIG-Co_40G_abinitio = 1
+    .background = background YFan_S11_YIG-Co_40G_abinitio = 0
+    .intensity = intensity YFan_S11_YIG-Co_40G_abinitio = 1
+    .sample_broadening = sample_broadening YFan_S11_YIG-Co_40G_abinitio = 0.026
+    .theta_offset = theta_offset YFan_S11_YIG-Co_40G_abinitio = 0
+  .pm
+    .back_absorption = back_absorption YFan_S11_YIG-Co_40G_abinitio = 1
+    .background = background YFan_S11_YIG-Co_40G_abinitio = 0
+    .intensity = intensity YFan_S11_YIG-Co_40G_abinitio = 1
+    .sample_broadening = sample_broadening YFan_S11_YIG-Co_40G_abinitio = 0.026
+    .theta_offset = theta_offset YFan_S11_YIG-Co_40G_abinitio = 0
+  .pp
+    .back_absorption = back_absorption YFan_S11_YIG-Co_40G_abinitio = 1
+    .background = background YFan_S11_YIG-Co_40G_abinitio = 0
+    .intensity = intensity YFan_S11_YIG-Co_40G_abinitio = 1.14819 in [0.5,5]
+    .sample_broadening = sample_broadening YFan_S11_5kOe_abinitio = 0.0175681 in [0,0.06]
+    .theta_offset = theta_offset YFan_S11_YIG-Co_40G_abinitio = 0.000857238 in [-0.008,0.008]
+.ratio
+  [0] = (1 - ratio 1) = 0.966121
+  [1] = ratio 1 = 0.0338795 in [0.001,0.99]
+.samples
+  [0]
+    .layers
+      [0]
+        .interface = Si interface = 105.43 in [1,200]
+        .material
+          .irho = Si irho = 0
+          .rho = Si rho = 2.07
+        .thickness = Si thickness = 100
+      [1]
+        .interface = SiO interface = 7.6554 in [1,30]
+        .material
+          .irho = SiO irho = 0
+          .rho = SiO rho = 3.49
+        .thickness = SiO thickness = 252
+      [2]
+        .interface = Pt interface = 1.0016 in [1,20]
+        .material
+          .irho = Pt irho = 0
+          .rho = Pt rho = 6.68
+        .thickness = Pt thickness = 82.6
+      [3]
+        .interface = YIG interface = 6.00716 in [1,30]
+        .magnetism
+          .dead_above = YIG deadM above = 0.0779561 in [0,50]
+          .dead_below = YIG deadM below = 0
+          .interface_above = None
+          .interface_below = None
+          .rhoM = YIG rhoM = -0.178275 in [-0.5,0.5]
+          .thetaM = YIG thetaM = 270
+        .material
+          .irho = YIG irho = 0
+          .rho = YIG rho = 5.71
+        .thickness = YIG thickness = 359.9
+      [4]
+        .interface = Co interface = 9.42015 in [1,20]
+        .magnetism
+          .dead_above = Co deadM above = 20.6908 in [0,40]
+          .dead_below = Co deadM below = 0.675546 in [0,50]
+          .interface_above = None
+          .interface_below = None
+          .rhoM = Co rhoM = 4.00444 in [0,5]
+          .thetaM = Co thetaM = 270
+        .material
+          .irho = Co irho = 0.012
+          .rho = Co rho = 2.19
+        .thickness = Co thickness = 187
+      [5]
+        .interface = Ta interface = 1.00042 in [1,20]
+        .material
+          .irho = Ta irho = 0
+          .rho = Ta rho = 3.86
+        .thickness = Ta thickness = 47.9
+      [6]
+        .interface = air interface = 0
+        .material = None
+        .thickness = air thickness = 0
+    .thickness = stack thickness = 1029.4
+  [1]
+    .layers
+      [0]
+        .interface = Si interface = 105.43 in [1,200]
+        .material
+          .irho = Si irho = 0
+          .rho = Si rho = 2.07
+        .thickness = Si thickness = 100
+      [1]
+        .interface = SiO interface = 7.6554 in [1,30]
+        .material
+          .irho = SiO irho = 0
+          .rho = SiO rho = 3.49
+        .thickness = SiO thickness = 252
+      [2]
+        .interface = Pt interface = 1.0016 in [1,20]
+        .material
+          .irho = Pt irho = 0
+          .rho = Pt rho = 6.68
+        .thickness = Pt thickness = 82.6
+      [3]
+        .interface = YIG interface = 6.00716 in [1,30]
+        .magnetism
+          .dead_above = YIG deadM above = 0.0167915 in [0,50]
+          .dead_below = YIG deadM below = 0
+          .interface_above = None
+          .interface_below = None
+          .rhoM = YIG rhoM = -0.499974 in [-0.5,0.5]
+          .thetaM = YIG thetaM = 180
+        .material
+          .irho = YIG irho = 0
+          .rho = YIG rho = 5.71
+        .thickness = YIG thickness = 359.9
+      [4]
+        .interface = Co interface = 9.42015 in [1,20]
+        .magnetism
+          .dead_above = Co deadM above = 20.6908 in [0,40]
+          .dead_below = Co deadM below = 10.0189 in [0,50]
+          .interface_above = None
+          .interface_below = None
+          .rhoM = Co rhoM = 4.05 in [0,5]
+          .thetaM = Co thetaM = 180
+        .material
+          .irho = Co irho = 0.012
+          .rho = Co rho = 2.19
+        .thickness = Co thickness = 187
+      [5]
+        .interface = Ta interface = 1.00042 in [1,20]
+        .material
+          .irho = Ta irho = 0
+          .rho = Ta rho = 3.86
+        .thickness = Ta thickness = 47.9
+      [6]
+        .interface = air interface = 0
+        .material = None
+        .thickness = air thickness = 0
+    .thickness = stack thickness = 1029.4
+
+[chisq=7.401(41), nllf=1909.52]
+-- Model 2 YFan_S11_300G_abinitio
+.probe
+  .Aguide = Aguide YFan_S11_300G_abinitio = 270
+  .H = H YFan_S11_300G_abinitio = 0
+  .mm
+    .back_absorption = back_absorption YFan_S11_300G_abinitio = 1
+    .background = background YFan_S11_300G_abinitio = 0
+    .intensity = intensity YFan_S11_300G_abinitio = 1.0042 in [0.5,5]
+    .sample_broadening = sample_broadening YFan_S11_300G_abinitio = 0.026
+    .theta_offset = theta_offset YFan_S11_300G_abinitio = 0.000204788 in [-0.008,0.008]
+  .mp = None
+  .pm = None
+  .pp
+    .back_absorption = back_absorption YFan_S11_300G_abinitio = 1
+    .background = background YFan_S11_300G_abinitio = 0
+    .intensity = intensity YFan_S11_300G_abinitio = 1.0042 in [0.5,5]
+    .sample_broadening = sample_broadening YFan_S11_5kOe_abinitio = 0.0175681 in [0,0.06]
+    .theta_offset = theta_offset YFan_S11_300G_abinitio = 0.000204788 in [-0.008,0.008]
+.sample
+  .layers
+    [0]
+      .interface = Si interface = 105.43 in [1,200]
+      .material
+        .irho = Si irho = 0
+        .rho = Si rho = 2.07
+      .thickness = Si thickness = 100
+    [1]
+      .interface = SiO interface = 7.6554 in [1,30]
+      .material
+        .irho = SiO irho = 0
+        .rho = SiO rho = 3.49
+      .thickness = SiO thickness = 252
+    [2]
+      .interface = Pt interface = 1.0016 in [1,20]
+      .material
+        .irho = Pt irho = 0
+        .rho = Pt rho = 6.68
+      .thickness = Pt thickness = 82.6
+    [3]
+      .interface = YIG interface = 6.00716 in [1,30]
+      .magnetism
+        .dead_above = YIG deadM above = 49.9983 in [0,50]
+        .dead_below = YIG deadM below = 0
+        .interface_above = None
+        .interface_below = None
+        .rhoM = YIG rhoM = 0.0829844 in [-0.5,0.5]
+        .thetaM = YIG thetaM = 270
+      .material
+        .irho = YIG irho = 0
+        .rho = YIG rho = 5.71
+      .thickness = YIG thickness = 359.9
+    [4]
+      .interface = Co interface = 9.42015 in [1,20]
+      .magnetism
+        .dead_above = Co deadM above = 20.6908 in [0,40]
+        .dead_below = Co deadM below = 0.57734 in [0,50]
+        .interface_above = None
+        .interface_below = None
+        .rhoM = Co rhoM = 4.05162 in [0,5]
+        .thetaM = Co thetaM = 270
+      .material
+        .irho = Co irho = 0.012
+        .rho = Co rho = 2.19
+      .thickness = Co thickness = 187
+    [5]
+      .interface = Ta interface = 1.00042 in [1,20]
+      .material
+        .irho = Ta irho = 0
+        .rho = Ta rho = 3.86
+      .thickness = Ta thickness = 47.9
+    [6]
+      .interface = air interface = 0
+      .material = None
+      .thickness = air thickness = 0
+  .thickness = stack thickness = 1029.4
+
+[chisq=7.120(83), nllf=679.998]
+-- Model 3 YFan_S11_450G_abinitio
+.probe
+  .Aguide = Aguide YFan_S11_450G_abinitio = 270
+  .H = H YFan_S11_450G_abinitio = 0
+  .mm
+    .back_absorption = back_absorption YFan_S11_450G_abinitio = 1
+    .background = background YFan_S11_450G_abinitio = 0
+    .intensity = intensity YFan_S11_450G_abinitio = 1.00976 in [0.5,5]
+    .sample_broadening = sample_broadening YFan_S11_450G_abinitio = 0.026
+    .theta_offset = theta_offset YFan_S11_450G_abinitio = -0.00197092 in [-0.008,0.008]
+  .mp = None
+  .pm = None
+  .pp
+    .back_absorption = back_absorption YFan_S11_450G_abinitio = 1
+    .background = background YFan_S11_450G_abinitio = 0
+    .intensity = intensity YFan_S11_450G_abinitio = 1.00976 in [0.5,5]
+    .sample_broadening = sample_broadening YFan_S11_5kOe_abinitio = 0.0175681 in [0,0.06]
+    .theta_offset = theta_offset YFan_S11_450G_abinitio = -0.00197092 in [-0.008,0.008]
+.sample
+  .layers
+    [0]
+      .interface = Si interface = 105.43 in [1,200]
+      .material
+        .irho = Si irho = 0
+        .rho = Si rho = 2.07
+      .thickness = Si thickness = 100
+    [1]
+      .interface = SiO interface = 7.6554 in [1,30]
+      .material
+        .irho = SiO irho = 0
+        .rho = SiO rho = 3.49
+      .thickness = SiO thickness = 252
+    [2]
+      .interface = Pt interface = 1.0016 in [1,20]
+      .material
+        .irho = Pt irho = 0
+        .rho = Pt rho = 6.68
+      .thickness = Pt thickness = 82.6
+    [3]
+      .interface = YIG interface = 6.00716 in [1,30]
+      .magnetism
+        .dead_above = YIG deadM above = 49.9987 in [0,50]
+        .dead_below = YIG deadM below = 0
+        .interface_above = None
+        .interface_below = None
+        .rhoM = YIG rhoM = 0.181939 in [-0.5,0.5]
+        .thetaM = YIG thetaM = 270
+      .material
+        .irho = YIG irho = 0
+        .rho = YIG rho = 5.71
+      .thickness = YIG thickness = 359.9
+    [4]
+      .interface = Co interface = 9.42015 in [1,20]
+      .magnetism
+        .dead_above = Co deadM above = 20.6908 in [0,40]
+        .dead_below = Co deadM below = 0.000268649 in [0,50]
+        .interface_above = None
+        .interface_below = None
+        .rhoM = Co rhoM = 4.08575 in [0,5]
+        .thetaM = Co thetaM = 270
+      .material
+        .irho = Co irho = 0.012
+        .rho = Co rho = 2.19
+      .thickness = Co thickness = 187
+    [5]
+      .interface = Ta interface = 1.00042 in [1,20]
+      .material
+        .irho = Ta irho = 0
+        .rho = Ta rho = 3.86
+      .thickness = Ta thickness = 47.9
+    [6]
+      .interface = air interface = 0
+      .material = None
+      .thickness = air thickness = 0
+  .thickness = stack thickness = 1029.4
+
+[chisq=13.176(83), nllf=1258.31]
+-- Model 4 YFan_S11_5kOe_abinitio
+.probe
+  .Aguide = Aguide YFan_S11_5kOe_abinitio = 270
+  .H = H YFan_S11_5kOe_abinitio = 0
+  .mm
+    .back_absorption = back_absorption YFan_S11_5kOe_abinitio = 1
+    .background = background YFan_S11_5kOe_abinitio = 0
+    .intensity = intensity YFan_S11_5kOe_abinitio = 0.997512 in [0.5,5]
+    .sample_broadening = sample_broadening YFan_S11_5kOe_abinitio = 0.0175681 in [0,0.06]
+    .theta_offset = theta_offset YFan_S11_5kOe_abinitio = 0.000338122 in [-0.008,0.008]
+  .mp = None
+  .pm = None
+  .pp
+    .back_absorption = back_absorption YFan_S11_5kOe_abinitio = 1
+    .background = background YFan_S11_5kOe_abinitio = 0
+    .intensity = intensity YFan_S11_5kOe_abinitio = 0.997512 in [0.5,5]
+    .sample_broadening = sample_broadening YFan_S11_5kOe_abinitio = 0.0175681 in [0,0.06]
+    .theta_offset = theta_offset YFan_S11_5kOe_abinitio = 0.000338122 in [-0.008,0.008]
+.sample
+  .layers
+    [0]
+      .interface = Si interface = 105.43 in [1,200]
+      .material
+        .irho = Si irho = 0
+        .rho = Si rho = 2.07
+      .thickness = Si thickness = 100
+    [1]
+      .interface = SiO interface = 7.6554 in [1,30]
+      .material
+        .irho = SiO irho = 0
+        .rho = SiO rho = 3.49
+      .thickness = SiO thickness = 252
+    [2]
+      .interface = Pt interface = 1.0016 in [1,20]
+      .material
+        .irho = Pt irho = 0
+        .rho = Pt rho = 6.68
+      .thickness = Pt thickness = 82.6
+    [3]
+      .interface = YIG interface = 6.00716 in [1,30]
+      .magnetism
+        .dead_above = YIG deadM above = 37.1048 in [0,50]
+        .dead_below = YIG deadM below = 0
+        .interface_above = None
+        .interface_below = None
+        .rhoM = YIG rhoM = 0.367907 in [-0.5,0.5]
+        .thetaM = YIG thetaM = 270
+      .material
+        .irho = YIG irho = 0
+        .rho = YIG rho = 5.71
+      .thickness = YIG thickness = 359.9
+    [4]
+      .interface = Co interface = 9.42015 in [1,20]
+      .magnetism
+        .dead_above = Co deadM above = 20.6908 in [0,40]
+        .dead_below = Co deadM below = 0.0025288 in [0,50]
+        .interface_above = None
+        .interface_below = None
+        .rhoM = Co rhoM = 4.08075 in [0,5]
+        .thetaM = Co thetaM = 270
+      .material
+        .irho = Co irho = 0.012
+        .rho = Co rho = 2.19
+      .thickness = Co thickness = 187
+    [5]
+      .interface = Ta interface = 1.00042 in [1,20]
+      .material
+        .irho = Ta irho = 0
+        .rho = Ta rho = 3.86
+      .thickness = Ta thickness = 47.9
+    [6]
+      .interface = air interface = 0
+      .material = None
+      .thickness = air thickness = 0
+  .thickness = stack thickness = 1029.4
+
+[chisq=6.92(12), nllf=446.44]
+-- Model 5 YFan_S11_700mT_abinitio
+.probe
+  .Aguide = Aguide YFan_S11_700mT_abinitio = 270
+  .H = H YFan_S11_700mT_abinitio = 0
+  .mm
+    .back_absorption = back_absorption YFan_S11_700mT_abinitio = 1
+    .background = background YFan_S11_700mT_abinitio = 0
+    .intensity = intensity YFan_S11_700mT_abinitio = 1.23198 in [0.5,5]
+    .sample_broadening = sample_broadening YFan_S11_700mT_abinitio = 0.026
+    .theta_offset = theta_offset YFan_S11_700mT_abinitio = 0.00292603 in [-0.008,0.008]
+  .mp = None
+  .pm = None
+  .pp
+    .back_absorption = back_absorption YFan_S11_700mT_abinitio = 1
+    .background = background YFan_S11_700mT_abinitio = 0
+    .intensity = intensity YFan_S11_700mT_abinitio = 1.23198 in [0.5,5]
+    .sample_broadening = sample_broadening YFan_S11_5kOe_abinitio = 0.0175681 in [0,0.06]
+    .theta_offset = theta_offset YFan_S11_700mT_abinitio = 0.00292603 in [-0.008,0.008]
+.sample
+  .layers
+    [0]
+      .interface = Si interface = 105.43 in [1,200]
+      .material
+        .irho = Si irho = 0
+        .rho = Si rho = 2.07
+      .thickness = Si thickness = 100
+    [1]
+      .interface = SiO interface = 7.6554 in [1,30]
+      .material
+        .irho = SiO irho = 0
+        .rho = SiO rho = 3.49
+      .thickness = SiO thickness = 252
+    [2]
+      .interface = Pt interface = 1.0016 in [1,20]
+      .material
+        .irho = Pt irho = 0
+        .rho = Pt rho = 6.68
+      .thickness = Pt thickness = 82.6
+    [3]
+      .interface = YIG interface = 6.00716 in [1,30]
+      .magnetism
+        .dead_above = YIG deadM above = 0.0127562 in [0,50]
+        .dead_below = YIG deadM below = 0
+        .interface_above = None
+        .interface_below = None
+        .rhoM = YIG rhoM = 0.380792 in [-0.5,0.5]
+        .thetaM = YIG thetaM = 270
+      .material
+        .irho = YIG irho = 0
+        .rho = YIG rho = 5.71
+      .thickness = YIG thickness = 359.9
+    [4]
+      .interface = Co interface = 9.42015 in [1,20]
+      .magnetism
+        .dead_above = Co deadM above = 20.6908 in [0,40]
+        .dead_below = Co deadM below = 1.13072 in [0,50]
+        .interface_above = None
+        .interface_below = None
+        .rhoM = Co rhoM = 4.18296 in [0,5]
+        .thetaM = Co thetaM = 270
+      .material
+        .irho = Co irho = 0.012
+        .rho = Co rho = 2.19
+      .thickness = Co thickness = 187
+    [5]
+      .interface = Ta interface = 1.00042 in [1,20]
+      .material
+        .irho = Ta irho = 0
+        .rho = Ta rho = 3.86
+      .thickness = Ta thickness = 47.9
+    [6]
+      .interface = air interface = 0
+      .material = None
+      .thickness = air thickness = 0
+  .thickness = stack thickness = 1029.4
+
+[chisq=8.207(50), nllf=1313.13]
+[overall chisq=8.645(35), nllf=7227.54]
