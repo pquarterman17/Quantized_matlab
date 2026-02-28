@@ -4494,10 +4494,24 @@ function dataImportGUI()
         end
         appData.zoomRectPatch = [];
         appData.zoomStartPt   = [];
-        % Only zoom if drag is at least 1% of the current axis span in both axes
-        xDrag = abs(x1 - x0);
-        yDrag = abs(y1 - y0);
-        if xDrag < diff(ax.XLim) * 0.01 || yDrag < diff(ax.YLim) * 0.01
+        % Only zoom if drag is at least 1% of the current axis span in both axes.
+        % For log-scale axes, compare in log space so that zooming across
+        % a few decades (visually large) isn't rejected as "too small."
+        if strcmp(ax.XScale, 'log') && x0 > 0 && x1 > 0
+            xDrag = abs(log10(x1) - log10(x0));
+            xSpan = abs(log10(ax.XLim(2)) - log10(ax.XLim(1)));
+        else
+            xDrag = abs(x1 - x0);
+            xSpan = diff(ax.XLim);
+        end
+        if strcmp(ax.YScale, 'log') && y0 > 0 && y1 > 0
+            yDrag = abs(log10(y1) - log10(y0));
+            ySpan = abs(log10(ax.YLim(2)) - log10(ax.YLim(1)));
+        else
+            yDrag = abs(y1 - y0);
+            ySpan = diff(ax.YLim);
+        end
+        if xDrag < xSpan * 0.01 || yDrag < ySpan * 0.01
             return;
         end
         xLo = min(x0,x1);  xHi = max(x0,x1);
@@ -4803,20 +4817,26 @@ function dataImportGUI()
                     dir = 'v_col12'; return;
                 end
 
-                % v_col23 and v_col34: only exist when peakPanel is visible (XRD mode)
                 if strcmp(peakPanel.Visible, 'on')
-                    % v_col23: right edge of axis-limits panel
+                    % v_col23: right edge of axis-limits panel (XRD mode)
                     alPos   = getpixelposition(axLimPanel, true);
                     borderX = alPos(1) + alPos(3);
                     if abs(mp(1) - borderX) <= SNAP_PX
                         dir = 'v_col23'; return;
                     end
 
-                    % v_col34: right edge of peak-analysis panel
+                    % v_col34: right edge of peak-analysis panel (XRD mode)
                     pkPos   = getpixelposition(peakPanel, true);
                     borderX = pkPos(1) + pkPos(3);
                     if abs(mp(1) - borderX) <= SNAP_PX
                         dir = 'v_col34'; return;
+                    end
+                else
+                    % v_col23: right edge of axis-limits panel (non-XRD: adjacent to save panel)
+                    alPos   = getpixelposition(axLimPanel, true);
+                    borderX = alPos(1) + alPos(3);
+                    if abs(mp(1) - borderX) <= SNAP_PX
+                        dir = 'v_col23'; return;
                     end
                 end
 
