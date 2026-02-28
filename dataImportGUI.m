@@ -3715,6 +3715,30 @@ function dataImportGUI()
                 effectiveSpacing = 0;
             end
 
+            % For neutron data, group polarization cross-sections from the
+            % same measurement so they share the same waterfall offset.
+            % E.g., file-refl.datA and file-refl.datD get the same offset.
+            wfGroupIdx = (1:nDS)';  % default: each dataset gets its own group
+            if waterfallOn && nDS > 1
+                anyNeutron = false;
+                baseNames = cell(nDS, 1);
+                for gi = 1:nDS
+                    gds = appData.datasets{gi};
+                    if isfield(gds, 'parserName') && isNeutronParser(gds.parserName)
+                        anyNeutron = true;
+                        [~, fn, ~] = fileparts(gds.filepath);
+                        fn = regexprep(fn, '-(refl|pnr)$', '');
+                        fn = regexprep(fn, '-[a-z]$', '', 'ignorecase');
+                        baseNames{gi} = fn;
+                    else
+                        baseNames{gi} = sprintf('__unique_%d__', gi);
+                    end
+                end
+                if anyNeutron
+                    [~, ~, wfGroupIdx] = unique(baseNames, 'stable');
+                end
+            end
+
             for di = 1:nDS
                 ds          = appData.datasets{di};
 
@@ -3820,7 +3844,7 @@ function dataImportGUI()
 
                         % Apply waterfall offset for multi-dataset display
                         if effectiveSpacing ~= 0
-                            yR = yR + (di - 1) * effectiveSpacing;
+                            yR = yR + (wfGroupIdx(di) - 1) * effectiveSpacing;
                         end
 
                         % Filter NaN
@@ -3877,7 +3901,7 @@ function dataImportGUI()
 
                             % Apply waterfall offset to theory so it aligns with measured data
                             if effectiveSpacing ~= 0
-                                yTheory = yTheory + (di - 1) * effectiveSpacing;
+                                yTheory = yTheory + (wfGroupIdx(di) - 1) * effectiveSpacing;
                             end
 
                             theoryColor = 0.55 * baseColor + 0.45 * [1 1 1];
@@ -3901,7 +3925,7 @@ function dataImportGUI()
                             yRaw     = d.values(:, idx);
                             if ctFactor > 0, yRaw = yRaw / ctFactor; end
                             if effectiveSpacing ~= 0
-                                yRaw = yRaw + (di - 1) * effectiveSpacing;
+                                yRaw = yRaw + (wfGroupIdx(di) - 1) * effectiveSpacing;
                             end
                             rawColor = 0.5 * baseColor + 0.5 * [1 1 1];
                             if isdatetime(xVecRaw)
@@ -3919,7 +3943,7 @@ function dataImportGUI()
                         yPrimary = primaryD.values(:, idx);
                         if ctFactor > 0, yPrimary = yPrimary / ctFactor; end
                         if effectiveSpacing ~= 0
-                            yPrimary = yPrimary + (di - 1) * effectiveSpacing;
+                            yPrimary = yPrimary + (wfGroupIdx(di) - 1) * effectiveSpacing;
                         end
                         if isdatetime(xVecPrimary)
                             good = ~isnat(xVecPrimary) & ~isnan(yPrimary);
