@@ -1317,29 +1317,17 @@ function dataImportGUI()
 
         cancelInteractions();
 
-        % Get selected indices (multi-select support)
-        selectedValues = ensureCell(lbDatasets.Value);
-        indicesToRemove = [];
-
-        % Match selected display strings to dataset indices
-        for i = 1:numel(appData.datasets)
-            ds = appData.datasets{i};
-            % Build the same display string as rebuildDatasetList does
-            badgeStr = getParserBadge(ds.parserName);
-            if isfield(ds,'legendName') && ~isempty(ds.legendName)
-                displayStr = ds.legendName;
-            elseif isfield(ds,'displayName') && ~isempty(ds.displayName)
-                displayStr = ds.displayName;
-            else
-                [~, fn, fext] = fileparts(ds.filepath);
-                displayStr = [fn, fext];
-            end
-            fullDisplayStr = sprintf('[%d]  %s  %s', i, badgeStr, displayStr);
-
-            if any(strcmp(selectedValues, fullDisplayStr))
-                indicesToRemove = [indicesToRemove, i];
-            end
+        % lbDatasets.ItemsData contains numeric indices, so Value returns
+        % the selected indices directly (not display strings).
+        sel = lbDatasets.Value;
+        if iscell(sel)
+            indicesToRemove = [sel{:}];
+        else
+            indicesToRemove = sel;
         end
+
+        % Filter out invalid indices (e.g. the placeholder 0)
+        indicesToRemove(indicesToRemove < 1 | indicesToRemove > numel(appData.datasets)) = [];
 
         % Sort indices in descending order so removal doesn't affect remaining indices
         indicesToRemove = sort(indicesToRemove, 'descend');
