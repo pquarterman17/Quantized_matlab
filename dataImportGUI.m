@@ -78,6 +78,9 @@ function dataImportGUI()
         % DropFcn is not available on this MATLAB version — silently skip
     end
 
+    % Delete key support for removing datasets
+    fig.KeyPressFcn = @onFigureKeyPress;
+
     % ── Dataset-colour palette (shared by widget and callbacks) ──────────
     DS_COLOR_NAMES = {'Auto','Blue','Orange','Red','Green', ...
                       'Purple','Teal','Brown','Black','Grey'};
@@ -100,9 +103,10 @@ function dataImportGUI()
     % Root grid  (3 rows × 2 cols: toolbar occupies left half of row 1 only;
     %             content and analysis span both columns at full width)
     % Row 1 height: 222px (= 185 × 1.20) to prevent apGL clipping.
-    % Row 2 (preview) gets 60% of flexible space, row 3 (analysis) gets 40%: ratio 3x:2x.
+    % Row 2 (preview) gets 50% of flexible space, row 3 (analysis) gets 50%: ratio 1x:1x.
+    % This provides enough space for the 16-row corrections grid.
     rootGL = uigridlayout(fig,[3 2], ...
-        'RowHeight',    {222,'3x','2x'}, ...
+        'RowHeight',    {222,'1x','1x'}, ...
         'ColumnWidth',  {'1x','1x'}, ...
         'Padding',      [8 8 8 8], ...
         'RowSpacing',   6, ...
@@ -148,8 +152,14 @@ function dataImportGUI()
         'ItemsData', {0}, ...
         'Multiselect','on', ...
         'ValueChangedFcn',@onSelectDataset, ...
-        'Tooltip','Loaded datasets — click to make active; Ctrl+click to select multiple for merging');
+        'Tooltip','Loaded datasets — click to make active; Ctrl+click to select multiple; right-click to remove');
     lbDatasets.Layout.Row = 3; lbDatasets.Layout.Column = [1 2];
+
+    % Context menu for dataset list (right-click)
+    cmDatasets = uicontextmenu(fig);
+    miRemove = uimenu(cmDatasets, 'Text', 'Remove Selected', ...
+        'MenuSelectedFcn', @(~,~) onRemoveDataset([], []));
+    lbDatasets.ContextMenu = cmDatasets;
 
     % ── Appearance panel (top right): colour, legend, axis labels, title ────
     % Column 3 (right-axis options) starts hidden (ColumnWidth{3}=0) and row 1
@@ -464,8 +474,8 @@ function dataImportGUI()
     corrPanel = uipanel(analysisGL,'Title','Corrections','FontSize',13);
     corrPanel.Layout.Row = 1; corrPanel.Layout.Column = 1;
 
-    corrGL = uigridlayout(corrPanel,[14 4], ...
-        'RowHeight',    {24,24,24,24,24,24,24,24,28,28,24,20,24,24}, ...
+    corrGL = uigridlayout(corrPanel,[16 4], ...
+        'RowHeight',    {24,24,24,24,24,24,24,24,28,28,24,20,24,24,24,24}, ...
         'ColumnWidth',  {70,'1x',88,'1x'}, ...
         'Padding',      [6 6 6 6], ...
         'RowSpacing',   4, ...
@@ -476,7 +486,7 @@ function dataImportGUI()
     lblCorrStyle.Layout.Row = 1; lblCorrStyle.Layout.Column = 1;
 
     ddCorrStyle = uidropdown(corrGL, ...
-        'Items',           {'Auto (from file)', 'Generic', 'Magnetometry', 'PPMS', 'XRD — 2\theta + BG'}, ...
+        'Items',           {'Auto (from file)', 'Generic', 'Magnetometry', 'PPMS', 'XRD — 2\theta + BG', 'Neutron NR'}, ...
         'Value',           'Auto (from file)', ...
         'Tooltip',         'Choose correction labels; Auto detects from the loaded file type', ...
         'ValueChangedFcn', @onCorrStyleChanged);
@@ -685,6 +695,26 @@ function dataImportGUI()
     efXTrimMax = uieditfield(corrGL,'text','Value','', ...
         'Tooltip','Trim x-range: keep only data up to this maximum x-value (blank = no limit)');
     efXTrimMax.Layout.Row = 14; efXTrimMax.Layout.Column = [3 4];
+
+    % Row 15: Neutron spin asymmetry calculation (neutron data only)
+    lblAsymmetry = uibutton(corrGL,'Text','Spin Asymmetry:','Enable','off');
+    lblAsymmetry.Layout.Row = 15; lblAsymmetry.Layout.Column = 1;
+
+    cbCalculateAsymmetry = uicheckbox(corrGL,'Text','Calculate & Plot', ...
+        'Value',false, ...
+        'Tooltip','Calculate spin asymmetry (R++ − R--) / (R++ + R--) and plot as new channel', ...
+        'ValueChangedFcn',@onAsymmetryToggle);
+    cbCalculateAsymmetry.Layout.Row = 15; cbCalculateAsymmetry.Layout.Column = [2 4];
+
+    % Row 16: Asymmetry formula selector (hidden by default)
+    lblAsymFormula = uibutton(corrGL,'Text','Formula:','Enable','off');
+    lblAsymFormula.Layout.Row = 16; lblAsymFormula.Layout.Column = 1;
+
+    ddAsymFormula = uidropdown(corrGL, ...
+        'Items',   {'Linear: (R++ − R--) / (R++ + R--)', 'Log: log(R++ / R--)'}, ...
+        'Value',   'Linear: (R++ − R--) / (R++ + R--)', ...
+        'Tooltip', 'Asymmetry formula: Linear uses reflectivity ratio, Log uses reflectivity ratio logarithm');
+    ddAsymFormula.Layout.Row = 16; ddAsymFormula.Layout.Column = [2 4];
 
     % ── Axis Limits sub-panel (middle column) ────────────────────────────
     % All six fields are text-type: blank = auto-scale, any number = manual.
@@ -982,8 +1012,8 @@ function dataImportGUI()
     %ONADDFILES  Open a multi-select file dialog; load every chosen file.
         startDir = guiTernary(isempty(appData.lastDir), pwd, appData.lastDir);
         [fnames, fpath] = uigetfile( ...
-            {'*.dat;*.csv;*.tsv;*.txt;*.xlsx;*.xls;*.xlsm;*.xlsb;*.ods;*.raw;*.xrdml', ...
-             'Supported data files (*.dat, *.csv, *.xlsx, *.ods, *.raw, *.xrdml)'; ...
+            {'*.dat;*.csv;*.tsv;*.txt;*.xlsx;*.xls;*.xlsm;*.xlsb;*.ods;*.raw;*.xrdml;*.refl;*.pnr;*.datA;*.datB;*.datC;*.datD;*.data;*.datb;*.datc;*.datd', ...
+             'Supported data files (*.dat, *.csv, *.xlsx, *.raw, *.xrdml, *.refl, *.pnr, *.datA/B/C/D)'; ...
              '*.*','All files (*.*)'}, ...
             'Select data file(s)', startDir, ...
             'MultiSelect', 'on');
@@ -1279,11 +1309,29 @@ function dataImportGUI()
     end
 
     function onRemoveDataset(~,~)
-    %ONREMOVEDATASET  Remove the active dataset from the list.
-        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+    %ONREMOVEDATASET  Remove selected dataset(s) from the list.
+    %  Supports removing multiple selected datasets when multi-select is enabled.
+        if isempty(appData.datasets) || isempty(lbDatasets.Value), return; end
 
         cancelInteractions();
-        appData.datasets(appData.activeIdx) = [];
+
+        % Get selected indices (multi-select support)
+        selectedValues = ensureCell(lbDatasets.Value);
+        indicesToRemove = [];
+
+        for i = 1:numel(appData.datasets)
+            ds = appData.datasets{i};
+            displayName = getDisplayName(ds);
+            if any(strcmp(selectedValues, displayName))
+                indicesToRemove = [indicesToRemove, i];
+            end
+        end
+
+        % Sort indices in descending order so removal doesn't affect remaining indices
+        indicesToRemove = sort(indicesToRemove, 'descend');
+
+        % Remove selected datasets
+        appData.datasets(indicesToRemove) = [];
 
         if isempty(appData.datasets)
             appData.activeIdx = 0;
@@ -1338,7 +1386,14 @@ function dataImportGUI()
             lbDatasets.ItemsData = {0};
             lbDatasets.Value     = {0};
             appData.activeIdx    = 0;
+            % Disable dataset-dependent buttons when no data loaded
+            btnRemoveDS.Enable  = 'off';
+            btnMerge.Enable     = 'off';
             return;
+        else
+            % Re-enable dataset buttons when data is available
+            btnRemoveDS.Enable  = 'on';
+            btnMerge.Enable     = 'on';
         end
 
         % Build full display strings for all datasets
@@ -1557,6 +1612,15 @@ function dataImportGUI()
 
         applyParserAnalysisConfig(resolvedCorrStyle());
 
+        % Auto-configure for neutron data
+        if isNeutronParser(ds.parserName)
+            rIdx = find(strcmp(d.labels, 'R'), 1);
+            if ~isempty(rIdx)
+                lbY.Value = d.labels(rIdx);
+            end
+            cbLogY.Value = true;
+        end
+
         ddX.ValueChangedFcn  = @onAxisChanged;
         lbY.ValueChangedFcn  = @onAxisChanged;
         lbY2.ValueChangedFcn = @(~,~) onPlot([],[]);
@@ -1577,6 +1641,13 @@ function dataImportGUI()
     %APPLYPARSERANALYSISCONFIG  Relabel Analysis panel controls for data type.
         switch pName
             case {'importRigaku_raw', 'importXRDML'}
+                % Re-enable controls for non-neutron case
+                for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
+                          btnApply, btnReset, btnApplyAll, btnUndo, ...
+                          cbSmooth, efSmoothWin, ddSmoothMethod, ...
+                          efXTrimMin, efXTrimMax, ddNormalize}
+                    hh{1}.Enable = 'on';
+                end
                 analysisPanel.Title   = 'Analysis & Corrections  —  XRD';
                 lblXOff.Text          = '2θ Offset (°):';
                 efXOffset.Tooltip     = '2θ-offset: 2θ_corrected = 2θ − this value  (0 = no shift)';
@@ -1597,8 +1668,20 @@ function dataImportGUI()
                 % Peak analysis panel — visible for XRD (col 3 and col 4 split flexible width)
                 peakPanel.Visible          = 'on';
                 analysisGL.ColumnWidth     = {appData.corrPanelWidth, appData.axLimPanelWidth, '1x', '1x'};
+                % Hide asymmetry controls for XRD
+                lblAsymmetry.Enable        = 'off';
+                cbCalculateAsymmetry.Enable = 'off';
+                lblAsymFormula.Enable      = 'off';
+                ddAsymFormula.Enable       = 'off';
 
             case 'importQDVSM'
+                % Re-enable controls for non-neutron case
+                for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
+                          btnApply, btnReset, btnApplyAll, btnUndo, ...
+                          cbSmooth, efSmoothWin, ddSmoothMethod, ...
+                          efXTrimMin, efXTrimMax, ddNormalize}
+                    hh{1}.Enable = 'on';
+                end
                 analysisPanel.Title   = 'Analysis & Corrections  —  VSM';
                 lblXOff.Text          = 'Field Offset:';
                 efXOffset.Tooltip     = 'Field offset: H_corrected = H − this value  (0 = no shift)';
@@ -1619,8 +1702,20 @@ function dataImportGUI()
                 % Peak analysis panel — hidden for VSM (col 3 collapses; axlim expands)
                 peakPanel.Visible          = 'off';
                 analysisGL.ColumnWidth     = {350, '1x', 0, 150};
+                % Hide asymmetry controls for VSM
+                lblAsymmetry.Enable        = 'off';
+                cbCalculateAsymmetry.Enable = 'off';
+                lblAsymFormula.Enable      = 'off';
+                ddAsymFormula.Enable       = 'off';
 
             case 'importPPMS'
+                % Re-enable controls for non-neutron case
+                for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
+                          btnApply, btnReset, btnApplyAll, btnUndo, ...
+                          cbSmooth, efSmoothWin, ddSmoothMethod, ...
+                          efXTrimMin, efXTrimMax, ddNormalize}
+                    hh{1}.Enable = 'on';
+                end
                 analysisPanel.Title   = 'Analysis & Corrections  —  PPMS';
                 lblXOff.Text          = 'X Offset:';
                 efXOffset.Tooltip     = 'X-offset: x_corrected = x − this value  (0 = no shift)';
@@ -1639,8 +1734,51 @@ function dataImportGUI()
                 % Peak analysis panel — hidden for PPMS (col 3 collapses; axlim expands)
                 peakPanel.Visible          = 'off';
                 analysisGL.ColumnWidth     = {350, '1x', 0, 150};
+                % Hide asymmetry controls for PPMS
+                lblAsymmetry.Enable        = 'off';
+                cbCalculateAsymmetry.Enable = 'off';
+                lblAsymFormula.Enable      = 'off';
+                ddAsymFormula.Enable       = 'off';
+
+            case {'importNCNRDat', 'importNCNRRefl', 'importNCNRPNR'}
+                analysisPanel.Title = 'Analysis & Corrections  —  Neutron Reflectometry';
+                lblXOff.Text  = 'Q Offset:';
+                lblYOff.Text  = 'R Offset:';
+                % Disable all correction controls (data is already reduced)
+                for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
+                          btnApply, btnReset, btnApplyAll, btnUndo, ...
+                          cbSmooth, efSmoothWin, ddSmoothMethod, ...
+                          efXTrimMin, efXTrimMax, ddNormalize, btnFitBG, btnPickY}
+                    hh{1}.Enable = 'off';
+                end
+                btnFitBG.Visible           = 'off';
+                btnPickY.Visible           = 'off';
+                btnYTranslate.Visible      = 'off';
+                btnAutoPeak.Visible        = 'off';
+                btnManualPeak.Visible      = 'off';
+                btnRemovePeakClick.Visible = 'off';
+                btnApply.Tooltip = 'Corrections are disabled for neutron reflectometry (data is already reduced)';
+                peakPanel.Visible          = 'off';
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 150};
+                % Show neutron-specific analysis controls
+                lblAsymmetry.Enable        = 'on';
+                cbCalculateAsymmetry.Enable = 'on';
+                lblAsymFormula.Enable      = 'on';
+                ddAsymFormula.Enable       = 'on';
 
             otherwise  % importCSV, importExcel, unknown — generic labels
+                % Hide asymmetry controls for non-neutron data
+                lblAsymmetry.Enable        = 'off';
+                cbCalculateAsymmetry.Enable = 'off';
+                lblAsymFormula.Enable      = 'off';
+                ddAsymFormula.Enable       = 'off';
+                % Re-enable controls for non-neutron case
+                for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
+                          btnApply, btnReset, btnApplyAll, btnUndo, ...
+                          cbSmooth, efSmoothWin, ddSmoothMethod, ...
+                          efXTrimMin, efXTrimMax, ddNormalize}
+                    hh{1}.Enable = 'on';
+                end
                 analysisPanel.Title   = 'Analysis & Corrections';
                 lblXOff.Text          = 'X Offset:';
                 efXOffset.Tooltip     = 'X-offset: x_corrected = x − this value  (0 = no shift)';
@@ -1673,6 +1811,8 @@ function dataImportGUI()
                 pName = 'importPPMS';
             case 'XRD — 2\theta + BG'
                 pName = 'importRigaku_raw';
+            case 'Neutron NR'
+                pName = 'importNCNRDat';
             case 'Generic'
                 pName = 'importCSV';
             otherwise  % 'Auto (from file)'
@@ -3373,6 +3513,48 @@ function dataImportGUI()
         drawToAxes(ax);
     end
 
+    function onAsymmetryToggle(~,~)
+    %ONASYMMETRYTOGGLE  Handle spin asymmetry checkbox state changes.
+    %   When asymmetry is enabled:
+    %     - Hide PNR datasets (importNCNRPNR) since asymmetry needs DAT files
+    %     - Switch to linear Y scale
+    %   When disabled:
+    %     - Restore PNR dataset visibility
+    %     - Restore previous log Y state
+
+        if cbCalculateAsymmetry.Value
+            % Asymmetry enabled: store previous log state and hide PNR data
+            if ~isfield(appData, 'asymmetryPrevLogY')
+                appData.asymmetryPrevLogY = cbLogY.Value;
+            end
+            cbLogY.Value = false;  % Switch to linear scale
+
+            % Hide all PNR datasets
+            for i = 1:numel(appData.datasets)
+                if strcmp(appData.datasets{i}.parserName, 'importNCNRPNR')
+                    if ~isfield(appData.datasets{i}, 'hiddenForAsymmetry')
+                        appData.datasets{i}.hiddenForAsymmetry = false;
+                    end
+                    appData.datasets{i}.hiddenForAsymmetry = true;
+                end
+            end
+        else
+            % Asymmetry disabled: restore PNR visibility and previous log state
+            for i = 1:numel(appData.datasets)
+                if isfield(appData.datasets{i}, 'hiddenForAsymmetry') && appData.datasets{i}.hiddenForAsymmetry
+                    appData.datasets{i}.hiddenForAsymmetry = false;
+                end
+            end
+
+            % Restore previous log Y state if we stored it
+            if isfield(appData, 'asymmetryPrevLogY')
+                cbLogY.Value = appData.asymmetryPrevLogY;
+            end
+        end
+
+        onPlot([], []);  % Redraw plot with updated visibility and scale
+    end
+
     function drawToAxes(targetAx)
     %DRAWTOAXES  Render ALL loaded datasets into targetAx.
     %   Channel selection and x-axis label are driven by the active dataset.
@@ -3461,6 +3643,11 @@ function dataImportGUI()
                     continue;
                 end
 
+                % Skip datasets hidden for asymmetry calculation
+                if isfield(ds, 'hiddenForAsymmetry') && ds.hiddenForAsymmetry
+                    continue;
+                end
+
                 d           = ds.data;
                 hasCorrData = ~isempty(ds.corrData);
                 showRawOver = hasCorrData && cbShowRaw.Value;
@@ -3510,47 +3697,159 @@ function dataImportGUI()
                     idx = find(strcmp(d.labels, ySel{k}), 1);
                     if isempty(idx), continue; end
 
-                    baseLabel = [guiLabel(d.labels{idx}, d.units{idx}), fileSuffix];
+                    % --- Neutron reflectometry: error bars + theory overlay ---
+                    isNeutron = isfield(ds,'parserName') && isNeutronParser(ds.parserName);
+                    isRChannel = strcmp(ySel{k}, 'R');
 
-                    % Raw overlay (dashed, desaturated 50% white-blend)
-                    if showRawOver
-                        anyRawShown = true;
-                        yRaw     = d.values(:, idx);
-                        if ctFactor > 0, yRaw = yRaw / ctFactor; end
-                        if effectiveSpacing ~= 0
-                            yRaw = yRaw + (di - 1) * effectiveSpacing;
+                    if isNeutron && isRChannel
+                        % Use polarization-based color
+                        pol = '';
+                        if isfield(d.metadata,'parserSpecific') && isfield(d.metadata.parserSpecific,'polarization')
+                            pol = d.metadata.parserSpecific.polarization;
                         end
-                        rawColor = 0.5 * baseColor + 0.5 * [1 1 1];
-                        if isdatetime(xVecRaw)
-                            good = ~isnat(xVecRaw) & ~isnan(yRaw);
+                        baseColor = neutronPolarizationColor(pol);
+
+                        % Build legend display name: 'R++', 'R+-', etc. with optional filename group
+                        if isempty(pol)
+                            polLabel = 'R';
                         else
-                            good = ~isnan(xVecRaw) & ~isnan(yRaw);
+                            polLabel = ['R' pol];
                         end
-                        plot(targetAx, xVecRaw(good), yRaw(good), lsRaw{:}, ...
-                            'Color',       rawColor, ...
-                            'HitTest',     'off', ...
-                            'DisplayName', [baseLabel, ' (raw)']);
-                    end
+                        if nDS > 1
+                            [~, fn, ~] = fileparts(ds.filepath);
+                            % Strip trailing polarization suffix (.datA/.datB etc.) from filename
+                            fn = regexprep(fn, '-refl$', '');   % strip refl suffix
+                            polLabel = [fn '  ' polLabel];
+                        end
+                        dispName = polLabel;
 
-                    % Primary trace
-                    yPrimary = primaryD.values(:, idx);
-                    if ctFactor > 0, yPrimary = yPrimary / ctFactor; end
-                    if effectiveSpacing ~= 0
-                        yPrimary = yPrimary + (di - 1) * effectiveSpacing;
-                    end
-                    if isdatetime(xVecPrimary)
-                        good = ~isnat(xVecPrimary) & ~isnan(yPrimary);
+                        % Measured R with error bars (manual construction for better HitTest control)
+                        yR  = primaryD.values(:, idx);
+                        % Find dR in primaryD (corrected or raw data)
+                        idR = find(strcmp(primaryD.labels, 'dR'), 1);
+                        if ~isempty(idR)
+                            dyR = primaryD.values(:, idR);
+                        else
+                            dyR = zeros(size(yR));
+                        end
+
+                        % Apply waterfall offset for multi-dataset display
+                        if effectiveSpacing ~= 0
+                            yR = yR + (di - 1) * effectiveSpacing;
+                        end
+
+                        % Filter NaN
+                        good = ~isnan(xVecPrimary) & ~isnan(yR);
+                        xGood = xVecPrimary(good);
+                        yGood = yR(good);
+                        dyGood = dyR(good);
+
+                        % Plot error bar whiskers (light color) - vectorized for performance
+                        if any(good) && ~isempty(idR)
+                            whiskerAlpha = 0.5;
+                            whiskerColor = [baseColor(1)*whiskerAlpha+0.5, baseColor(2)*whiskerAlpha+0.5, baseColor(3)*whiskerAlpha+0.5];
+
+                            % Build NaN-separated whisker segments: [x1 x1 NaN x2 x2 NaN ...]
+                            nPts = length(xGood);
+                            xWhiskers = zeros(1, nPts*3);
+                            yWhiskers = zeros(1, nPts*3);
+                            for ii = 1:nPts
+                                idx = (ii-1)*3 + 1;
+                                xWhiskers(idx:idx+1) = xGood(ii);
+                                yWhiskers(idx) = yGood(ii) - dyGood(ii);
+                                yWhiskers(idx+1) = yGood(ii) + dyGood(ii);
+                                xWhiskers(idx+2) = NaN;
+                                yWhiskers(idx+2) = NaN;
+                            end
+
+                            % Plot all whiskers as one line object (much more efficient)
+                            plot(targetAx, xWhiskers, yWhiskers, '-', ...
+                                'Color', whiskerColor, ...
+                                'LineWidth', 1.2, 'HitTest', 'off', 'HandleVisibility', 'off');
+                        end
+
+                        % Plot measured R points (main trace, first plot gets the legend)
+                        plot(targetAx, xGood, yGood, 'o', ...
+                            'Color',       baseColor, ...
+                            'MarkerSize',  4.5, ...
+                            'LineWidth',   1.0, ...
+                            'HitTest',     'off', ...
+                            'DisplayName', dispName);
+
+                        % Theory overlay (lighter/desaturated)
+                        % Search in primaryD.labels (corrected or raw) for consistency
+                        iTheory = find(strcmp(primaryD.labels, 'theory'), 1);
+                        if isempty(iTheory)
+                            % Try alternate naming conventions
+                            iTheory = find(strcmpi(primaryD.labels, 'Theory'), 1);
+                        end
+                        if isempty(iTheory)
+                            iTheory = find(strcmpi(primaryD.labels, 'model'), 1);
+                        end
+
+                        if ~isempty(iTheory)
+                            yTheory = primaryD.values(:, iTheory);
+
+                            % Apply waterfall offset to theory so it aligns with measured data
+                            if effectiveSpacing ~= 0
+                                yTheory = yTheory + (di - 1) * effectiveSpacing;
+                            end
+
+                            theoryColor = 0.55 * baseColor + 0.45 * [1 1 1];
+                            goodT = ~isnan(xVecPrimary) & ~isnan(yTheory);
+                            if any(goodT)
+                                plot(targetAx, xVecPrimary(goodT), yTheory(goodT), '-', ...
+                                    'Color',       theoryColor, ...
+                                    'LineWidth',   1.2, ...
+                                    'HitTest',     'off', ...
+                                    'DisplayName', [polLabel ' theory']);
+                            end
+                        end
+
                     else
-                        good = ~isnan(xVecPrimary) & ~isnan(yPrimary);
+                        % --- Standard (non-neutron) path ---
+                        baseLabel = [guiLabel(d.labels{idx}, d.units{idx}), fileSuffix];
+
+                        % Raw overlay (dashed, desaturated 50% white-blend)
+                        if showRawOver
+                            anyRawShown = true;
+                            yRaw     = d.values(:, idx);
+                            if ctFactor > 0, yRaw = yRaw / ctFactor; end
+                            if effectiveSpacing ~= 0
+                                yRaw = yRaw + (di - 1) * effectiveSpacing;
+                            end
+                            rawColor = 0.5 * baseColor + 0.5 * [1 1 1];
+                            if isdatetime(xVecRaw)
+                                good = ~isnat(xVecRaw) & ~isnan(yRaw);
+                            else
+                                good = ~isnan(xVecRaw) & ~isnan(yRaw);
+                            end
+                            plot(targetAx, xVecRaw(good), yRaw(good), lsRaw{:}, ...
+                                'Color',       rawColor, ...
+                                'HitTest',     'off', ...
+                                'DisplayName', [baseLabel, ' (raw)']);
+                        end
+
+                        % Primary trace
+                        yPrimary = primaryD.values(:, idx);
+                        if ctFactor > 0, yPrimary = yPrimary / ctFactor; end
+                        if effectiveSpacing ~= 0
+                            yPrimary = yPrimary + (di - 1) * effectiveSpacing;
+                        end
+                        if isdatetime(xVecPrimary)
+                            good = ~isnat(xVecPrimary) & ~isnan(yPrimary);
+                        else
+                            good = ~isnan(xVecPrimary) & ~isnan(yPrimary);
+                        end
+                        dispName = guiTernary(hasCorrData, [baseLabel, ' (corr)'], baseLabel);
+                        if isfield(ds,'legendName') && ~isempty(ds.legendName)
+                            dispName = ds.legendName;
+                        end
+                        plot(targetAx, xVecPrimary(good), yPrimary(good), lsPrimary{:}, ...
+                            'Color',       baseColor, ...
+                            'HitTest',     'off', ...
+                            'DisplayName', dispName);
                     end
-                    dispName = guiTernary(hasCorrData, [baseLabel, ' (corr)'], baseLabel);
-                    if isfield(ds,'legendName') && ~isempty(ds.legendName)
-                        dispName = ds.legendName;
-                    end
-                    plot(targetAx, xVecPrimary(good), yPrimary(good), lsPrimary{:}, ...
-                        'Color',       baseColor, ...
-                        'HitTest',     'off', ...
-                        'DisplayName', dispName);
                 end
 
                 % ── Right-axis (Y2) channels ──────────────────────────────
@@ -3585,6 +3884,119 @@ function dataImportGUI()
                     yyaxis(targetAx, 'left');
                 end
             end
+
+            % ── Spin asymmetry calculation (if enabled for neutron data) ────────
+            if cbCalculateAsymmetry.Value && isNeutronParser(resolvedCorrStyle())
+                hold(targetAx, 'on');
+                pairMap = findPolarizationPairs(appData.datasets);
+
+                for i = 1:numel(pairMap)
+                    if isempty(pairMap{i}), continue; end
+                    [idxPP, idxMM] = deal(pairMap{i}(1), pairMap{i}(2));
+
+                    % Get both polarization datasets
+                    dsPP = appData.datasets{idxPP};
+                    dsMM = appData.datasets{idxMM};
+                    dPP = dsPP.data;
+                    dMM = dsMM.data;
+
+                    % Use corrected data if available
+                    primaryPP = guiTernary(~isempty(dsPP.corrData), dsPP.corrData, dPP);
+                    primaryMM = guiTernary(~isempty(dsMM.corrData), dsMM.corrData, dMM);
+
+                    % Get R channel from both
+                    idxRPP = find(strcmp(primaryPP.labels, 'R'), 1);
+                    idxRMM = find(strcmp(primaryMM.labels, 'R'), 1);
+                    if isempty(idxRPP) || isempty(idxRMM), continue; end
+
+                    % Assemble data struct for asymmetry calculation
+                    % We need to create a temporary struct with ++ and -- in same labels
+                    asymCalcData.labels = {'R', 'dR'};
+                    asymCalcData.values = [primaryPP.values(:, idxRPP), primaryPP.values(:, find(strcmp(primaryPP.labels, 'dR'), 1))];
+                    asymCalcData.metadata = dPP.metadata;
+
+                    % Find dR columns
+                    idxdRPP = find(strcmp(primaryPP.labels, 'dR'), 1);
+                    idxdRMM = find(strcmp(primaryMM.labels, 'dR'), 1);
+
+                    % Calculate asymmetry
+                    RPP = primaryPP.values(:, idxRPP);
+                    RMM = primaryMM.values(:, idxRMM);
+                    dRPP = guiTernary(~isempty(idxdRPP), primaryPP.values(:, idxdRPP), zeros(size(RPP)));
+                    dRMM = guiTernary(~isempty(idxdRMM), primaryMM.values(:, idxdRMM), zeros(size(RMM)));
+
+                    % Parse formula
+                    formulaStr = ddAsymFormula.Value;
+                    if contains(formulaStr, 'Log')
+                        formula = 'Log';
+                    else
+                        formula = 'Linear';
+                    end
+
+                    % Calculate asymmetry values and errors
+                    xAsym = primaryPP.time;
+                    valid = ~isnan(RPP) & ~isnan(RMM) & RPP > 0 & RMM > 0;
+
+                    asymVal = NaN(size(RPP));
+                    asymErr = NaN(size(RPP));
+
+                    if strcmp(formula, 'Linear')
+                        sumR = RPP + RMM;
+                        asymVal(valid) = (RPP(valid) - RMM(valid)) ./ sumR(valid);
+                        dA_dRPP = 2 * RMM(valid) ./ (sumR(valid).^2);
+                        dA_dRMM = -2 * RPP(valid) ./ (sumR(valid).^2);
+                        asymErr(valid) = sqrt((dA_dRPP .* dRPP(valid)).^2 + (dA_dRMM .* dRMM(valid)).^2);
+                    else  % Log
+                        asymVal(valid) = log(RPP(valid) ./ RMM(valid));
+                        dA_dRPP = 1 ./ RPP(valid);
+                        dA_dRMM = -1 ./ RMM(valid);
+                        asymErr(valid) = sqrt((dA_dRPP .* dRPP(valid)).^2 + (dA_dRMM .* dRMM(valid)).^2);
+                    end
+
+                    % Plot asymmetry with error bars
+                    good = ~isnan(xAsym) & ~isnan(asymVal);
+                    xGood = xAsym(good);
+                    yGood = asymVal(good);
+                    dyGood = asymErr(good);
+
+                    % Get base filename for legend
+                    [~, fnPP, ~] = fileparts(dsPP.filepath);
+                    fnPP = regexprep(fnPP, '-refl$', '');
+                    asymLegend = sprintf('%s  Asymmetry', fnPP);
+
+                    % Plot asymmetry whiskers (light gray) - vectorized for performance
+                    whiskerAlpha = 0.4;
+                    asymColor = [0.5 0.5 0.5];  % neutral gray
+                    whiskerColor = [asymColor(1)*whiskerAlpha+0.5, asymColor(2)*whiskerAlpha+0.5, asymColor(3)*whiskerAlpha+0.5];
+
+                    nPts = length(xGood);
+                    xWhiskers = zeros(1, nPts*3);
+                    yWhiskers = zeros(1, nPts*3);
+                    for ii = 1:nPts
+                        idx = (ii-1)*3 + 1;
+                        xWhiskers(idx:idx+1) = xGood(ii);
+                        yWhiskers(idx) = yGood(ii) - dyGood(ii);
+                        yWhiskers(idx+1) = yGood(ii) + dyGood(ii);
+                        xWhiskers(idx+2) = NaN;
+                        yWhiskers(idx+2) = NaN;
+                    end
+
+                    plot(targetAx, xWhiskers, yWhiskers, '-', ...
+                        'Color', whiskerColor, ...
+                        'LineWidth', 0.4, 'HitTest', 'off', 'HandleVisibility', 'off');
+
+                    % Plot asymmetry points
+                    plot(targetAx, xGood, yGood, 'o', ...
+                        'Color', asymColor, ...
+                        'MarkerSize', 2.5, ...
+                        'LineWidth', 0.6, ...
+                        'HitTest', 'off', ...
+                        'DisplayName', asymLegend);
+                end
+
+                hold(targetAx, 'off');
+            end
+
             hold(targetAx,'off');
             if hasY2
                 yyaxis(targetAx, 'right');
@@ -4064,6 +4476,16 @@ function dataImportGUI()
             fig.SizeChangedFcn = '';          % disable to avoid recursion
             fig.Position(4) = MIN_FIG_H;
             fig.SizeChangedFcn = @onFigSizeChanged;
+        end
+    end
+
+    function onFigureKeyPress(~, e)
+    %ONFIGUREKEYPRES  Handle keyboard shortcuts (Delete key for removing datasets).
+        if strcmp(e.Key, 'delete')
+            % Delete key: remove selected datasets if listbox has focus/selection
+            if ~isempty(lbDatasets.Value) && ~isempty(appData.datasets)
+                onRemoveDataset([], []);
+            end
         end
     end
 
@@ -4717,6 +5139,19 @@ function [data, parserName] = guiImport(fp)
             data       = parser.importCSV(fp);
             parserName = 'importCSV';
 
+        case '.refl'
+            data       = parser.importNCNRRefl(fp);
+            parserName = 'importNCNRRefl';
+
+        case '.pnr'
+            data       = parser.importNCNRPNR(fp);
+            parserName = 'importNCNRPNR';
+
+        case {'.data', '.datb', '.datc', '.datd'}
+            % NCNR refl1d output: polarization encoded in extension
+            data       = parser.importNCNRDat(fp);
+            parserName = 'importNCNRDat';
+
         case '.dat'
             % Load every available channel so the user can explore them in the GUI.
             try
@@ -4733,7 +5168,8 @@ function [data, parserName] = guiImport(fp)
 
         otherwise
             error('dataImportGUI:unknownExt', ...
-                'No parser for extension "%s".\nSupported: .raw  .xlsx  .csv  .tsv  .txt  .dat', ...
+                ['No parser for extension "%s".\n' ...
+                 'Supported: .raw  .xrdml  .xlsx/.xls/.xlsm  .csv/.tsv/.txt  .refl  .pnr  .datA/B/C/D  .dat'], ...
                 ext);
     end
 end
@@ -5056,10 +5492,36 @@ function badge = getParserBadge(parserName)
             badge = '[XRD]';
         case {'importQDVSM', 'importPPMS', 'importMPMS', 'importLakeShore'}
             badge = '[MAG]';  % Magnetometry
+        case {'importNCNRDat', 'importNCNRRefl', 'importNCNRPNR'}
+            badge = '[NR]';   % Neutron Reflectometry
         case {'importExcel', 'importCSV'}
             badge = '[DAT]';  % Generic data
         otherwise
             badge = '';
+    end
+end
+
+
+function tf = isNeutronParser(pName)
+%ISNEUTRONPARSER  True when pName is an NCNR neutron reflectometry parser.
+    tf = ismember(pName, {'importNCNRDat', 'importNCNRRefl', 'importNCNRPNR'});
+end
+
+
+function col = neutronPolarizationColor(polarization)
+%NEUTRONPOLARIZATIONCOLOR  Fixed base color for each polarization channel.
+%   ++ = blue, +- = red, -+ = green, -- = purple, '' = mid-gray
+    switch polarization
+        case '++'
+            col = [0.12 0.47 0.71];
+        case '+-'
+            col = [0.80 0.15 0.15];
+        case '-+'
+            col = [0.18 0.63 0.18];
+        case '--'
+            col = [0.58 0.40 0.74];
+        otherwise
+            col = [0.40 0.40 0.40];
     end
 end
 
@@ -5230,5 +5692,172 @@ function y = evalMultiPeak(p, x, nP, isGauss)
         else
             y = y + H ./ (1 + 4.*((x - x0) ./ fwhm).^2);
         end
+    end
+end
+
+
+function pairMap = findPolarizationPairs(datasets)
+%FINDPOLARIZATIONPAIRS  Identify paired neutron datasets by matching filenames.
+%
+%  INPUT:
+%    datasets — cell array of dataset structs (each has .filepath, .data, .parserName)
+%
+%  OUTPUT:
+%    pairMap — cell array where pairMap{i} = [idx_PP, idx_MM] for paired polarizations,
+%              or [idx, 0] for unpaired. pairMap{i} is non-empty only if both ++ and --
+%              channels exist for that measurement.
+%
+%  Looks for datasets from same measurement (matching filename prefix) with
+%  complementary polarizations (++ with --).
+
+    pairMap = {};
+    nDS = numel(datasets);
+
+    for i = 1:nDS
+        ds_i = datasets{i};
+        if ~isfield(ds_i, 'data') || ~isfield(ds_i.data, 'metadata')
+            continue;
+        end
+        meta_i = ds_i.data.metadata;
+        if ~isfield(meta_i, 'parserSpecific') || ~isfield(meta_i.parserSpecific, 'polarization')
+            continue;
+        end
+        pol_i = meta_i.parserSpecific.polarization;
+
+        % Skip if not ++ or --
+        if ~strcmp(pol_i, '++') && ~strcmp(pol_i, '--')
+            continue;
+        end
+
+        % Get filename without extension and polarization suffix
+        [~, fn_i, ~] = fileparts(ds_i.filepath);
+        fn_base_i = regexprep(fn_i, '-(refl|pnr)$', '');  % strip refl/pnr suffix
+        fn_base_i = regexprep(fn_base_i, '-[a-z]$', '');  % strip polarization suffix
+
+        % Look for matching dataset with opposite polarization
+        targetPol = guiTernary(strcmp(pol_i, '++'), '--', '++');
+        partnerIdx = 0;
+
+        for j = i+1:nDS
+            ds_j = datasets{j};
+            if ~isfield(ds_j, 'data') || ~isfield(ds_j.data, 'metadata')
+                continue;
+            end
+            meta_j = ds_j.data.metadata;
+            if ~isfield(meta_j, 'parserSpecific') || ~isfield(meta_j.parserSpecific, 'polarization')
+                continue;
+            end
+            pol_j = meta_j.parserSpecific.polarization;
+
+            if strcmp(pol_j, targetPol)
+                [~, fn_j, ~] = fileparts(ds_j.filepath);
+                fn_base_j = regexprep(fn_j, '-(refl|pnr)$', '');
+                fn_base_j = regexprep(fn_base_j, '-[a-z]$', '');
+
+                if strcmp(fn_base_i, fn_base_j)
+                    partnerIdx = j;
+                    break;
+                end
+            end
+        end
+
+        % Store pair mapping
+        if partnerIdx > 0
+            if strcmp(pol_i, '++')
+                pairMap{i} = [i, partnerIdx];
+            else
+                pairMap{i} = [partnerIdx, i];  % always [++, --]
+            end
+        end
+    end
+end
+
+
+function [asymData, asymErrors] = calculateSpinAsymmetry(data, formula)
+%CALCULATESPINASYMMETRY  Calculate spin asymmetry from neutron reflectometry data.
+%
+%  INPUT:
+%    data — parsed data struct with .labels, .values
+%    formula — 'Linear' for (R++ - R--) / (R++ + R--),
+%              'Log' for log(R++ / R--)
+%
+%  OUTPUT:
+%    asymData — asymmetry values (same length as input)
+%    asymErrors — error estimates (standard error propagation)
+%
+%  Looks for R++ and R-- channels in data.labels; returns NaN for rows
+%  where either polarization is missing or invalid.
+
+    asymData   = NaN(size(data.values, 1), 1);
+    asymErrors = NaN(size(data.values, 1), 1);
+
+    % Find R++ and R-- channels
+    idxPP = find(strcmp(data.labels, 'R'), 1);   % R++ stored as 'R' by default
+    idxMM = [];  % R-- not standard; check for variations
+
+    % Try to find ++ and -- channels more generically
+    for k = 1:length(data.labels)
+        lbl = data.labels{k};
+        if contains(lbl, '++', 'IgnoreCase', true)
+            idxPP = k;
+        elseif contains(lbl, '--', 'IgnoreCase', true) || contains(lbl, '−−')
+            idxMM = k;
+        end
+    end
+
+    % If standard names not found, try to infer from metadata
+    if isempty(idxMM) && isfield(data, 'metadata') && isfield(data.metadata, 'parserSpecific')
+        % This is a fallback; proper implementation would check all loaded datasets
+        idxMM = [];
+    end
+
+    % Cannot compute asymmetry without both polarizations
+    if isempty(idxPP) || isempty(idxMM)
+        return;
+    end
+
+    RPP = data.values(:, idxPP);
+    RMM = data.values(:, idxMM);
+
+    % Look for error columns
+    idxdPP = find(strcmp(data.labels, 'dR'), 1);
+    idxdMM = [];
+    if ~isempty(idxdPP)
+        dRPP = data.values(:, idxdPP);
+    else
+        dRPP = zeros(size(RPP));
+    end
+
+    if ~isempty(idxdMM)
+        dRMM = data.values(:, idxdMM);
+    else
+        dRMM = zeros(size(RMM));
+    end
+
+    % Calculate asymmetry and propagate errors
+    valid = ~isnan(RPP) & ~isnan(RMM) & RPP > 0 & RMM > 0;
+
+    if strcmp(formula, 'Linear')
+        % A = (R++ - R--) / (R++ + R--)
+        % dA/dR++ = 2*R-- / (R++ + R--)^2
+        % dA/dR-- = -2*R++ / (R++ + R--)^2
+        sum_R = RPP + RMM;
+        asymData(valid) = (RPP(valid) - RMM(valid)) ./ sum_R(valid);
+
+        % Error propagation (standard formula)
+        dA_dRPP = 2 * RMM(valid) ./ (sum_R(valid).^2);
+        dA_dRMM = -2 * RPP(valid) ./ (sum_R(valid).^2);
+        asymErrors(valid) = sqrt((dA_dRPP .* dRPP(valid)).^2 + (dA_dRMM .* dRMM(valid)).^2);
+
+    else  % 'Log'
+        % A = log(R++ / R--)
+        % dA/dR++ = 1 / R++
+        % dA/dR-- = -1 / R--
+        asymData(valid) = log(RPP(valid) ./ RMM(valid));
+
+        % Error propagation
+        dA_dRPP = 1 ./ RPP(valid);
+        dA_dRMM = -1 ./ RMM(valid);
+        asymErrors(valid) = sqrt((dA_dRPP .* dRPP(valid)).^2 + (dA_dRMM .* dRMM(valid)).^2);
     end
 end
