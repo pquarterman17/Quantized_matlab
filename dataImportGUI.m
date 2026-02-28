@@ -3703,6 +3703,11 @@ function dataImportGUI()
                     isNeutron = isfield(ds,'parserName') && isNeutronParser(ds.parserName);
                     isRChannel = strcmp(ySel{k}, 'R');
 
+                    % When spin asymmetry is active, skip individual PNR traces
+                    if isNeutron && isRChannel && cbCalculateAsymmetry.Value
+                        continue;
+                    end
+
                     if isNeutron && isRChannel
                         % Use polarization-based color
                         pol = '';
@@ -3967,9 +3972,8 @@ function dataImportGUI()
                     asymLegend = sprintf('%s  Asymmetry', fnPP);
 
                     % Plot asymmetry whiskers (light gray) - vectorized for performance
-                    whiskerAlpha = 0.4;
-                    asymColor = [0.5 0.5 0.5];  % neutral gray
-                    whiskerColor = [asymColor(1)*whiskerAlpha+0.5, asymColor(2)*whiskerAlpha+0.5, asymColor(3)*whiskerAlpha+0.5];
+                    asymColor = [0.4 0.4 0.4];  % neutral dark gray
+                    whiskerColor = 0.5 * asymColor + 0.5 * [1 1 1];
 
                     nPts = length(xGood);
                     xWhiskers = zeros(1, nPts*3);
@@ -3985,15 +3989,50 @@ function dataImportGUI()
 
                     plot(targetAx, xWhiskers, yWhiskers, '-', ...
                         'Color', whiskerColor, ...
-                        'LineWidth', 0.4, 'HitTest', 'off', 'HandleVisibility', 'off');
+                        'LineWidth', 1.0, 'HitTest', 'off', 'HandleVisibility', 'off');
 
                     % Plot asymmetry points
                     plot(targetAx, xGood, yGood, 'o', ...
                         'Color', asymColor, ...
-                        'MarkerSize', 2.5, ...
-                        'LineWidth', 0.6, ...
+                        'MarkerSize', 4.5, ...
+                        'LineWidth', 1.0, ...
                         'HitTest', 'off', ...
                         'DisplayName', asymLegend);
+
+                    % ── Theoretical asymmetry overlay ─────────────────────
+                    % Look for 'theory' column in both ++ and -- datasets
+                    iThPP = find(strcmpi(primaryPP.labels, 'theory'), 1);
+                    if isempty(iThPP)
+                        iThPP = find(strcmpi(primaryPP.labels, 'model'), 1);
+                    end
+                    iThMM = find(strcmpi(primaryMM.labels, 'theory'), 1);
+                    if isempty(iThMM)
+                        iThMM = find(strcmpi(primaryMM.labels, 'model'), 1);
+                    end
+
+                    if ~isempty(iThPP) && ~isempty(iThMM)
+                        thPP = primaryPP.values(:, iThPP);
+                        thMM = primaryMM.values(:, iThMM);
+                        validTh = ~isnan(thPP) & ~isnan(thMM) & thPP > 0 & thMM > 0;
+
+                        asymTheory = NaN(size(thPP));
+                        if strcmp(formula, 'Linear')
+                            sumTh = thPP + thMM;
+                            asymTheory(validTh) = (thPP(validTh) - thMM(validTh)) ./ sumTh(validTh);
+                        else  % Log
+                            asymTheory(validTh) = log(thPP(validTh) ./ thMM(validTh));
+                        end
+
+                        goodTh = ~isnan(xAsym) & ~isnan(asymTheory);
+                        if any(goodTh)
+                            theoryColor = 0.55 * asymColor + 0.45 * [1 1 1];
+                            plot(targetAx, xAsym(goodTh), asymTheory(goodTh), '-', ...
+                                'Color',       theoryColor, ...
+                                'LineWidth',   1.2, ...
+                                'HitTest',     'off', ...
+                                'DisplayName', [asymLegend ' theory']);
+                        end
+                    end
                 end
 
                 hold(targetAx, 'off');
