@@ -3421,7 +3421,9 @@ function dataImportGUI()
             return;
         end
         try
-            guiSaveCSV(ds.corrData, fp, ds.data);
+            % Compute spin asymmetry columns for paired neutron data
+            asymData = computeAsymmetryForExport(ds);
+            guiSaveCSV(ds.corrData, fp, ds.data, asymData);
             uialert(fig, sprintf('Saved:\n%s', fp), 'Saved');
         catch ME
             fprintf(2, '\n[dataImportGUI] Save error: %s\n', ME.message);
@@ -3430,6 +3432,82 @@ function dataImportGUI()
             end
             uialert(fig, ME.message, 'Save error');
         end
+    end
+
+    function asymData = computeAsymmetryForExport(ds)
+    %COMPUTEASYMMETRYFOREXPORT  Compute spin asymmetry for CSV export.
+    %  Returns a struct with .headers and .values if the active dataset is
+    %  neutron data with a paired ++ / -- partner. Returns empty struct otherwise.
+        asymData = struct('headers', {{}}, 'values', []);
+
+        if ~isfield(ds, 'parserName') || ~isNeutronParser(ds.parserName)
+            return;
+        end
+        if ~isfield(ds.data.metadata, 'parserSpecific') || ...
+           ~isfield(ds.data.metadata.parserSpecific, 'polarization')
+            return;
+        end
+        pol = ds.data.metadata.parserSpecific.polarization;
+        if ~strcmp(pol, '++') && ~strcmp(pol, '--')
+            return;
+        end
+
+        % Find paired dataset
+        pairMap = findPolarizationPairs(appData.datasets);
+        myIdx = find(cellfun(@(c) ~isempty(c) && any(c == appData.activeIdx), pairMap), 1);
+        if isempty(myIdx), return; end
+        pair = pairMap{myIdx};
+        idxPP = pair(1);  idxMM = pair(2);
+
+        dsPP = appData.datasets{idxPP};
+        dsMM = appData.datasets{idxMM};
+        primaryPP = guiTernary(~isempty(dsPP.corrData), dsPP.corrData, dsPP.data);
+        primaryMM = guiTernary(~isempty(dsMM.corrData), dsMM.corrData, dsMM.data);
+
+        iRPP = find(strcmp(primaryPP.labels, 'R'), 1);
+        iRMM = find(strcmp(primaryMM.labels, 'R'), 1);
+        if isempty(iRPP) || isempty(iRMM), return; end
+
+        RPP = primaryPP.values(:, iRPP);
+        RMM = primaryMM.values(:, iRMM);
+
+        idRPP = find(strcmp(primaryPP.labels, 'dR'), 1);
+        idRMM = find(strcmp(primaryMM.labels, 'dR'), 1);
+        dRPP = guiTernary(~isempty(idRPP), primaryPP.values(:, idRPP), zeros(size(RPP)));
+        dRMM = guiTernary(~isempty(idRMM), primaryMM.values(:, idRMM), zeros(size(RMM)));
+
+        % Linear asymmetry: (R++ - R--) / (R++ + R--)
+        valid = RPP > 0 & RMM > 0 & ~isnan(RPP) & ~isnan(RMM);
+        asymVal = NaN(size(RPP));
+        asymErr = NaN(size(RPP));
+        sumR = RPP + RMM;
+        asymVal(valid) = (RPP(valid) - RMM(valid)) ./ sumR(valid);
+        dA_dRPP = 2 * RMM(valid) ./ (sumR(valid).^2);
+        dA_dRMM = -2 * RPP(valid) ./ (sumR(valid).^2);
+        asymErr(valid) = sqrt((dA_dRPP .* dRPP(valid)).^2 + (dA_dRMM .* dRMM(valid)).^2);
+
+        headers = {'Asymmetry', 'dAsymmetry'};
+        vals = [asymVal, asymErr];
+
+        % Theory asymmetry (if both datasets have theory columns)
+        iThPP = find(strcmpi(primaryPP.labels, 'theory'), 1);
+        if isempty(iThPP), iThPP = find(strcmpi(primaryPP.labels, 'model'), 1); end
+        iThMM = find(strcmpi(primaryMM.labels, 'theory'), 1);
+        if isempty(iThMM), iThMM = find(strcmpi(primaryMM.labels, 'model'), 1); end
+
+        if ~isempty(iThPP) && ~isempty(iThMM)
+            thPP = primaryPP.values(:, iThPP);
+            thMM = primaryMM.values(:, iThMM);
+            validTh = thPP > 0 & thMM > 0 & ~isnan(thPP) & ~isnan(thMM);
+            asymTheory = NaN(size(thPP));
+            sumTh = thPP + thMM;
+            asymTheory(validTh) = (thPP(validTh) - thMM(validTh)) ./ sumTh(validTh);
+            headers{end+1} = 'Asymmetry_theory';
+            vals = [vals, asymTheory];
+        end
+
+        asymData.headers = headers;
+        asymData.values  = vals;
     end
 
     function onBatchExportCSV(~,~)
@@ -4104,6 +4182,11 @@ function dataImportGUI()
                 title(targetAx, titleStr, 'Interpreter','none');
             end
 
+            % Suppress "Negative data ignored" warning that MATLAB emits
+            % when log-scale axes contain zero or negative values (expected
+            % for asymmetry data or zero-padded theory curves).
+            warnState = warning('off', 'MATLAB:Axes:NegativeDataInLogAxis');
+            cleanupWarn = onCleanup(@() warning(warnState));
             targetAx.XScale = guiTernary(cbLogX.Value,'log','linear');
             targetAx.YScale = guiTernary(cbLogY.Value,'log','linear');
             grid(targetAx,'on');
@@ -4832,10 +4915,14 @@ function dataImportGUI()
                         dir = 'v_col34'; return;
                     end
                 else
-                    % v_col23: right edge of axis-limits panel (non-XRD: adjacent to save panel)
-                    alPos   = getpixelposition(axLimPanel, true);
-                    borderX = alPos(1) + alPos(3);
-                    if abs(mp(1) - borderX) <= SNAP_PX
+                    % v_col23: gap between axis-limits and save panels (non-XRD).
+                    % Column 3 is hidden (width=0) but ColumnSpacing creates a
+                    % ~20px gap.  Detect anywhere in that gap.
+                    alPos = getpixelposition(axLimPanel, true);
+                    spPos = getpixelposition(savePanel, true);
+                    rightOfAL = alPos(1) + alPos(3);
+                    leftOfSP  = spPos(1);
+                    if mp(1) >= rightOfAL - SNAP_PX && mp(1) <= leftOfSP + SNAP_PX
                         dir = 'v_col23'; return;
                     end
                 end
@@ -5359,19 +5446,21 @@ function c = ensureCell(v)
 end
 
 
-function guiSaveCSV(d, fp, dRaw)
+function guiSaveCSV(d, fp, dRaw, asymData)
 %GUISAVECSV  Write a data struct to a comma-delimited CSV file.
 %   Columns: x-axis (d.time) then all y-channels (d.values).
 %   A header row of column names (with units in parentheses) is written first.
 %
-%   guiSaveCSV(d, fp)        — write corrected data only
-%   guiSaveCSV(d, fp, dRaw)  — append raw data columns after corrected columns
+%   guiSaveCSV(d, fp)                — write corrected data only
+%   guiSaveCSV(d, fp, dRaw)         — append raw data columns after corrected
+%   guiSaveCSV(d, fp, dRaw, asymD)  — also append spin asymmetry columns
 %
 %   When dRaw is supplied the headers are suffixed:
 %     corrected  →  'X [corr]', 'Label (unit) [corr]', ...
 %     raw        →  'X [raw]',  'Label (unit) [raw]',  ...
 
-    hasRaw = nargin >= 3 && ~isempty(dRaw) && isfield(dRaw, 'time');
+    hasRaw  = nargin >= 3 && ~isempty(dRaw) && isfield(dRaw, 'time');
+    hasAsym = nargin >= 4 && ~isempty(asymData) && isfield(asymData, 'headers') && ~isempty(asymData.headers);
     suffix = guiTernary(hasRaw, ' [corr]', '');
 
     % ── Header row ────────────────────────────────────────────────────
@@ -5394,6 +5483,10 @@ function guiSaveCSV(d, fp, dRaw)
             rawYHdrs{k} = [base, ' [raw]'];
         end
         allHdrs = [allHdrs, {'X [raw]'}, rawYHdrs];
+    end
+
+    if hasAsym
+        allHdrs = [allHdrs, asymData.headers];
     end
 
     % ── Validate and open file ────────────────────────────────────────
@@ -5433,6 +5526,12 @@ function guiSaveCSV(d, fp, dRaw)
             end
             for c = 1:size(dRaw.values, 2)
                 fprintf(fid, ',%.10g', dRaw.values(r, c));
+            end
+        end
+        % Asymmetry columns (appended for paired neutron data)
+        if hasAsym && r <= size(asymData.values, 1)
+            for c = 1:size(asymData.values, 2)
+                fprintf(fid, ',%.10g', asymData.values(r, c));
             end
         end
         fprintf(fid, '\n');
