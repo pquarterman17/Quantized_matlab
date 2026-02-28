@@ -100,6 +100,11 @@ impl# TODO — thin_film_toolkit_matlab
   10+ files are loaded and you want to isolate a subset without removing the others.
   **Implemented, needs testing.**
 
+- [ ] **Multi-select and merge datasets** — allow `lbDatasets` to support multi-select
+  (Ctrl+click / Shift+click) with a "Merge Selected" button that concatenates selected
+  datasets into a single combined dataset. Useful for aggregating repeated measurements
+  or temperature-sweep segments. Merged dataset stores `.sourceDatasetIndices` for traceability.
+
 - [ ] **Filter/search box above dataset list** — small text field that filters `lbDatasets`
   items by filename or legend name as you type. Rebuild `Items` from a filtered subset on
   each keystroke; restore full list on clear. Most useful with 20+ loaded files.
