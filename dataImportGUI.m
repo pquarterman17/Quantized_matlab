@@ -286,8 +286,8 @@ function dataImportGUI()
     ctrlPanel = uipanel(contentGL,'Title','Controls','FontSize',13);
     ctrlPanel.Layout.Column = 1;
 
-    ctrlGL = uigridlayout(ctrlPanel,[12 1], ...
-        'RowHeight', {26,4,'1x',4,'1x',4,36,26,4,30,4,26}, ...
+    ctrlGL = uigridlayout(ctrlPanel,[13 1], ...
+        'RowHeight', {26,4,'1x',4,'1x',4,36,26,4,30,4,26,26}, ...
         'Padding',   [6 6 6 6], ...
         'RowSpacing', 0);
 
@@ -324,22 +324,37 @@ function dataImportGUI()
     lbY2.Layout.Row = 2; lbY2.Layout.Column = [1 2];
 
     % Plot-style buttons (row 7) — three uibutton objects in a nested grid.
-    styleGL = uigridlayout(ctrlGL,[1 3], ...
-        'Padding',[0 0 0 0],'ColumnSpacing',2,'ColumnWidth',{'1x','1x','1x'});
+    styleGL = uigridlayout(ctrlGL,[2 3], ...
+        'Padding',[0 0 0 0],'ColumnSpacing',2,'RowSpacing',2, ...
+        'ColumnWidth',{'1x','1x','1x'},'RowHeight',{20,'1x'});
     styleGL.Layout.Row = 7;
 
+    % Row 1: Colormap label
+    lblColormap = uilabel(styleGL,'Text','Colormap:','FontSize',10);
+    lblColormap.Layout.Row = 1; lblColormap.Layout.Column = 1;
+
+    % Row 1: Colormap selector
+    COLORMAPS = {'lines (MATLAB default)', 'jet', 'turbo', 'hot', 'cool', ...
+                 'spring', 'summer', 'autumn', 'winter', 'gray', 'copper', ...
+                 'pink', 'bone', 'hsv', 'parula', 'viridis', 'plasma', 'inferno'};
+    ddColormap = uidropdown(styleGL, 'Items', COLORMAPS, 'Value', COLORMAPS{1}, ...
+        'Tooltip', 'Color palette for multi-dataset plots', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    ddColormap.Layout.Row = 1; ddColormap.Layout.Column = [2 3];
+
+    % Row 2: Style buttons
     btnStyleLine = uibutton(styleGL,'Text','Line', ...
         'ButtonPushedFcn',@(~,~) onStylePick('Line'), ...
         'BackgroundColor',[0.20 0.50 0.20],'FontColor',[1 1 1]);
-    btnStyleLine.Layout.Column = 1;
+    btnStyleLine.Layout.Row = 2; btnStyleLine.Layout.Column = 1;
 
     btnStyleScatter = uibutton(styleGL,'Text','Scatter', ...
         'ButtonPushedFcn',@(~,~) onStylePick('Scatter'));
-    btnStyleScatter.Layout.Column = 2;
+    btnStyleScatter.Layout.Row = 2; btnStyleScatter.Layout.Column = 2;
 
     btnStyleLineMarkers = uibutton(styleGL,'Text','Line+Pts', ...
         'ButtonPushedFcn',@(~,~) onStylePick('Line+Pts'));
-    btnStyleLineMarkers.Layout.Column = 3;
+    btnStyleLineMarkers.Layout.Row = 2; btnStyleLineMarkers.Layout.Column = 3;
 
     chkGL = uigridlayout(ctrlGL,[1 3], ...
         'Padding',[0 0 0 0],'ColumnWidth',{'1x','1x','1x'},'ColumnSpacing',4);
@@ -374,6 +389,14 @@ function dataImportGUI()
         'Tooltip',         'Spacing between stacked traces in data units — blank = auto (1.1× max data range)', ...
         'ValueChangedFcn', @(~,~) onPlot([],[]));
     efWaterfallSpacing.Layout.Column = 2;
+
+    % Row 13: Annotation mode toggle
+    cbAnnotationMode = uicheckbox(ctrlGL, ...
+        'Text',    'Annotation Mode', ...
+        'Value',   false, ...
+        'Tooltip', 'Click on the plot to add text annotations. Right-click to delete.', ...
+        'ValueChangedFcn', @onAnnotationModeChanged);
+    cbAnnotationMode.Layout.Row = 13;
 
     % ── Right: preview axes ───────────────────────────────────────────────
     axPanel = uipanel(contentGL,'Title','Preview','FontSize',13);
@@ -413,7 +436,7 @@ function dataImportGUI()
         'RowSpacing', 6);
 
     % ── Corrections sub-panel (analysisGL col 1) ─────────────────────────
-    % 9-row × 4-col grid:
+    % 10-row × 4-col grid:
     %   row  1  : correction style selector
     %   rows 2-3: [X Offset | BG Slope] / [Y Offset | BG Intercept]
     %   row  4  : smoothing controls
@@ -422,11 +445,12 @@ function dataImportGUI()
     %   row  7  : background file selector (Load BG)
     %   row  8  : Subtract BG checkbox + Clear BG button
     %   row  9  : Apply Corrections | Reset | Show Raw checkbox
+    %   row 10  : Undo button (one-level undo for corrections)
     corrPanel = uipanel(analysisGL,'Title','Corrections','FontSize',13);
     corrPanel.Layout.Row = 1; corrPanel.Layout.Column = 1;
 
-    corrGL = uigridlayout(corrPanel,[9 4], ...
-        'RowHeight',    {24,24,24,24,24,24,24,24,28}, ...
+    corrGL = uigridlayout(corrPanel,[11 4], ...
+        'RowHeight',    {24,24,24,24,24,24,24,24,28,28,24}, ...
         'ColumnWidth',  {70,'1x',88,'1x'}, ...
         'Padding',      [6 6 6 6], ...
         'RowSpacing',   4, ...
@@ -559,12 +583,18 @@ function dataImportGUI()
         'Placeholder','— none loaded —', ...
         'Editable','off', ...
         'Tooltip','Loaded background dataset — use "Load BG..." to populate');
-    efBGFile.Layout.Row = 7; efBGFile.Layout.Column = [2 3];
+    efBGFile.Layout.Row = 7; efBGFile.Layout.Column = 2;
 
     btnLoadBG = uibutton(corrGL,'Text','Load BG...', ...
         'ButtonPushedFcn',@onLoadBackground, ...
         'Tooltip','Load a background file (any supported format) to subtract from corrected data');
-    btnLoadBG.Layout.Row = 7; btnLoadBG.Layout.Column = 4;
+    btnLoadBG.Layout.Row = 7; btnLoadBG.Layout.Column = 3;
+
+    btnSetActiveBG = uibutton(corrGL,'Text','Use Active', ...
+        'ButtonPushedFcn',@onSetActiveBG, ...
+        'Tooltip','Use the active dataset as the background (no file dialog needed)', ...
+        'FontSize',9);
+    btnSetActiveBG.Layout.Row = 7; btnSetActiveBG.Layout.Column = 4;
 
     % Row 8: Subtract BG toggle + Clear
     cbSubtractBG = uicheckbox(corrGL,'Text','Subtract BG','Value',false, ...
@@ -593,6 +623,26 @@ function dataImportGUI()
         'Tooltip','When corrected data exists, also overlay raw data (dashed, desaturated)', ...
         'ValueChangedFcn',@(~,~) onPlot([],[]));
     cbShowRaw.Layout.Row = 9; cbShowRaw.Layout.Column = 4;
+
+    % Row 10: Apply to All | Undo
+    btnApplyAll = uibutton(corrGL,'Text','Apply to All', ...
+        'ButtonPushedFcn',@onApplyCorrectionsAll, ...
+        'Tooltip','Copy current corrections to all loaded datasets', ...
+        'FontColor',[0.4 0.4 0.4],'FontSize',9);
+    btnApplyAll.Layout.Row = 10; btnApplyAll.Layout.Column = [1 2];
+
+    btnUndo = uibutton(corrGL,'Text','Undo', ...
+        'ButtonPushedFcn',@onUndoCorrections, ...
+        'Tooltip','Restore previous correction state (one-level undo)', ...
+        'FontColor',[0.6 0.6 0.6]);
+    btnUndo.Layout.Row = 10; btnUndo.Layout.Column = 3;
+
+    % Row 11: Visibility toggle
+    btnToggleVis = uibutton(corrGL,'Text','Hide Dataset', ...
+        'ButtonPushedFcn',@onToggleDatasetVisibility, ...
+        'Tooltip','Hide/show the active dataset in the plot without removing it', ...
+        'FontColor',[0.5 0.5 0.5]);
+    btnToggleVis.Layout.Row = 11; btnToggleVis.Layout.Column = [1 2];
 
     % ── Axis Limits sub-panel (middle column) ────────────────────────────
     % All six fields are text-type: blank = auto-scale, any number = manual.
@@ -703,8 +753,8 @@ function dataImportGUI()
     savePanel = uipanel(analysisGL,'Title','Save Corrected Data','FontSize',13);
     savePanel.Layout.Row = 1; savePanel.Layout.Column = 4;
 
-    saveGL = uigridlayout(savePanel,[5 2], ...
-        'RowHeight',    {26,32,32,32,32}, ...
+    saveGL = uigridlayout(savePanel,[6 2], ...
+        'RowHeight',    {26,32,32,32,32,32}, ...
         'ColumnWidth',  {'1x',100}, ...
         'Padding',      [6 6 6 6], ...
         'RowSpacing',   4, ...
@@ -747,6 +797,13 @@ function dataImportGUI()
         'FontColor',[1 1 1], ...
         'Tooltip','Copy the current plot as an image to the system clipboard (Windows only)');
     btnCopyClip.Layout.Row = 5; btnCopyClip.Layout.Column = [1 2];
+
+    btnBatchExport = uibutton(saveGL,'Text','Batch Export All CSV', ...
+        'ButtonPushedFcn',@onBatchExportCSV, ...
+        'BackgroundColor',[0.50 0.40 0.10], ...
+        'FontColor',[1 1 1], ...
+        'Tooltip','Export all loaded datasets to separate CSV files (one per dataset)');
+    btnBatchExport.Layout.Row = 6; btnBatchExport.Layout.Column = [1 2];
 
     % ── Peak Analysis sub-panel (row 2, full width) ───────────────────────
     % Always visible; XRD buttons in corrGL activate it contextually.
@@ -1104,12 +1161,20 @@ function dataImportGUI()
         items = cell(1, N);
         for i = 1:N
             dsI = appData.datasets{i};
-            if isfield(dsI,'displayName') && ~isempty(dsI.displayName)
-                items{i} = sprintf('[%d]  %s', i, dsI.displayName);
+            % Get parser badge (short type tag like [XRD], [VSM], [CSV])
+            badgeStr = getParserBadge(dsI.parserName);
+
+            % Use legend name if set; otherwise use filename
+            if isfield(dsI,'legendName') && ~isempty(dsI.legendName)
+                displayStr = dsI.legendName;
+            elseif isfield(dsI,'displayName') && ~isempty(dsI.displayName)
+                displayStr = dsI.displayName;
             else
                 [~, fn, fext] = fileparts(dsI.filepath);
-                items{i} = sprintf('[%d]  %s%s', i, fn, fext);
+                displayStr = [fn, fext];
             end
+
+            items{i} = sprintf('[%d]  %s  %s', i, badgeStr, displayStr);
         end
         lbDatasets.Items     = items;
         lbDatasets.ItemsData = num2cell(1:N);
@@ -1984,6 +2049,98 @@ function dataImportGUI()
 
     % ── Corrections callbacks ─────────────────────────────────────────────
 
+    function onApplyCorrectionsAll(~,~)
+    %ONAPPLYCORRECTIONSALL  Apply current corrections to all datasets.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig,'Load a file first.','No data');
+            return;
+        end
+
+        % Get current correction parameters from UI
+        xOff     = efXOffset.Value;
+        yOff     = efYOffset.Value;
+        bgSlope  = efBGSlope.Value;
+        bgIntcpt = efBGIntercept.Value;
+        smoothEnabled = cbSmooth.Value;
+        smoothWin = efSmoothWin.Value;
+        smoothMeth = ddSmoothMethod.Value;
+
+        % Apply to all datasets
+        for di = 1:numel(appData.datasets)
+            ds = appData.datasets{di};
+            d = ds.data;
+
+            % Save undo state (same logic as onApplyCorrections)
+            undoState = struct();
+            undoState.corrData       = ds.corrData;
+            undoState.xOff           = ds.xOff;
+            undoState.yOff           = ds.yOff;
+            undoState.bgSlope        = ds.bgSlope;
+            undoState.bgInt          = ds.bgInt;
+            undoState.smoothEnabled  = ds.smoothEnabled;
+            undoState.smoothWindow   = ds.smoothWindow;
+            undoState.smoothMethod   = ds.smoothMethod;
+            ds.undoState = undoState;
+
+            % Apply corrections (same logic as onApplyCorrections)
+            corrData = d;
+            if isdatetime(d.time)
+                corrData.time = d.time;
+            else
+                corrData.time = d.time - xOff;
+            end
+
+            for k = 1:size(d.values, 2)
+                yRaw = d.values(:, k);
+                if isdatetime(d.time)
+                    xForBG = (1:numel(yRaw))';
+                else
+                    xForBG = double(d.time);
+                end
+                yBG = bgSlope .* xForBG + bgIntcpt;
+                corrData.values(:, k) = yRaw - yBG - yOff;
+            end
+
+            % Subtract background dataset (interpolated to corrected x-axis)
+            if cbSubtractBG.Value && ~isempty(appData.bgDataset)
+                bgDs = appData.bgDataset;
+                if ~isdatetime(bgDs.time) && ~isdatetime(corrData.time)
+                    bgX = double(bgDs.time);
+                    bgY = bgDs.values(:, 1);
+                    bgInterp = interp1(bgX, bgY, double(corrData.time), ...
+                                       'linear', 0);
+                    for k = 1:size(corrData.values, 2)
+                        corrData.values(:, k) = corrData.values(:, k) - bgInterp;
+                    end
+                end
+            end
+
+            % Apply smoothing
+            if smoothEnabled
+                win = max(1, round(smoothWin));
+                corrData.values = utilities.smoothData(corrData.values, ...
+                    'Window', win, 'Method', lower(smoothMeth));
+            end
+
+            % Save corrected data
+            ds.corrData      = corrData;
+            ds.xOff          = xOff;
+            ds.yOff          = yOff;
+            ds.bgSlope       = bgSlope;
+            ds.bgInt         = bgIntcpt;
+            ds.smoothEnabled = smoothEnabled;
+            ds.smoothWindow  = smoothWin;
+            ds.smoothMethod  = smoothMeth;
+
+            appData.datasets{di} = ds;
+        end
+
+        % Refresh plot
+        onPlot([],[]);
+        uialert(fig, sprintf('Corrections applied to all %d datasets.', ...
+            numel(appData.datasets)), 'Batch Apply Complete');
+    end
+
     function onApplyCorrections(~,~)
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig,'Load a file first.','No data');
@@ -1995,6 +2152,24 @@ function dataImportGUI()
         yOff     = efYOffset.Value;
         bgSlope  = efBGSlope.Value;
         bgIntcpt = efBGIntercept.Value;
+
+        % ════════════════════════════════════════════════════════════════
+        %  Save undo state before applying new corrections
+        % ════════════════════════════════════════════════════════════════
+        % Store the current state so user can undo with one button click
+        if ~isfield(ds, 'undoState') || isempty(ds.undoState)
+            % Initialize undoState only if it doesn't exist
+            ds.undoState = struct();
+        end
+        undoState.corrData       = ds.corrData;
+        undoState.xOff           = ds.xOff;
+        undoState.yOff           = ds.yOff;
+        undoState.bgSlope        = ds.bgSlope;
+        undoState.bgInt          = ds.bgInt;
+        undoState.smoothEnabled  = ds.smoothEnabled;
+        undoState.smoothWindow   = ds.smoothWindow;
+        undoState.smoothMethod   = ds.smoothMethod;
+        ds.undoState = undoState;
 
         % Build corrected data struct (value-copy, then override time/values)
         corrData = d;
@@ -2091,6 +2266,52 @@ function dataImportGUI()
         onPlot([],[]);
     end
 
+    function onUndoCorrections(~,~)
+    %ONUNDOCORRECTIONS  Restore the previous correction state (one-level undo).
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig,'Load a file first.','No data');
+            return;
+        end
+
+        ds = appData.datasets{appData.activeIdx};
+
+        % Check if an undo state exists
+        if ~isfield(ds, 'undoState') || isempty(ds.undoState)
+            uialert(fig, 'No previous correction state to restore.', 'Undo unavailable');
+            return;
+        end
+
+        undoState = ds.undoState;
+
+        % Restore all correction state from the saved undo state
+        ds.corrData      = undoState.corrData;
+        ds.xOff          = undoState.xOff;
+        ds.yOff          = undoState.yOff;
+        ds.bgSlope       = undoState.bgSlope;
+        ds.bgInt         = undoState.bgInt;
+        ds.smoothEnabled = undoState.smoothEnabled;
+        ds.smoothWindow  = undoState.smoothWindow;
+        ds.smoothMethod  = undoState.smoothMethod;
+
+        % Clear the undo state after restoring (one-level undo)
+        ds.undoState = struct();
+
+        % Update appData
+        appData.datasets{appData.activeIdx} = ds;
+
+        % Sync UI fields to the restored state
+        efXOffset.Value      = ds.xOff;
+        efYOffset.Value      = ds.yOff;
+        efBGSlope.Value      = ds.bgSlope;
+        efBGIntercept.Value  = ds.bgInt;
+        cbSmooth.Value       = ds.smoothEnabled;
+        efSmoothWin.Value    = ds.smoothWindow;
+        ddSmoothMethod.Value = ds.smoothMethod;
+
+        % Refresh the plot
+        onPlot([],[]);
+    end
+
     function onLoadBackground(~,~)
     %ONLOADBACKGROUND  Open file dialog and load a background dataset via importAuto.
         startDir = guiTernary(isempty(appData.lastDir), pwd, appData.lastDir);
@@ -2120,10 +2341,160 @@ function dataImportGUI()
         cbSubtractBG.Value = false;
     end
 
+    function onSetActiveBG(~,~)
+    %ONSETACTIVEBG  Use the active dataset as the background.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig,'Load a file first.','No data');
+            return;
+        end
+
+        ds = appData.datasets{appData.activeIdx};
+        [~, fname, fext] = fileparts(ds.filepath);
+
+        % Use corrected data if available, otherwise raw data
+        if ~isempty(ds.corrData)
+            bgData = ds.corrData;
+        else
+            bgData = ds.data;
+        end
+
+        appData.bgDataset = bgData;
+        appData.bgFile = [fname, fext];
+        efBGFile.Value = appData.bgFile;
+        cbSubtractBG.Value = true;  % auto-enable subtraction
+
+        uialert(fig, sprintf('Background set to:\n%s', appData.bgFile), ...
+            'Background Updated');
+    end
+
+    function onToggleDatasetVisibility(~,~)
+    %ONTOGLEDATASETVISIBILITY  Toggle visibility of the active dataset.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig,'Load a file first.','No data');
+            return;
+        end
+
+        ds = appData.datasets{appData.activeIdx};
+        ds.visible = ~ds.visible;
+        appData.datasets{appData.activeIdx} = ds;
+
+        % Update button label
+        if ds.visible
+            btnToggleVis.Text = 'Hide Dataset';
+        else
+            btnToggleVis.Text = 'Show Dataset';
+        end
+
+        % Refresh plot
+        onPlot([],[]);
+    end
+
     function onSmoothingChanged(~,~)
     %ONSMOOTHINGCHANGED  Re-apply corrections whenever smoothing controls change.
         if ~isempty(appData.datasets) && appData.activeIdx >= 1
             onApplyCorrections([],[]);
+        end
+    end
+
+    % ── Annotation tool ───────────────────────────────────────────────────
+
+    function onAnnotationModeChanged(~,~)
+    %ONANNOTATIONMODECHANGED  Toggle annotation mode on/off.
+    %   When enabled, single-click on the plot adds annotations.
+    %   Right-click on an annotation deletes it.
+        if cbAnnotationMode.Value
+            % Enable annotation mode
+            appData.annotationMode = true;
+            fig.WindowButtonDownFcn = @onAnnotationClick;
+            fig.Pointer = 'crosshair';
+        else
+            % Disable annotation mode
+            appData.annotationMode = false;
+            fig.WindowButtonDownFcn = @onAxesButtonDown;
+            fig.Pointer = 'arrow';
+        end
+    end
+
+    function onAnnotationClick(~,~)
+    %ONANNOTATIONCLICK  Handle clicks in annotation mode: add or delete annotations.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            return;
+        end
+
+        % Get click position in axes coordinates
+        cp = ax.CurrentPoint;
+        x = cp(1,1);
+        y = cp(1,2);
+
+        % Ignore clicks outside the axes plot area
+        if x < ax.XLim(1) || x > ax.XLim(2) || ...
+           y < ax.YLim(1) || y > ax.YLim(2)
+            return;
+        end
+
+        % Right-click: delete annotation if near cursor
+        if strcmp(fig.SelectionType, 'alt')
+            deleteNearestAnnotation(x, y);
+            onPlot([],[]);
+            return;
+        end
+
+        % Left-click: add new annotation
+        % Prompt user for annotation text
+        answer = inputdlg('Enter annotation text:', 'Add Annotation', [1 40]);
+        if isempty(answer) || isempty(strtrim(answer{1}))
+            return;  % User cancelled
+        end
+
+        text = strtrim(answer{1});
+
+        % Add annotation to current dataset
+        ds = appData.datasets{appData.activeIdx};
+        if ~isfield(ds, 'annotations') || isempty(ds.annotations)
+            ds.annotations = {};
+        end
+
+        % Create annotation struct
+        annot = struct('x', x, 'y', y, 'text', text);
+        ds.annotations{end+1} = annot;
+
+        appData.datasets{appData.activeIdx} = ds;
+
+        % Refresh plot
+        onPlot([],[]);
+    end
+
+    function deleteNearestAnnotation(x, y)
+    %DELETENEARESTANNOTATION  Remove the annotation closest to (x, y).
+        ds = appData.datasets{appData.activeIdx};
+        if isempty(ds.annotations)
+            return;
+        end
+
+        % Find the closest annotation (within 5% of axes range)
+        xRange = ax.XLim(2) - ax.XLim(1);
+        yRange = ax.YLim(2) - ax.YLim(1);
+        thresh = 0.05;  % 5% of range
+
+        minDist = inf;
+        minIdx = -1;
+
+        for ai = 1:numel(ds.annotations)
+            annot = ds.annotations{ai};
+            dx = abs(annot.x - x) / xRange;
+            dy = abs(annot.y - y) / yRange;
+            dist = sqrt(dx^2 + dy^2);
+
+            if dist < thresh && dist < minDist
+                minDist = dist;
+                minIdx = ai;
+            end
+        end
+
+        % Delete if found
+        if minIdx > 0
+            ds.annotations(minIdx) = [];
+            appData.datasets{appData.activeIdx} = ds;
         end
     end
 
@@ -2439,6 +2810,51 @@ function dataImportGUI()
         end
     end
 
+    function onBatchExportCSV(~,~)
+    %ONBATCHEXPORTCSV  Export all loaded datasets to separate CSV files.
+        if isempty(appData.datasets)
+            uialert(fig,'Load a file first.','No data');
+            return;
+        end
+
+        nDS = numel(appData.datasets);
+        nExported = 0;
+        failedFiles = {};
+
+        for di = 1:nDS
+            ds = appData.datasets{di};
+
+            % Skip datasets without corrected data
+            if isempty(ds.corrData)
+                continue;
+            end
+
+            % Generate output filename: original_corrected.csv
+            [fpath, fname, ~] = fileparts(ds.filepath);
+            outFile = fullfile(fpath, [fname, '_corrected.csv']);
+
+            try
+                guiSaveCSV(ds.corrData, outFile, ds.data);
+                nExported = nExported + 1;
+            catch ME
+                failedFiles{end+1} = sprintf('%s: %s', fname, ME.message); %#ok<AGROW>
+            end
+        end
+
+        % Show result
+        if nExported == 0
+            uialert(fig, 'No corrected data to export (apply corrections first).', ...
+                'Batch Export Failed');
+        elseif isempty(failedFiles)
+            uialert(fig, sprintf('Successfully exported %d dataset(s) to CSV.', nExported), ...
+                'Batch Export Complete');
+        else
+            msg = sprintf('Exported: %d\nFailed: %d\n\n', nExported, numel(failedFiles));
+            msg = [msg, strjoin(failedFiles, '\n')];
+            uialert(fig, msg, 'Batch Export Partial');
+        end
+    end
+
     function onExportHDF5(~,~)
     %ONEXPORTHDF5  Export the active dataset to HDF5 via a browse-and-save dialog.
         if isempty(appData.datasets) || appData.activeIdx < 1
@@ -2503,10 +2919,12 @@ function dataImportGUI()
             hasY2    = nY2 > 0;
 
             % ── Colour allocation ─────────────────────────────────────────
-            % lines(nDS*(nY+nY2)) gives one colour per (dataset, channel) pair.
+            % Generate colors from selected colormap or default lines() palette.
             % Left-axis indices:  (di-1)*nY  + k
             % Right-axis indices: nDS*nY     + (di-1)*nY2 + k
-            colors = lines(max(nDS * (nY + nY2), 1));
+            colormapName = ddColormap.Value;
+            nColors = max(nDS * (nY + nY2), 1);
+            colors = getColorsFromMap(colormapName, nColors);
 
             % ── Draw ──────────────────────────────────────────────────────
             % Peak markers and zoom rect use HandleVisibility='off' so ax.Children may
@@ -2557,6 +2975,12 @@ function dataImportGUI()
 
             for di = 1:nDS
                 ds          = appData.datasets{di};
+
+                % Skip invisible datasets
+                if isfield(ds, 'visible') && ~ds.visible
+                    continue;
+                end
+
                 d           = ds.data;
                 hasCorrData = ~isempty(ds.corrData);
                 showRawOver = hasCorrData && cbShowRaw.Value;
@@ -2959,6 +3383,35 @@ function dataImportGUI()
                         end
                     end
                     hold(targetAx,'off');
+                end
+            end
+
+            % ── User annotations ──────────────────────────────────────────
+            % Render text labels placed by user in annotation mode.
+            if appData.activeIdx >= 1 && ~isempty(appData.datasets)
+                dsAnn = appData.datasets{appData.activeIdx};
+                if isfield(dsAnn, 'annotations') && ~isempty(dsAnn.annotations)
+                    hold(targetAx, 'on');
+                    % In waterfall mode, offset annotations by dataset
+                    annYOff = (appData.activeIdx - 1) * effectiveSpacing;
+
+                    for ai = 1:numel(dsAnn.annotations)
+                        annot = dsAnn.annotations{ai};
+                        yPos = annot.y + annYOff;
+
+                        % Render text with light background for visibility
+                        text(targetAx, annot.x, yPos, annot.text, ...
+                            'FontSize',         10, ...
+                            'FontWeight',       'normal', ...
+                            'Color',            [0.2 0.2 0.2], ...
+                            'BackgroundColor',  [1.0 0.95 0.85], ...
+                            'EdgeColor',        [0.7 0.7 0.7], ...
+                            'LineWidth',        0.5, ...
+                            'HitTest',          'off', ...
+                            'Tag',              'GUIUserAnnotation', ...
+                            'HandleVisibility', 'off');
+                    end
+                    hold(targetAx, 'off');
                 end
             end
 
@@ -3548,11 +4001,14 @@ function ds = buildDs(fp, data, parserName)
     ds.filepath    = fp;
     ds.parserName  = parserName;
     ds.displayName = '';          % '' = use filepath-derived name in rebuildDatasetList
+    ds.visible     = true;        % Visibility toggle for hiding datasets without removing them
     ds.corrData    = [];
     ds.xOff        = 0;
     ds.yOff        = 0;
     ds.bgSlope     = 0;
     ds.bgInt       = 0;
+    ds.undoState   = struct();    % Stores previous correction state for one-level undo
+    ds.annotations = {};          % Cell array of annotation structs {x, y, text}
     ds.color         = [];        % [] = Auto (lines() palette); [r g b] = override
     ds.colorR        = [];        % [] = Auto for right-axis channels
     ds.legendName    = '';        % '' = Auto (built from channel name)
@@ -3900,11 +4356,29 @@ function lbl = guiParserLabel(parserName)
     switch parserName
         case 'importRigaku_raw', lbl = 'Rigaku SmartLab XRD';
         case 'importXRDML',   lbl = 'PANalytical XRDML';
+        case 'importBruker',  lbl = 'Bruker XRD';
         case 'importExcel',   lbl = 'Excel Spreadsheet';
         case 'importCSV',     lbl = 'Delimited Text';
         case 'importQDVSM',   lbl = 'Quantum Design VSM';
         case 'importPPMS',    lbl = 'QD PPMS (legacy)';
+        case 'importMPMS',    lbl = 'QD MPMS SQUID';
+        case 'importLakeShore', lbl = 'Lake Shore Magnetometer';
         otherwise,            lbl = parserName;
+    end
+end
+
+
+function badge = getParserBadge(parserName)
+%GETPARSERBADGE  Return a short parser type tag (e.g. [XRD], [VSM], [CSV]).
+    switch parserName
+        case {'importRigaku_raw', 'importXRDML', 'importBruker'}
+            badge = '[XRD]';
+        case {'importQDVSM', 'importPPMS', 'importMPMS', 'importLakeShore'}
+            badge = '[MAG]';  % Magnetometry
+        case {'importExcel', 'importCSV'}
+            badge = '[DAT]';  % Generic data
+        otherwise
+            badge = '';
     end
 end
 
@@ -3933,4 +4407,128 @@ function ct = guiCountingTime(ds)
         end
     catch
     end
+end
+
+
+function colors = getColorsFromMap(colormapName, nColors)
+%GETCOLORSFROMMPA  Generate nColors colors from a named colormap.
+%   If colormapName is 'lines (MATLAB default)', uses the lines() function.
+%   Otherwise, generates evenly-spaced colors from the specified colormap.
+%
+%   Output: colors [nColors × 3] RGB matrix
+
+    % Handle MATLAB default
+    if strcmpi(colormapName, 'lines (MATLAB default)')
+        colors = lines(nColors);
+        return;
+    end
+
+    % Normalize colormap name (remove spaces, handle common variants)
+    cmName = lower(strrep(colormapName, ' ', ''));
+
+    % Map common names to MATLAB built-in colormaps
+    % For newer MATLAB versions, use the listed names directly
+    % For older versions, use alternative colormaps
+    switch cmName
+        case 'jet',      colors = getMapFromBuiltin('jet', nColors);
+        case 'turbo',    colors = getMapFromBuiltin('turbo', nColors);
+        case 'hot',      colors = getMapFromBuiltin('hot', nColors);
+        case 'cool',     colors = getMapFromBuiltin('cool', nColors);
+        case 'spring',   colors = getMapFromBuiltin('spring', nColors);
+        case 'summer',   colors = getMapFromBuiltin('summer', nColors);
+        case 'autumn',   colors = getMapFromBuiltin('autumn', nColors);
+        case 'winter',   colors = getMapFromBuiltin('winter', nColors);
+        case 'gray',     colors = getMapFromBuiltin('gray', nColors);
+        case 'copper',   colors = getMapFromBuiltin('copper', nColors);
+        case 'pink',     colors = getMapFromBuiltin('pink', nColors);
+        case 'bone',     colors = getMapFromBuiltin('bone', nColors);
+        case 'hsv',      colors = getMapFromBuiltin('hsv', nColors);
+        case 'parula',   colors = getMapFromBuiltin('parula', nColors);
+        case 'viridis',  colors = generateViridis(nColors);
+        case 'plasma',   colors = generatePlasma(nColors);
+        case 'inferno',  colors = generateInferno(nColors);
+        otherwise
+            % Default to lines if unrecognized
+            colors = lines(nColors);
+    end
+end
+
+
+function colors = getMapFromBuiltin(mapName, nColors)
+%GETMAPFROMBUILTIN  Sample colors from a MATLAB built-in colormap.
+    try
+        % Try the modern colormap() function (R2014b+)
+        cmap = colormap(gca, mapName);
+        if size(cmap, 1) >= nColors
+            % Sample evenly from the colormap
+            indices = round(linspace(1, size(cmap, 1), nColors));
+            colors = cmap(indices, :);
+        else
+            % Colormap smaller than requested, interpolate
+            indices = linspace(1, size(cmap, 1), nColors);
+            colors = interp1(1:size(cmap, 1), cmap, indices);
+        end
+    catch
+        % Fallback: use feval for older MATLAB versions
+        try
+            cmap = feval(mapName, 256);
+            indices = round(linspace(1, 256, nColors));
+            colors = cmap(indices, :);
+        catch
+            % If all else fails, use lines
+            colors = lines(nColors);
+        end
+    end
+end
+
+
+function colors = generateViridis(nColors)
+%GENERATEVIRIDIS  Create a viridis-like colormap (perceptually uniform).
+%   Approximation of the Python matplotlib 'viridis' colormap.
+    if nColors == 1
+        colors = [0.267 0.004 0.329];
+        return;
+    end
+    t = linspace(0, 1, nColors)';
+    % Viridis is a perceptually-uniform colormap; approximate with smooth spline
+    % Purple (0,0) → Blue (0.5, 0) → Green (0.5, 0.5) → Yellow (1, 1)
+    r = interp1([0 1], [0.267 0.993], t, 'pchip');
+    g = interp1([0 0.5 1], [0.004 0.906 0.906], t, 'pchip');
+    b = interp1([0 0.5 1], [0.329 0.145 0.023], t, 'pchip');
+    colors = [r, g, b];
+    colors = max(0, min(1, colors));  % Clamp to [0, 1]
+end
+
+
+function colors = generatePlasma(nColors)
+%GENERATEPLASMA  Create a plasma-like colormap.
+%   Approximation of the Python matplotlib 'plasma' colormap.
+    if nColors == 1
+        colors = [0.050 0.030 0.529];
+        return;
+    end
+    t = linspace(0, 1, nColors)';
+    % Plasma: Purple → Pink → Yellow
+    r = interp1([0 0.5 1], [0.050 0.940 0.940], t, 'pchip');
+    g = interp1([0 0.5 1], [0.030 0.098 0.906], t, 'pchip');
+    b = interp1([0 0.5 1], [0.529 0.208 0.145], t, 'pchip');
+    colors = [r, g, b];
+    colors = max(0, min(1, colors));  % Clamp to [0, 1]
+end
+
+
+function colors = generateInferno(nColors)
+%GENERATEINFERNO  Create an inferno-like colormap.
+%   Approximation of the Python matplotlib 'inferno' colormap.
+    if nColors == 1
+        colors = [0.001 0.001 0.014];
+        return;
+    end
+    t = linspace(0, 1, nColors)';
+    % Inferno: Black → Purple → Yellow
+    r = interp1([0 0.5 1], [0.001 0.283 0.988], t, 'pchip');
+    g = interp1([0 0.5 1], [0.001 0.075 0.998], t, 'pchip');
+    b = interp1([0 0.5 1], [0.014 0.612 0.120], t, 'pchip');
+    colors = [r, g, b];
+    colors = max(0, min(1, colors));  % Clamp to [0, 1]
 end

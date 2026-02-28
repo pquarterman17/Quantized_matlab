@@ -319,6 +319,147 @@ else
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  8. importBruker  –  Bruker .brml (ZIP+XML) or .raw (binary v3)
+% ════════════════════════════════════════════════════════════════════════
+BRML_FILE = 'C:\Users\patri\Downloads\bruker_sample.brml';
+BRUKER_RAW_FILE = 'C:\Users\patri\Downloads\bruker_sample.raw';
+fprintf('\n══ TEST 8: parser.importBruker ══\n');
+
+brmlExists = isfile(BRML_FILE);
+rawExists  = isfile(BRUKER_RAW_FILE);
+
+if ~brmlExists && ~rawExists
+    fprintf('  SKIP – no .brml or Bruker .raw file found. Update file paths at top of script.\n');
+else
+    try
+        % Test .brml if available
+        if brmlExists
+            d = parser.importBruker(BRML_FILE, 'Verbose', true);
+
+            assert(isstruct(d),                        'output must be a struct');
+            assert(isfield(d, 'time'),                 'missing field: time');
+            assert(isfield(d, 'values'),               'missing field: values');
+            assert(isfield(d, 'labels'),               'missing field: labels');
+            assert(isfield(d, 'units'),                'missing field: units');
+            assert(isfield(d, 'metadata'),             'missing field: metadata');
+            assert(~isempty(d.time),                   '2θ vector is empty');
+            assert(size(d.values, 2) == 1,             'expected exactly 1 intensity channel');
+            assert(isfield(d.metadata, 'startAngle'),  'missing metadata.startAngle');
+            assert(isfield(d.metadata, 'endAngle'),    'missing metadata.endAngle');
+            assert(isfield(d.metadata, 'stepSize'),    'missing metadata.stepSize');
+            assert(isfield(d.metadata, 'countingTime'),'missing metadata.countingTime');
+
+            fprintf('  Points        : %d\n',   numel(d.time));
+            fprintf('  2θ range      : %.4f to %.4f deg\n', d.metadata.startAngle, d.metadata.endAngle);
+            fprintf('  Format        : .brml (ZIP+XML)\n');
+        end
+
+        % Test Bruker .raw (v3) if available
+        if rawExists
+            d = parser.importBruker(BRUKER_RAW_FILE, 'UseCountsPerSec', true, 'Verbose', true);
+
+            assert(isstruct(d),                        'output must be a struct');
+            assert(isfield(d, 'time'),                 'missing field: time');
+            assert(isfield(d, 'values'),               'missing field: values');
+            assert(size(d.values, 2) == 1,             'expected 1 intensity channel');
+            assert(strcmp(d.units{1}, 'counts/s'),     'UseCountsPerSec=true should yield counts/s');
+
+            fprintf('  Points        : %d\n',   numel(d.time));
+            fprintf('  2θ range      : %.4f to %.4f deg\n', d.metadata.startAngle, d.metadata.endAngle);
+            fprintf('  Format        : .raw (Bruker binary v3)\n');
+        end
+
+        fprintf('  PASS\n');
+        passed = passed + 1;
+    catch ME
+        fprintf('  FAIL: %s\n', ME.message);
+        failed = failed + 1;
+    end
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  9. importMPMS  –  Quantum Design MPMS SQUID magnetometer
+% ════════════════════════════════════════════════════════════════════════
+MPMS_FILE = 'C:\Users\patri\Downloads\mpms_sample.dat';
+fprintf('\n══ TEST 9: parser.importMPMS ══\n');
+if ~isfile(MPMS_FILE)
+    fprintf('  SKIP – MPMS_FILE not found. Update file path at top of script.\n');
+else
+    try
+        % ── 9a: Default (T vs DC Moment) ─────────────────────────────────
+        d = parser.importMPMS(MPMS_FILE, Verbose=true);
+
+        assert(isstruct(d),                        'output must be a struct');
+        assert(isfield(d, 'time'),                 'missing field: time');
+        assert(isfield(d, 'values'),               'missing field: values');
+        assert(isfield(d, 'labels'),               'missing field: labels');
+        assert(isfield(d, 'units'),                'missing field: units');
+        assert(isfield(d, 'metadata'),             'missing field: metadata');
+        assert(strcmp(d.metadata.parserName, 'importMPMS'), 'parserName should be importMPMS');
+
+        % ── 9b: Multiple channels (DC moment + AC susceptibility) ────────
+        d2 = parser.importMPMS(MPMS_FILE, YAxis={'dcmoment', 'acsusceptibility'});
+        if ~isempty(d2.values)
+            assert(size(d2.values, 2) >= 1, 'expected at least 1 channel');
+        end
+
+        % ── 9c: Field-dependent (H vs M) ────────────────────────────────
+        d3 = parser.importMPMS(MPMS_FILE, XAxis='field', YAxis='dcmoment');
+        if ~isempty(d3.values)
+            assert(~isempty(d3.time), '2θ vector should not be empty');
+        end
+
+        fprintf('  PASS\n');
+        passed = passed + 1;
+    catch ME
+        fprintf('  FAIL: %s\n', ME.message);
+        failed = failed + 1;
+    end
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  10. importLakeShore  –  Lake Shore magnetometer CSV/DAT
+% ════════════════════════════════════════════════════════════════════════
+LAKESHORE_FILE = 'C:\Users\patri\Downloads\lakeshore_sample.csv';
+fprintf('\n══ TEST 10: parser.importLakeShore ══\n');
+if ~isfile(LAKESHORE_FILE)
+    fprintf('  SKIP – LAKESHORE_FILE not found. Update file path at top of script.\n');
+else
+    try
+        % ── 10a: Auto-detect header, default x/y ────────────────────────
+        d = parser.importLakeShore(LAKESHORE_FILE, Verbose=true);
+
+        assert(isstruct(d),                        'output must be a struct');
+        assert(isfield(d, 'time'),                 'missing field: time');
+        assert(isfield(d, 'values'),               'missing field: values');
+        assert(isfield(d, 'labels'),               'missing field: labels');
+        assert(isfield(d, 'units'),                'missing field: units');
+        assert(isfield(d, 'metadata'),             'missing field: metadata');
+        assert(strcmp(d.metadata.parserName, 'importLakeShore'), 'parserName should be importLakeShore');
+
+        % ── 10b: Field-dependent with auto header detection ──────────────
+        d2 = parser.importLakeShore(LAKESHORE_FILE, XAxis='field', YAxis='moment');
+        if ~isempty(d2.values)
+            assert(~isempty(d2.time), 'x-axis should not be empty');
+            fprintf('  Field range: %.4g to %.4g\n', min(d2.time), max(d2.time));
+        end
+
+        % ── 10c: Multiple channels (moment + susceptibility) ──────────────
+        d3 = parser.importLakeShore(LAKESHORE_FILE, YAxis={'moment', 'susceptibility'});
+        if ~isempty(d3.values)
+            % At least one of the requested channels found
+            assert(size(d3.values, 2) >= 1, 'expected at least 1 channel');
+        end
+
+        fprintf('  PASS\n');
+        passed = passed + 1;
+    catch ME
+        fprintf('  FAIL: %s\n', ME.message);
+        failed = failed + 1;
+    end
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  Summary
 % ════════════════════════════════════════════════════════════════════════
 total = passed + failed;

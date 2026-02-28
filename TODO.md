@@ -26,11 +26,19 @@ impl# TODO — thin_film_toolkit_matlab
 
 ### High impact, low effort
 
-- [ ] **Batch-apply corrections to all datasets** — "Apply to All" button copies the
-  current X/Y offset, BG slope/intercept, and smoothing settings to every loaded dataset.
+- [/] **Show legend name / parser badge in dataset list** — `rebuildDatasetList` currently
+  shows `[N] filename.ext`. When `ds.legendName` is set, display it instead of the
+  filename; always prefix with a short type tag (`[VSM]`, `[XRD]`, `[CSV]`) derived from
+  `ds.parserName`. Makes mixed-type sessions immediately scannable without clicking each entry.
+  **Implemented, needs testing.**
 
-- [ ] **Batch export CSV** — "Export All CSV" button in the Save panel writes one
+- [/] **Batch-apply corrections to all datasets** — "Apply to All" button copies the
+  current X/Y offset, BG slope/intercept, and smoothing settings to every loaded dataset.
+  **Implemented, needs testing.**
+
+- [/] **Batch export CSV** — "Export All CSV" button in the Save panel writes one
   `_corrected.csv` per loaded dataset using their auto-generated paths.
+  **Implemented, needs testing.**
 
 - [ ] **Copy plot to clipboard** — button that copies the current plot as an image
   (e.g. `print(fig, '-clipboard', '-dbitmap')`).
@@ -55,16 +63,16 @@ impl# TODO — thin_film_toolkit_matlab
 
 ### Visualization
 
-- [ ] **Colormap for parameter series** — when many datasets are loaded (e.g. 20
+- [/] **Colormap for parameter series** — when many datasets are loaded (e.g. 20
   temperature-series XRD scans), auto-assign colors from a chosen colormap (jet,
-  viridis, etc.) rather than the fixed 10-color palette.
+  viridis, etc.) rather than the fixed 10-color palette. **Needs testing in GUI.**
 
 - [/] **Second Y-axis** — checkbox to plot a selected channel on a right-side Y-axis
   with its own scale. Useful for overlaying moment and temperature vs time in PPMS data.
 
-- [ ] **Annotation tool** — click on the plot to drop a text label (peak index, sample
+- [/] **Annotation tool** — click on the plot to drop a text label (peak index, sample
   name, etc.) that follows data coordinates. Store in `ds.annotations`; re-render in
-  `drawToAxes`.
+  `drawToAxes`. **Needs testing in GUI.**
 
 
 ---
@@ -74,11 +82,27 @@ impl# TODO — thin_film_toolkit_matlab
 - [x] **Drag-and-drop file loading** — use `fig.DropFcn` (MATLAB R2023a+) to accept
   files dragged from Explorer. Add a version guard; fall back gracefully on older MATLAB.
 
-- [ ] **Undo for corrections** — one-level undo: snapshot `ds.corrData`, offsets, etc.
+- [/] **Undo for corrections** — one-level undo: snapshot `ds.corrData`, offsets, etc.
   into `ds.undoState` before "Apply Corrections"; an "Undo" button restores it.
+  **Needs testing in GUI.**
 
 - [x] **Dataset reorder (drag in list)** — allow dragging rows in `lbDatasets` to
   reorder datasets, affecting legend order and waterfall offset order.
+
+- [/] **"Set active dataset as background" button** — one-click to copy the active
+  dataset into `appData.bgDataset`, instead of requiring a separate file-browse. Eliminates
+  the extra step when the reference measurement is already loaded as a dataset.
+  **Implemented, needs testing.**
+
+- [/] **Dataset visibility toggle** — add a `ds.visible` boolean (default `true`) and a
+  "Hide/Show" button (or checkbox) per dataset. The `for di = 1:nDS` plot loop already
+  supports per-dataset skipping; just add `if ~ds.visible, continue; end`. Useful when
+  10+ files are loaded and you want to isolate a subset without removing the others.
+  **Implemented, needs testing.**
+
+- [ ] **Filter/search box above dataset list** — small text field that filters `lbDatasets`
+  items by filename or legend name as you type. Rebuild `Items` from a filtered subset on
+  each keystroke; restore full list on clear. Most useful with 20+ loaded files.
 
 ---
 
@@ -99,6 +123,52 @@ impl# TODO — thin_film_toolkit_matlab
 ### File Handling
 
 - [ ] **Additional File Support** — support file types added into '+test_datasets' on a rolling basis
+
+---
+
+## New Parsers — File Format Support
+
+### Tier 1 — XRD (XML-based, no example files needed)
+
+- [/] **`importXRDML.m`** — PANalytical / Malvern Empyrean `.xrdml` format. Well-documented
+  XML schema; parse with `readstruct` or `xmlread`. Extract 2θ array, intensity counts,
+  step size, wavelength, and scan metadata.
+
+- [/] **`importBruker.m`** — Bruker D8/D2 `.brml` (ZIP archive containing XML) and legacy
+  `.raw` binary (v3 magic `"RAW1.01"`, v4 magic `"RAW "`). Unzip `.brml` with `unzip`,
+  then XML parse; binary `.raw` requires manual byte-level reading similar to
+  `importRigaku_raw.m`. Single parser dispatches on extension/magic.
+
+---
+
+### Tier 2 — Magnetometry / Transport
+
+- [/] **`importMPMS.m`** — Quantum Design MPMS SQUID `.dat`. Same `[Header]/[Data]`
+  block structure as the existing VSM/PPMS parsers; different column layout (DC moment,
+  AC susceptibility). Implemented as a thin wrapper around importQDVSM with MPMS-specific
+  column shortcuts. **Needs testing with real MPMS files.**
+
+- [/] **`importLakeShore.m`** — Lake Shore VSM / cryostat exports. CSV-style with
+  instrument header block. Auto-detects header row and column names; supports temperature/field
+  x-axis and moment/susceptibility y-axis with flexible column resolution. **Needs testing with
+  real Lake Shore files.**
+
+- [ ] **`importOxford.m`** — Oxford Instruments MagLab exports. Format varies by software
+  version (often CSV or custom text). Needs example file to determine structure.
+
+---
+
+### Tier 3 — Spectroscopy
+
+- [ ] **`importRaman.m`** (or extend `importCSV`) — Raman text exports from Horiba LabSpec
+  (`.txt`) and Renishaw ASCII export. Wavenumber + intensity columns; likely already
+  handled by `importCSV` — verify and add `importAuto` dispatch rule for `.txt` Raman files.
+
+- [ ] **`importOpus.m`** — Bruker OPUS FTIR binary format. Proprietary block structure;
+  needs example file. Reference: open-source `brukeropus` Python library for format spec.
+
+- [ ] **`importSPC.m`** — GRAMS/Thermo `.spc` spectral format (Shimadzu UV-Vis and others).
+  Published binary spec available; single and multi-file variants.
 
 ---
 

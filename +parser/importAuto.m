@@ -12,7 +12,9 @@ function [data, parserName] = importAuto(filepath, varargin)
 %
 %   DISPATCH RULES:
 %     .xrdml            → parser.importXRDML
-%     .raw              → parser.importRigaku_raw
+%     .brml             → parser.importBruker
+%     .raw              → parser.importBruker (Bruker magic "RAW1.01")
+%                         parser.importRigaku_raw (Rigaku magic "FI")
 %     .xlsx .xls .xlsm
 %       .ods .xlsb      → parser.importExcel
 %     .csv .tsv .txt    → parser.importCSV
@@ -37,7 +39,7 @@ function [data, parserName] = importAuto(filepath, varargin)
 %       % Inspect the result
 %       parser.importAuto('log.csv')
 %
-%   See also IMPORTXRDML, IMPORTRIGAKU_RAW, IMPORTCSV, IMPORTEXCEL, IMPORTPPMS, IMPORTQDVSM
+%   See also IMPORTXRDML, IMPORTBRUKER, IMPORTRIGAKU_RAW, IMPORTCSV, IMPORTEXCEL, IMPORTPPMS, IMPORTQDVSM
 
     arguments
         filepath (1,1) string {mustBeFile}
@@ -65,9 +67,19 @@ function [data, parserName] = importAuto(filepath, varargin)
             parserName = 'importXRDML';
             data = parser.importXRDML(filepath, varargin{:});
 
+        case '.brml'
+            parserName = 'importBruker';
+            data = parser.importBruker(filepath, varargin{:});
+
         case '.raw'
-            parserName = 'importRigaku_raw';
-            data = parser.importRigaku_raw(filepath, varargin{:});
+            magic = readFileMagic(filepath, 7);
+            if strncmp(magic, 'RAW', 3)
+                parserName = 'importBruker';
+                data = parser.importBruker(filepath, varargin{:});
+            else
+                parserName = 'importRigaku_raw';
+                data = parser.importRigaku_raw(filepath, varargin{:});
+            end
 
         case {'.xlsx', '.xls', '.xlsm', '.xlsb', '.ods'}
             parserName = 'importExcel';
@@ -95,7 +107,7 @@ function [data, parserName] = importAuto(filepath, varargin)
         otherwise
             error('parser:importAuto:unknownExtension', ...
                 ['No parser registered for extension "%s".\n' ...
-                 'Supported: .xrdml, .raw, .xlsx/.xls/.xlsm, .csv/.tsv/.txt, .dat'], ext);
+                 'Supported: .xrdml, .brml, .raw, .xlsx/.xls/.xlsm, .csv/.tsv/.txt, .dat'], ext);
     end
 
     % ════════════════════════════════════════════════════════════════
@@ -160,5 +172,23 @@ function label = resolveXLabel(meta)
         label = meta.xColumnName;
     else
         label = '';
+    end
+end
+
+
+function magic = readFileMagic(filepath, nBytes)
+%READFILEMAGIC  Read the first nBytes from filepath as characters.
+%   Returns a char array of length nBytes (padded with nulls if file is shorter).
+    try
+        fid = fopen(filepath, 'r');
+        if fid == -1
+            magic = char(zeros(1, nBytes));
+            return;
+        end
+        cleanObj = onCleanup(@() fclose(fid));
+        raw = fread(fid, nBytes, '*uint8');
+        magic = char(raw(:)');
+    catch
+        magic = char(zeros(1, nBytes));
     end
 end
