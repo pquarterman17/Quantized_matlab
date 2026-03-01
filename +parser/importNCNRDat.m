@@ -118,9 +118,12 @@ function data = importNCNRDat(filepath, options)
         tokens = str2double(strsplit(strtrim(line)));
         % Filter out NaN tokens
         tokens(isnan(tokens)) = [];
-        if ~isempty(tokens)
-            dataArray = [dataArray; tokens];
+        if isempty(tokens), continue; end
+        % Guard: skip rows with inconsistent column count
+        if ~isempty(dataArray) && numel(tokens) ~= size(dataArray, 2)
+            continue;
         end
+        dataArray = [dataArray; tokens];
     end
 
     if isempty(dataArray)
@@ -146,17 +149,27 @@ function data = importNCNRDat(filepath, options)
     % ════════════════════════════════════════════════════════════════
     %  Build output
     % ════════════════════════════════════════════════════════════════
-    labels = {'Q', 'dQ', 'R', 'dR', 'theory', 'fresnel'};
-    % Only keep labels for columns we actually have
-    labels = labels(1:size(valueData, 2)+1);  % +1 for Q
-    labels(1) = [];  % Remove Q (already used as time)
-
-    units = {'1/A', '1/A', '', '', '', ''};
-    units = units(2:size(valueData, 2)+1);
+    nVal = size(valueData, 2);
+    defaultLabels = {'dQ', 'R', 'dR', 'theory', 'fresnel'};
+    defaultUnits  = {'1/A', '', '', '', ''};
+    if nVal <= numel(defaultLabels)
+        labels = defaultLabels(1:nVal);
+        units  = defaultUnits(1:nVal);
+    else
+        % More columns than expected — extend with generic names
+        labels = defaultLabels;
+        units  = defaultUnits;
+        for ei = numel(defaultLabels)+1:nVal
+            labels{ei} = sprintf('col%d', ei);
+            units{ei}  = '';
+        end
+    end
 
     metadata.filename = filepath;
     metadata.source = 'refl1d fitting';
     metadata.xColumnName = 'Q';
+    metadata.importDate = datetime('now');
+    metadata.parserName = 'importNCNRDat';
     metadata.parserSpecific.instrument = 'NCNR reflectometer';
     metadata.parserSpecific.polarization = polarization;
 

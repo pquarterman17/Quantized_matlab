@@ -34,27 +34,34 @@ function out = smoothData(y, options)
         options.Window (1,1) double {mustBePositive, mustBeInteger} = 5
     end
 
-    hw   = options.Window;
-    wLen = 2*hw + 1;
-
-    % Build convolution kernel
-    switch options.Method
-        case 'moving'
-            kernel = ones(wLen, 1) / wLen;
-        case 'gaussian'
-            sigma  = hw / 2;
-            t      = (-hw:hw)';
-            kernel = exp(-t.^2 / (2*sigma^2));
-            kernel = kernel / sum(kernel);
-    end
+    hw = options.Window;
 
     out = NaN(size(y));
     for c = 1:size(y, 2)
         col = y(:, c);
         n   = numel(col);
 
+        % Clamp half-width so mirror-pad indices stay valid
+        hwc = min(hw, n - 1);
+        if hwc < 1
+            out(:, c) = col;
+            continue;
+        end
+
+        % Build convolution kernel (inside loop to use clamped hwc)
+        wLen = 2*hwc + 1;
+        switch options.Method
+            case 'moving'
+                kernel = ones(wLen, 1) / wLen;
+            case 'gaussian'
+                sigma  = hwc / 2;
+                t      = (-hwc:hwc)';
+                kernel = exp(-t.^2 / (2*sigma^2));
+                kernel = kernel / sum(kernel);
+        end
+
         % Mirror-pad to reduce edge effects
-        padded = [col(hw+1:-1:2); col; col(end-1:-1:end-hw)];
+        padded = [col(hwc+1:-1:2); col; col(end-1:-1:end-hwc)];
 
         % Convolve
         smoothed = conv(padded, kernel, 'valid');

@@ -158,19 +158,18 @@ function data = importNCNRRefl(filepath, options)
     % Note: Qz is stored in .time, not .values, so labels should not include it
     outLabels = valueLabels;
     outUnits = valueUnits;
-    if isempty(outUnits{1})
-        outUnits{1} = '1/Ang';
-    end
 
     % Store metadata
     metadata.filename = filepath;
     metadata.source = 'NCNR reductus';
     metadata.xColumnName = 'Qz';
+    metadata.importDate = datetime('now');
+    metadata.parserName = 'importNCNRRefl';
     metadata.parserSpecific.instrument = 'NCNR reflectometer';
     metadata.parserSpecific.name = name;
 
     % Detect CANDOR vs PBR by checking if wavelength is an array
-    if isscalar(wavelength)
+    if ~isempty(wavelength) && isscalar(wavelength)
         metadata.parserSpecific.instrument_type = 'PBR (monochromatic)';
         metadata.parserSpecific.wavelength = wavelength;
     else

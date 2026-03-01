@@ -39,6 +39,13 @@ function data = createDataStruct(timeVec, valuesMatrix, varargin)
         units = repmat({''}, 1, M);
     end
 
+    assert(numel(labels) == M, ...
+        'parser:createDataStruct:labelCountMismatch', ...
+        'Expected %d labels for %d columns, got %d.', M, M, numel(labels));
+    assert(numel(units) == M, ...
+        'parser:createDataStruct:unitCountMismatch', ...
+        'Expected %d units for %d columns, got %d.', M, M, numel(units));
+
     data.time     = timeVec;
     data.values   = valuesMatrix;
     data.labels   = labels;

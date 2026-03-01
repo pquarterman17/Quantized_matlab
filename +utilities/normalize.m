@@ -14,7 +14,7 @@ function out = normalize(y, options)
 %   OPTIONAL NAME-VALUE PAIRS:
 %       Method — normalisation method:
 %                  'range' (default) — linearly maps [min,max] → Range
-%                  'peak'            — divides by the column maximum
+%                  'peak'            — divides by the maximum absolute value
 %                  'zscore'          — subtracts mean, divides by std dev
 %       Range  — [lo, hi] target output range for 'range' method (default [0,1])
 %

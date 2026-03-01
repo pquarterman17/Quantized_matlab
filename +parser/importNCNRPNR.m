@@ -69,7 +69,6 @@ function data = importNCNRPNR(filepath, options)
 
     % Clean up column names (replace polarization markers)
     cleanLabels = cleanPolarizationLabels(colNames);
-    cleanUnits = units(2:end);  % Skip Q unit, keep the rest
 
     % ════════════════════════════════════════════════════════════════
     %  Detect variant (NSF vs SF)
@@ -93,7 +92,7 @@ function data = importNCNRPNR(filepath, options)
     % ════════════════════════════════════════════════════════════════
     % Build labels and units: Q is the first column (already extracted as time)
     % outLabels should be the remaining column names (already cleaned)
-    outLabels = cleanLabels;
+    outLabels = cleanLabels(2:end);  % skip Q (already extracted as time)
 
     % Build units: skip the first unit (Q) and keep the rest
     outUnits = units(2:end);
@@ -101,6 +100,8 @@ function data = importNCNRPNR(filepath, options)
     metadata.filename = filepath;
     metadata.source = 'NCNR reductus';
     metadata.xColumnName = 'Q';
+    metadata.importDate = datetime('now');
+    metadata.parserName = 'importNCNRPNR';
     metadata.parserSpecific.instrument = 'NCNR polarized reflectometer';
     metadata.parserSpecific.variant = variant;
 

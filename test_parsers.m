@@ -224,10 +224,10 @@ try
     fprintf('  Named-col units : %s | %s\n', d2.units{1}, d2.units{2});
 
     % --- Test 6c: metadata ---
-    assert(isfield(d.metadata, 'sheetName'), 'missing metadata.sheetName');
-    assert(isfield(d.metadata, 'allSheets'), 'missing metadata.allSheets');
+    assert(isfield(d.metadata.parserSpecific, 'sheetName'), 'missing metadata.parserSpecific.sheetName');
+    assert(isfield(d.metadata.parserSpecific, 'allSheets'), 'missing metadata.parserSpecific.allSheets');
 
-    fprintf('  Sheet name   : %s\n', d.metadata.sheetName);
+    fprintf('  Sheet name   : %s\n', d.metadata.parserSpecific.sheetName);
     fprintf('  PASS\n');
     passed = passed + 1;
 catch ME

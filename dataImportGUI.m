@@ -811,90 +811,113 @@ function dataImportGUI()
         'ValueChangedFcn', @(~,~) onPlot([],[]));
     ddY2Fmt.Layout.Column = 6;
 
-    % ── Save Corrected Data sub-panel (right column) ──────────────────────
-    savePanel = uipanel(analysisGL,'Title','Save Corrected Data','FontSize',13);
+    % ── Save / Export sub-panel (right column) ─────────────────────────────
+    savePanel = uipanel(analysisGL,'Title','Save / Export','FontSize',13);
     savePanel.Layout.Row = 1; savePanel.Layout.Column = 4;
 
-    saveGL = uigridlayout(savePanel,[8 2], ...
-        'RowHeight',    {26,32,32,32,32,32,32,32}, ...
+    saveGL = uigridlayout(savePanel,[11 2], ...
+        'RowHeight',    {26,28,32,32,32,32,32,32,32,32,32}, ...
         'ColumnWidth',  {'1x','1x'}, ...
         'Padding',      [6 6 6 6], ...
         'RowSpacing',   4, ...
         'ColumnSpacing', 4);
 
     efSavePath = uieditfield(saveGL,'Value','', ...
-        'Placeholder','(auto-set when corrections are applied)', ...
-        'Tooltip','Output CSV file path — auto-filled on Apply, or browse to choose');
+        'Placeholder','(auto-set on dataset load or Apply)', ...
+        'Tooltip','Output CSV file path — auto-filled on load/Apply, or browse to choose');
     efSavePath.Layout.Row = 1; efSavePath.Layout.Column = [1 2];
+
+    % Row 2: CSV format selector
+    ddExportFormat = uidropdown(saveGL, ...
+        'Items',   {'Standard CSV', 'Origin ASCII'}, ...
+        'Value',   'Standard CSV', ...
+        'Tooltip', 'CSV format: Standard (single header) or Origin (Long Name / Units / Designation rows)');
+    ddExportFormat.Layout.Row = 2; ddExportFormat.Layout.Column = [1 2];
 
     btnSaveBrowse = uibutton(saveGL,'Text','Browse...', ...
         'ButtonPushedFcn',@onSaveBrowse, ...
         'Tooltip','Choose output file location');
-    btnSaveBrowse.Layout.Row = 2; btnSaveBrowse.Layout.Column = 1;
+    btnSaveBrowse.Layout.Row = 3; btnSaveBrowse.Layout.Column = 1;
 
     btnSave = uibutton(saveGL,'Text','Save CSV', ...
         'ButtonPushedFcn',@onSaveCSV, ...
         'BackgroundColor',[0.15 0.37 0.63], ...
         'FontColor',[1 1 1],'FontWeight','bold', ...
-        'Tooltip','Write corrected data to CSV file');
-    btnSave.Layout.Row = 2; btnSave.Layout.Column = 2;
+        'Tooltip','Write data to CSV (raw or corrected; consolidated for neutron data)');
+    btnSave.Layout.Row = 3; btnSave.Layout.Column = 2;
 
     btnExportHDF5 = uibutton(saveGL,'Text','Export HDF5...', ...
         'ButtonPushedFcn',@onExportHDF5, ...
         'BackgroundColor',[0.10 0.45 0.45], ...
         'FontColor',[1 1 1], ...
         'Tooltip','Export data, corrections, and peaks to a self-describing HDF5 file (.h5)');
-    btnExportHDF5.Layout.Row = 3; btnExportHDF5.Layout.Column = [1 2];
+    btnExportHDF5.Layout.Row = 4; btnExportHDF5.Layout.Column = [1 2];
 
     btnExportFig = uibutton(saveGL,'Text','Export to Figure', ...
         'ButtonPushedFcn',@onExportFigure, ...
         'BackgroundColor',[0.30 0.30 0.60], ...
         'FontColor',[1 1 1], ...
         'Tooltip','Open a new figure window with the current plot (full MATLAB toolbar — ideal for publication-quality editing)');
-    btnExportFig.Layout.Row = 4; btnExportFig.Layout.Column = [1 2];
+    btnExportFig.Layout.Row = 5; btnExportFig.Layout.Column = [1 2];
 
     btnCopyClip = uibutton(saveGL,'Text','Copy Plot to Clipboard', ...
         'ButtonPushedFcn',@onCopyToClipboard, ...
         'BackgroundColor',[0.22 0.22 0.22], ...
         'FontColor',[1 1 1], ...
         'Tooltip','Copy the current plot as an image to the system clipboard (Windows only)');
-    btnCopyClip.Layout.Row = 5; btnCopyClip.Layout.Column = [1 2];
+    btnCopyClip.Layout.Row = 6; btnCopyClip.Layout.Column = [1 2];
 
     btnBatchExport = uibutton(saveGL,'Text','Batch Export All CSV', ...
         'ButtonPushedFcn',@onBatchExportCSV, ...
         'BackgroundColor',[0.50 0.40 0.10], ...
         'FontColor',[1 1 1], ...
         'Tooltip','Export all loaded datasets to separate CSV files (one per dataset)');
-    btnBatchExport.Layout.Row = 6; btnBatchExport.Layout.Column = [1 2];
+    btnBatchExport.Layout.Row = 7; btnBatchExport.Layout.Column = [1 2];
 
-    % Row 7: Publication figure save — format selector + save button
+    % Row 8: Publication figure save — format selector + save button
     ddFigFormat = uidropdown(saveGL, ...
         'Items',   {'PNG (300 dpi)', 'PDF (vector)', 'SVG (vector)', 'TIFF (300 dpi)'}, ...
         'Value',   'PNG (300 dpi)', ...
         'Tooltip', 'Output file format for publication-quality figure save');
-    ddFigFormat.Layout.Row = 7; ddFigFormat.Layout.Column = 1;
+    ddFigFormat.Layout.Row = 8; ddFigFormat.Layout.Column = 1;
 
     btnSaveFig = uibutton(saveGL,'Text','Save Figure', ...
         'ButtonPushedFcn',@onSaveFigure, ...
         'BackgroundColor',[0.55 0.20 0.55], ...
         'FontColor',[1 1 1], ...
         'Tooltip','Save the current plot to an image or vector file via exportgraphics');
-    btnSaveFig.Layout.Row = 7; btnSaveFig.Layout.Column = 2;
+    btnSaveFig.Layout.Row = 8; btnSaveFig.Layout.Column = 2;
 
-    % Row 8: Session save / load
+    % Row 9: Session save / load
     btnSaveSession = uibutton(saveGL,'Text','Save Session...', ...
         'ButtonPushedFcn',@onSaveSession, ...
         'BackgroundColor',[0.25 0.35 0.45], ...
         'FontColor',[1 1 1], ...
         'Tooltip','Save all loaded datasets, corrections, and peaks to a .mat session file');
-    btnSaveSession.Layout.Row = 8; btnSaveSession.Layout.Column = 1;
+    btnSaveSession.Layout.Row = 9; btnSaveSession.Layout.Column = 1;
 
     btnLoadSession = uibutton(saveGL,'Text','Load Session...', ...
         'ButtonPushedFcn',@onLoadSession, ...
         'BackgroundColor',[0.25 0.35 0.45], ...
         'FontColor',[1 1 1], ...
         'Tooltip','Restore a previously saved session from a .mat file');
-    btnLoadSession.Layout.Row = 8; btnLoadSession.Layout.Column = 2;
+    btnLoadSession.Layout.Row = 9; btnLoadSession.Layout.Column = 2;
+
+    % Row 10: Copy data to clipboard (tab-delimited with Origin headers)
+    btnCopyDataClip = uibutton(saveGL,'Text','Copy Data to Clipboard', ...
+        'ButtonPushedFcn', @onCopyDataToClipboard, ...
+        'BackgroundColor', [0.35 0.50 0.35], ...
+        'FontColor', [1 1 1], ...
+        'Tooltip', 'Copy selected datasets as tab-delimited text to clipboard (Origin-ready)');
+    btnCopyDataClip.Layout.Row = 10; btnCopyDataClip.Layout.Column = [1 2];
+
+    % Row 11: Send to Origin via COM (falls back to clipboard)
+    btnSendOrigin = uibutton(saveGL,'Text','Send to Origin', ...
+        'ButtonPushedFcn', @onSendToOrigin, ...
+        'BackgroundColor', [0.60 0.30 0.15], ...
+        'FontColor', [1 1 1], ...
+        'Tooltip', 'Send data to OriginPro via COM automation (falls back to clipboard copy)');
+    btnSendOrigin.Layout.Row = 11; btnSendOrigin.Layout.Column = [1 2];
 
     % ── Peak Analysis sub-panel (row 2, full width) ───────────────────────
     % Always visible; XRD buttons in corrGL activate it contextually.
@@ -1592,11 +1615,13 @@ function dataImportGUI()
         fmtGL.ColumnWidth{6}  = guiTernary(y2Active, '1x', 0);
         toggleY2Appearance(y2Active);
 
+        [fp2, fn2, ~] = fileparts(ds.filepath);
         if ~isempty(ds.corrData)
-            [fp2, fn2, ~] = fileparts(ds.filepath);
             efSavePath.Value = fullfile(fp2, [fn2, '_corrected.csv']);
+        elseif isfield(ds, 'parserName') && isNeutronParser(ds.parserName)
+            efSavePath.Value = fullfile(fp2, [neutronBaseName(ds.filepath), '_neutron.csv']);
         else
-            efSavePath.Value = '';
+            efSavePath.Value = fullfile(fp2, [fn2, '_export.csv']);
         end
 
         applyParserAnalysisConfig(resolvedCorrStyle());
@@ -1729,8 +1754,8 @@ function dataImportGUI()
                 analysisPanel.Title = 'Analysis & Corrections  —  Neutron Reflectometry';
                 lblXOff.Text  = 'Q Offset:';
                 efXOffset.Tooltip = 'Q-offset: Q_corrected = Q − this value  (0 = no shift)';
-                lblYOff.Text  = 'R Offset:';
-                efYOffset.Tooltip = 'R-offset: applied to reflectivity  (0 = no shift)';
+                lblYOff.Text  = 'R Scale:';
+                efYOffset.Tooltip = 'R scale factor: R_corrected = R × this value  (1.0 = no change)';
                 % Enable useful corrections (offsets, trim, normalize, apply/reset)
                 for hh = {efXOffset, efYOffset, btnApply, btnReset, btnApplyAll, btnUndo, ...
                           efXTrimMin, efXTrimMax, ddNormalize}
@@ -1748,7 +1773,7 @@ function dataImportGUI()
                 btnAutoPeak.Visible        = 'off';
                 btnManualPeak.Visible      = 'off';
                 btnRemovePeakClick.Visible = 'off';
-                btnApply.Tooltip = 'Apply Q/R offsets, trim, and normalization to all polarizations from the same measurement';
+                btnApply.Tooltip = 'Apply Q offset / R scale, trim, and normalization to all polarizations from the same measurement';
                 peakPanel.Visible          = 'off';
                 analysisGL.ColumnWidth     = {appData.corrPanelWidth, '7x', 0, '3x'};
                 % Hide BG file rows (not applicable); show asymmetry rows
@@ -2613,6 +2638,9 @@ function dataImportGUI()
         smoothEnabled = cbSmooth.Value;
         smoothWin = efSmoothWin.Value;
         smoothMeth = ddSmoothMethod.Value;
+        xTrimMin = str2num_trim(efXTrimMin.Value);
+        xTrimMax = str2num_trim(efXTrimMax.Value);
+        normVal  = ddNormalize.Value;
 
         % Apply to all datasets
         for di = 1:numel(appData.datasets)
@@ -2620,7 +2648,6 @@ function dataImportGUI()
             d = ds.data;
 
             % Save undo state (same logic as onApplyCorrections)
-            undoState = struct();
             undoState.corrData       = ds.corrData;
             undoState.xOff           = ds.xOff;
             undoState.yOff           = ds.yOff;
@@ -2629,25 +2656,48 @@ function dataImportGUI()
             undoState.smoothEnabled  = ds.smoothEnabled;
             undoState.smoothWindow   = ds.smoothWindow;
             undoState.smoothMethod   = ds.smoothMethod;
+            undoState.xTrimMin       = ds.xTrimMin;
+            undoState.xTrimMax       = ds.xTrimMax;
+            undoState.normMethod     = ds.normMethod;
             ds.undoState = undoState;
 
-            % Apply corrections (same logic as onApplyCorrections)
+            % Build corrected data struct
             corrData = d;
-            if isdatetime(d.time)
-                corrData.time = d.time;
-            else
-                corrData.time = d.time - xOff;
+
+            % Trim/crop (FIRST step)
+            if ~isnan(xTrimMin) || ~isnan(xTrimMax)
+                tVec = double(corrData.time);
+                mask = true(size(tVec));
+                if ~isnan(xTrimMin), mask = mask & tVec >= xTrimMin; end
+                if ~isnan(xTrimMax), mask = mask & tVec <= xTrimMax; end
+                corrData.time   = corrData.time(mask);
+                corrData.values = corrData.values(mask, :);
             end
 
-            for k = 1:size(d.values, 2)
-                yRaw = d.values(:, k);
-                if isdatetime(d.time)
-                    xForBG = (1:numel(yRaw))';
-                else
-                    xForBG = double(d.time);
+            % Correct x axis (use corrData after trim)
+            if ~isdatetime(corrData.time)
+                corrData.time = corrData.time - xOff;
+            end
+
+            % Correct y channels (use corrData after trim)
+            isNeutronDS = isfield(ds, 'parserName') && isNeutronParser(ds.parserName);
+            if isNeutronDS
+                for k = 1:size(corrData.values, 2)
+                    if ~strcmpi(corrData.labels{k}, 'dQ')
+                        corrData.values(:, k) = corrData.values(:, k) * yOff;
+                    end
                 end
-                yBG = bgSlope .* xForBG + bgIntcpt;
-                corrData.values(:, k) = yRaw - yBG - yOff;
+            else
+                for k = 1:size(corrData.values, 2)
+                    yRaw = corrData.values(:, k);
+                    if isdatetime(corrData.time)
+                        xForBG = (1:numel(yRaw))';
+                    else
+                        xForBG = double(corrData.time);
+                    end
+                    yBG = bgSlope .* xForBG + bgIntcpt;
+                    corrData.values(:, k) = yRaw - yBG - yOff;
+                end
             end
 
             % Subtract background dataset (interpolated to corrected x-axis)
@@ -2671,6 +2721,21 @@ function dataImportGUI()
                     'Window', win, 'Method', lower(smoothMeth));
             end
 
+            % Normalization (LAST step)
+            switch normVal
+                case 'Range [0,1]'
+                    corrData.values = utilities.normalize(corrData.values,'Method','range');
+                case 'Peak (max=1)'
+                    corrData.values = utilities.normalize(corrData.values,'Method','peak');
+                case 'Z-score'
+                    corrData.values = utilities.normalize(corrData.values,'Method','zscore');
+                case 'Area (integral=1)'
+                    for k = 1:size(corrData.values,2)
+                        A = trapz(double(corrData.time), corrData.values(:,k));
+                        if A ~= 0, corrData.values(:,k) = corrData.values(:,k) / A; end
+                    end
+            end
+
             % Save corrected data
             ds.corrData      = corrData;
             ds.xOff          = xOff;
@@ -2680,6 +2745,9 @@ function dataImportGUI()
             ds.smoothEnabled = smoothEnabled;
             ds.smoothWindow  = smoothWin;
             ds.smoothMethod  = smoothMeth;
+            ds.xTrimMin      = xTrimMin;
+            ds.xTrimMax      = xTrimMax;
+            ds.normMethod    = normVal;
 
             appData.datasets{di} = ds;
         end
@@ -2705,11 +2773,6 @@ function dataImportGUI()
         % ════════════════════════════════════════════════════════════════
         %  Save undo state before applying new corrections
         % ════════════════════════════════════════════════════════════════
-        % Store the current state so user can undo with one button click
-        if ~isfield(ds, 'undoState') || isempty(ds.undoState)
-            % Initialize undoState only if it doesn't exist
-            ds.undoState = struct();
-        end
         undoState.corrData       = ds.corrData;
         undoState.xOff           = ds.xOff;
         undoState.yOff           = ds.yOff;
@@ -2740,24 +2803,33 @@ function dataImportGUI()
         end
 
         % Correct x axis (datetime x-offset not supported — leave unchanged)
-        if isdatetime(d.time)
-            corrData.time = d.time;
-        else
-            corrData.time = d.time - xOff;
+        if ~isdatetime(corrData.time)
+            corrData.time = corrData.time - xOff;
         end
 
-        % Correct all y channels:
-        %   y_corrected = y_raw - (bgSlope * x_raw + bgIntcpt) - yOff
-        % BG is evaluated at RAW x so the fitted BG level is consistent.
-        for k = 1:size(d.values, 2)
-            yRaw = d.values(:, k);
-            if isdatetime(d.time)
-                xForBG = (1:numel(yRaw))';
-            else
-                xForBG = double(d.time);
+        % Correct all y channels (use corrData, not d, so trim is respected)
+        isNeutron = isfield(ds, 'parserName') && isNeutronParser(ds.parserName);
+        if isNeutron
+            % Neutron reflectometry: yOff is a multiplicative R scale factor
+            % applied to all R-related columns (R, dR, theory, fresnel).
+            % dQ (Q uncertainty) is left unchanged.
+            for k = 1:size(corrData.values, 2)
+                if ~strcmpi(corrData.labels{k}, 'dQ')
+                    corrData.values(:, k) = corrData.values(:, k) * yOff;
+                end
             end
-            yBG = bgSlope .* xForBG + bgIntcpt;
-            corrData.values(:, k) = yRaw - yBG - yOff;
+        else
+            % Standard: y_corrected = y_raw - (bgSlope * x_raw + bgIntcpt) - yOff
+            for k = 1:size(corrData.values, 2)
+                yRaw = corrData.values(:, k);
+                if isdatetime(corrData.time)
+                    xForBG = (1:numel(yRaw))';
+                else
+                    xForBG = double(corrData.time);
+                end
+                yBG = bgSlope .* xForBG + bgIntcpt;
+                corrData.values(:, k) = yRaw - yBG - yOff;
+            end
         end
 
         % Subtract background dataset (interpolated to corrected x-axis).
@@ -2856,8 +2928,11 @@ function dataImportGUI()
                 if ~isdatetime(pds.data.time)
                     pCorr.time = pCorr.time - xOff;
                 end
+                % Multiplicative R scale for neutron sibling datasets
                 for k = 1:size(pCorr.values, 2)
-                    pCorr.values(:, k) = pCorr.values(:, k) - yOff;
+                    if ~strcmpi(pCorr.labels{k}, 'dQ')
+                        pCorr.values(:, k) = pCorr.values(:, k) * yOff;
+                    end
                 end
                 switch normVal
                     case 'Range [0,1]'
@@ -2892,8 +2967,16 @@ function dataImportGUI()
     end
 
     function onResetCorrections(~,~)
+        % Determine neutral yOff: 1.0 for neutron (multiplicative), 0 for others (additive)
+        isNeutronReset = false;
+        if appData.activeIdx >= 1 && ~isempty(appData.datasets)
+            dsCheck = appData.datasets{appData.activeIdx};
+            isNeutronReset = isfield(dsCheck, 'parserName') && isNeutronParser(dsCheck.parserName);
+        end
+        yOffDefault = guiTernary(isNeutronReset, 1, 0);
+
         efXOffset.Value     = 0;
-        efYOffset.Value     = 0;
+        efYOffset.Value     = yOffDefault;
         efBGSlope.Value     = 0;
         efBGIntercept.Value = 0;
         cbSmooth.Value      = false;
@@ -2908,7 +2991,7 @@ function dataImportGUI()
             ds               = appData.datasets{appData.activeIdx};
             ds.corrData      = [];
             ds.xOff          = 0;
-            ds.yOff          = 0;
+            ds.yOff          = yOffDefault;
             ds.bgSlope       = 0;
             ds.bgInt         = 0;
             ds.smoothEnabled = false;
@@ -3450,7 +3533,11 @@ function dataImportGUI()
             appData.yOriginPt1        = [];
 
             btnPickY.Text   = 'Est. Y Offset  (2 pts)';
-            btnPickY.Enable = 'on';
+            % Re-enable only for non-neutron parsers (neutron hides btnPickY)
+            if isempty(appData.datasets) || ~isfield(appData.datasets{appData.activeIdx}, 'parserName') ...
+                    || ~isNeutronParser(appData.datasets{appData.activeIdx}.parserName)
+                btnPickY.Enable = 'on';
+            end
             btnFitBG.Enable = 'on';
 
             onApplyCorrections([], []);
@@ -3472,19 +3559,25 @@ function dataImportGUI()
             return;
         end
         ds = appData.datasets{appData.activeIdx};
-        if isempty(ds.corrData)
-            uialert(fig,'Apply corrections first.','No corrected data');
-            return;
-        end
         fp = strtrim(efSavePath.Value);
         if isempty(fp)
             uialert(fig,'Set an output file path first.','No output path');
             return;
         end
+        fmt = resolvedExportFormat();
         try
-            % Compute spin asymmetry columns for paired neutron data
-            asymData = computeAsymmetryForExport(ds);
-            guiSaveCSV(ds.corrData, fp, ds.data, asymData);
+            if isfield(ds, 'parserName') && isNeutronParser(ds.parserName)
+                saveConsolidatedNeutronCSV(ds, fp, fmt);
+            else
+                hasCorrected = ~isempty(ds.corrData);
+                exportData   = guiTernary(hasCorrected, ds.corrData, ds.data);
+                if hasCorrected
+                    asymData = computeAsymmetryForExport(ds);
+                    guiSaveCSV(exportData, fp, ds.data, asymData, fmt);
+                else
+                    guiSaveCSV(exportData, fp, [], [], fmt);
+                end
+            end
             uialert(fig, sprintf('Saved:\n%s', fp), 'Saved');
         catch ME
             fprintf(2, '\n[dataImportGUI] Save error: %s\n', ME.message);
@@ -3492,6 +3585,15 @@ function dataImportGUI()
                 fprintf(2, '  at %s  (line %d)\n', ME.stack(si).name, ME.stack(si).line);
             end
             uialert(fig, ME.message, 'Save error');
+        end
+    end
+
+    function fmt = resolvedExportFormat()
+    %RESOLVEDEXPORTFORMAT  Map dropdown value to format string.
+        if strcmp(ddExportFormat.Value, 'Origin ASCII')
+            fmt = 'origin';
+        else
+            fmt = 'standard';
         end
     end
 
@@ -3571,31 +3673,227 @@ function dataImportGUI()
         asymData.values  = vals;
     end
 
+    function saveConsolidatedNeutronCSV(activeDs, fp, fmt)
+    %SAVECONSOLIDATEDNEUTRONCSV  Write all polarization channels to one CSV.
+    %   Gathers loaded neutron datasets from the same measurement and writes
+    %   a single file with Q, R/dR/theory per polarization, plus spin asymmetry.
+    %   fmt = 'standard' (default) or 'origin' (multi-row Origin headers).
+        if nargin < 3 || isempty(fmt), fmt = 'standard'; end
+
+        % ── Polarization suffix map ────────────────────────────────────
+        polOrder   = {'++', '+-', '-+', '--', ''};
+        polSuffix  = {'pp', 'pm', 'mp', 'mm', 'unpol'};
+
+        % ── Gather datasets from the same measurement ─────────────────
+        baseName = neutronBaseName(activeDs.filepath);
+        nDS = numel(appData.datasets);
+        collected = struct('ds', {}, 'pol', {}, 'sortKey', {});
+
+        for di = 1:nDS
+            dsi = appData.datasets{di};
+            if ~isfield(dsi, 'parserName') || ~isNeutronParser(dsi.parserName)
+                continue;
+            end
+            if ~strcmp(neutronBaseName(dsi.filepath), baseName)
+                continue;
+            end
+            pol = '';
+            if isfield(dsi.data.metadata, 'parserSpecific') && ...
+               isfield(dsi.data.metadata.parserSpecific, 'polarization')
+                pol = dsi.data.metadata.parserSpecific.polarization;
+            end
+            idx = find(strcmp(polOrder, pol), 1);
+            if isempty(idx), idx = numel(polOrder); end
+            entry.ds      = dsi;
+            entry.pol     = pol;
+            entry.sortKey = idx;
+            collected(end+1) = entry; %#ok<AGROW>
+        end
+
+        if isempty(collected)
+            error('saveConsolidatedNeutronCSV:noData', ...
+                'No neutron datasets found for measurement "%s".', baseName);
+        end
+
+        % Sort by canonical polarization order
+        [~, si] = sort([collected.sortKey]);
+        collected = collected(si);
+
+        % ── Build shared Q vector from first dataset ──────────────────
+        src0 = guiTernary(~isempty(collected(1).ds.corrData), ...
+                          collected(1).ds.corrData, collected(1).ds.data);
+        Q = src0.time(:);
+        nRows = numel(Q);
+
+        % ── Determine Q unit ──────────────────────────────────────────
+        qUnit = '';
+        if isfield(src0, 'units') && ~isempty(src0.units)
+            % X-axis unit is in metadata for neutron data
+        end
+        if isfield(src0.metadata, 'parserSpecific') && ...
+           isfield(src0.metadata.parserSpecific, 'xUnit')
+            qUnit = src0.metadata.parserSpecific.xUnit;
+        end
+        qHdr = guiTernary(~isempty(qUnit), sprintf('Q (%s)', qUnit), 'Q');
+
+        % ── Collect columns per polarization ──────────────────────────
+        allHdrs = {qHdr};
+        allCols = {Q};
+        hasPP = false; hasMM = false;
+        RPP = []; RMM = []; dRPP = []; dRMM = []; thPP = []; thMM = [];
+
+        for ci = 1:numel(collected)
+            pol    = collected(ci).pol;
+            dsi    = collected(ci).ds;
+            src    = guiTernary(~isempty(dsi.corrData), dsi.corrData, dsi.data);
+            pidx   = find(strcmp(polOrder, pol), 1);
+            suffix = polSuffix{pidx};
+
+            iR  = find(strcmp(src.labels, 'R'), 1);
+            idR = find(strcmp(src.labels, 'dR'), 1);
+            iTh = find(strcmp(src.labels, 'theory'), 1);
+
+            % Interpolate onto shared Q grid if needed
+            Qi = src.time(:);
+            needInterp = numel(Qi) ~= nRows || any(abs(Qi - Q) > eps(Q)*10);
+
+            if ~isempty(iR)
+                Rcol = src.values(:, iR);
+                if needInterp, Rcol = interp1(Qi, Rcol, Q, 'linear', NaN); end
+                allHdrs{end+1} = sprintf('R_%s', suffix);
+                allCols{end+1} = Rcol(:);
+                if strcmp(pol, '++'), RPP = Rcol(:); hasPP = true; end
+                if strcmp(pol, '--'), RMM = Rcol(:); hasMM = true; end
+            end
+            if ~isempty(idR)
+                dRcol = src.values(:, idR);
+                if needInterp, dRcol = interp1(Qi, dRcol, Q, 'linear', NaN); end
+                allHdrs{end+1} = sprintf('dR_%s', suffix);
+                allCols{end+1} = dRcol(:);
+                if strcmp(pol, '++'), dRPP = dRcol(:); end
+                if strcmp(pol, '--'), dRMM = dRcol(:); end
+            end
+            if ~isempty(iTh)
+                thcol = src.values(:, iTh);
+                if needInterp, thcol = interp1(Qi, thcol, Q, 'linear', NaN); end
+                allHdrs{end+1} = sprintf('theory_%s', suffix);
+                allCols{end+1} = thcol(:);
+                if strcmp(pol, '++'), thPP = thcol(:); end
+                if strcmp(pol, '--'), thMM = thcol(:); end
+            end
+        end
+
+        % ── Spin asymmetry (++ and -- present) ────────────────────────
+        if hasPP && hasMM
+            valid = RPP > 0 & RMM > 0 & ~isnan(RPP) & ~isnan(RMM);
+            asymVal = NaN(nRows, 1);
+            sumR = RPP + RMM;
+            asymVal(valid) = (RPP(valid) - RMM(valid)) ./ sumR(valid);
+            allHdrs{end+1} = 'Asymmetry';
+            allCols{end+1} = asymVal;
+
+            % Propagated error: dA = 2/(R+++R--)^2 * sqrt((R--*dR++)^2 + (R++*dR--)^2)
+            if ~isempty(dRPP) && ~isempty(dRMM)
+                dAsym = NaN(nRows, 1);
+                dAsym(valid) = 2 ./ sumR(valid).^2 .* ...
+                    sqrt((RMM(valid) .* dRPP(valid)).^2 + (RPP(valid) .* dRMM(valid)).^2);
+                allHdrs{end+1} = 'dAsymmetry';
+                allCols{end+1} = dAsym;
+            end
+
+            % Theory asymmetry
+            if ~isempty(thPP) && ~isempty(thMM)
+                validTh = thPP > 0 & thMM > 0 & ~isnan(thPP) & ~isnan(thMM);
+                asymTh = NaN(nRows, 1);
+                sumTh = thPP + thMM;
+                asymTh(validTh) = (thPP(validTh) - thMM(validTh)) ./ sumTh(validTh);
+                allHdrs{end+1} = 'Asymmetry_theory';
+                allCols{end+1} = asymTh;
+            end
+        end
+
+        % ── Write CSV ─────────────────────────────────────────────────
+        dirPart = fileparts(fp);
+        if ~isempty(dirPart) && ~isfolder(dirPart)
+            error('saveConsolidatedNeutronCSV:badDir', ...
+                'Output directory does not exist:\n%s', dirPart);
+        end
+        fid = fopen(fp, 'w');
+        if fid < 0
+            error('saveConsolidatedNeutronCSV:cannotOpen', ...
+                'Cannot open file for writing:\n%s', fp);
+        end
+        closeGuard = onCleanup(@() fclose(fid)); %#ok<NASGU>
+
+        if strcmp(fmt, 'origin')
+            longNames = cellfun(@(h) strtrim(regexprep(h, '\s*\([^)]+\)', '')), ...
+                                allHdrs, 'UniformOutput', false);
+            units = cellfun(@extractUnitFromHeader, allHdrs, 'UniformOutput', false);
+            desigs = buildColumnDesignations(allHdrs);
+            fprintf(fid, '%s\n', strjoin(longNames, ','));
+            fprintf(fid, '%s\n', strjoin(units, ','));
+            fprintf(fid, '%s\n', strjoin(desigs, ','));
+        else
+            fprintf(fid, '%s\n', strjoin(allHdrs, ','));
+        end
+        nCols = numel(allCols);
+        for r = 1:nRows
+            fprintf(fid, '%.10g', allCols{1}(r));
+            for c = 2:nCols
+                fprintf(fid, ',%.10g', allCols{c}(r));
+            end
+            fprintf(fid, '\n');
+        end
+    end
+
     function onBatchExportCSV(~,~)
     %ONBATCHEXPORTCSV  Export all loaded datasets to separate CSV files.
+    %   Non-neutron datasets: individual CSV (corrected+raw or raw-only).
+    %   Neutron datasets: one consolidated CSV per measurement base name.
         if isempty(appData.datasets)
             uialert(fig,'Load a file first.','No data');
             return;
         end
 
+        fmt = resolvedExportFormat();
         nDS = numel(appData.datasets);
         nExported = 0;
         failedFiles = {};
+        neutronDone = {};  % base names already exported
 
         for di = 1:nDS
             ds = appData.datasets{di};
 
-            % Skip datasets without corrected data
-            if isempty(ds.corrData)
+            % ── Neutron: consolidated export (once per measurement) ────
+            if isfield(ds, 'parserName') && isNeutronParser(ds.parserName)
+                bn = neutronBaseName(ds.filepath);
+                if any(strcmp(neutronDone, bn)), continue; end
+                [fpath, ~, ~] = fileparts(ds.filepath);
+                outFile = fullfile(fpath, [bn, '_neutron.csv']);
+                try
+                    saveConsolidatedNeutronCSV(ds, outFile, fmt);
+                    nExported = nExported + 1;
+                    neutronDone{end+1} = bn; %#ok<AGROW>
+                catch ME
+                    failedFiles{end+1} = sprintf('%s: %s', bn, ME.message); %#ok<AGROW>
+                end
                 continue;
             end
 
-            % Generate output filename: original_corrected.csv
+            % ── Non-neutron: individual export ─────────────────────────
+            hasCorrected = ~isempty(ds.corrData);
+            exportData   = guiTernary(hasCorrected, ds.corrData, ds.data);
+            suffix       = guiTernary(hasCorrected, '_corrected.csv', '_export.csv');
+
             [fpath, fname, ~] = fileparts(ds.filepath);
-            outFile = fullfile(fpath, [fname, '_corrected.csv']);
+            outFile = fullfile(fpath, [fname, suffix]);
 
             try
-                guiSaveCSV(ds.corrData, outFile, ds.data);
+                if hasCorrected
+                    guiSaveCSV(exportData, outFile, ds.data, [], fmt);
+                else
+                    guiSaveCSV(exportData, outFile, [], [], fmt);
+                end
                 nExported = nExported + 1;
             catch ME
                 failedFiles{end+1} = sprintf('%s: %s', fname, ME.message); %#ok<AGROW>
@@ -3604,15 +3902,152 @@ function dataImportGUI()
 
         % Show result
         if nExported == 0
-            uialert(fig, 'No corrected data to export (apply corrections first).', ...
-                'Batch Export Failed');
+            uialert(fig, 'No datasets to export.', 'Batch Export');
         elseif isempty(failedFiles)
-            uialert(fig, sprintf('Successfully exported %d dataset(s) to CSV.', nExported), ...
+            uialert(fig, sprintf('Successfully exported %d file(s) to CSV.', nExported), ...
                 'Batch Export Complete');
         else
             msg = sprintf('Exported: %d\nFailed: %d\n\n', nExported, numel(failedFiles));
             msg = [msg, strjoin(failedFiles, '\n')];
             uialert(fig, msg, 'Batch Export Partial');
+        end
+    end
+
+    function onCopyDataToClipboard(~,~)
+    %ONCOPYDATATOCLIPBOARD  Copy selected datasets as tab-delimited text to clipboard.
+    %   Opens a dataset picker dialog; copies data with Origin multi-row headers.
+        if isempty(appData.datasets)
+            uialert(fig, 'Load a file first.', 'No data');
+            return;
+        end
+
+        % Build display names for each loaded dataset
+        nDS = numel(appData.datasets);
+        names = cell(1, nDS);
+        for i = 1:nDS
+            [~, fn, ex] = fileparts(appData.datasets{i}.filepath);
+            badge = getParserBadge(appData.datasets{i}.parserName);
+            names{i} = sprintf('%s %s%s', badge, fn, ex);
+        end
+
+        % Modal multi-select dialog
+        sel = listdlg('ListString', names, ...
+            'SelectionMode', 'multiple', ...
+            'InitialValue', appData.activeIdx, ...
+            'Name', 'Copy to Clipboard', ...
+            'PromptString', 'Select datasets to copy:', ...
+            'ListSize', [350 300]);
+        if isempty(sel), return; end
+
+        try
+            clipStr = buildClipboardString(sel);
+            clipboard('copy', clipStr);
+            uialert(fig, sprintf('Copied %d dataset(s) to clipboard.\nPaste into Origin or Excel.', ...
+                numel(sel)), 'Copied');
+        catch ME
+            uialert(fig, ME.message, 'Clipboard error');
+        end
+    end
+
+    function s = buildClipboardString(dsIndices)
+    %BUILDCLIPBOARDSTRING  Build tab-delimited text with Origin-style headers.
+    %   Returns a string ready for clipboard('copy', s) and Origin paste.
+        allLongNames = {};
+        allUnits     = {};
+        allDesig     = {};
+        allCols      = {};
+        multiDS      = numel(dsIndices) > 1;
+
+        for ii = 1:numel(dsIndices)
+            di = dsIndices(ii);
+            dsi = appData.datasets{di};
+            src = guiTernary(~isempty(dsi.corrData), dsi.corrData, dsi.data);
+            [~, fn, ~] = fileparts(dsi.filepath);
+            prefix = guiTernary(multiDS, [fn, '_'], '');
+
+            % X column
+            allLongNames{end+1} = [prefix, 'X']; %#ok<AGROW>
+            allUnits{end+1}     = extractXUnitFromStruct(src); %#ok<AGROW>
+            allDesig{end+1}     = 'X'; %#ok<AGROW>
+            allCols{end+1}      = src.time(:); %#ok<AGROW>
+
+            % Y columns
+            for k = 1:size(src.values, 2)
+                allLongNames{end+1} = [prefix, src.labels{k}]; %#ok<AGROW>
+                allUnits{end+1}     = src.units{k}; %#ok<AGROW>
+                lbl = lower(src.labels{k});
+                if contains(lbl, {'err', 'dr', 'std', 'sigma'})
+                    allDesig{end+1} = 'yEr'; %#ok<AGROW>
+                else
+                    allDesig{end+1} = 'Y'; %#ok<AGROW>
+                end
+                allCols{end+1} = src.values(:, k); %#ok<AGROW>
+            end
+        end
+
+        % Determine max rows across all datasets
+        maxR = max(cellfun(@numel, allCols));
+        nC   = numel(allCols);
+
+        % Build string: Long Name / Units / Comments header rows, then data
+        lines = cell(1, maxR + 3);
+        lines{1} = strjoin(allLongNames, sprintf('\t'));
+        lines{2} = strjoin(allUnits, sprintf('\t'));
+        lines{3} = strjoin(allDesig, sprintf('\t'));
+
+        for r = 1:maxR
+            vals = cell(1, nC);
+            for c = 1:nC
+                if r <= numel(allCols{c})
+                    vals{c} = sprintf('%.10g', allCols{c}(r));
+                else
+                    vals{c} = '';
+                end
+            end
+            lines{r + 3} = strjoin(vals, sprintf('\t'));
+        end
+
+        s = strjoin(lines, newline);
+    end
+
+    function onSendToOrigin(~,~)
+    %ONSENDTOORIGIN  Send active dataset to OriginPro via COM; fall back to clipboard.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig, 'Load a file first.', 'No data');
+            return;
+        end
+        ds  = appData.datasets{appData.activeIdx};
+        src = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
+        [~, fn, ~] = fileparts(ds.filepath);
+
+        % Gather axis label hints from current GUI state
+        axLabels = struct();
+        if ~isempty(efCustomXLabel.Value)
+            axLabels.x = efCustomXLabel.Value;
+        end
+        if ~isempty(efCustomYLabel.Value)
+            axLabels.y = efCustomYLabel.Value;
+        end
+
+        % Attempt COM bridge
+        ok = utilities.toOrigin(src, ...
+            'SheetName',  fn, ...
+            'BookName',   'ThinFilmToolkit', ...
+            'AxisLabels', axLabels, ...
+            'LogY',       cbLogY.Value, ...
+            'LogX',       cbLogX.Value);
+
+        if ok
+            uialert(fig, sprintf('Data sent to OriginPro.\nWorksheet: %s', fn), ...
+                'Origin Export');
+        else
+            % Fallback: copy to clipboard in Origin-ready format
+            clipStr = buildClipboardString(appData.activeIdx);
+            clipboard('copy', clipStr);
+            uialert(fig, ...
+                ['Origin not available — data copied to clipboard instead.' newline ...
+                 'Paste into Origin with Edit > Paste.'], ...
+                'Origin not found');
         end
     end
 
@@ -3924,12 +4359,12 @@ function dataImportGUI()
                             xWhiskers = zeros(1, nPts*3);
                             yWhiskers = zeros(1, nPts*3);
                             for ii = 1:nPts
-                                idx = (ii-1)*3 + 1;
-                                xWhiskers(idx:idx+1) = xGood(ii);
-                                yWhiskers(idx) = yGood(ii) - dyGood(ii);
-                                yWhiskers(idx+1) = yGood(ii) + dyGood(ii);
-                                xWhiskers(idx+2) = NaN;
-                                yWhiskers(idx+2) = NaN;
+                                wi = (ii-1)*3 + 1;
+                                xWhiskers(wi:wi+1) = xGood(ii);
+                                yWhiskers(wi) = yGood(ii) - dyGood(ii);
+                                yWhiskers(wi+1) = yGood(ii) + dyGood(ii);
+                                xWhiskers(wi+2) = NaN;
+                                yWhiskers(wi+2) = NaN;
                             end
 
                             % Plot all whiskers as one line object (much more efficient)
@@ -4059,10 +4494,14 @@ function dataImportGUI()
             if cbCalculateAsymmetry.Value && isNeutronParser(resolvedCorrStyle())
                 hold(targetAx, 'on');
                 pairMap = findPolarizationPairs(appData.datasets);
+                drawnPairs = [];  % track drawn (pp,mm) index pairs to skip duplicates
 
                 for i = 1:numel(pairMap)
                     if isempty(pairMap{i}), continue; end
                     [idxPP, idxMM] = deal(pairMap{i}(1), pairMap{i}(2));
+                    pairKey = idxPP * 10000 + idxMM;
+                    if ismember(pairKey, drawnPairs), continue; end
+                    drawnPairs(end+1) = pairKey; %#ok<AGROW>
 
                     % Get both polarization datasets
                     dsPP = appData.datasets{idxPP};
@@ -4078,12 +4517,6 @@ function dataImportGUI()
                     idxRPP = find(strcmp(primaryPP.labels, 'R'), 1);
                     idxRMM = find(strcmp(primaryMM.labels, 'R'), 1);
                     if isempty(idxRPP) || isempty(idxRMM), continue; end
-
-                    % Assemble data struct for asymmetry calculation
-                    % We need to create a temporary struct with ++ and -- in same labels
-                    asymCalcData.labels = {'R', 'dR'};
-                    asymCalcData.values = [primaryPP.values(:, idxRPP), primaryPP.values(:, find(strcmp(primaryPP.labels, 'dR'), 1))];
-                    asymCalcData.metadata = dPP.metadata;
 
                     % Find dR columns
                     idxdRPP = find(strcmp(primaryPP.labels, 'dR'), 1);
@@ -4142,12 +4575,12 @@ function dataImportGUI()
                     xWhiskers = zeros(1, nPts*3);
                     yWhiskers = zeros(1, nPts*3);
                     for ii = 1:nPts
-                        idx = (ii-1)*3 + 1;
-                        xWhiskers(idx:idx+1) = xGood(ii);
-                        yWhiskers(idx) = yGood(ii) - dyGood(ii);
-                        yWhiskers(idx+1) = yGood(ii) + dyGood(ii);
-                        xWhiskers(idx+2) = NaN;
-                        yWhiskers(idx+2) = NaN;
+                        wi = (ii-1)*3 + 1;
+                        xWhiskers(wi:wi+1) = xGood(ii);
+                        yWhiskers(wi) = yGood(ii) - dyGood(ii);
+                        yWhiskers(wi+1) = yGood(ii) + dyGood(ii);
+                        xWhiskers(wi+2) = NaN;
+                        yWhiskers(wi+2) = NaN;
                     end
 
                     plot(targetAx, xWhiskers, yWhiskers, '-', ...
@@ -4197,8 +4630,6 @@ function dataImportGUI()
                         end
                     end
                 end
-
-                hold(targetAx, 'off');
             end
 
             hold(targetAx,'off');
@@ -4819,6 +5250,7 @@ function dataImportGUI()
         box(tmpAx,'on');
         grid(tmpAx,'on');
         drawToAxes(tmpAx);
+        styleAxesForExport(tmpAx);
         try
             % copygraphics (R2020a+): vector EMF with transparent background
             copygraphics(tmpAx, 'ContentType','vector', 'BackgroundColor','none');
@@ -4890,6 +5322,7 @@ function dataImportGUI()
         box(tmpAx,'on');
         grid(tmpAx,'on');
         drawToAxes(tmpAx);
+        styleAxesForExport(tmpAx);
         try
             exportgraphics(tmpFig, outPath, egOpts{:});
             delete(tmpFig);
@@ -4897,6 +5330,38 @@ function dataImportGUI()
         catch ME
             delete(tmpFig);
             uialert(fig, sprintf('exportgraphics failed:\n%s', ME.message), 'Save error');
+        end
+    end
+
+    function styleAxesForExport(expAx)
+    %STYLEAXESFOREXPORT  Make axes readable on white backgrounds.
+    %  Darkens axis lines, ticks, and labels; thickens the bounding box.
+    %  Applied only to temporary export figures (clipboard / save).
+        darkColor = [0.15 0.15 0.15];
+        expAx.XColor    = darkColor;
+        expAx.YColor    = darkColor;
+        expAx.LineWidth = 1.2;
+        expAx.FontSize  = 13;
+        % Darken axis labels
+        if ~isempty(expAx.XLabel.String)
+            expAx.XLabel.Color = darkColor;
+        end
+        if ~isempty(expAx.YLabel.String)
+            expAx.YLabel.Color = darkColor;
+        end
+        if ~isempty(expAx.Title.String)
+            expAx.Title.Color = darkColor;
+        end
+        % Style right Y-axis if it exists
+        if isprop(expAx, 'YAxis') && numel(expAx.YAxis) > 1
+            expAx.YAxis(2).Color = darkColor;
+        end
+        % Thicken data lines for better visibility
+        lines = findobj(expAx, 'Type', 'Line');
+        for li = 1:numel(lines)
+            if lines(li).LineWidth < 1.2
+                lines(li).LineWidth = 1.2;
+            end
         end
     end
 
@@ -5453,7 +5918,7 @@ function ds = buildDs(fp, data, parserName)
     ds.visible     = true;        % Visibility toggle for hiding datasets without removing them
     ds.corrData    = [];
     ds.xOff        = 0;
-    ds.yOff        = 0;
+    ds.yOff        = guiTernary(isNeutronParser(parserName), 1, 0);
     ds.bgSlope     = 0;
     ds.bgInt       = 0;
     ds.undoState   = struct();    % Stores previous correction state for one-level undo
@@ -5657,21 +6122,31 @@ function c = ensureCell(v)
 end
 
 
-function guiSaveCSV(d, fp, dRaw, asymData)
+function guiSaveCSV(d, fp, dRaw, asymData, fmt)
 %GUISAVECSV  Write a data struct to a comma-delimited CSV file.
 %   Columns: x-axis (d.time) then all y-channels (d.values).
 %   A header row of column names (with units in parentheses) is written first.
 %
-%   guiSaveCSV(d, fp)                — write corrected data only
-%   guiSaveCSV(d, fp, dRaw)         — append raw data columns after corrected
-%   guiSaveCSV(d, fp, dRaw, asymD)  — also append spin asymmetry columns
+%   guiSaveCSV(d, fp)                      — write data only (standard CSV)
+%   guiSaveCSV(d, fp, dRaw)               — append raw data columns after corrected
+%   guiSaveCSV(d, fp, dRaw, asymD)        — also append spin asymmetry columns
+%   guiSaveCSV(d, fp, dRaw, asymD, fmt)   — fmt = 'standard' (default) or 'origin'
 %
 %   When dRaw is supplied the headers are suffixed:
 %     corrected  →  'X [corr]', 'Label (unit) [corr]', ...
 %     raw        →  'X [raw]',  'Label (unit) [raw]',  ...
+%
+%   When fmt = 'origin', three header rows are written:
+%     Row 1: Long Name  (label without units)
+%     Row 2: Units      (extracted from parentheses)
+%     Row 3: Comments   (column designations: X, Y, yEr)
 
-    hasRaw  = nargin >= 3 && ~isempty(dRaw) && isfield(dRaw, 'time');
-    hasAsym = nargin >= 4 && ~isempty(asymData) && isfield(asymData, 'headers') && ~isempty(asymData.headers);
+    if nargin < 5 || isempty(fmt), fmt = 'standard'; end
+    if nargin < 4, asymData = []; end
+    if nargin < 3, dRaw = []; end
+
+    hasRaw  = ~isempty(dRaw) && isstruct(dRaw) && isfield(dRaw, 'time');
+    hasAsym = ~isempty(asymData) && isstruct(asymData) && isfield(asymData, 'headers') && ~isempty(asymData.headers);
     suffix = guiTernary(hasRaw, ' [corr]', '');
 
     % ── Header row ────────────────────────────────────────────────────
@@ -5713,7 +6188,17 @@ function guiSaveCSV(d, fp, dRaw, asymData)
     closeGuard = onCleanup(@() fclose(fid)); %#ok<NASGU>
 
     % ── Header ────────────────────────────────────────────────────────
-    fprintf(fid, '%s\n', strjoin(allHdrs, ','));
+    if strcmp(fmt, 'origin')
+        longNames = cellfun(@(h) strtrim(regexprep(h, '\s*\([^)]+\)', '')), ...
+                            allHdrs, 'UniformOutput', false);
+        units = cellfun(@extractUnitFromHeader, allHdrs, 'UniformOutput', false);
+        desigs = buildColumnDesignations(allHdrs);
+        fprintf(fid, '%s\n', strjoin(longNames, ','));
+        fprintf(fid, '%s\n', strjoin(units, ','));
+        fprintf(fid, '%s\n', strjoin(desigs, ','));
+    else
+        fprintf(fid, '%s\n', strjoin(allHdrs, ','));
+    end
 
     % ── Data rows ─────────────────────────────────────────────────────
     nRows = numel(d.time);
@@ -5746,6 +6231,49 @@ function guiSaveCSV(d, fp, dRaw, asymData)
             end
         end
         fprintf(fid, '\n');
+    end
+end
+
+
+function unit = extractUnitFromHeader(hdr)
+%EXTRACTUNITFROMHEADER  Extract text inside parentheses from a header string.
+%   'Moment (emu) [corr]' → 'emu';  'X [raw]' → ''
+    tok = regexp(hdr, '\(([^)]+)\)', 'tokens', 'once');
+    if ~isempty(tok)
+        unit = tok{1};
+    else
+        unit = '';
+    end
+end
+
+
+function desigs = buildColumnDesignations(hdrs)
+%BUILDCOLUMNDESIGNATIONS  Map header names to Origin column designations.
+%   First column → 'X'.  Headers containing error-like keywords → 'yEr'.
+%   Any column named 'X [raw]' → 'X'.  All others → 'Y'.
+    desigs = cell(size(hdrs));
+    for k = 1:numel(hdrs)
+        lbl = lower(hdrs{k});
+        if k == 1 || startsWith(lbl, 'x ')
+            desigs{k} = 'X';
+        elseif contains(lbl, {'err', 'dr_', 'dr ', 'dasym', 'std', 'sigma'})
+            desigs{k} = 'yEr';
+        else
+            desigs{k} = 'Y';
+        end
+    end
+end
+
+
+function unit = extractXUnitFromStruct(d)
+%EXTRACTXUNITFROMSTRUCT  Get X-axis unit string from a data struct's metadata.
+    unit = '';
+    if ~isfield(d, 'metadata'), return; end
+    m = d.metadata;
+    if isfield(m, 'xColumnUnit') && ~isempty(m.xColumnUnit)
+        unit = char(m.xColumnUnit);
+    elseif isfield(m, 'parserSpecific') && isfield(m.parserSpecific, 'xUnit')
+        unit = char(m.parserSpecific.xUnit);
     end
 end
 
@@ -5851,6 +6379,8 @@ function lbl = guiParserLabel(parserName)
         case 'importPPMS',    lbl = 'QD PPMS (legacy)';
         case 'importMPMS',    lbl = 'QD MPMS SQUID';
         case 'importLakeShore', lbl = 'Lake Shore Magnetometer';
+        case {'importNCNRDat', 'importNCNRRefl'}, lbl = 'NCNR Neutron Reflectometry';
+        case 'importNCNRPNR', lbl = 'NCNR Polarized Neutron Reflectometry';
         otherwise,            lbl = parserName;
     end
 end
@@ -6155,91 +6685,3 @@ function pairMap = findPolarizationPairs(datasets)
 end
 
 
-function [asymData, asymErrors] = calculateSpinAsymmetry(data, formula)
-%CALCULATESPINASYMMETRY  Calculate spin asymmetry from neutron reflectometry data.
-%
-%  INPUT:
-%    data — parsed data struct with .labels, .values
-%    formula — 'Linear' for (R++ - R--) / (R++ + R--),
-%              'Log' for log(R++ / R--)
-%
-%  OUTPUT:
-%    asymData — asymmetry values (same length as input)
-%    asymErrors — error estimates (standard error propagation)
-%
-%  Looks for R++ and R-- channels in data.labels; returns NaN for rows
-%  where either polarization is missing or invalid.
-
-    asymData   = NaN(size(data.values, 1), 1);
-    asymErrors = NaN(size(data.values, 1), 1);
-
-    % Find R++ and R-- channels
-    idxPP = find(strcmp(data.labels, 'R'), 1);   % R++ stored as 'R' by default
-    idxMM = [];  % R-- not standard; check for variations
-
-    % Try to find ++ and -- channels more generically
-    for k = 1:length(data.labels)
-        lbl = data.labels{k};
-        if contains(lbl, '++', 'IgnoreCase', true)
-            idxPP = k;
-        elseif contains(lbl, '--', 'IgnoreCase', true) || contains(lbl, '−−')
-            idxMM = k;
-        end
-    end
-
-    % If standard names not found, try to infer from metadata
-    if isempty(idxMM) && isfield(data, 'metadata') && isfield(data.metadata, 'parserSpecific')
-        % This is a fallback; proper implementation would check all loaded datasets
-        idxMM = [];
-    end
-
-    % Cannot compute asymmetry without both polarizations
-    if isempty(idxPP) || isempty(idxMM)
-        return;
-    end
-
-    RPP = data.values(:, idxPP);
-    RMM = data.values(:, idxMM);
-
-    % Look for error columns
-    idxdPP = find(strcmp(data.labels, 'dR'), 1);
-    idxdMM = [];
-    if ~isempty(idxdPP)
-        dRPP = data.values(:, idxdPP);
-    else
-        dRPP = zeros(size(RPP));
-    end
-
-    if ~isempty(idxdMM)
-        dRMM = data.values(:, idxdMM);
-    else
-        dRMM = zeros(size(RMM));
-    end
-
-    % Calculate asymmetry and propagate errors
-    valid = ~isnan(RPP) & ~isnan(RMM) & RPP > 0 & RMM > 0;
-
-    if strcmp(formula, 'Linear')
-        % A = (R++ - R--) / (R++ + R--)
-        % dA/dR++ = 2*R-- / (R++ + R--)^2
-        % dA/dR-- = -2*R++ / (R++ + R--)^2
-        sum_R = RPP + RMM;
-        asymData(valid) = (RPP(valid) - RMM(valid)) ./ sum_R(valid);
-
-        % Error propagation (standard formula)
-        dA_dRPP = 2 * RMM(valid) ./ (sum_R(valid).^2);
-        dA_dRMM = -2 * RPP(valid) ./ (sum_R(valid).^2);
-        asymErrors(valid) = sqrt((dA_dRPP .* dRPP(valid)).^2 + (dA_dRMM .* dRMM(valid)).^2);
-
-    else  % 'Log'
-        % A = log(R++ / R--)
-        % dA/dR++ = 1 / R++
-        % dA/dR-- = -1 / R--
-        asymData(valid) = log(RPP(valid) ./ RMM(valid));
-
-        % Error propagation
-        dA_dRPP = 1 ./ RPP(valid);
-        dA_dRMM = -1 ./ RMM(valid);
-        asymErrors(valid) = sqrt((dA_dRPP .* dRPP(valid)).^2 + (dA_dRMM .* dRMM(valid)).^2);
-    end
-end
