@@ -60,7 +60,7 @@ function dataImportGUI()
     appData.panelResizeStart  = [];   % [mousePixX, mousePixY] at resize drag start
     appData.panelResizeOrig   = [];   % panel dimension (px) at resize drag start
     appData.corrPanelWidth    = 350;  % user-resized corrections column width (px)
-    appData.axLimPanelWidth   = 180;  % user-resized axis-limits column width (px)
+    appData.axLimPanelWidth   = 220;  % user-resized axes+appearance column width (px)
     appData.listDragSrcIdx    = 0;    % source row being dragged in lbDatasets (0 = none)
     appData.listDragActive    = false; % true once mouse has moved > threshold after listbox down
     appData.listDragStartPt   = [];   % [x y] fig-pixel position at listbox mouse-down
@@ -100,14 +100,12 @@ function dataImportGUI()
     YTICKFMT_NAMES = {'Auto', 'Scientific', 'Fixed 4dp', 'Fixed 2dp', 'Integer', 'Exp = 0'};
     YTICKFMT_DATA  = {'',     '%.2e',       '%.4f',      '%.2f',      '%d',      '__exp0'};
 
-    % Root grid  (3 rows × 2 cols: toolbar occupies left half of row 1 only;
-    %             content and analysis span both columns at full width)
-    % Row 1 height: 222px (= 185 × 1.20) to prevent apGL clipping.
-    % Row 2 (preview) gets 50% of flexible space, row 3 (analysis) gets 50%: ratio 1x:1x.
-    % This provides enough space for the 16-row corrections grid.
-    rootGL = uigridlayout(fig,[3 2], ...
-        'RowHeight',    {222,'1x','1x'}, ...
-        'ColumnWidth',  {'1x','1x'}, ...
+    % Root grid  (3 rows × 1 col: toolbar row 1, preview row 2, analysis row 3)
+    % Row 1 height: 130px (dataset list only — appearance moved to axLimPanel).
+    % Row 2 (preview) gets 50% of flexible space, row 3 (analysis) gets 50%.
+    rootGL = uigridlayout(fig,[3 1], ...
+        'RowHeight',    {130,'1x','1x'}, ...
+        'ColumnWidth',  {'1x'}, ...
         'Padding',      [8 8 8 8], ...
         'RowSpacing',   6, ...
         'ColumnSpacing', 0);
@@ -119,7 +117,7 @@ function dataImportGUI()
         'Padding',      [0 0 0 0], ...
         'RowSpacing',   4, ...
         'ColumnSpacing', 6);
-    tbGL.Layout.Row = 1; tbGL.Layout.Column = 1;
+    tbGL.Layout.Row = 1; tbGL.Layout.Column = 1;  % single-column root grid
 
     btnBrowse = uibutton(tbGL,'Text','Add File(s)...', ...
         'ButtonPushedFcn',@onAddFiles, ...
@@ -163,140 +161,12 @@ function dataImportGUI()
         'MenuSelectedFcn', @(~,~) onRemoveDataset([], []));
     lbDatasets.ContextMenu = cmDatasets;
 
-    % ── Appearance panel (top right): colour, legend, axis labels, title ────
-    % Column 3 (right-axis options) starts hidden (ColumnWidth{3}=0) and row 1
-    % (L/R column headers) starts hidden (RowHeight{1}=0).  Both are revealed
-    % when Y2 channels are active.
-    apGL = uigridlayout(rootGL,[7 3], ...
-        'RowHeight',    {0,22,22,22,22,22,22}, ...
-        'ColumnWidth',  {60,'1x',0}, ...
-        'Padding',      [6 5 6 5], ...
-        'RowSpacing',   2, ...
-        'ColumnSpacing', 6);
-    apGL.Layout.Row = 1; apGL.Layout.Column = 2;
-
-    % Row 1: L / R column headers (hidden until Y2 is active)
-    lblApHdrL = uilabel(apGL,'Text','Left Y','FontSize',12, ...
-        'HorizontalAlignment','center','FontColor',[0.60 0.60 0.60],'FontWeight','bold');
-    lblApHdrL.Layout.Row = 1; lblApHdrL.Layout.Column = 2;
-    lblApHdrR = uilabel(apGL,'Text','Right Y','FontSize',12, ...
-        'HorizontalAlignment','center','FontColor',[0.60 0.60 0.60],'FontWeight','bold');
-    lblApHdrR.Layout.Row = 1; lblApHdrR.Layout.Column = 3;
-
-    % Row 2: Color
-    lblApColor = uibutton(apGL,'Text','Color:','Enable','off','FontSize',10);
-    lblApColor.Layout.Row = 2; lblApColor.Layout.Column = 1;
-
-    ddDatasetColor = uidropdown(apGL, ...
-        'Items',     DS_COLOR_NAMES, ...
-        'ItemsData', DS_COLOR_RGBS, ...
-        'Value',     [], ...
-        'Enable',    'off', ...
-        'Tooltip',   'Override line colour for left-axis channels ("Auto" uses the palette)', ...
-        'ValueChangedFcn', @onDatasetColorChanged);
-    ddDatasetColor.Layout.Row = 2; ddDatasetColor.Layout.Column = 2;
-
-    ddDatasetColorR = uidropdown(apGL, ...
-        'Items',     DS_COLOR_NAMES, ...
-        'ItemsData', DS_COLOR_RGBS, ...
-        'Value',     [], ...
-        'Enable',    'off', ...
-        'Tooltip',   'Override line colour for right-axis channels ("Auto" uses the palette)', ...
-        'ValueChangedFcn', @onDatasetColorRChanged);
-    ddDatasetColorR.Layout.Row = 2; ddDatasetColorR.Layout.Column = 3;
-
-    % Row 3: Legend name
-    lblApLegend = uibutton(apGL,'Text','Legend:','Enable','off','FontSize',10);
-    lblApLegend.Layout.Row = 3; lblApLegend.Layout.Column = 1;
-
-    efLegendName = uieditfield(apGL,'text','Value','', ...
-        'Enable',          'off', ...
-        'Placeholder',     'auto (channel name)', ...
-        'Tooltip',         'Override the legend label for left-axis channels — blank = auto', ...
-        'ValueChangedFcn', @onLegendNameChanged);
-    efLegendName.Layout.Row = 3; efLegendName.Layout.Column = 2;
-
-    efLegendNameR = uieditfield(apGL,'text','Value','', ...
-        'Enable',          'off', ...
-        'Placeholder',     'auto', ...
-        'Tooltip',         'Override the legend label for right-axis channels — blank = auto', ...
-        'ValueChangedFcn', @onLegendNameRChanged);
-    efLegendNameR.Layout.Row = 3; efLegendNameR.Layout.Column = 3;
-
-    % Row 4: X label (spans both value columns — only one X axis)
-    lblApXLabel = uibutton(apGL,'Text','X Label:','Enable','off','FontSize',10);
-    lblApXLabel.Layout.Row = 4; lblApXLabel.Layout.Column = 1;
-
-    efCustomXLabel = uieditfield(apGL,'text','Value','', ...
-        'Placeholder',     'auto (from data)', ...
-        'Tooltip',         'Override the X-axis label — blank = auto', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    efCustomXLabel.Layout.Row = 4; efCustomXLabel.Layout.Column = [2 3];
-
-    % Row 5: Y label (left and right independently)
-    lblApYLabel = uibutton(apGL,'Text','Y Label:','Enable','off','FontSize',10);
-    lblApYLabel.Layout.Row = 5; lblApYLabel.Layout.Column = 1;
-
-    efCustomYLabel = uieditfield(apGL,'text','Value','', ...
-        'Placeholder',     'auto (from data)', ...
-        'Tooltip',         'Override the left Y-axis label — blank = auto', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    efCustomYLabel.Layout.Row = 5; efCustomYLabel.Layout.Column = 2;
-
-    efCustomY2Label = uieditfield(apGL,'text','Value','', ...
-        'Placeholder',     'auto', ...
-        'Tooltip',         'Override the right Y-axis label — blank = auto', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    efCustomY2Label.Layout.Row = 5; efCustomY2Label.Layout.Column = 3;
-
-    % Row 6: Title (spans both value columns)
-    lblApTitle = uibutton(apGL,'Text','Title:','Enable','off','FontSize',10);
-    lblApTitle.Layout.Row = 6; lblApTitle.Layout.Column = 1;
-
-    efCustomTitle = uieditfield(apGL,'text','Value','', ...
-        'Placeholder',     'auto (from filename)', ...
-        'Tooltip',         'Override the plot title — blank = auto', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    efCustomTitle.Layout.Row = 6; efCustomTitle.Layout.Column = [2 3];
-
-    % Row 7: Tick-label notation — X and Y1 always visible; R (Y2) hidden until active.
-    % A nested 1×6 grid packs [X: dd | Y: dd | R: dd] into the two value columns.
-    % Cols 5-6 (the R label + dropdown) start at width 0 and are revealed with Y2.
-    lblApFmt = uibutton(apGL,'Text','Format:','Enable','off','FontSize',10);
-    lblApFmt.Layout.Row = 7; lblApFmt.Layout.Column = 1;
-
-    fmtGL = uigridlayout(apGL, [1 6], ...
-        'Padding', [0 0 0 0], 'RowSpacing', 0, 'ColumnSpacing', 2, ...
-        'ColumnWidth', {16, '1x', 16, '1x', 0, 0});
-    fmtGL.Layout.Row = 7; fmtGL.Layout.Column = [2 3];
-
-    lblFmtX = uilabel(fmtGL,'Text','X','FontSize',9,'HorizontalAlignment','right');
-    lblFmtX.Layout.Column = 1;
-    ddXFmt = uidropdown(fmtGL, 'Items', TICKFMT_NAMES, 'ItemsData', TICKFMT_DATA, ...
-        'Value', '', 'FontSize', 10, 'Tooltip', 'X-axis tick label notation', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    ddXFmt.Layout.Column = 2;
-
-    lblFmtY = uilabel(fmtGL,'Text','Y','FontSize',9,'HorizontalAlignment','right');
-    lblFmtY.Layout.Column = 3;
-    ddYFmt = uidropdown(fmtGL, 'Items', YTICKFMT_NAMES, 'ItemsData', YTICKFMT_DATA, ...
-        'Value', '__exp0', 'FontSize', 10, 'Tooltip', 'Left Y-axis tick label notation', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    ddYFmt.Layout.Column = 4;
-
-    lblFmtR = uilabel(fmtGL,'Text','R','FontSize',9,'HorizontalAlignment','right');
-    lblFmtR.Layout.Column = 5;
-    ddY2Fmt = uidropdown(fmtGL, 'Items', YTICKFMT_NAMES, 'ItemsData', YTICKFMT_DATA, ...
-        'Value', '', 'FontSize', 10, 'Tooltip', 'Right Y-axis tick label notation', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    ddY2Fmt.Layout.Column = 6;
-
     % ── Content: controls panel (left) | preview axes (right) ────────────
     contentGL = uigridlayout(rootGL,[1 2], ...
         'ColumnWidth',  {215,'1x'}, ...
         'Padding',      [0 0 0 0], ...
         'ColumnSpacing', 8);
-    contentGL.Layout.Row = 2; contentGL.Layout.Column = [1 2];
+    contentGL.Layout.Row = 2; contentGL.Layout.Column = 1;
 
     % Left controls panel
     % Title updates to show parser name after each load.
@@ -453,10 +323,10 @@ function dataImportGUI()
 
     % ── Analysis & Corrections panel (row 3, full width) ─────────────────
     analysisPanel = uipanel(rootGL,'Title','Analysis & Corrections','FontSize',13);
-    analysisPanel.Layout.Row = 3; analysisPanel.Layout.Column = [1 2];
+    analysisPanel.Layout.Row = 3; analysisPanel.Layout.Column = 1;
 
     analysisGL = uigridlayout(analysisPanel,[1 4], ...
-        'ColumnWidth', {350, 180, '1x', '1x'}, ...
+        'ColumnWidth', {350, 220, '7x', '3x'}, ...
         'RowHeight',   {'1x'}, ...
         'Padding',     [6 6 6 6], ...
         'ColumnSpacing', 10, ...
@@ -477,7 +347,7 @@ function dataImportGUI()
     corrPanel.Layout.Row = 1; corrPanel.Layout.Column = 1;
 
     corrGL = uigridlayout(corrPanel,[16 4], ...
-        'RowHeight',    {24,24,24,24,24,24,24,24,28,28,24,20,24,24,24,24}, ...
+        'RowHeight',    {24,24,24,24,24,24,24,24,28,28,24,20,24,24,0,0}, ...
         'ColumnWidth',  {70,'1x',88,'1x'}, ...
         'Padding',      [6 6 6 6], ...
         'RowSpacing',   4, ...
@@ -718,15 +588,16 @@ function dataImportGUI()
         'Tooltip', 'Asymmetry formula: Linear uses reflectivity ratio, Log uses reflectivity ratio logarithm');
     ddAsymFormula.Layout.Row = 16; ddAsymFormula.Layout.Column = [2 4];
 
-    % ── Axis Limits sub-panel (middle column) ────────────────────────────
-    % All six fields are text-type: blank = auto-scale, any number = manual.
+    % ── Axes & Appearance sub-panel (middle column) ──────────────────────
+    % Combined panel: rows 1-5 axis limits, rows 6-11 appearance controls.
+    % All limit fields are text-type: blank = auto-scale, any number = manual.
     % str2double('') == NaN, so blank naturally means "do not apply".
-    axLimPanel = uipanel(analysisGL,'Title','Axis Limits','FontSize',13);
+    axLimPanel = uipanel(analysisGL,'Title','Axes & Appearance','FontSize',13);
     axLimPanel.Layout.Row = 1; axLimPanel.Layout.Column = 2;
 
-    axLimGL = uigridlayout(axLimPanel,[5 4], ...
-        'RowHeight',    {22,26,26,0,32}, ...
-        'ColumnWidth',  {38,'1x','1x','1x'}, ...
+    axLimGL = uigridlayout(axLimPanel,[11 4], ...
+        'RowHeight',    {22,26,26,0,28, 22,22,22,22,22,22}, ...
+        'ColumnWidth',  {40,'1x','1x','1x'}, ...
         'Padding',      [6 6 6 6], ...
         'RowSpacing',   4, ...
         'ColumnSpacing', 4);
@@ -817,11 +688,128 @@ function dataImportGUI()
         'ValueChangedFcn',@(~,~) onPlot([],[]));
     efY2Step.Layout.Row = 4; efY2Step.Layout.Column = 4;
 
-    % Row 5: clear-all button
-    btnAutoLimits = uibutton(axLimGL,'Text','Auto (Clear All)', ...
+    % Row 5: Auto Scale (smart) + Clear All (reset)
+    btnSmartScale = uibutton(axLimGL,'Text','Auto Scale', ...
+        'ButtonPushedFcn',@onSmartScale, ...
+        'Tooltip','Auto-detect linear/log scale and set reasonable axis limits from the data');
+    btnSmartScale.Layout.Row = 5; btnSmartScale.Layout.Column = [1 2];
+
+    btnAutoLimits = uibutton(axLimGL,'Text','Clear All', ...
         'ButtonPushedFcn',@onAutoLimits, ...
-        'Tooltip','Clear all manual axis limits — return to auto-scale');
-    btnAutoLimits.Layout.Row = 5; btnAutoLimits.Layout.Column = [1 4];
+        'Tooltip','Clear all manual axis limits and reset to auto-scale');
+    btnAutoLimits.Layout.Row = 5; btnAutoLimits.Layout.Column = [3 4];
+
+    % ── Appearance controls (rows 6-11) ────────────────────────────────
+    % Row 6: Color (L spans 2-3 normally; R in col 4 when Y2 active)
+    lblApColor = uibutton(axLimGL,'Text','Color:','Enable','off','FontSize',10);
+    lblApColor.Layout.Row = 6; lblApColor.Layout.Column = 1;
+
+    ddDatasetColor = uidropdown(axLimGL, ...
+        'Items',     DS_COLOR_NAMES, ...
+        'ItemsData', DS_COLOR_RGBS, ...
+        'Value',     [], ...
+        'Enable',    'off', ...
+        'Tooltip',   'Override line colour for left-axis channels ("Auto" uses the palette)', ...
+        'ValueChangedFcn', @onDatasetColorChanged);
+    ddDatasetColor.Layout.Row = 6; ddDatasetColor.Layout.Column = [2 4];
+
+    ddDatasetColorR = uidropdown(axLimGL, ...
+        'Items',     DS_COLOR_NAMES, ...
+        'ItemsData', DS_COLOR_RGBS, ...
+        'Value',     [], ...
+        'Enable',    'off', ...
+        'Visible',   'off', ...
+        'Tooltip',   'Override line colour for right-axis channels ("Auto" uses the palette)', ...
+        'ValueChangedFcn', @onDatasetColorRChanged);
+    ddDatasetColorR.Layout.Row = 6; ddDatasetColorR.Layout.Column = 4;
+
+    % Row 7: Legend name
+    lblApLegend = uibutton(axLimGL,'Text','Legend:','Enable','off','FontSize',10);
+    lblApLegend.Layout.Row = 7; lblApLegend.Layout.Column = 1;
+
+    efLegendName = uieditfield(axLimGL,'text','Value','', ...
+        'Enable',          'off', ...
+        'Placeholder',     'auto (channel name)', ...
+        'Tooltip',         'Override the legend label for left-axis channels — blank = auto', ...
+        'ValueChangedFcn', @onLegendNameChanged);
+    efLegendName.Layout.Row = 7; efLegendName.Layout.Column = [2 4];
+
+    efLegendNameR = uieditfield(axLimGL,'text','Value','', ...
+        'Enable',          'off', ...
+        'Visible',         'off', ...
+        'Placeholder',     'auto', ...
+        'Tooltip',         'Override the legend label for right-axis channels — blank = auto', ...
+        'ValueChangedFcn', @onLegendNameRChanged);
+    efLegendNameR.Layout.Row = 7; efLegendNameR.Layout.Column = 4;
+
+    % Row 8: X label (spans all value columns — only one X axis)
+    lblApXLabel = uibutton(axLimGL,'Text','X Label:','Enable','off','FontSize',10);
+    lblApXLabel.Layout.Row = 8; lblApXLabel.Layout.Column = 1;
+
+    efCustomXLabel = uieditfield(axLimGL,'text','Value','', ...
+        'Placeholder',     'auto (from data)', ...
+        'Tooltip',         'Override the X-axis label — blank = auto', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    efCustomXLabel.Layout.Row = 8; efCustomXLabel.Layout.Column = [2 4];
+
+    % Row 9: Y label (left and right independently)
+    lblApYLabel = uibutton(axLimGL,'Text','Y Label:','Enable','off','FontSize',10);
+    lblApYLabel.Layout.Row = 9; lblApYLabel.Layout.Column = 1;
+
+    efCustomYLabel = uieditfield(axLimGL,'text','Value','', ...
+        'Placeholder',     'auto (from data)', ...
+        'Tooltip',         'Override the left Y-axis label — blank = auto', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    efCustomYLabel.Layout.Row = 9; efCustomYLabel.Layout.Column = [2 4];
+
+    efCustomY2Label = uieditfield(axLimGL,'text','Value','', ...
+        'Visible',         'off', ...
+        'Placeholder',     'auto', ...
+        'Tooltip',         'Override the right Y-axis label — blank = auto', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    efCustomY2Label.Layout.Row = 9; efCustomY2Label.Layout.Column = 4;
+
+    % Row 10: Title (spans all value columns)
+    lblApTitle = uibutton(axLimGL,'Text','Title:','Enable','off','FontSize',10);
+    lblApTitle.Layout.Row = 10; lblApTitle.Layout.Column = 1;
+
+    efCustomTitle = uieditfield(axLimGL,'text','Value','', ...
+        'Placeholder',     'auto (from filename)', ...
+        'Tooltip',         'Override the plot title — blank = auto', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    efCustomTitle.Layout.Row = 10; efCustomTitle.Layout.Column = [2 4];
+
+    % Row 11: Tick-label notation — X and Y1 always visible; R (Y2) hidden until active.
+    % A nested 1×6 grid packs [X: dd | Y: dd | R: dd] into the three value columns.
+    % Cols 5-6 (the R label + dropdown) start at width 0 and are revealed with Y2.
+    lblApFmt = uibutton(axLimGL,'Text','Format:','Enable','off','FontSize',10);
+    lblApFmt.Layout.Row = 11; lblApFmt.Layout.Column = 1;
+
+    fmtGL = uigridlayout(axLimGL, [1 6], ...
+        'Padding', [0 0 0 0], 'RowSpacing', 0, 'ColumnSpacing', 2, ...
+        'ColumnWidth', {16, '1x', 16, '1x', 0, 0});
+    fmtGL.Layout.Row = 11; fmtGL.Layout.Column = [2 4];
+
+    lblFmtX = uilabel(fmtGL,'Text','X','FontSize',9,'HorizontalAlignment','right');
+    lblFmtX.Layout.Column = 1;
+    ddXFmt = uidropdown(fmtGL, 'Items', TICKFMT_NAMES, 'ItemsData', TICKFMT_DATA, ...
+        'Value', '', 'FontSize', 10, 'Tooltip', 'X-axis tick label notation', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    ddXFmt.Layout.Column = 2;
+
+    lblFmtY = uilabel(fmtGL,'Text','Y','FontSize',9,'HorizontalAlignment','right');
+    lblFmtY.Layout.Column = 3;
+    ddYFmt = uidropdown(fmtGL, 'Items', YTICKFMT_NAMES, 'ItemsData', YTICKFMT_DATA, ...
+        'Value', '__exp0', 'FontSize', 10, 'Tooltip', 'Left Y-axis tick label notation', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    ddYFmt.Layout.Column = 4;
+
+    lblFmtR = uilabel(fmtGL,'Text','R','FontSize',9,'HorizontalAlignment','right');
+    lblFmtR.Layout.Column = 5;
+    ddY2Fmt = uidropdown(fmtGL, 'Items', YTICKFMT_NAMES, 'ItemsData', YTICKFMT_DATA, ...
+        'Value', '', 'FontSize', 10, 'Tooltip', 'Right Y-axis tick label notation', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    ddY2Fmt.Layout.Column = 6;
 
     % ── Save Corrected Data sub-panel (right column) ──────────────────────
     savePanel = uipanel(analysisGL,'Title','Save Corrected Data','FontSize',13);
@@ -829,7 +817,7 @@ function dataImportGUI()
 
     saveGL = uigridlayout(savePanel,[8 2], ...
         'RowHeight',    {26,32,32,32,32,32,32,32}, ...
-        'ColumnWidth',  {'1x',100}, ...
+        'ColumnWidth',  {'1x','1x'}, ...
         'Padding',      [6 6 6 6], ...
         'RowSpacing',   4, ...
         'ColumnSpacing', 4);
@@ -1600,10 +1588,9 @@ function dataImportGUI()
         % Show Y2 rows/columns only when a right-axis channel is active
         y2Active = ~all(strcmp(ensureCell(lbY2.Value), '(none)'));
         axLimGL.RowHeight{4}  = 26 * y2Active;
-        apGL.ColumnWidth{3}   = guiTernary(y2Active, '1x', 0);
-        apGL.RowHeight{1}     = guiTernary(y2Active, 20,   0);
         fmtGL.ColumnWidth{5}  = guiTernary(y2Active, 20,   0);
         fmtGL.ColumnWidth{6}  = guiTernary(y2Active, '1x', 0);
+        toggleY2Appearance(y2Active);
 
         if ~isempty(ds.corrData)
             [fp2, fn2, ~] = fileparts(ds.filepath);
@@ -1614,13 +1601,15 @@ function dataImportGUI()
 
         applyParserAnalysisConfig(resolvedCorrStyle());
 
-        % Auto-configure for neutron data
+        % Auto-configure for neutron data; reset log scale for non-neutron
         if isNeutronParser(ds.parserName)
             rIdx = find(strcmp(d.labels, 'R'), 1);
             if ~isempty(rIdx)
                 lbY.Value = d.labels(rIdx);
             end
             cbLogY.Value = true;
+        else
+            cbLogY.Value = false;
         end
 
         ddX.ValueChangedFcn  = @onAxisChanged;
@@ -1669,12 +1658,10 @@ function dataImportGUI()
                 btnRemovePeakClick.Visible = 'on';
                 % Peak analysis panel — visible for XRD (col 3 and col 4 split flexible width)
                 peakPanel.Visible          = 'on';
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, appData.axLimPanelWidth, '1x', '1x'};
-                % Hide asymmetry controls for XRD
-                lblAsymmetry.Enable        = 'off';
-                cbCalculateAsymmetry.Enable = 'off';
-                lblAsymFormula.Enable      = 'off';
-                ddAsymFormula.Enable       = 'off';
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, appData.axLimPanelWidth, '7x', '3x'};
+                % Hide asymmetry rows (save 48px); restore BG rows
+                corrGL.RowHeight{7}  = 24; corrGL.RowHeight{8}  = 24;
+                corrGL.RowHeight{15} = 0;  corrGL.RowHeight{16} = 0;
 
             case 'importQDVSM'
                 % Re-enable controls for non-neutron case
@@ -1703,12 +1690,10 @@ function dataImportGUI()
                 btnRemovePeakClick.Visible = 'off';
                 % Peak analysis panel — hidden for VSM (col 3 collapses; axlim expands)
                 peakPanel.Visible          = 'off';
-                analysisGL.ColumnWidth     = {350, '1x', 0, 150};
-                % Hide asymmetry controls for VSM
-                lblAsymmetry.Enable        = 'off';
-                cbCalculateAsymmetry.Enable = 'off';
-                lblAsymFormula.Enable      = 'off';
-                ddAsymFormula.Enable       = 'off';
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '7x', 0, '3x'};
+                % Hide asymmetry rows (save 48px); restore BG rows
+                corrGL.RowHeight{7}  = 24; corrGL.RowHeight{8}  = 24;
+                corrGL.RowHeight{15} = 0;  corrGL.RowHeight{16} = 0;
 
             case 'importPPMS'
                 % Re-enable controls for non-neutron case
@@ -1735,33 +1720,40 @@ function dataImportGUI()
                 btnRemovePeakClick.Visible = 'off';
                 % Peak analysis panel — hidden for PPMS (col 3 collapses; axlim expands)
                 peakPanel.Visible          = 'off';
-                analysisGL.ColumnWidth     = {350, '1x', 0, 150};
-                % Hide asymmetry controls for PPMS
-                lblAsymmetry.Enable        = 'off';
-                cbCalculateAsymmetry.Enable = 'off';
-                lblAsymFormula.Enable      = 'off';
-                ddAsymFormula.Enable       = 'off';
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '7x', 0, '3x'};
+                % Hide asymmetry rows (save 48px); restore BG rows
+                corrGL.RowHeight{7}  = 24; corrGL.RowHeight{8}  = 24;
+                corrGL.RowHeight{15} = 0;  corrGL.RowHeight{16} = 0;
 
             case {'importNCNRDat', 'importNCNRRefl', 'importNCNRPNR'}
                 analysisPanel.Title = 'Analysis & Corrections  —  Neutron Reflectometry';
                 lblXOff.Text  = 'Q Offset:';
+                efXOffset.Tooltip = 'Q-offset: Q_corrected = Q − this value  (0 = no shift)';
                 lblYOff.Text  = 'R Offset:';
-                % Disable all correction controls (data is already reduced)
-                for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
-                          btnApply, btnReset, btnApplyAll, btnUndo, ...
-                          cbSmooth, efSmoothWin, ddSmoothMethod, ...
-                          efXTrimMin, efXTrimMax, ddNormalize, btnFitBG, btnPickY}
+                efYOffset.Tooltip = 'R-offset: applied to reflectivity  (0 = no shift)';
+                % Enable useful corrections (offsets, trim, normalize, apply/reset)
+                for hh = {efXOffset, efYOffset, btnApply, btnReset, btnApplyAll, btnUndo, ...
+                          efXTrimMin, efXTrimMax, ddNormalize}
+                    hh{1}.Enable = 'on';
+                end
+                % Keep BG slope/intercept and smoothing disabled (not meaningful for neutron)
+                for hh = {efBGSlope, efBGIntercept, cbSmooth, efSmoothWin, ddSmoothMethod}
                     hh{1}.Enable = 'off';
                 end
+                lblBGSlope.Text = 'BG Slope:';
+                lblBGInt.Text   = 'BG Intercept:';
                 btnFitBG.Visible           = 'off';
                 btnPickY.Visible           = 'off';
                 btnYTranslate.Visible      = 'off';
                 btnAutoPeak.Visible        = 'off';
                 btnManualPeak.Visible      = 'off';
                 btnRemovePeakClick.Visible = 'off';
-                btnApply.Tooltip = 'Corrections are disabled for neutron reflectometry (data is already reduced)';
+                btnApply.Tooltip = 'Apply Q/R offsets, trim, and normalization to all polarizations from the same measurement';
                 peakPanel.Visible          = 'off';
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 150};
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '7x', 0, '3x'};
+                % Hide BG file rows (not applicable); show asymmetry rows
+                corrGL.RowHeight{7}  = 0;  corrGL.RowHeight{8}  = 0;
+                corrGL.RowHeight{15} = 24; corrGL.RowHeight{16} = 24;
                 % Show neutron-specific analysis controls
                 lblAsymmetry.Enable        = 'on';
                 cbCalculateAsymmetry.Enable = 'on';
@@ -1769,11 +1761,9 @@ function dataImportGUI()
                 ddAsymFormula.Enable       = 'on';
 
             otherwise  % importCSV, importExcel, unknown — generic labels
-                % Hide asymmetry controls for non-neutron data
-                lblAsymmetry.Enable        = 'off';
-                cbCalculateAsymmetry.Enable = 'off';
-                lblAsymFormula.Enable      = 'off';
-                ddAsymFormula.Enable       = 'off';
+                % Hide asymmetry rows (save 48px); restore BG rows
+                corrGL.RowHeight{7}  = 24; corrGL.RowHeight{8}  = 24;
+                corrGL.RowHeight{15} = 0;  corrGL.RowHeight{16} = 0;
                 % Re-enable controls for non-neutron case
                 for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
                           btnApply, btnReset, btnApplyAll, btnUndo, ...
@@ -1798,7 +1788,7 @@ function dataImportGUI()
                 btnRemovePeakClick.Visible = 'off';
                 % Peak analysis panel — hidden for generic data (col 3 collapses; axlim expands)
                 peakPanel.Visible          = 'off';
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 150};
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '7x', 0, '3x'};
         end
     end
 
@@ -2822,6 +2812,77 @@ function dataImportGUI()
         ds.xTrimMax      = xTrimMax;
         ds.normMethod    = ddNormalize.Value;
         appData.datasets{appData.activeIdx} = ds;
+
+        % ════════════════════════════════════════════════════════════════
+        %  Cross-polarization propagation (neutron data only)
+        %  Apply same corrections to all datasets sharing the same source
+        %  file (matched by stripping polarization suffixes).
+        % ════════════════════════════════════════════════════════════════
+        if isfield(ds, 'parserName') && isNeutronParser(ds.parserName)
+            activeBase = neutronBaseName(ds.filepath);
+            normVal    = ddNormalize.Value;
+            for pi = 1:numel(appData.datasets)
+                if pi == appData.activeIdx, continue; end
+                pds = appData.datasets{pi};
+                if ~isfield(pds, 'parserName') || ~isNeutronParser(pds.parserName)
+                    continue;
+                end
+                if ~strcmp(neutronBaseName(pds.filepath), activeBase)
+                    continue;
+                end
+                % Save undo state for this sibling
+                pUndo.corrData      = pds.corrData;
+                pUndo.xOff          = pds.xOff;
+                pUndo.yOff          = pds.yOff;
+                pUndo.bgSlope       = pds.bgSlope;
+                pUndo.bgInt         = pds.bgInt;
+                pUndo.smoothEnabled = pds.smoothEnabled;
+                pUndo.smoothWindow  = pds.smoothWindow;
+                pUndo.smoothMethod  = pds.smoothMethod;
+                pUndo.xTrimMin      = pds.xTrimMin;
+                pUndo.xTrimMax      = pds.xTrimMax;
+                pUndo.normMethod    = pds.normMethod;
+                pds.undoState       = pUndo;
+                % Apply same correction pipeline: trim → offset → normalize
+                pCorr = pds.data;
+                if ~isnan(xTrimMin) || ~isnan(xTrimMax)
+                    tVec = double(pCorr.time);
+                    mask = true(size(tVec));
+                    if ~isnan(xTrimMin), mask = mask & tVec >= xTrimMin; end
+                    if ~isnan(xTrimMax), mask = mask & tVec <= xTrimMax; end
+                    pCorr.time   = pCorr.time(mask);
+                    pCorr.values = pCorr.values(mask, :);
+                end
+                if ~isdatetime(pds.data.time)
+                    pCorr.time = pCorr.time - xOff;
+                end
+                for k = 1:size(pCorr.values, 2)
+                    pCorr.values(:, k) = pCorr.values(:, k) - yOff;
+                end
+                switch normVal
+                    case 'Range [0,1]'
+                        pCorr.values = utilities.normalize(pCorr.values,'Method','range');
+                    case 'Peak (max=1)'
+                        pCorr.values = utilities.normalize(pCorr.values,'Method','peak');
+                    case 'Z-score'
+                        pCorr.values = utilities.normalize(pCorr.values,'Method','zscore');
+                    case 'Area (integral=1)'
+                        for k = 1:size(pCorr.values,2)
+                            A = trapz(double(pCorr.time), pCorr.values(:,k));
+                            if A ~= 0, pCorr.values(:,k) = pCorr.values(:,k) / A; end
+                        end
+                end
+                pds.corrData   = pCorr;
+                pds.xOff       = xOff;
+                pds.yOff       = yOff;
+                pds.bgSlope    = 0;
+                pds.bgInt      = 0;
+                pds.xTrimMin   = xTrimMin;
+                pds.xTrimMax   = xTrimMax;
+                pds.normMethod = normVal;
+                appData.datasets{pi} = pds;
+            end
+        end
 
         % Auto-set the save path for the active dataset
         [fpath, fname, ~] = fileparts(ds.filepath);
@@ -4159,7 +4220,7 @@ function dataImportGUI()
 
             % Legend: on when multi-channel, multi-dataset, raw overlay, or Y2 shown
             if nY > 1 || nDS > 1 || anyRawShown || hasY2
-                legend(targetAx,'Location','best');
+                legend(targetAx,'Location','best','Interpreter','none');
             else
                 legend(targetAx,'off');
             end
@@ -4263,10 +4324,9 @@ function dataImportGUI()
             % Toggle row visibility when drawing to the main GUI axes.
             if targetAx == ax
                 axLimGL.RowHeight{4} = 26 * hasY2;
-                apGL.ColumnWidth{3}  = guiTernary(hasY2, '1x', 0);
-                apGL.RowHeight{1}    = guiTernary(hasY2, 20,   0);
                 fmtGL.ColumnWidth{5} = guiTernary(hasY2, 20,   0);
                 fmtGL.ColumnWidth{6} = guiTernary(hasY2, '1x', 0);
+                toggleY2Appearance(hasY2);
             end
             if hasY2
                 y2MinV  = str2double(efY2Min.Value);
@@ -4464,6 +4524,79 @@ function dataImportGUI()
         end
     end
 
+    function onSmartScale(~,~)
+    %ONSMARTSCALE  Auto-detect linear/log and set reasonable axis limits.
+    %   Examines the plotted data to choose log scale when values span >2
+    %   decades and are all positive, otherwise linear.  Sets axis limits
+    %   to show all data with a small margin.
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+
+        % ── Collect visible X and Y data across all datasets ──────────
+        allX = [];  allY = [];
+        for si = 1:numel(appData.datasets)
+            sds = appData.datasets{si};
+            if isfield(sds,'visible') && ~sds.visible, continue; end
+            sd = guiTernary(~isempty(sds.corrData), sds.corrData, sds.data);
+            if isdatetime(sd.time), continue; end
+            allX = [allX; double(sd.time(:))]; %#ok<AGROW>
+            allY = [allY; sd.values(:)];       %#ok<AGROW>
+        end
+        if isempty(allX) || isempty(allY), return; end
+
+        % Remove NaN/Inf for range analysis
+        allX = allX(isfinite(allX));
+        allY = allY(isfinite(allY));
+        if isempty(allX) || isempty(allY), return; end
+
+        % ── Decide log vs linear for each axis ───────────────────────
+        % Log is appropriate when all values are positive and span >2
+        % orders of magnitude (e.g. reflectivity 1e-6 to 1).
+        xMin = min(allX);  xMax = max(allX);
+        yMin = min(allY);  yMax = max(allY);
+
+        useLogX = false;
+        if xMin > 0 && xMax > 0 && xMax/xMin > 100
+            useLogX = true;
+        end
+        useLogY = false;
+        if yMin > 0 && yMax > 0 && yMax/yMin > 100
+            useLogY = true;
+        end
+
+        cbLogX.Value = useLogX;
+        cbLogY.Value = useLogY;
+
+        % ── Set reasonable limits with margin ─────────────────────────
+        if useLogX
+            % Round to nearest decade with 0.5-decade margin
+            efXMin.Value = sprintf('%.6g', 10^floor(log10(xMin)));
+            efXMax.Value = sprintf('%.6g', 10^ceil(log10(xMax)));
+        else
+            xRange = xMax - xMin;
+            if xRange == 0, xRange = max(abs(xMax), 1); end
+            margin = xRange * 0.02;
+            efXMin.Value = sprintf('%.6g', xMin - margin);
+            efXMax.Value = sprintf('%.6g', xMax + margin);
+        end
+
+        if useLogY
+            efYMin.Value = sprintf('%.6g', 10^floor(log10(yMin)));
+            efYMax.Value = sprintf('%.6g', 10^ceil(log10(yMax)));
+        else
+            yRange = yMax - yMin;
+            if yRange == 0, yRange = max(abs(yMax), 1); end
+            margin = yRange * 0.05;
+            efYMin.Value = sprintf('%.6g', yMin - margin);
+            efYMax.Value = sprintf('%.6g', yMax + margin);
+        end
+        efXStep.Value = '';
+        efYStep.Value = '';
+        efY2Min.Value = '';  efY2Max.Value = '';  efY2Step.Value = '';
+
+        saveAxisLimsToActiveDataset();
+        onPlot([],[]);
+    end
+
     function onAutoLimits(~,~)
     %ONAUTOLIMITS  Clear all axis limit fields → return to auto-scale.
         efXMin.Value = '';  efXMax.Value = '';  efXStep.Value = '';
@@ -4492,7 +4625,11 @@ function dataImportGUI()
             set(appData.cursorText, 'Visible', 'off');
             return;
         end
+        % Suppress "Negative data ignored" warning from ax.CurrentPoint
+        % when log-scale axes contain negative data (fires every mouse move).
+        wState = warning('off', 'MATLAB:Axes:NegativeDataInLogAxis');
         cp = ax.CurrentPoint;
+        warning(wState);
         x  = cp(1,1);  y = cp(1,2);
         if x < ax.XLim(1) || x > ax.XLim(2) || ...
            y < ax.YLim(1) || y > ax.YLim(2)
@@ -4666,8 +4803,8 @@ function dataImportGUI()
 
     function onCopyToClipboard(~,~)
     %ONCOPYTOCLIPBOARD  Render the current plot into a temporary figure and copy
-    %  it to the system clipboard as a bitmap image.
-    %  Note: '-clipboard' is only supported on Windows; an alert is shown otherwise.
+    %  it to the system clipboard as a vector EMF with transparent background.
+    %  Falls back to bitmap if copygraphics is unavailable.
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig,'Load a file first.','No data');
             return;
@@ -4675,21 +4812,29 @@ function dataImportGUI()
         % Spin up a lightweight off-screen figure so the GUI is not disturbed
         tmpFig = figure('Visible','off', ...
                         'Name','ClipboardCopy','NumberTitle','off', ...
-                        'MenuBar','none','ToolBar','none');
+                        'MenuBar','none','ToolBar','none', ...
+                        'Color','none');
         tmpAx = axes(tmpFig);   %#ok<LAXES>
+        set(tmpAx, 'Color','none');
         box(tmpAx,'on');
         grid(tmpAx,'on');
         drawToAxes(tmpAx);
         try
-            print(tmpFig, '-clipboard', '-dbitmap');
+            % copygraphics (R2020a+): vector EMF with transparent background
+            copygraphics(tmpAx, 'ContentType','vector', 'BackgroundColor','none');
         catch ME
-            delete(tmpFig);
-            uialert(fig, ...
-                sprintf(['Clipboard copy is not supported on this platform.\n\n' ...
-                         '(%s)\n\nUse "Export to Figure" and copy from there.'], ...
-                        ME.message), ...
-                'Copy to clipboard failed');
-            return;
+            % Fallback: bitmap copy via print (Windows only)
+            try
+                print(tmpFig, '-clipboard', '-dmeta');
+            catch ME2
+                delete(tmpFig);
+                uialert(fig, ...
+                    sprintf(['Clipboard copy failed.\n\n' ...
+                             '(%s)\n\nUse "Export to Figure" and copy from there.'], ...
+                            ME2.message), ...
+                    'Copy to clipboard failed');
+                return;
+            end
         end
         delete(tmpFig);
     end
@@ -4964,7 +5109,7 @@ function dataImportGUI()
         if strcmp(appData.panelResizeDir, 'h_row12')
             % Snapshot the current toolbar row height (always a fixed-px number)
             rh = rootGL.RowHeight;
-            appData.panelResizeOrig = guiTernary(isnumeric(rh{1}), rh{1}, 222);
+            appData.panelResizeOrig = guiTernary(isnumeric(rh{1}), rh{1}, 130);
         elseif strcmp(appData.panelResizeDir, 'h_row23')
             % Snapshot the current analysis panel height (px)
             try
@@ -4983,12 +5128,23 @@ function dataImportGUI()
                 appData.panelResizeOrig = appData.corrPanelWidth;
             end
         elseif strcmp(appData.panelResizeDir, 'v_col23')
-            % Snapshot the current axis-limits panel width (px)
-            try
-                alPos = getpixelposition(axLimPanel, true);
-                appData.panelResizeOrig = alPos(3);
-            catch
-                appData.panelResizeOrig = appData.axLimPanelWidth;
+            if strcmp(peakPanel.Visible, 'on')
+                % XRD mode: snapshot the current axis-limits panel width (px)
+                try
+                    alPos = getpixelposition(axLimPanel, true);
+                    appData.panelResizeOrig = alPos(3);
+                catch
+                    appData.panelResizeOrig = appData.axLimPanelWidth;
+                end
+            else
+                % Non-XRD mode: snapshot the save panel width (col 4)
+                try
+                    spPos = getpixelposition(savePanel, true);
+                    appData.panelResizeOrig = spPos(3);
+                catch
+                    cw = analysisGL.ColumnWidth;
+                    appData.panelResizeOrig = guiTernary(isnumeric(cw{4}), cw{4}, 120);
+                end
             end
         elseif strcmp(appData.panelResizeDir, 'v_col34')
             % Snapshot the current peak-analysis panel width (px)
@@ -5013,7 +5169,7 @@ function dataImportGUI()
             % Sign is inverted vs h_row23: dragging the top border down expands row 1.
             delta_y = mp(2) - appData.panelResizeStart(2);
             newH    = round(appData.panelResizeOrig - delta_y);
-            newH    = max(140, min(newH, 400));
+            newH    = max(90, min(newH, 400));
             rootGL.RowHeight = {newH, '3x', '2x'};
 
         elseif strcmp(appData.panelResizeDir, 'h_row23')
@@ -5022,10 +5178,10 @@ function dataImportGUI()
             figH    = fig.Position(4);
             % Available px after toolbar row + padding + spacings
             %   rootGL: Padding [8 8 8 8] → 16 px;  2 RowSpacing gaps of 6 → 12 px
-            availH  = figH - 16 - 12 - 222;
+            availH  = figH - 16 - 12 - 130;
             newH    = round(appData.panelResizeOrig + delta_y);
             newH    = max(200, min(newH, availH - 100));  % leave ≥ 100 px for preview
-            rootGL.RowHeight = {222, '1x', newH};
+            rootGL.RowHeight = {130, '1x', newH};
 
         elseif strcmp(appData.panelResizeDir, 'v_col12')
             % Mouse moves right → corrections panel gets wider
@@ -5038,14 +5194,24 @@ function dataImportGUI()
             analysisGL.ColumnWidth = cw;
 
         elseif strcmp(appData.panelResizeDir, 'v_col23')
-            % Mouse moves right → axis-limits panel gets wider
             delta_x = mp(1) - appData.panelResizeStart(1);
-            newW    = round(appData.panelResizeOrig + delta_x);
-            newW    = max(120, min(newW, 400));
-            appData.axLimPanelWidth = newW;
-            cw    = analysisGL.ColumnWidth;
-            cw{2} = newW;
-            analysisGL.ColumnWidth = cw;
+            if strcmp(peakPanel.Visible, 'on')
+                % XRD mode: mouse moves right → axis-limits panel gets wider
+                newW    = round(appData.panelResizeOrig + delta_x);
+                newW    = max(150, min(newW, 500));
+                appData.axLimPanelWidth = newW;
+                cw    = analysisGL.ColumnWidth;
+                cw{2} = newW;
+                analysisGL.ColumnWidth = cw;
+            else
+                % Non-XRD mode: resize save panel (col 4); col 2 stays '1x'
+                % Drag left → save panel wider; drag right → save panel narrower
+                newW    = round(appData.panelResizeOrig - delta_x);
+                newW    = max(100, min(newW, 400));
+                cw    = analysisGL.ColumnWidth;
+                cw{4} = newW;
+                analysisGL.ColumnWidth = cw;
+            end
 
         elseif strcmp(appData.panelResizeDir, 'v_col34')
             % Mouse moves right → peak-analysis panel gets wider
@@ -5176,6 +5342,27 @@ function dataImportGUI()
 
         rebuildDatasetList(true);
         onPlot([], []);
+    end
+
+    function toggleY2Appearance(active)
+    %TOGGLEY2APPEARANCE  Show/hide right-axis appearance controls in the combined panel.
+    %  When active (true): L fields span cols 2-3, R fields visible in col 4.
+    %  When inactive: L fields span cols 2-4, R fields hidden.
+        if active
+            ddDatasetColor.Layout.Column  = [2 3];
+            ddDatasetColorR.Visible       = 'on';
+            efLegendName.Layout.Column    = [2 3];
+            efLegendNameR.Visible         = 'on';
+            efCustomYLabel.Layout.Column  = [2 3];
+            efCustomY2Label.Visible       = 'on';
+        else
+            ddDatasetColor.Layout.Column  = [2 4];
+            ddDatasetColorR.Visible       = 'off';
+            efLegendName.Layout.Column    = [2 4];
+            efLegendNameR.Visible         = 'off';
+            efCustomYLabel.Layout.Column  = [2 4];
+            efCustomY2Label.Visible       = 'off';
+        end
     end
 
 end  % dataImportGUI
@@ -5689,6 +5876,17 @@ end
 function tf = isNeutronParser(pName)
 %ISNEUTRONPARSER  True when pName is an NCNR neutron reflectometry parser.
     tf = ismember(pName, {'importNCNRDat', 'importNCNRRefl', 'importNCNRPNR'});
+end
+
+
+function baseName = neutronBaseName(filepath)
+%NEUTRONBASENAME  Strip polarization suffixes to get the measurement base name.
+%   Removes -(refl|pnr) and trailing -[a-z] so that all cross-sections from
+%   one measurement share the same base name.
+    [~, fn, ~] = fileparts(filepath);
+    fn = regexprep(fn, '-(refl|pnr)$', '');
+    fn = regexprep(fn, '-[a-z]$', '', 'ignorecase');
+    baseName = fn;
 end
 
 

@@ -13,7 +13,11 @@
       "WebFetch(domain:www.researchgate.net)",
       "Bash(wc:*)",
       "Bash(cut:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(matlab:*)",
+      "Bash(ls:*)",
+      "Bash(git add:*)",
+      "Bash(git:*)"
     ]
   }
 }

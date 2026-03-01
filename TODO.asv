@@ -73,14 +73,13 @@ impl# TODO — thin_film_toolkit_matlab
 - [/] **Annotation tool** — click on the plot to drop a text label (peak index, sample
   name, etc.) that follows data coordinates. Store in `ds.annotations`; re-render in
   `drawToAxes`. **Needs testing in GUI.**
-- [x] **Clean up Analysis & Corrections Section** - there are analysis options that only apply to certain data types but are displayed for all. For example, spin asymmetry should only be shown in Neutron Refelectomery analysis
-    - [x] Enable other data corrections for Neutron Reflectomery, but remove: subtract BG and smoothing from this data type
-    - [x] For Neutron reflectomery corrections, apply R and Q offset equally to all polarizations with same data file name
-    - [x] Remove spin asymmetry from all but neutron reflectomery data types in 'analysis and corrections'
-    -
-- [x] **axis settings and plot appearance** looks section of GUI takes up a lot of horozontal space, input boxes can be narrower to make entire box narrower.
-- [ ] **Control panel to set GUI arrangement defaults** create a separate GUI to control the size and arrangement of plot and analysis GUI. activate it with a separate GUI control. Use same color styles
-
+- [ ] **Clean up Analysis & Corrections Section** - there are analysis options that only apply to certain data types but are displayed for all. For example, spin asymmetry should only be shown in Neutron Refelectomery analysis
+    - [ ] Enable other data corrections for Neutron Reflectomery, but remove: subtract BG and smoothing from this data type
+    - [ ] For Neutron reflectomery corrections, apply R and Q offset equally to all polarizations with same data file name
+    - [ ] Remove spin asymmetry from all but neutron reflectomery data types in 'analysis and corrections'
+    - 
+- [ ] **axis settings and plot looks section of GUI takes up a lot of horozontal space, input boxes can be narrower to make entire box narrower.
+- [ ] **Control panel to set GUI arrangement defaults** create a separate GUI to control the size and arrangement
 
 ---
 

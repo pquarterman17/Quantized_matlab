@@ -18,6 +18,10 @@ function [data, parserName] = importAuto(filepath, varargin)
 %     .xlsx .xls .xlsm
 %       .ods .xlsb      → parser.importExcel
 %     .csv .tsv .txt    → parser.importCSV
+%     .refl             → parser.importNCNRRefl (NCNR reflectivity from reductus)
+%     .pnr              → parser.importNCNRPNR (PNR polychromatic variants)
+%     .data/.datb/
+%       .datc/.datd     → parser.importNCNRDat (refl1d fit output, polarization-encoded)
 %     .dat              → tries parser.importQDVSM ([Header]/[Data] format)
 %                         falls back to parser.importPPMS (legacy CSV)
 %
@@ -29,17 +33,18 @@ function [data, parserName] = importAuto(filepath, varargin)
 %       data       - Unified data struct (.time, .values, .labels, .units,
 %                    .metadata) as returned by the underlying parser.
 %       parserName - (optional) Name of the parser that was used, e.g.
-%                    'importQDVSM', 'importCSV', 'importRigaku_raw'.
+%                    'importQDVSM', 'importNCNRRefl', 'importCSV'.
 %
 %   EXAMPLES:
 %       % Let importAuto pick the parser
-%       d = parser.importAuto('EDP140_PerpStraw.dat');
+%       d = parser.importAuto('reflectivity.refl');
+%       d = parser.importAuto('polarization.pnr');
 %       d = parser.importAuto('results.xlsx', 'Sheet', 2);
 %
-%       % Inspect the result
-%       parser.importAuto('log.csv')
+%       % Inspect the result with verbose summary
+%       parser.importAuto('log.csv', 'Verbose', true)
 %
-%   See also IMPORTXRDML, IMPORTBRUKER, IMPORTRIGAKU_RAW, IMPORTCSV, IMPORTEXCEL, IMPORTPPMS, IMPORTQDVSM
+%   See also IMPORTNCNRREFL, IMPORTNCNRPNR, IMPORTNCNRDAT, IMPORTXRDML, IMPORTBRUKER, IMPORTRIGAKU_RAW, IMPORTCSV, IMPORTEXCEL, IMPORTPPMS, IMPORTQDVSM
 
     arguments
         filepath (1,1) string {mustBeFile}
@@ -62,6 +67,7 @@ function [data, parserName] = importAuto(filepath, varargin)
     % ════════════════════════════════════════════════════════════════
     %  Dispatch by extension
     % ════════════════════════════════════════════════════════════════
+
     switch ext
         case '.xrdml'
             parserName = 'importXRDML';
@@ -89,6 +95,20 @@ function [data, parserName] = importAuto(filepath, varargin)
             parserName = 'importCSV';
             data = parser.importCSV(filepath, varargin{:});
 
+        case '.refl'
+            parserName = 'importNCNRRefl';
+            data = parser.importNCNRRefl(filepath, varargin{:});
+
+        case '.pnr'
+            parserName = 'importNCNRPNR';
+            data = parser.importNCNRPNR(filepath, varargin{:});
+
+        case {'.data', '.datb', '.datc', '.datd'}
+            % NCNR refl1d output files: polarization encoded in extension
+            % .data = .datA (R++), .datb = .datB (R+-), .datc = .datC (R-+), .datd = .datD (--)
+            parserName = 'importNCNRDat';
+            data = parser.importNCNRDat(filepath, varargin{:});
+
         case '.dat'
             % Try QD VSM format first (has [Header]/[Data] markers)
             try
@@ -107,7 +127,7 @@ function [data, parserName] = importAuto(filepath, varargin)
         otherwise
             error('parser:importAuto:unknownExtension', ...
                 ['No parser registered for extension "%s".\n' ...
-                 'Supported: .xrdml, .brml, .raw, .xlsx/.xls/.xlsm, .csv/.tsv/.txt, .dat'], ext);
+                 'Supported: .xrdml, .brml, .raw, .xlsx/.xls/.xlsm, .csv/.tsv/.txt, .refl, .pnr, .datA/B/C/D, .dat'], ext);
     end
 
     % ════════════════════════════════════════════════════════════════

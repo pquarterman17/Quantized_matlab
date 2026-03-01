@@ -460,6 +460,112 @@ else
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  11. NCNR parsers  –  Neutron reflectivity data from reductus and refl1d
+% ════════════════════════════════════════════════════════════════════════
+NCNR_REFL_FILE = fullfile(ROOT, '+parser/file_examples_implementation/NCNR/NR_Nickelate/raw_data/J395_dfs01_v2.refl');
+NCNR_PNR_FILE  = fullfile(ROOT, '+parser/file_examples_implementation/NCNR/PNR_SF/S11_20G_SF.pnr');
+NCNR_DAT_FILE  = fullfile(ROOT, '+parser/file_examples_implementation/NCNR/PNR_NoSpinFlip/S3_Si_YIG_Py_300K_700mT_multi-1-refl.datA');
+
+fprintf('\n══ TEST 11: NCNR Parsers (.refl, .pnr, .datA) ══\n');
+
+% 11a: importNCNRRefl (.refl files)
+if ~isfile(NCNR_REFL_FILE)
+    fprintf('  SKIP .refl – file not found\n');
+else
+    try
+        d = parser.importNCNRRefl(NCNR_REFL_FILE);
+
+        assert(isstruct(d),                            'output must be a struct');
+        assert(isfield(d, 'time'),                     'missing field: time');
+        assert(isfield(d, 'values'),                   'missing field: values');
+        assert(isfield(d, 'labels'),                   'missing field: labels');
+        assert(isfield(d, 'units'),                    'missing field: units');
+        assert(isfield(d, 'metadata'),                 'missing field: metadata');
+        assert(~isempty(d.time),                       'Qz vector is empty');
+        assert(strcmpi(d.labels{1}, 'Qz'),             'first label should be Qz');
+        assert(isfield(d.metadata, 'parserSpecific'),  'missing metadata.parserSpecific');
+
+        fprintf('  [.refl] PASS: %d points, instrument=%s\n', ...
+            numel(d.time), d.metadata.parserSpecific.instrument_type);
+        passed = passed + 1;
+    catch ME
+        fprintf('  [.refl] FAIL: %s\n', ME.message);
+        failed = failed + 1;
+    end
+end
+
+% 11b: importNCNRPNR (.pnr files)
+if ~isfile(NCNR_PNR_FILE)
+    fprintf('  SKIP .pnr – file not found\n');
+else
+    try
+        d = parser.importNCNRPNR(NCNR_PNR_FILE);
+
+        assert(isstruct(d),                            'output must be a struct');
+        assert(isfield(d, 'time'),                     'missing field: time');
+        assert(isfield(d, 'values'),                   'missing field: values');
+        assert(~isempty(d.time),                       'Q vector is empty');
+        assert(isfield(d.metadata, 'parserSpecific'),  'missing metadata.parserSpecific');
+        assert(isfield(d.metadata.parserSpecific, 'variant'), 'missing variant');
+
+        fprintf('  [.pnr] PASS: %d points, variant=%s\n', ...
+            numel(d.time), d.metadata.parserSpecific.variant);
+        passed = passed + 1;
+    catch ME
+        fprintf('  [.pnr] FAIL: %s\n', ME.message);
+        failed = failed + 1;
+    end
+end
+
+% 11c: importNCNRDat (.datA, .datB, .datC, .datD files)
+if ~isfile(NCNR_DAT_FILE)
+    fprintf('  SKIP .datA – file not found\n');
+else
+    try
+        d = parser.importNCNRDat(NCNR_DAT_FILE);
+
+        assert(isstruct(d),                            'output must be a struct');
+        assert(isfield(d, 'time'),                     'missing field: time');
+        assert(isfield(d, 'values'),                   'missing field: values');
+        assert(~isempty(d.time),                       'Q vector is empty');
+        assert(isfield(d.metadata, 'parserSpecific'),  'missing metadata.parserSpecific');
+        assert(isfield(d.metadata.parserSpecific, 'polarization'), 'missing polarization');
+
+        pol = d.metadata.parserSpecific.polarization;
+        assert(strcmp(pol, '++'),                      'expected ++ polarization for .datA');
+
+        fprintf('  [.datA] PASS: %d points, polarization=%s\n', ...
+            numel(d.time), pol);
+        passed = passed + 1;
+    catch ME
+        fprintf('  [.datA] FAIL: %s\n', ME.message);
+        failed = failed + 1;
+    end
+end
+
+% 11d: importAuto dispatch
+fprintf('  [importAuto] Testing dispatch for .refl, .pnr, .datA:\n');
+try
+    [d1, p1] = parser.importAuto(NCNR_REFL_FILE);
+    assert(strcmp(p1, 'importNCNRRefl'), 'dispatch to importNCNRRefl failed');
+
+    [d2, p2] = parser.importAuto(NCNR_PNR_FILE);
+    assert(strcmp(p2, 'importNCNRPNR'), 'dispatch to importNCNRPNR failed');
+
+    [d3, p3] = parser.importAuto(NCNR_DAT_FILE);
+    assert(strcmp(p3, 'importNCNRDat'), 'dispatch to importNCNRDat failed');
+
+    fprintf('        .refl → %s\n', p1);
+    fprintf('        .pnr  → %s\n', p2);
+    fprintf('        .datA → %s\n', p3);
+    fprintf('        PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('        FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  Summary
 % ════════════════════════════════════════════════════════════════════════
 total = passed + failed;
