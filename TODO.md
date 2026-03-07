@@ -202,7 +202,37 @@ impl# TODO — thin_film_toolkit_matlab
 
 ---
 
-## Code Quality Scan — 2026-03-07 — **PRIORITY 1 COMPLETE** ✓
+## Testing & Validation
+
+### Running Tests
+
+All tests are self-contained and use repository-relative paths (no external dependencies):
+
+```matlab
+% Core parser tests with fixed paths
+test_parsers                    % Smoke tests for all +parser functions
+test_importAuto                 % importAuto dispatch tests
+test_parsers_edge_cases         % Edge case / error handling
+
+% Priority 2 Test & Validation suites
+test_gui_harness                % 15 tests of GUI programmatic API
+test_data_roundtrip             % 10 tests of CSV export/re-import
+test_batch_processing           % 14 tests of batch operations
+```
+
+**Test Summary:**
+- **GUI Harness** — File loading, corrections, peaks, undo, sessions, visibility
+- **Round-Trip** — CSV formats (standard/Origin), precision (1e-5 deg, 1e-4 rel.), metadata
+- **Batch Processing** — `batchImport` scan/filter; `batchConvertXRD` magic bytes/collision/recursion
+
+**Test Data Location:**
+- `+test_datasets/XRDML/` — XRD files
+- `+test_datasets/QuantumDesign/` — VSM files
+- `+test_datasets/NCNR/` — Neutron reflectometry files
+
+---
+
+## Code Quality Scan — 2026-03-07 — **PRIORITY 1 & 2 COMPLETE** ✓
 
 Comprehensive automated scan of codebase identified **22 issues** across error handling, test coverage, documentation, performance, and architecture. See detailed analysis below.
 
@@ -326,17 +356,19 @@ Comprehensive automated scan of codebase identified **22 issues** across error h
 | Status | Category | Count | Effort |
 |--------|----------|-------|--------|
 | ✓ **DONE** | Priority 1 (Critical) | 5/5 | **5 hrs** |
-| — TODO | Priority 2 (Testing) | 3/3 | 12 hrs |
+| ✓ **DONE** | Priority 2 (Testing) | 3/3 | **4 hrs** |
 | — TODO | Priority 3 (Docs) | 4/4 | 6 hrs |
 | ✓ **DONE** | Priority 4 (Perf) | 4/4 | **2 hrs** |
 | — TODO | Backlog (Architecture) | 6/6 | 9 hrs |
-| **TOTAL** | Code Quality Issues | **22** | **27 hrs remaining** |
+| **TOTAL** | Code Quality Issues | **22** | **15 hrs remaining** |
 
 **Completed 2026-03-07:**
 - **Priority 1 (5 hrs):** Critical fixes — dispatcher divergence, error logging, test suite, metadata standardization, multi-range warnings
+- **Priority 2 (4 hrs):** Test & Validation — GUI programmatic API (15 tests), round-trip export validation (10 tests), batch processing integration (14 tests)
 - **Priority 4 (2 hrs):** Performance — file I/O streaming (readlines + vectorized str2double), GUI render caching (softUpdateLines for instant color/visibility), progress bar (uiprogressdlg), magic number constants
+- **Commit:** `daab853`
 
-**Next priority:** Priority 2 (Test & Validation) — automated GUI test harness and round-trip export tests
+**Next priority:** Priority 3 (Documentation) — GUI state machine diagram, parser metadata docs, usage docstrings
 
 
 ### Bugs
