@@ -386,3 +386,7 @@ Comprehensive automated scan of codebase identified **22 issues** across error h
   - Added: folderPath update in `scanAndPopulateFileList()` for consistency
 
   **Combined impact:** Both crashes eliminated; state synchronization now robust
+
+- [x] **xrdConvertGUI struct field name bug** — **FIXED (commit d2ba59f)**
+  - `struct('Standard CSV', ...)` is invalid — field names cannot contain spaces
+  - Replaced `formatMap`/`intensityMap` structs with `switch` statements
