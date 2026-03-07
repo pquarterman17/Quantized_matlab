@@ -372,8 +372,17 @@ Comprehensive automated scan of codebase identified **22 issues** across error h
 
 
 ### Bugs
-- [x] **xrdConvertGUI error** — **FIXED (2026-03-07, commit 4d793da)**
-  - Error: "Index exceeds array bounds" in onConvert callback (line 405)
-  - Root cause: Array size mismatch between listbox items and stored file paths
-  - Fix: Restructured mapping logic with safety checks and better error handling
-  - Added defensive programming: verify array sizes, bounds checking, diagnostic messages
+- [x] **xrdConvertGUI errors** — **FIXED (2026-03-07, commits 4d793da + 3536617)**
+
+  **Bug #1: "Index exceeds array bounds"** (line 405)
+  - Root cause: Unsafe array indexing without bounds checking
+  - Fix: Restructured mapping logic with safety checks and bounds verification
+  - Added defensive programming: verify array sizes, validate indices
+
+  **Bug #2: "listbox items (N) do not match file paths (0)"**
+  - Root cause: State overwriting in `onBrowseFolder()` after files were loaded
+  - Timeline: `scanAndPopulateFileList()` updates state → then old state saved, overwrites it
+  - Fix: Removed redundant state save; ensured file paths persist across callbacks
+  - Added: folderPath update in `scanAndPopulateFileList()` for consistency
+
+  **Combined impact:** Both crashes eliminated; state synchronization now robust
