@@ -372,12 +372,8 @@ Comprehensive automated scan of codebase identified **22 issues** across error h
 
 
 ### Bugs
-- [ ] **xrdConvertGUI error** >> xrdConvertGUI
-        Index exceeds array bounds.
-        
-        Error in xrdConvertGUI/onConvert (line 405)
-                            selectedPaths{end+1} = state.appData.filePaths{i};
-                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
-         
-        Error using appdesservices.internal.interfaces.model.AbstractModel/executeUserCallback (line 282)
-        Error while evaluating Button PrivateButtonPushedFcn.
+- [x] **xrdConvertGUI error** — **FIXED (2026-03-07, commit 4d793da)**
+  - Error: "Index exceeds array bounds" in onConvert callback (line 405)
+  - Root cause: Array size mismatch between listbox items and stored file paths
+  - Fix: Restructured mapping logic with safety checks and better error handling
+  - Added defensive programming: verify array sizes, bounds checking, diagnostic messages
