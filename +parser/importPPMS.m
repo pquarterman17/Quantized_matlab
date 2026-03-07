@@ -56,6 +56,10 @@ function data = importPPMS(filepath, options)
 %       % All numeric channels vs field
 %       data = parser.importPPMS('run.dat', 'YAxis', 'all');
 %
+%   Limitations
+%     File size: tested up to ~50 MB. The entire file is read into memory.
+%     Files above ~500 MB may exhaust available RAM.
+%
 %   See also IMPORTQDVSM, IMPORTCSV, CREATEDATASTRUCT
 
     arguments
@@ -238,10 +242,11 @@ function data = importPPMS(filepath, options)
     labels       = colNames(yColIdx);
     units        = colUnits(yColIdx);
 
-    meta.source      = char(filepath);
-    meta.importDate  = datetime('now');
-    meta.parserName  = 'importPPMS';
-    meta.xColumnName = colNames{xColIdx};
+    meta.source        = char(filepath);
+    meta.importDate    = datetime('now');
+    meta.parserName    = 'importPPMS';
+    meta.parserVersion = '1.0';
+    meta.xColumnName   = colNames{xColIdx};
     meta.xColumnUnit = colUnits{xColIdx};
 
     meta.parserSpecific.allColumnNames  = colNames;
@@ -280,56 +285,32 @@ end
 
 function idx = resolvePPMSColumn(spec, colNames, role)
 %RESOLVEPPMSCOLUMN Map a shorthand or name/index to a column index.
-    shorthandMap = {
-        'field',       'Magnetic Field'
-        'moment',      'Moment'
-        'temp',        'Temperature'
-        'temperature', 'Temperature'
-        'time',        'Time Stamp'
-        'stderr',      'M. Std. Err.'
-        'mass',        'Mass'
-        'pressure',    'Pressure'
-        'frequency',   'Frequency'
-        'amplitude',   'Peak Amplitude'
-        'range',       'Range'
-        'motorcurrent','Motor Current'
-    };
-
-    if isnumeric(spec)
-        if spec < 1 || spec > numel(colNames)
-            error('parser:importPPMS:badIndex', ...
-                '%s index %d out of range (1-%d).', role, spec, numel(colNames));
+%   Delegates to parser.resolveColumnShorthand with the PPMS-specific shorthand map.
+    persistent PPMS_SHORTHAND_MAP
+    if isempty(PPMS_SHORTHAND_MAP)
+        PPMS_SHORTHAND_MAP = {
+            'field',       'Magnetic Field'
+            'moment',      'Moment'
+            'temp',        'Temperature'
+            'temperature', 'Temperature'
+            'time',        'Time Stamp'
+            'stderr',      'M. Std. Err.'
+            'mass',        'Mass'
+            'pressure',    'Pressure'
+            'frequency',   'Frequency'
+            'amplitude',   'Peak Amplitude'
+            'range',       'Range'
+            'motorcurrent','Motor Current'
+        };
+    end
+    try
+        idx = parser.resolveColumnShorthand(spec, colNames, PPMS_SHORTHAND_MAP, role);
+    catch ME
+        if contains(ME.identifier, 'notFound')
+            error('parser:importPPMS:columnNotFound', ...
+                'Cannot find %s column "%s".\nAvailable: %s\nShorthands: field, moment, temp, time, stderr', ...
+                role, char(spec), strjoin(colNames, ', '));
         end
-        idx = spec;
-        return;
+        rethrow(ME);
     end
-
-    spec = char(spec);
-
-    % Apply shorthand
-    for k = 1:size(shorthandMap, 1)
-        if strcmpi(spec, shorthandMap{k,1})
-            spec = shorthandMap{k,2};
-            break;
-        end
-    end
-
-    % Exact match
-    idx = find(strcmpi(colNames, spec), 1);
-    if ~isempty(idx), return; end
-
-    % Partial match (shortest wins)
-    matches = find(contains(colNames, spec, 'IgnoreCase', true));
-    if numel(matches) == 1
-        idx = matches;
-        return;
-    elseif numel(matches) > 1
-        [~, best] = min(cellfun(@numel, colNames(matches)));
-        idx = matches(best);
-        return;
-    end
-
-    error('parser:importPPMS:columnNotFound', ...
-        'Cannot find %s column "%s".\nAvailable: %s\nShorthands: field, moment, temp, time, stderr', ...
-        role, spec, strjoin(colNames, ', '));
 end

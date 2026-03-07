@@ -425,9 +425,10 @@ function data = importXRDML(filepath, options)
     ps.stepSize                = mean(diff(twoTheta_col), 'omitnan');
 
     meta = struct();
-    meta.source       = char(filepath);
-    meta.importDate   = datetime('now');
-    meta.parserName   = 'importXRDML';
+    meta.source        = char(filepath);
+    meta.importDate    = datetime('now');
+    meta.parserName    = 'importXRDML';
+    meta.parserVersion = '1.0';
     meta.xColumnName  = '2-Theta';
     meta.xColumnUnit  = 'deg';
     % Note: geometry parameters (numPoints, startAngle, endAngle, stepSize, countingTime)

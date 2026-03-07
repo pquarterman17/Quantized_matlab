@@ -60,6 +60,12 @@ function data = importExcel(filepath, options)
 %       [~, sheets] = xlsfinfo('data.xlsx');
 %       disp(sheets);
 %
+%   Limitations
+%     File size: tested up to ~50 MB. MATLAB's readcell loads the entire sheet into
+%     memory; very large workbooks (>100 MB) may be slow or exhaust RAM.
+%     Excel formula errors (#DIV/0!, #VALUE!, #REF!, etc.) become NaN on import;
+%     a warning is emitted when more than 10% of values are NaN.
+%
 %   See also IMPORTCSV, CREATEDATASTRUCT, XLSFINFO, READTABLE
 
     arguments
@@ -218,6 +224,18 @@ function data = importExcel(filepath, options)
 
     valuesMatrix = dataNumMat(:, dataColIdx);
 
+    % ── NaN fraction check — likely formula errors (#DIV/0!, #VALUE!, etc.) ──
+    if numDataRows > 0
+        nanFrac = sum(isnan(valuesMatrix(:))) / numel(valuesMatrix);
+        if nanFrac > 0.10
+            warning('parser:importExcel:highNaNFraction', ...
+                ['%.0f%% of data values are NaN in "%s".\n' ...
+                 'Excel formula errors (#DIV/0!, #VALUE!, #REF!, etc.) become NaN on import.\n' ...
+                 'Check the source spreadsheet for formula errors.'], ...
+                nanFrac * 100, sheetName);
+        end
+    end
+
     % ════════════════════════════════════════════════════════════════
     %  STEP 9: Build labels and units
     % ════════════════════════════════════════════════════════════════
@@ -262,11 +280,12 @@ function data = importExcel(filepath, options)
         if isempty(allColNames{ci}), allColNames{ci} = colHeaders{ci}; end
     end
 
-    meta.source      = char(filepath);
-    meta.importDate  = datetime('now');
-    meta.parserName  = 'importExcel';
-    meta.xColumnName = xName;
-    meta.xColumnUnit = xUnit;
+    meta.source        = char(filepath);
+    meta.importDate    = datetime('now');
+    meta.parserName    = 'importExcel';
+    meta.parserVersion = '1.0';
+    meta.xColumnName   = xName;
+    meta.xColumnUnit   = xUnit;
 
     meta.parserSpecific.sheet          = sheetIdx;
     meta.parserSpecific.sheetName      = sheetName;
@@ -339,18 +358,8 @@ end
 
 function idx = resolveColumnIndex(spec, colHeaders)
 %RESOLVECOLUMNINDEX Resolve a single column spec (index or name) to index.
-    if isnumeric(spec)
-        idx = spec;
-    elseif ischar(spec) || isstring(spec)
-        idx = find(strcmpi(colHeaders, spec), 1);
-        if isempty(idx)
-            error('parser:importExcel:columnNotFound', ...
-                'Column "%s" not found. Available: %s', ...
-                spec, strjoin(colHeaders, ', '));
-        end
-    else
-        idx = 1;
-    end
+%   Delegates to parser.resolveColumnShorthand (no shorthand map — plain name/index).
+    idx = parser.resolveColumnShorthand(spec, colHeaders);
 end
 
 

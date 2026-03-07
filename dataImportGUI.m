@@ -1451,8 +1451,17 @@ function api = dataImportGUI()
         end
 
         % Restore datasets
-        appData.datasets = s.savedDatasets;
+        appData.datasets  = s.savedDatasets;
         appData.activeIdx = 0;
+
+        % parserVersion compatibility check (#18)
+        nLegacy = sum(cellfun(@(ds) ...
+            ~isfield(ds.data.metadata, 'parserVersion'), appData.datasets));
+        if nLegacy > 0
+            warning('dataImportGUI:legacySession', ...
+                '%d dataset(s) lack parserVersion; re-import files to attach version metadata.', ...
+                nLegacy);
+        end
 
         % Restore GUI state if available
         if isfield(s, 'savedState')
@@ -5937,6 +5946,15 @@ function api = dataImportGUI()
         appData.bgDataset = guiTernary(isfield(S,'savedBgDataset'), S.savedBgDataset, []);
         appData.style     = guiTernary(isfield(S,'savedStyle'),     S.savedStyle,     'Line');
         appData.lastDir   = guiTernary(isfield(S,'savedLastDir'),   S.savedLastDir,   '');
+
+        % parserVersion compatibility check (#18): warn if session was created before v1.0
+        nLegacy = sum(cellfun(@(ds) ...
+            ~isfield(ds.data.metadata, 'parserVersion'), appData.datasets));
+        if nLegacy > 0
+            warning('dataImportGUI:legacySession', ...
+                ['%d dataset(s) in this session were imported before parser versioning was introduced.\n' ...
+                 'Data should load correctly; re-import files to attach version metadata.'], nLegacy);
+        end
 
         if isempty(appData.datasets)
             rebuildDatasetList(false);

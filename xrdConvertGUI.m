@@ -547,6 +547,15 @@ fig.UserData = struct('appData', appData, 'handles', handles);
             return;
         end
 
+        % Validate that all selected files still exist on disk (#19)
+        missingFiles = selectedPaths(~cellfun(@isfile, selectedPaths));
+        if ~isempty(missingFiles)
+            msg = sprintf('%d selected file(s) no longer exist on disk:\n\n%s\n\nRemove them from the list and try again.', ...
+                numel(missingFiles), strjoin(missingFiles, '\n'));
+            uialert(fig, msg, 'Missing Files');
+            return;
+        end
+
         % Map dropdown values to option strings
         switch handles.ddFormat.Value
             case 'Standard CSV';   fmt = 'standard';

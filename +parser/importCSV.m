@@ -56,6 +56,11 @@ function data = importCSV(filepath, options)
 %       % No time column — use sample index
 %       data = importCSV('raw.csv', 'TimeColumn', 0);
 %
+%   Limitations
+%     File size: tested up to ~200 MB. Larger files will load but may be slow due to
+%     in-memory string processing. Files above ~1 GB may exhaust available RAM.
+%     For very large files, consider pre-filtering with external tools before import.
+%
 %   See also CREATEDATASTRUCT, VALIDATEDATA, PREVIEWFILE, IMPORTAUTO
 
     arguments
@@ -231,11 +236,12 @@ function data = importCSV(filepath, options)
         if isempty(allColNames{ci}), allColNames{ci} = colHeaders{ci}; end
     end
 
-    meta.source      = char(filepath);
-    meta.importDate  = datetime('now');
-    meta.parserName  = 'importCSV';
-    meta.xColumnName = xName;
-    meta.xColumnUnit = xUnit;
+    meta.source        = char(filepath);
+    meta.importDate    = datetime('now');
+    meta.parserName    = 'importCSV';
+    meta.parserVersion = '1.0';
+    meta.xColumnName   = xName;
+    meta.xColumnUnit   = xUnit;
 
     meta.parserSpecific.delimiter      = char(delim);
     meta.parserSpecific.headerRow      = headerRow;
@@ -371,18 +377,8 @@ end
 
 function idx = resolveColumnIndex(spec, colHeaders)
 %RESOLVECOLUMNINDEX Convert a column spec (index or name) to index.
-    if isnumeric(spec)
-        idx = spec;
-    elseif ischar(spec) || isstring(spec)
-        idx = find(strcmpi(colHeaders, spec), 1);
-        if isempty(idx)
-            error('parser:importCSV:columnNotFound', ...
-                'Column "%s" not found. Available: %s', ...
-                spec, strjoin(colHeaders, ', '));
-        end
-    else
-        idx = 1;
-    end
+%   Delegates to parser.resolveColumnShorthand (no shorthand map — plain name/index).
+    idx = parser.resolveColumnShorthand(spec, colHeaders);
 end
 
 

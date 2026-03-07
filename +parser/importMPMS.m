@@ -101,7 +101,8 @@ function data = importMPMS(filepath, options)
     % ════════════════════════════════════════════════════════════════════════
     %  2. Update metadata to indicate MPMS parser
     % ════════════════════════════════════════════════════════════════════════
-    data.metadata.parserName = 'importMPMS';
+    data.metadata.parserName    = 'importMPMS';
+    data.metadata.parserVersion = '1.0';
     data.metadata.parserSpecific.instrumentType = 'MPMS SQUID';
 
     % ════════════════════════════════════════════════════════════════════════

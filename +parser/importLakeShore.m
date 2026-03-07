@@ -198,9 +198,10 @@ function data = importLakeShore(filepath, options)
     % ════════════════════════════════════════════════════════════════════════
     %  7. Assemble output struct
     % ════════════════════════════════════════════════════════════════════════
-    meta.source       = char(filepath);
-    meta.importDate   = datetime('now');
-    meta.parserName   = 'importLakeShore';
+    meta.source        = char(filepath);
+    meta.importDate    = datetime('now');
+    meta.parserName    = 'importLakeShore';
+    meta.parserVersion = '1.0';
     meta.xColumnName  = colNames{xColIdx};
     meta.xColumnUnit  = colUnits{xColIdx};
     meta.parserSpecific.instrumentType = 'Lake Shore VSM/Magnetometer';

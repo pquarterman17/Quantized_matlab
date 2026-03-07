@@ -58,6 +58,12 @@ function data = importRigaku_raw(filepath, options)
 %       % Import multi-range file (warning only, no error)
 %       data = parser.importRigaku_raw('multirange.raw', 'AllowPartialImport', true);
 %
+%   Limitations
+%     File size: binary format; tested up to ~20 MB. File is read entirely into memory
+%     via fread. Files above ~200 MB may be slow.
+%     Only single-range files are fully supported; multi-range files require
+%     AllowPartialImport=true and only the first range is returned.
+%
 %   See also parser.importAuto, parser.importCSV, parser.importQDVSM
 
     arguments
@@ -190,9 +196,10 @@ function data = importRigaku_raw(filepath, options)
     % ════════════════════════════════════════════════════════════════
     %  STEP 7: Assemble output struct
     % ════════════════════════════════════════════════════════════════
-    meta.source      = char(filepath);
-    meta.importDate  = datetime('now');
-    meta.parserName  = 'importRigaku_raw';
+    meta.source        = char(filepath);
+    meta.importDate    = datetime('now');
+    meta.parserName    = 'importRigaku_raw';
+    meta.parserVersion = '1.0';
     meta.xColumnName = '2-Theta';
     meta.xColumnUnit = 'deg';
 

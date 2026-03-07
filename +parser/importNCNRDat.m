@@ -165,9 +165,10 @@ function data = importNCNRDat(filepath, options)
         end
     end
 
-    metadata.source = char(filepath);
-    metadata.importDate = datetime('now');
-    metadata.parserName = 'importNCNRDat';
+    metadata.source        = char(filepath);
+    metadata.importDate    = datetime('now');
+    metadata.parserName    = 'importNCNRDat';
+    metadata.parserVersion = '1.0';
     metadata.xColumnName = 'Q';
     metadata.xColumnUnit = '1/Ang';
     metadata.parserSpecific.dataSource = 'refl1d fitting';

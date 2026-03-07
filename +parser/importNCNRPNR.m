@@ -97,9 +97,10 @@ function data = importNCNRPNR(filepath, options)
     % Build units: skip the first unit (Q) and keep the rest
     outUnits = units(2:end);
 
-    metadata.source = char(filepath);
-    metadata.importDate = datetime('now');
-    metadata.parserName = 'importNCNRPNR';
+    metadata.source        = char(filepath);
+    metadata.importDate    = datetime('now');
+    metadata.parserName    = 'importNCNRPNR';
+    metadata.parserVersion = '1.0';
     metadata.xColumnName = 'Q';
     metadata.xColumnUnit = '1/Ang';
     metadata.parserSpecific.dataSource = 'NCNR reductus';

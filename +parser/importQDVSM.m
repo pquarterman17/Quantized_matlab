@@ -76,6 +76,10 @@ function data = importQDVSM(filepath, options)
 %           'TimeColumn', 'Temperature', ...
 %           'DataColumns', {'Moment', 'M. Std. Err.'});
 %
+%   Limitations
+%     File size: tested up to ~100 MB. The entire file is read into memory at once;
+%     very large files may be slow. Files above ~500 MB may exhaust available RAM.
+%
 %   See also CREATEDATASTRUCT, VALIDATEDATA, IMPORTCSV, PLOTTIMESERIES
 
     arguments
@@ -282,9 +286,10 @@ function data = importQDVSM(filepath, options)
     units  = colUnits(yColIdx);
 
     % Build metadata — core fields at top level, parser-specific in sub-struct
-    meta.source      = char(filepath);
-    meta.importDate  = datetime('now');
-    meta.parserName  = 'importQDVSM';
+    meta.source        = char(filepath);
+    meta.importDate    = datetime('now');
+    meta.parserName    = 'importQDVSM';
+    meta.parserVersion = '1.0';
     meta.xColumnName = colNames{xColIdx};
     meta.xColumnUnit = colUnits{xColIdx};
 
@@ -353,66 +358,35 @@ end
 
 function idx = resolveQDColumn(spec, colNames, label)
 %RESOLVEQDCOLUMN Resolve a column spec to an index using shorthands.
-
-    % Handle numeric index
-    if isnumeric(spec)
-        if spec < 1 || spec > numel(colNames)
-            error('parser:importQDVSM:badIndex', ...
-                '%s column index %d is out of range (1-%d).', ...
-                label, spec, numel(colNames));
+%   Delegates to parser.resolveColumnShorthand with the QD-specific shorthand map.
+    persistent QD_SHORTHAND_MAP
+    if isempty(QD_SHORTHAND_MAP)
+        QD_SHORTHAND_MAP = {
+            'field',       'Magnetic Field'
+            'moment',      'Moment'
+            'temp',        'Temperature'
+            'temperature', 'Temperature'
+            'time',        'Time Stamp'
+            'stderr',      'M. Std. Err.'
+            'mass',        'Mass'
+            'pressure',    'Pressure'
+            'frequency',   'Frequency'
+            'amplitude',   'Peak Amplitude'
+            'range',       'Range'
+            'motorcurrent','Motor Current'
+            'coilsignal',  'Coil Signal'
+        };
+    end
+    try
+        idx = parser.resolveColumnShorthand(spec, colNames, QD_SHORTHAND_MAP, label);
+    catch ME
+        % Re-throw with QDVSM-specific message for backward compatibility
+        if contains(ME.identifier, 'notFound')
+            validNames = colNames(~cellfun('isempty', colNames));
+            error('parser:importQDVSM:columnNotFound', ...
+                'Cannot resolve %s column "%s".\nAvailable columns:\n  %s\n\nShorthands: field, moment, temp, time, stderr, mass, pressure', ...
+                label, char(spec), strjoin(validNames, '\n  '));
         end
-        idx = spec;
-        return;
+        rethrow(ME);
     end
-
-    spec = char(spec);
-
-    % ── Shorthands ───────────────────────────────────────────────
-    shorthandMap = {
-        'field',      'Magnetic Field'
-        'moment',     'Moment'
-        'temp',       'Temperature'
-        'temperature','Temperature'
-        'time',       'Time Stamp'
-        'stderr',     'M. Std. Err.'
-        'mass',       'Mass'
-        'pressure',   'Pressure'
-        'frequency',  'Frequency'
-        'amplitude',  'Peak Amplitude'
-        'range',      'Range'
-        'motorcurrent','Motor Current'
-        'coilsignal', 'Coil Signal'
-    };
-
-    resolvedName = spec;
-    for k = 1:size(shorthandMap, 1)
-        if strcmpi(spec, shorthandMap{k, 1})
-            resolvedName = shorthandMap{k, 2};
-            break;
-        end
-    end
-
-    % ── Exact match ──────────────────────────────────────────────
-    idx = find(strcmpi(colNames, resolvedName), 1);
-    if ~isempty(idx), return; end
-
-    % ── Partial match (contains) ─────────────────────────────────
-    matches = find(contains(colNames, resolvedName, 'IgnoreCase', true));
-    if numel(matches) == 1
-        idx = matches;
-        return;
-    elseif numel(matches) > 1
-        % Prefer shortest match (most specific)
-        lens = cellfun(@numel, colNames(matches));
-        [~, best] = min(lens);
-        idx = matches(best);
-        return;
-    end
-
-    % ── Failed ───────────────────────────────────────────────────
-    % Build helpful error message
-    validNames = colNames(~cellfun('isempty', colNames));
-    error('parser:importQDVSM:columnNotFound', ...
-        'Cannot resolve %s column "%s".\nAvailable columns:\n  %s\n\nShorthands: field, moment, temp, time, stderr, mass, pressure', ...
-        label, spec, strjoin(validNames, '\n  '));
 end

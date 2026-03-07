@@ -236,9 +236,10 @@ function data = parseBRML(filepath, options)
     % ════════════════════════════════════════════════════════════════════════
     %  10. Assemble output struct
     % ════════════════════════════════════════════════════════════════════════
-    meta.source       = char(filepath);
-    meta.importDate   = datetime('now');
-    meta.parserName   = 'importBruker';
+    meta.source        = char(filepath);
+    meta.importDate    = datetime('now');
+    meta.parserName    = 'importBruker';
+    meta.parserVersion = '1.0';
     meta.xColumnName  = '2-Theta';
     meta.xColumnUnit  = 'deg';
     % Note: geometry parameters are stored in parserSpecific (canonical schema compliance)
@@ -403,9 +404,10 @@ function data = parseRawBinary(filepath, options)
             end
 
             % Assemble output
-            meta.source       = char(filepath);
-            meta.importDate   = datetime('now');
-            meta.parserName   = 'importBruker';
+            meta.source        = char(filepath);
+            meta.importDate    = datetime('now');
+            meta.parserName    = 'importBruker';
+            meta.parserVersion = '1.0';
             meta.xColumnName  = '2-Theta';
             meta.xColumnUnit  = 'deg';
             % Note: geometry parameters are stored in parserSpecific (canonical schema compliance)
