@@ -441,6 +441,14 @@ fig.UserData = struct('appData', appData, 'handles', handles);
         handles.lblStatus.Text = 'Converting...';
         drawnow;
 
+        % Create progress dialog
+        dlg = uiprogressdlg(fig, ...
+            'Title', 'Batch XRD Convert', ...
+            'Message', 'Starting...', ...
+            'Cancelable', 'on', ...
+            'Indeterminate', 'off');
+        cleanupDlg = onCleanup(@() closeIfValid(dlg));
+
         % Run batch conversion with progress callback
         try
             results = scripts.batchConvertXRD(selectedPaths, ...
@@ -449,7 +457,7 @@ fig.UserData = struct('appData', appData, 'handles', handles);
                 Intensity=intensity, ...
                 IncludeMetadata=handles.cbMetadata.Value, ...
                 Verbose=false, ...
-                ProgressFcn=@progressCallback);
+                ProgressFcn=@(k,n,f) progressCallback(k, n, f, dlg));
 
             % Count successes and failures
             nOk = sum(cellfun(@isempty, {results.error}));
@@ -463,9 +471,14 @@ fig.UserData = struct('appData', appData, 'handles', handles);
             end
 
         catch ME
-            handles.taLog.Value = [handles.taLog.Value, ...
-                sprintf('[ERROR] Conversion failed: %s\n', ME.message)];
-            handles.lblStatus.Text = 'Conversion failed';
+            % Check if error is due to user cancellation
+            if ~contains(ME.message, 'cancelled')
+                handles.taLog.Value = [handles.taLog.Value, ...
+                    sprintf('[ERROR] Conversion failed: %s\n', ME.message)];
+                handles.lblStatus.Text = 'Conversion failed';
+            else
+                handles.lblStatus.Text = 'Conversion cancelled by user';
+            end
         end
 
         % Re-enable controls
@@ -481,11 +494,24 @@ fig.UserData = struct('appData', appData, 'handles', handles);
 % CALLBACK: Progress function (called from batchConvertXRD)
 % ════════════════════════════════════════════════════════════════════════
 
-    function progressCallback(k, n, filename)
-        % This is called by batchConvertXRD; need to check if file succeeded or errored
-        % For now, just show filename being processed
-        logLine = sprintf('Processing %d/%d: %s', k, n, filename);
+    function progressCallback(k, n, filename, dlg)
+        % Update progress bar and log
+        if isvalid(dlg)
+            pct = round(100 * k / n);
+            dlg.Value = k / n;
+            dlg.Message = sprintf('[%d/%d]  %s', k, n, filename);
+
+            % Check for user cancellation
+            if dlg.CancelRequested
+                error('xrdConvertGUI:cancelled', 'Conversion cancelled by user.');
+            end
+        end
+
+        % Update log text area and status label
+        logLine = sprintf('[%d/%d] %s', k, n, filename);
         handles.taLog.Value = [handles.taLog.Value, logLine, newline];
+        pct = round(100 * k / n);
+        handles.lblStatus.Text = sprintf('Converting: %d/%d  (%d%%)', k, n, pct);
         drawnow;
     end
 
@@ -529,5 +555,15 @@ function str = onoff(bool)
         str = 'on';
     else
         str = 'off';
+    end
+end
+
+% ════════════════════════════════════════════════════════════════════════
+% UTILITY: Safely close a progress dialog if it's still valid
+% ════════════════════════════════════════════════════════════════════════
+
+function closeIfValid(dlg)
+    if isvalid(dlg)
+        close(dlg);
     end
 end

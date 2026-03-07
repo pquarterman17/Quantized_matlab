@@ -67,6 +67,17 @@ function data = importRigaku_raw(filepath, options)
         options.AllowPartialImport  (1,1) logical = false
     end
 
+    % ─ Rigaku SmartLab binary format constants (1-indexed byte offsets) ─
+    RGK_MAGIC          = 1:2;           % magic identifier "FI"
+    RGK_COUNTING_TIME  = 2959:2962;     % float32: counting time per step (s)
+    RGK_START_ANGLE    = 2963:2966;     % float32: starting 2θ (degrees)
+    RGK_END_ANGLE      = 2967:2970;     % float32: ending 2θ (degrees)
+    RGK_STEP_SIZE      = 2971:2974;     % float32: angular step size (degrees)
+    RGK_NUM_POINTS     = 3155:3158;     % uint32:  number of data points
+    RGK_HEADER_SIZE    = 3158;          % total header bytes before data
+    RGK_DATA_START     = 3159;          % first byte of intensity float32 array
+    RGK_MIN_FILE_SIZE  = 3162;          % minimum valid file: header + 1 float32
+
     % ════════════════════════════════════════════════════════════════
     %  STEP 1: Read binary file
     % ════════════════════════════════════════════════════════════════
@@ -82,13 +93,13 @@ function data = importRigaku_raw(filepath, options)
     % ════════════════════════════════════════════════════════════════
     %  STEP 2: Validate format
     % ════════════════════════════════════════════════════════════════
-    if nBytes < 3162   % 3158-byte header + at least one float32 (4 bytes)
+    if nBytes < RGK_MIN_FILE_SIZE   % 3158-byte header + at least one float32 (4 bytes)
         error('parser:importRigaku_raw:fileTooSmall', ...
             'File too small to be a valid Rigaku SmartLab .raw (%d bytes): %s', ...
             nBytes, filepath);
     end
 
-    magic = char(raw(1:2)');
+    magic = char(raw(RGK_MAGIC)');
     if ~strcmp(magic, 'FI')
         error('parser:importRigaku_raw:badMagic', ...
             ['Unrecognised magic bytes "%s" (expected "FI").\n' ...
@@ -98,11 +109,11 @@ function data = importRigaku_raw(filepath, options)
     % ════════════════════════════════════════════════════════════════
     %  STEP 3: Extract header parameters  (all offsets are 1-indexed)
     % ════════════════════════════════════════════════════════════════
-    countingTime = double(typecast(raw(2959:2962), 'single'));
-    startAngle   = double(typecast(raw(2963:2966), 'single'));
-    endAngle     = double(typecast(raw(2967:2970), 'single'));
-    stepSize     = double(typecast(raw(2971:2974), 'single'));
-    numPoints    = double(typecast(raw(3155:3158), 'uint32'));
+    countingTime = double(typecast(raw(RGK_COUNTING_TIME), 'single'));
+    startAngle   = double(typecast(raw(RGK_START_ANGLE), 'single'));
+    endAngle     = double(typecast(raw(RGK_END_ANGLE), 'single'));
+    stepSize     = double(typecast(raw(RGK_STEP_SIZE), 'single'));
+    numPoints    = double(typecast(raw(RGK_NUM_POINTS), 'uint32'));
 
     % Guard against nonsensical header values
     if stepSize == 0
@@ -118,7 +129,7 @@ function data = importRigaku_raw(filepath, options)
     end
 
     % ── Validate numPoints against bytes actually present ─────────────
-    nAvail = floor((nBytes - 3158) / 4);   % complete float32 words after header
+    nAvail = floor((nBytes - RGK_HEADER_SIZE) / 4);   % complete float32 words after header
     if numPoints == 0 || numPoints > nAvail
         if nAvail == 0
             error('parser:importRigaku_raw:noData', ...
@@ -133,7 +144,7 @@ function data = importRigaku_raw(filepath, options)
     % ── Detect multi-range files ──────────────────────────────────────
     % After the first range's data block, any remaining bytes indicate
     % additional scan ranges. By default, error on multi-range detection.
-    firstRangeEnd = 3158 + numPoints * 4;
+    firstRangeEnd = RGK_HEADER_SIZE + numPoints * 4;
     if nBytes > firstRangeEnd + 3
         if options.AllowPartialImport
             % User opted in: warn and continue with first range only
@@ -155,9 +166,9 @@ function data = importRigaku_raw(filepath, options)
     end
 
     % ════════════════════════════════════════════════════════════════
-    %  STEP 4: Read intensity data (float32, contiguous from byte 3159)
+    %  STEP 4: Read intensity data (float32, contiguous from byte RGK_DATA_START)
     % ════════════════════════════════════════════════════════════════
-    dataBytes   = raw(3159 : 3158 + numPoints*4);
+    dataBytes   = raw(RGK_DATA_START : RGK_HEADER_SIZE + numPoints*4);
     intensities = double(typecast(dataBytes, 'single'));
 
     % ════════════════════════════════════════════════════════════════

@@ -119,20 +119,29 @@ function data = importCSV(filepath, options)
     dataRows = tokens(dataStartRow:end);
     numRows = numel(dataRows);
 
-    rawMatrix = NaN(numRows, numCols);
+    % Build a padded 2D cell array of all tokens; trim whitespace
+    allTokens = cell(numRows, numCols);
     rawText   = cell(numRows, numCols);   % keep text for datetime parsing
     for r = 1:numRows
         row = dataRows{r};
         nCols = min(numel(row), numCols);
         for c = 1:nCols
             val = strtrim(row{c});
-            rawText{r,c} = val;
-            num = str2double(val);
-            if ~isnan(num)
-                rawMatrix(r,c) = num;
-            elseif isempty(val) || strcmpi(val, 'nan') || ...
-                   strcmpi(val, 'na') || strcmpi(val, '-') || ...
-                   strcmpi(val, 'n/a')
+            allTokens{r,c} = val;
+            rawText{r,c}   = val;
+        end
+    end
+
+    % Vectorized str2double call on the entire matrix
+    rawMatrix = str2double(allTokens);
+
+    % Post-process NaN patterns: treat empties, 'nan', 'na', '-', 'n/a' as NaN
+    for r = 1:numRows
+        for c = 1:numCols
+            val = rawText{r,c};
+            if isempty(val) || strcmpi(val, 'nan') || ...
+               strcmpi(val, 'na') || strcmpi(val, '-') || ...
+               strcmpi(val, 'n/a')
                 rawMatrix(r,c) = NaN;
             end
         end
@@ -250,27 +259,18 @@ end
 
 function rawLines = readRawLines(filepath, commentChars)
 %READRAWLINES Read file, strip blank and comment lines.
-    fid = fopen(filepath, 'r');
-    cleanObj = onCleanup(@() fclose(fid));
-    allLines = {};
-    while ~feof(fid)
-        line = fgetl(fid);
-        if ~ischar(line), continue; end
-        stripped = strtrim(line);
-        if isempty(stripped), continue; end
-        % Skip comment lines
-        isComment = false;
-        for c = 1:strlength(commentChars)
-            if stripped(1) == extract(commentChars, c)
-                isComment = true;
-                break;
-            end
-        end
-        if ~isComment
-            allLines{end+1} = stripped; %#ok<AGROW>
-        end
+    % Use readlines() for vectorized I/O (R2020b+) — much faster than fgetl loop
+    allLines = readlines(filepath);
+    allLines = strtrim(allLines);                    % vectorized trim
+
+    % Build mask for non-blank, non-comment lines
+    mask = allLines ~= "";
+    for c = 1:strlength(commentChars)
+        cc = extract(commentChars, c);
+        mask = mask & ~startsWith(allLines, cc);
     end
-    rawLines = allLines(:);
+
+    rawLines = cellstr(allLines(mask));             % convert to cell for compatibility
 end
 
 

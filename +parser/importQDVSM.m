@@ -104,19 +104,8 @@ function data = importQDVSM(filepath, options)
     % ════════════════════════════════════════════════════════════════
     %  STEP 1: Read entire file
     % ════════════════════════════════════════════════════════════════
-    fid = fopen(filepath, 'r');
-    if fid == -1
-        error('parser:importQDVSM:cannotOpen', 'Cannot open file: %s', filepath);
-    end
-    cleanObj = onCleanup(@() fclose(fid));
-
-    rawLines = {};
-    while ~feof(fid)
-        line = fgetl(fid);
-        if ischar(line)
-            rawLines{end+1} = line; %#ok<AGROW>
-        end
-    end
+    % Use readlines() for vectorized I/O (R2020b+) — much faster than fgetl loop
+    rawLines = cellstr(readlines(filepath));
 
     % ════════════════════════════════════════════════════════════════
     %  STEP 2: Parse [Header] and locate [Data]
@@ -215,9 +204,10 @@ function data = importQDVSM(filepath, options)
     dataLines = rawLines(dataStartLine+1 : end);
     numRows = numel(dataLines);
 
-    rawMatrix = NaN(numRows, numCols);
     validRows = true(numRows, 1);
 
+    % Build a padded 2D cell array of all tokens; trim whitespace
+    allTokens = cell(numRows, numCols);
     for r = 1:numRows
         line = dataLines{r};
         if isempty(strtrim(line))
@@ -225,15 +215,14 @@ function data = importQDVSM(filepath, options)
             continue;
         end
         parts = strsplit(line, ',', 'CollapseDelimiters', false);
-        nCols = min(numel(parts), numCols);
-        for c = 1:nCols
-            val = strtrim(parts{c});
-            if ~isempty(val)
-                num = str2double(val);
-                rawMatrix(r, c) = num;  % NaN if non-numeric
-            end
+        nCols_row = min(numel(parts), numCols);
+        for c = 1:nCols_row
+            allTokens{r,c} = strtrim(parts{c});
         end
     end
+
+    % Vectorized str2double call on the entire matrix
+    rawMatrix = str2double(allTokens);
 
     % Remove completely empty rows
     rawMatrix = rawMatrix(validRows, :);

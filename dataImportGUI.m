@@ -65,6 +65,10 @@ function dataImportGUI()
     appData.listDragActive    = false; % true once mouse has moved > threshold after listbox down
     appData.listDragStartPt   = [];   % [x y] fig-pixel position at listbox mouse-down
     appData.searchFilter      = '';   % dataset list search string (empty = show all)
+    % ── Line caching for performance (soft-update path for color/visibility) ──
+    appData.lineCache.valid   = false; % false = cache stale, use full redraw
+    appData.lineCache.left    = {};    % {nDS × nY} line handles (left axis)
+    appData.lineCache.right   = {};    % {nDS × nY2} line handles (right axis)
 
     % ── Figure ───────────────────────────────────────────────────────────
     fig = uifigure('Name','Data Import & Preview', ...
@@ -1299,7 +1303,7 @@ function dataImportGUI()
         ds       = appData.datasets{appData.activeIdx};
         ds.color = ddDatasetColor.Value;   % [] = Auto; [r g b] = named colour
         appData.datasets{appData.activeIdx} = ds;
-        onPlot([],[]);
+        softUpdateLines();  % Fast path: update only colors/visibility
     end
 
     function onLegendNameChanged(~,~)
@@ -3150,8 +3154,8 @@ function dataImportGUI()
             btnToggleVis.Text = 'Show Dataset';
         end
 
-        % Refresh plot
-        onPlot([],[]);
+        % Refresh plot — use soft-update for instant visibility toggle
+        softUpdateLines();
     end
 
     function onSmoothingChanged(~,~)
@@ -4097,8 +4101,83 @@ function dataImportGUI()
 
     % ── Plot callbacks ────────────────────────────────────────────────────
 
+    function softUpdateLines()
+    % SOFTUPDATELINES  Update line colors and visibility without full redraw.
+    %   Fast path for color/visibility changes that only need property updates
+    %   on existing line handles. Falls back to full redraw if cache is invalid.
+        if ~appData.lineCache.valid
+            % Cache stale — fall back to full redraw
+            onPlot([],[]);
+            return;
+        end
+
+        nDS = numel(appData.datasets);
+
+        % Update left-axis lines (color and visibility)
+        for di = 1:nDS
+            ds = appData.datasets{di};
+            vis = 'on';
+            if isfield(ds, 'visible') && ~ds.visible
+                vis = 'off';
+            end
+            col = ds.color;  % per-dataset color override ([] = Auto)
+
+            % Iterate over cached left-axis lines for this dataset
+            for k = 1:size(appData.lineCache.left, 2)
+                if di <= size(appData.lineCache.left, 1)
+                    h = appData.lineCache.left{di, k};
+                    if isvalid(h)
+                        h.Visible = vis;
+                        % Color: use override if present, otherwise keep current
+                        if ~isempty(col)
+                            h.Color = col;
+                        end
+                    else
+                        % Line handle is invalid — cache is stale
+                        appData.lineCache.valid = false;
+                        onPlot([],[]);
+                        return;
+                    end
+                end
+            end
+        end
+
+        % Update right-axis lines (color and visibility)
+        for di = 1:nDS
+            ds = appData.datasets{di};
+            vis = 'on';
+            if isfield(ds, 'visible') && ~ds.visible
+                vis = 'off';
+            end
+            colR = ds.colorR;  % per-dataset right-axis color override ([] = Auto)
+
+            % Iterate over cached right-axis lines for this dataset
+            for k = 1:size(appData.lineCache.right, 2)
+                if di <= size(appData.lineCache.right, 1)
+                    h = appData.lineCache.right{di, k};
+                    if isvalid(h)
+                        h.Visible = vis;
+                        % Color: use override if present
+                        if ~isempty(colR)
+                            h.Color = colR;
+                        end
+                    else
+                        % Line handle is invalid — cache is stale
+                        appData.lineCache.valid = false;
+                        onPlot([],[]);
+                        return;
+                    end
+                end
+            end
+        end
+
+        drawnow limitrate;  % lightweight update
+    end
+
     function onPlot(~,~)
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        % Invalidate line cache on full redraw — cache will be rebuilt by drawToAxes
+        appData.lineCache.valid = false;
         drawToAxes(ax);
     end
 
@@ -4958,6 +5037,62 @@ function dataImportGUI()
                     hold(targetAx, 'off');
                 end
             end
+
+            % ── Cache line handles for soft-update performance ────────────────
+            % Collect all line handles from the axes and organize by dataset/axis
+            % This enables fast color/visibility updates without full redraws.
+            allLines = findobj(targetAx, 'Type', 'line');
+            nDS      = numel(appData.datasets);
+
+            % Initialize cache
+            appData.lineCache.left  = cell(nDS, max(nY, 1));
+            appData.lineCache.right = cell(nDS, max(nY2, 1));
+            appData.lineCache.valid = false;  % conservative: mark as invalid until verified
+
+            % Attempt to map lines to datasets by iterating through allLines and counting
+            % Left-axis lines first, then right-axis lines (if any).
+            % This is a heuristic based on order of creation in drawToAxes.
+            lineIdx = 1;
+            for di = 1:nDS
+                ds = appData.datasets{di};
+                if isfield(ds, 'visible') && ~ds.visible
+                    continue;  % skip invisible datasets
+                end
+                if isfield(ds, 'hiddenForAsymmetry') && ds.hiddenForAsymmetry
+                    continue;  % skip hidden datasets
+                end
+
+                % Count expected lines for this dataset (Y + Y2 channels)
+                for k = 1:nY
+                    if lineIdx <= numel(allLines)
+                        appData.lineCache.left{di, k} = allLines(lineIdx);
+                        lineIdx = lineIdx + 1;
+                    end
+                end
+            end
+
+            % Right-axis lines (if Y2 is active)
+            if hasY2
+                for di = 1:nDS
+                    ds = appData.datasets{di};
+                    if isfield(ds, 'visible') && ~ds.visible
+                        continue;
+                    end
+                    if isfield(ds, 'hiddenForAsymmetry') && ds.hiddenForAsymmetry
+                        continue;
+                    end
+
+                    for k = 1:nY2
+                        if lineIdx <= numel(allLines)
+                            appData.lineCache.right{di, k} = allLines(lineIdx);
+                            lineIdx = lineIdx + 1;
+                        end
+                    end
+                end
+            end
+
+            % Mark cache as valid (soft-update is now possible)
+            appData.lineCache.valid = true;
 
         catch ME
             fprintf(2, '\n[dataImportGUI] Plot error: %s\n', ME.message);
