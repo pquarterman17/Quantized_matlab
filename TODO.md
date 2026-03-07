@@ -202,21 +202,46 @@ impl# TODO — thin_film_toolkit_matlab
 
 ---
 
-## Code Quality Scan — 2026-03-07
+## Code Quality Scan — 2026-03-07 — **PRIORITY 1 COMPLETE** ✓
 
 Comprehensive automated scan of codebase identified **22 issues** across error handling, test coverage, documentation, performance, and architecture. See detailed analysis below.
 
-### Priority 1: Critical Fixes (Est. 17 hrs) — **COMPLETE** ✓
+### Priority 1: Critical Fixes — **COMPLETE ✓ (2026-03-07, 5 hrs)**
 
-- [x] **#1: Fix dual dispatcher bug** — Created `+parser/resolveParser.m` as centralized dispatcher for extension→parser mapping + magic-byte detection. Updated `importAuto.m` and `guiImport()` to use it. Now `.brml` and `.raw` magic-byte detection work in both paths. **COMPLETE**
+**Status:** All 5 critical items completed. Commit: c7be785
 
-- [x] **#2: Add error logging to silent catch blocks** — Added `warning()` calls to silent catch blocks in `importCSV.m`, `importExcel.m`, `importXRDML.m`. Tracks parse failures with counters, emits one warning per operation. **COMPLETE**
+- [x] **#1: Fix dual dispatcher bug** — **COMPLETE**
+  - Created `+parser/resolveParser.m`: centralized dispatcher with magic-byte detection
+  - Refactored `importAuto.m` and `guiImport()` to use `resolveParser`
+  - Now `.brml` works in GUI (was missing), `.raw` magic-byte detection in both paths
+  - Prevents future dispatcher divergence
+  - Files: `+parser/resolveParser.m` (NEW), `importAuto.m`, `guiImport()`
 
-- [x] **#3: Create parser edge-case test suite** — Built `test_parsers_edge_cases.m` with 10 comprehensive edge case tests: empty files, truncated binaries, inconsistent columns, multi-range detection, magic-byte detection, datetime parse failures. **COMPLETE**
+- [x] **#2: Add error logging to silent catch blocks** — **COMPLETE**
+  - Added `warning()` calls to datetime parse failures
+  - Pattern: count failures with counter, emit single warning after loop
+  - Updated: `importCSV.m` (lines ~415-439), `importExcel.m` (lines ~380-397), `importXRDML.m` (lines ~132, 266-278)
+  - Improves debuggability; reduces silent data loss
 
-- [x] **#4: Standardize metadata schema** — Enforced canonical schema across all 14 parsers. All now have: `source` (filepath), `importDate`, `parserName`, `xColumnName`, `xColumnUnit`, `parserSpecific` (instrument-specific). Updated NCNR*, LakeShore, MPMS, XRDML, Bruker parsers. **COMPLETE**
+- [x] **#3: Create parser edge-case test suite** — **COMPLETE**
+  - Built `test_parsers_edge_cases.m`: 10 comprehensive tests
+  - Coverage: empty files, truncated binaries, inconsistent columns, ragged arrays
+  - Tests: multi-range detection, magic-byte detection, unknown extensions, missing files, datetime failures
+  - File: `test_parsers_edge_cases.m` (NEW)
 
-- [x] **#5: Convert multi-range XRD warning to error** — Added `AllowPartialImport` parameter to `importRigaku_raw.m`. Default=false: error on multi-range. True: warn (user opt-in). Updated docstring with Limitations section. **COMPLETE**
+- [x] **#4: Standardize metadata schema** — **COMPLETE**
+  - Canonical schema across all 14 parsers: `source`, `importDate`, `parserName`, `xColumnName`, `xColumnUnit`, `parserSpecific`
+  - Updated: `importNCNRRefl.m`, `importNCNRPNR.m`, `importNCNRDat.m` (added xColumnUnit, moved dataSource)
+  - Updated: `importLakeShore.m`, `importMPMS.m` (moved instrumentType to parserSpecific)
+  - Updated: `importXRDML.m`, `importBruker.m` (moved geometry fields to parserSpecific)
+  - All parsers now follow consistent schema
+
+- [x] **#5: Convert multi-range XRD warning to error** — **COMPLETE**
+  - Added `AllowPartialImport` parameter to `importRigaku_raw.m` (default=false)
+  - Default: error on multi-range detection (prevents silent data loss)
+  - AllowPartialImport=true: warn and proceed (user opt-in)
+  - Updated docstring with Limitations section and examples
+  - File: `+parser/importRigaku_raw.m`
 
 ### Priority 2: Test & Validation (Est. 12 hrs)
 
@@ -279,11 +304,22 @@ Comprehensive automated scan of codebase identified **22 issues** across error h
 
 ### Summary
 
-| Category | High | Medium | Total |
-|----------|------|--------|-------|
-| Code Quality | 7 | 15 | **22** |
-| **Est. Effort** | **Priority 1-3: ~35 hrs** | **Priority 4+: ~15 hrs** | **~50 hrs total** |
+| Status | Category | Count | Effort |
+|--------|----------|-------|--------|
+| ✓ **DONE** | Priority 1 (Critical) | 5/5 | **5 hrs** |
+| — TODO | Priority 2 (Testing) | 3/3 | 12 hrs |
+| — TODO | Priority 3 (Docs) | 4/4 | 6 hrs |
+| — TODO | Priority 4 (Perf) | 4/4 | 10 hrs |
+| — TODO | Backlog (Architecture) | 6/6 | 9 hrs |
+| **TOTAL** | Code Quality Issues | **22** | **42 hrs remaining** |
 
-**Recommended next step:** Start with Priority 1 items (#1, #2, #5) — quick wins that prevent architectural debt and silent failures.
+**Completed 2026-03-07:** Priority 1 critical fixes (5 hrs)
+- Fixed dispatcher divergence (resolveParser.m)
+- Added error logging to silent catches
+- Created edge-case test suite
+- Standardized metadata schema across all 14 parsers
+- Converted multi-range warnings to errors with opt-out
+
+**Next priority:** Priority 2 (Test & Validation) — automated GUI test harness and round-trip export tests
 
 
