@@ -1,46 +1,229 @@
 function api = dataImportGUI()
 %DATAIMPORTGUI  Browse, import and preview data files using the +parser toolkit.
 %
+% ── Syntax ────────────────────────────────────────────────────────────────
+%
+%   dataImportGUI()
 %   api = dataImportGUI()
 %
-%   Returns an API struct for programmatic access to the GUI. Fields:
-%   - fig              — figure handle
-%   - addFiles(fpaths) — load files from cell array of file paths
-%   - getDatasets()    — retrieve all loaded datasets
-%   - getActiveIdx()   — get currently active dataset index (0 if none)
-%   - setActiveIdx(idx) — set active dataset (1-based index)
-%   - setCorrections(xOff, yOff, bgSlope, bgInt) — set correction widget values
-%   - applyCorrections() — apply corrections to active dataset
-%   - getPeaks()       — get peak struct array from active dataset
-%   - undoCorrections() — undo corrections on active dataset
-%   - autoPeaks()      — auto-detect peaks in active dataset
-%   - fitPeaks()       — fit detected peaks
-%   - saveSession(outPath) — save session to .mat file
-%   - loadSession(matPath) — load session from .mat file
-%   - close()          — close the figure
+% ── Supported File Formats ────────────────────────────────────────────────
 %
-%   Opens an interactive figure with:
-%     - Multi-file import: add several files at once; each becomes a named dataset
-%     - Auto-detection of the correct parser (same logic as parser.importAuto)
-%     - X / Y channel selectors -- Y supports multi-select for overlay plots
-%     - Line, Scatter, and Line+Markers plot styles
-%     - Log-scale toggles for both axes
-%     - Metadata summary panel (shows the active dataset)
-%     - Analysis & Corrections: X/Y offset, linear background subtraction
-%     - Raw + corrected overlay plotting (raw in desaturated pastel, corrected in full colour)
-%     - Save corrected data to CSV
-%     - Export to a standard MATLAB figure for publication-quality editing
+%   Extension(s)          Parser              Instrument / Format
+%   ─────────────────     ──────────────────  ───────────────────────────────
+%   .xrdml                importXRDML         PANalytical / Malvern Empyrean
+%   .brml                 importBruker        Bruker D8/D2 (ZIP+XML)
+%   .raw  (magic "FI")    importRigaku_raw    Rigaku SmartLab binary
+%   .raw  (magic RAW1.01) importBruker        Bruker binary v3
+%   .dat  ([Header])      importQDVSM         Quantum Design VSM / DynaCool
+%   .dat  (plain CSV)     importPPMS          Quantum Design PPMS legacy
+%   .dat  (MPMS SQUID)    importMPMS          Quantum Design MPMS
+%   .dat  (Lake Shore)    importLakeShore     Lake Shore VSM / cryostat
+%   .refl                 importNCNRRefl      NCNR neutron reflectometry
+%   .pnr                  importNCNRPNR       NCNR polarized neutron refl.
+%   .datA/.datB/.datC/.datD  importNCNRDat   refl1d fit output
+%   .csv / .tsv / .txt    importCSV           Generic delimited text
+%   .xlsx / .xls / .ods   importExcel         Spreadsheet
 %
-%   All loaded datasets are overlaid on the same axes.  Click a dataset in
-%   the list to make it active — channel selectors and corrections then apply
-%   to that file only.  Remove a file with the "Remove Selected" button.
+%   Auto-detection priority:
+%     1. Magic bytes  (.raw: first 7 bytes → Rigaku or Bruker)
+%     2. Extension    (all others above)
+%     3. Content      (.dat: [Header]/[Data] markers → importQDVSM)
 %
-%   Run from the project root:
-%       cd G:\Onedrive\Coding\git\thin_film_toolkit_matlab
-%       dataImportGUI
+% ── GUI Overview ──────────────────────────────────────────────────────────
 %
-%   See also parser.importAuto, parser.importRigaku_raw, parser.importPPMS,
-%            parser.importCSV, parser.importExcel, parser.importQDVSM
+%   All loaded datasets are overlaid on the same axes.  Click a row in the
+%   dataset list to make it active — channel selectors, corrections, and
+%   peak tools then operate on that file only.
+%
+%   Toolbar (top):
+%     Add Files / Drop files onto window  — loads one or more files at once
+%     Dataset list (left panel)           — shows badge [XRD]/[MAG]/[NR]/…,
+%                                           legend name, search/filter box
+%     X / Y / Y2 channel dropdowns        — select columns to plot
+%     Log X / Log Y                       — toggle log scale per axis
+%     Plot style                          — Line | Scatter | Line+Markers
+%     Waterfall offset                    — stacked view for series data
+%     Colormap                            — auto-color datasets from a map
+%
+%   Corrections panel (left):
+%     X Offset / Y Offset                 — rigid shift applied before plot
+%     Background slope / intercept        — linear BG subtraction
+%     Background file                     — subtract a separate reference file
+%     Smoothing (moving average)
+%     Normalization                       — None / Peak / Area / Z-score
+%     Data trim (X min / X max)           — crop scan edges
+%     Correction style dropdown           — selects parser-aware defaults
+%     Apply / Reset / Undo
+%     Apply to All                        — copy corrections to every dataset
+%
+%   Peak tools panel (right, XRD only):
+%     Auto-detect peaks (prominence threshold)
+%     Manual add / remove
+%     Fit All (Lorentzian or Gaussian)
+%     Fit All Together (simultaneous multi-peak fit)
+%     Peak table: Center / FWHM / Height / Area / Status
+%     Export peak summary CSV / XLSX
+%
+%   Axes & Appearance panel:
+%     X / Y / Y2 limits (manual or auto)
+%     Tick notation (auto / sci / engineering / exp=0)
+%     Custom axis labels / title
+%     Legend names per dataset
+%     Color pickers (left and right axes)
+%     Save figure (PNG/TIFF 300 dpi, PDF/SVG vector)
+%
+%   Save panel:
+%     Save corrected CSV / batch export all datasets
+%     Copy data to clipboard
+%     Export to MATLAB figure
+%     Batch Convert XRD (opens xrdConvertGUI)
+%
+% ── Programmatic API ──────────────────────────────────────────────────────
+%
+%   api = dataImportGUI() returns a struct of function handles for
+%   automated testing and scripting.  All handles share the same closure
+%   as the GUI, so they see live appData.
+%
+%   api.fig                    — figure handle
+%   api.addFiles(fpaths)       — load a cell array of file paths
+%   api.getDatasets()          — return cell array of dataset structs
+%   api.getActiveIdx()         — active dataset index (0 when none loaded)
+%   api.setActiveIdx(idx)      — switch active dataset (1-based)
+%   api.setCorrections(xOff, yOff, bgSlope, bgInt)
+%                              — write correction widget values
+%   api.applyCorrections()     — run onApplyCorrections on active dataset
+%   api.applyCorrectionsAll()  — apply same corrections to every dataset
+%   api.undoCorrections()      — restore pre-correction state
+%   api.autoPeaks()            — run auto peak detection
+%   api.fitPeaks()             — fit detected peaks individually
+%   api.getPeaks()             — return peaks struct from active dataset
+%   api.setDatasetVisible(idx, vis) — toggle dataset visibility
+%   api.saveSession(outPath)   — save session .mat (no dialog)
+%   api.loadSession(matPath)   — restore session .mat (no dialog)
+%   api.close()                — close figure
+%
+%   Headless usage (e.g. in test_gui_harness.m):
+%     api = dataImportGUI();
+%     api.fig.Visible = 'off';
+%     api.addFiles({'/path/to/scan.xrdml'});
+%     api.autoPeaks();
+%     peaks = api.getPeaks();
+%     api.close();
+%
+% ── Dataset Struct (appData.datasets{i}) ──────────────────────────────────
+%
+%   .data          — raw parsed data struct (from parser)
+%   .corrData      — corrected data ([] until Apply Corrections is clicked)
+%   .filepath      — full source file path
+%   .parserName    — parser that produced .data
+%   .displayName   — label shown in dataset list
+%   .legendName    — user-editable legend name ('' = use displayName)
+%   .xOff          — current X offset value
+%   .yOff          — current Y offset value
+%   .bgSlope       — background slope
+%   .bgInt         — background intercept
+%   .peaks         — struct array of detected/fitted peaks
+%   .visible       — boolean; false = excluded from plot
+%   .axLims        — per-dataset saved axis limits (restored on switch)
+%   .annotations   — cell array of {x, y, text} annotation structs
+%   .color         — [R G B] line color assigned from colormap
+%
+% ── Callback Flow (State Machine) ─────────────────────────────────────────
+%
+%   FILE LOADING
+%   ────────────
+%   onAddFiles / onDropFiles
+%     └─► loadFilePaths(fpaths)
+%           ├─ guiImport(fp)  [uses resolveParser → parser.*]
+%           ├─ buildDs(fp, data, parserName)
+%           ├─ appData.datasets{end+1} = ds
+%           └─► rebuildDatasetList()
+%                 └─► updateControlsForActiveDataset()
+%                       └─► onPlot()
+%                             └─► drawToAxes()
+%
+%   DATASET SELECTION
+%   ─────────────────
+%   lbDatasets.ValueChangedFcn → onSelectDataset()
+%     ├─ saveAxisLimsToActiveDataset()   [persist zoom before leaving]
+%     ├─ appData.activeIdx = new index
+%     └─► updateControlsForActiveDataset()
+%           ├─ populate efXOffset / efYOffset / …  from ds
+%           ├─ set ddCorrStyle, ddNormalize, ddX, lbY, lbY2
+%           ├─ applyParserAnalysisConfig(pName)
+%           │     [shows/hides panels based on parser type]
+%           └─► onPlot() → drawToAxes()
+%
+%   CORRECTIONS PIPELINE  (onApplyCorrections)
+%   ──────────────────────────────────────────
+%   Each step reads from ds.data (raw) or the previous step's output:
+%
+%     1. Trim (xTrimMin / xTrimMax)
+%     2. X offset  (time = time − xOff)
+%     3. Background subtraction  (file-based or slope+intercept)
+%     4. Y offset  (values = values + yOff)
+%     5. Normalization  (peak / area / z-score)
+%     6. Smoothing  (moving average)
+%     7. Spin asymmetry  (neutron NR only: (up−down)/(up+down))
+%
+%   Result stored in ds.corrData.  drawToAxes() plots corrData when
+%   available, otherwise falls back to ds.data.
+%
+%   PEAK DETECTION / FITTING
+%   ────────────────────────
+%   onAutoPeak()
+%     ├─ Uses Signal Processing Toolbox findpeaks if available
+%     ├─ Falls back to simplePeakFind() (built-in only)
+%     └─ Populates ds.peaks struct array
+%
+%   onFitPeaks()  — fits each peak independently
+%   onFitAllPeaks() — fits all peaks simultaneously (sum-of-Lorentzians)
+%     Both use fminsearch with Lorentzian or Gaussian model.
+%     Results stored in ds.peaks(k).{center,fwhm,height,area,status}.
+%
+%   SESSION SAVE / LOAD
+%   ────────────────────
+%   onSaveSession() → saveSessionDirect(outPath)
+%     saves: appData.datasets (full structs), GUI widget state
+%
+%   onLoadSession() → loadSessionDirect(matPath)
+%     restores: datasets, corrections, peaks, axis limits, widget state
+%
+%   MOUSE / INTERACTION
+%   ────────────────────
+%   fig.WindowButtonDownFcn   = @onAxesButtonDown   (always active)
+%   fig.WindowButtonMotionFcn = @onMouseHover        (always active)
+%   Special modes (BG select, peak pick, annotation, pan-resize) override
+%   these temporarily and restore them on completion.
+%   Double-click detected via manual tic/toc (350 ms threshold).
+%
+%   RENDER CACHING
+%   ───────────────
+%   appData.lineCache stores line handles after each full drawToAxes() call.
+%   Color/visibility changes call softUpdateLines() instead of full redraw,
+%   updating handle properties directly for instant response with 50+ datasets.
+%   Cache is invalidated when data, axis selection, or scale changes.
+%
+% ── Invariants ────────────────────────────────────────────────────────────
+%
+%   • appData.activeIdx == 0  iff  appData.datasets is empty.
+%   • ds.corrData is []  until Apply Corrections is clicked; the plot
+%     always prefers corrData over data when it is non-empty.
+%   • The listbox lbDatasets.Items always mirrors appData.datasets (same
+%     order, same count) — maintained by rebuildDatasetList().
+%   • All widget writes to appData happen before any call to onPlot(),
+%     so drawToAxes() always sees a consistent state.
+%
+% ── Requirements ──────────────────────────────────────────────────────────
+%
+%   MATLAB R2021b+ (arguments blocks, uifigure, uilistbox Multiselect)
+%   No external toolboxes required.  Signal Processing Toolbox improves
+%   peak detection (findpeaks) but falls back gracefully without it.
+%
+% ── See Also ──────────────────────────────────────────────────────────────
+%
+%   parser.importAuto, parser.resolveParser, +parser/README.md,
+%   xrdConvertGUI, test_gui_harness
 
     % ── Shared application state ─────────────────────────────────────────
     % Each element of appData.datasets is a struct with fields:
