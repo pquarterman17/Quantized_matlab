@@ -205,14 +205,10 @@ fig.UserData = struct('appData', appData, 'handles', handles);
         end
 
         % Update UI
-        state = fig.UserData;
-        state.appData.folderPath = folderPath;
         handles.efFolderPath.Value = folderPath;
 
-        % Scan for XRD files
+        % Scan for XRD files (this updates fig.UserData with file paths)
         scanAndPopulateFileList(folderPath);
-
-        fig.UserData = state;
     end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -294,6 +290,7 @@ fig.UserData = struct('appData', appData, 'handles', handles);
         end
 
         % Update state
+        state.appData.folderPath = folderPath;
         state.appData.filePaths = filePaths;
         state.appData.fileTypes = fileTypes;
         fig.UserData = state;
@@ -405,9 +402,11 @@ fig.UserData = struct('appData', appData, 'handles', handles);
         % Verify array sizes match (safety check)
         if numel(allItems) ~= numel(allFilePaths)
             uialert(fig, ...
-                sprintf('Internal error: listbox items (%d) do not match file paths (%d)\nPlease reload the folder.', ...
+                sprintf(['Internal error: listbox items (%d) do not match file paths (%d).\n\n' ...
+                    'This suggests the file list was not properly loaded.\n' ...
+                    'Please click "Browse Folder..." again to reload.'], ...
                     numel(allItems), numel(allFilePaths)), ...
-                'Array Mismatch Error');
+                'File List Sync Error');
             return;
         end
 
