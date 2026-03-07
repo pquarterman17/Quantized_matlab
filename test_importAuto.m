@@ -1,9 +1,9 @@
 %TEST_IMPORTAUTO  Quick manual test of parser.importAuto dispatch.
 clear; clc;
 
-DAT1 = 'G:\Onedrive\Coding\Python\DataPlotting\2449_1B_IP.dat';
-DAT2 = 'G:\Onedrive\Coding\Python\DataPlotting\EDP140_PerpStraw.dat';
-RAW1 = 'G:\Onedrive\Work and School Research\NCNR Research\YIG_AF-Coupling-YabinFan\XRD\YIG_Py_S7.raw';
+ROOT = fileparts(mfilename('fullpath'));
+DAT1 = fullfile(ROOT, '+test_datasets', 'QuantumDesign', 'EDP136_Perp_StrawNew.dat');
+RAW1 = fullfile(ROOT, '+test_datasets', 'rigaku_sample.raw');
 
 passed = 0; failed = 0;
 
@@ -19,7 +19,7 @@ catch ME; fprintf('FAIL: %s\n', ME.message); failed = failed+1; end
 % ── PPMS legacy .dat (all channels) ──────────────────────────────
 fprintf('=== 2. PPMS legacy .dat (all channels) ===\n');
 try
-    d = parser.importAuto(DAT2, 'YAxis', 'all');
+    d = parser.importAuto(DAT1, 'YAxis', 'all');
     assert(size(d.values,2) > 5);
     passed = passed + 1;
 catch ME; fprintf('FAIL: %s\n', ME.message); failed = failed+1; end

@@ -1,7 +1,23 @@
-function dataImportGUI()
+function api = dataImportGUI()
 %DATAIMPORTGUI  Browse, import and preview data files using the +parser toolkit.
 %
-%   dataImportGUI()
+%   api = dataImportGUI()
+%
+%   Returns an API struct for programmatic access to the GUI. Fields:
+%   - fig              — figure handle
+%   - addFiles(fpaths) — load files from cell array of file paths
+%   - getDatasets()    — retrieve all loaded datasets
+%   - getActiveIdx()   — get currently active dataset index (0 if none)
+%   - setActiveIdx(idx) — set active dataset (1-based index)
+%   - setCorrections(xOff, yOff, bgSlope, bgInt) — set correction widget values
+%   - applyCorrections() — apply corrections to active dataset
+%   - getPeaks()       — get peak struct array from active dataset
+%   - undoCorrections() — undo corrections on active dataset
+%   - autoPeaks()      — auto-detect peaks in active dataset
+%   - fitPeaks()       — fit detected peaks
+%   - saveSession(outPath) — save session to .mat file
+%   - loadSession(matPath) — load session from .mat file
+%   - close()          — close the figure
 %
 %   Opens an interactive figure with:
 %     - Multi-file import: add several files at once; each becomes a named dataset
@@ -1028,6 +1044,26 @@ function dataImportGUI()
     clear dsi dropSurfaces;
 
     % ════════════════════════════════════════════════════════════════════
+    %  PROGRAMMATIC API (for automated testing / scripting)
+    % ════════════════════════════════════════════════════════════════════
+    api.fig                 = fig;
+    api.addFiles            = @addFilesDirect;
+    api.saveSession         = @saveSessionDirect;
+    api.loadSession         = @loadSessionDirect;
+    api.getDatasets         = @() appData.datasets;
+    api.getActiveIdx        = @() appData.activeIdx;
+    api.setActiveIdx        = @setActiveIdxDirect;
+    api.setCorrections      = @setCorrections;
+    api.applyCorrections    = @() onApplyCorrections([],[]);
+    api.applyCorrectionsAll = @() onApplyCorrectionsAll([],[]);
+    api.undoCorrections     = @() onUndoCorrections([],[]);
+    api.autoPeaks           = @() onAutoPeak([],[]);
+    api.fitPeaks            = @() onFitPeaks([],[]);
+    api.getPeaks            = @getPeaksDirect;
+    api.setDatasetVisible   = @setDatasetVisibleDirect;
+    api.close               = @() close(fig);
+
+    % ════════════════════════════════════════════════════════════════════
     %  NESTED CALLBACKS  (share appData + all control handles via closure)
     % ════════════════════════════════════════════════════════════════════
 
@@ -1177,6 +1213,130 @@ function dataImportGUI()
         cancelInteractions();
         rebuildDatasetList(true);
         updateControlsForActiveDataset();
+        onPlot([],[]);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  API HELPER FUNCTIONS
+    % ════════════════════════════════════════════════════════════════════
+
+    function addFilesDirect(fpaths)
+    %ADDFILESDIRECT  Load files from a cell array of paths (or normalizing string input).
+        if isstring(fpaths)
+            fpaths = cellstr(fpaths);
+        elseif ischar(fpaths)
+            fpaths = {fpaths};
+        end
+        loadFilePaths(fpaths);
+    end
+
+    function saveSessionDirect(outPath)
+    %SAVESESSIONDIRECT  Save session to .mat file (no dialog).
+        if nargin < 1 || isempty(outPath)
+            error('outPath required');
+        end
+
+        % Save datasets with all their state
+        savedDatasets = appData.datasets;
+
+        % Save GUI state
+        savedState = struct( ...
+            'colormap', ddColormap.Value, ...
+            'xCol', ddX.Value, ...
+            'yCol', lbY.Value, ...
+            'y2Col', lbY2.Value, ...
+            'logX', cbLogX.Value, ...
+            'logY', cbLogY.Value, ...
+            'logY2', cbLogY2.Value);
+
+        save(outPath, 'savedDatasets', 'savedState');
+    end
+
+    function loadSessionDirect(matPath)
+    %LOADSESSIONDIRECT  Load session from .mat file (no dialog).
+        if nargin < 1 || isempty(matPath)
+            error('matPath required');
+        end
+
+        if ~isfile(matPath)
+            error('Session file not found: %s', matPath);
+        end
+
+        s = load(matPath);
+        if ~isfield(s, 'savedDatasets')
+            error('Invalid session file: missing savedDatasets field');
+        end
+
+        % Restore datasets
+        appData.datasets = s.savedDatasets;
+        appData.activeIdx = 0;
+
+        % Restore GUI state if available
+        if isfield(s, 'savedState')
+            try
+                ddColormap.Value = s.savedState.colormap;
+                ddX.Value = s.savedState.xCol;
+                lbY.Value = s.savedState.yCol;
+                lbY2.Value = s.savedState.y2Col;
+                cbLogX.Value = s.savedState.logX;
+                cbLogY.Value = s.savedState.logY;
+                cbLogY2.Value = s.savedState.logY2;
+            catch
+                % Ignore state restoration errors; dataset structure is sufficient
+            end
+        end
+
+        cancelInteractions();
+        rebuildDatasetList(true);
+        if ~isempty(appData.datasets)
+            appData.activeIdx = 1;
+            updateControlsForActiveDataset();
+        end
+        onPlot([],[]);
+    end
+
+    function setActiveIdxDirect(idx)
+    %SETACTIVEIDXDIRECT  Set the active dataset by index (1-based).
+        assert(isnumeric(idx) && idx >= 1 && idx <= numel(appData.datasets), ...
+            'idx must be integer in range [1, %d]', numel(appData.datasets));
+        appData.activeIdx = idx;
+        updateControlsForActiveDataset();
+        onPlot([],[]);
+    end
+
+    function setCorrections(xOff, yOff, bgSlope, bgInt)
+    %SETCORRECTIONS  Set correction widget values (xOffset, yOffset, bgSlope, bgIntercept).
+        if nargin < 1, xOff = []; end
+        if nargin < 2, yOff = []; end
+        if nargin < 3, bgSlope = []; end
+        if nargin < 4, bgInt = []; end
+
+        if ~isempty(xOff),  efXOffset.Value = xOff; end
+        if ~isempty(yOff),  efYOffset.Value = yOff; end
+        if ~isempty(bgSlope), efBGSlope.Value = bgSlope; end
+        if ~isempty(bgInt),  efBGIntercept.Value = bgInt; end
+    end
+
+    function peaks = getPeaksDirect()
+    %GETPEAKSDIRECT  Return peaks from active dataset, or empty struct.
+        if appData.activeIdx == 0
+            peaks = struct.empty;
+        else
+            ds = appData.datasets{appData.activeIdx};
+            if isfield(ds, 'peaks') && ~isempty(ds.peaks)
+                peaks = ds.peaks;
+            else
+                peaks = struct.empty;
+            end
+        end
+    end
+
+    function setDatasetVisibleDirect(idx, vis)
+    %SETDATASETVISIBLEDDIRECT  Set visibility of dataset at index.
+        assert(isnumeric(idx) && idx >= 1 && idx <= numel(appData.datasets), ...
+            'idx out of range');
+        assert(islogical(vis) || isnumeric(vis), 'vis must be logical');
+        appData.datasets{idx}.visible = logical(vis);
         onPlot([],[]);
     end
 
