@@ -17,7 +17,15 @@
       "Bash(matlab:*)",
       "Bash(ls:*)",
       "Bash(git add:*)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(gh api:*)",
+      "Bash(where gh:*)",
+      "Bash(curl:*)",
+      "Bash(uv pip:*)",
+      "Bash(py:*)",
+      "Bash(python3:*)",
+      "Bash(python:*)",
+      "Bash(mkdir:*)"
     ]
   }
 }
