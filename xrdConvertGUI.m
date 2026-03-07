@@ -397,15 +397,37 @@ fig.UserData = struct('appData', appData, 'handles', handles);
         end
 
         % Map selected items back to file paths
+        % selectedItems contains the display strings; find corresponding file paths
         allItems = handles.lbFiles.Items;
+        allFilePaths = state.appData.filePaths;
         selectedPaths = {};
-        for i = 1:numel(allItems)
-            for j = 1:numel(selectedItems)
-                if strcmp(allItems{i}, selectedItems{j})
-                    selectedPaths{end+1} = state.appData.filePaths{i};
-                    break;
-                end
+
+        % Verify array sizes match (safety check)
+        if numel(allItems) ~= numel(allFilePaths)
+            uialert(fig, ...
+                sprintf('Internal error: listbox items (%d) do not match file paths (%d)\nPlease reload the folder.', ...
+                    numel(allItems), numel(allFilePaths)), ...
+                'Array Mismatch Error');
+            return;
+        end
+
+        % Build mapping: for each selected item, find its index and get corresponding path
+        for j = 1:numel(selectedItems)
+            selectedItem = selectedItems{j};
+            % Find this item in all items
+            itemIdx = find(strcmp(allItems, selectedItem), 1);
+            if ~isempty(itemIdx) && itemIdx <= numel(allFilePaths)
+                selectedPaths{end+1} = allFilePaths{itemIdx};
             end
+        end
+
+        % Verify we found all selected files
+        if numel(selectedPaths) ~= numel(selectedItems)
+            uialert(fig, ...
+                sprintf('Error: Only found %d/%d selected files. Please try again.', ...
+                    numel(selectedPaths), numel(selectedItems)), ...
+                'File Mapping Error');
+            return;
         end
 
         % Map dropdown values to option strings
