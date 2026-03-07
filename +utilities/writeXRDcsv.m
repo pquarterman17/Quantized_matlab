@@ -48,12 +48,16 @@ end
 validatestring(options.Format, ["standard", "origin"]);
 validatestring(options.Intensity, ["both", "cps", "counts"]);
 
-% Check output directory exists
+% Check output directory exists (if a directory is specified)
 [outDir, ~, ~] = fileparts(outputPath);
-if ~isempty(outDir) && ~isfolder(outDir)
-    error("utilities:writeXRDcsv:badOutputDir", ...
-        "Output directory does not exist: " + outDir);
+if ~isempty(outDir)
+    % A directory was specified — verify it exists
+    if ~isfolder(outDir)
+        error("utilities:writeXRDcsv:badOutputDir", ...
+            "Output directory does not exist: " + outDir);
+    end
 end
+% If outDir is empty, file will be written to current directory (pwd)
 
 % Determine intensity columns to write
 [intensityVals, intensityLabels, intensityUnits] = ...
@@ -62,8 +66,8 @@ end
 % Prepare header row and data
 if strcmp(options.Format, "origin")
     % Origin ASCII format: tab-delimited, 3 header rows (Name, Units, Designation)
-    xLabel = extractLabel(data.labels{1});
-    xUnit = data.units{1};
+    xLabel = getXAxisLabel(data);
+    xUnit = getXAxisUnit(data);
 
     names = [xLabel, intensityLabels];
     units = [xUnit, intensityUnits];
@@ -111,7 +115,7 @@ if strcmp(options.Format, "origin")
     end
 else
     % Standard CSV format: comma-delimited, metadata block, data with headers
-    xLabel = extractLabel(data.labels{1});
+    xLabel = getXAxisLabel(data);
     headers = [xLabel, intensityLabels];
 
     fid = fopen(outputPath, 'w');
@@ -296,7 +300,41 @@ function writeMetadataBlock(fid, data, isOriginFormat)
 end
 
 % ════════════════════════════════════════════════════════════════════════
-% HELPER: Extract axis label from parser-specific label
+% HELPER: Get x-axis label from metadata or default
+% ════════════════════════════════════════════════════════════════════════
+
+function label = getXAxisLabel(data)
+    % Return x-axis label from metadata; default to "X Axis"
+    if isfield(data.metadata, 'xColumnName')
+        unit = '';
+        if isfield(data.metadata, 'xColumnUnit')
+            unit = data.metadata.xColumnUnit;
+        end
+        if ~isempty(unit)
+            label = sprintf('%s (%s)', data.metadata.xColumnName, unit);
+        else
+            label = data.metadata.xColumnName;
+        end
+    else
+        label = 'X Axis';
+    end
+end
+
+% ════════════════════════════════════════════════════════════════════════
+% HELPER: Get x-axis unit from metadata or default
+% ════════════════════════════════════════════════════════════════════════
+
+function unit = getXAxisUnit(data)
+    % Return x-axis unit from metadata; default to empty
+    if isfield(data.metadata, 'xColumnUnit')
+        unit = data.metadata.xColumnUnit;
+    else
+        unit = '';
+    end
+end
+
+% ════════════════════════════════════════════════════════════════════════
+% HELPER: Extract axis label (legacy, not used)
 % ════════════════════════════════════════════════════════════════════════
 
 function label = extractLabel(fullLabel)

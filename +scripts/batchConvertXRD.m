@@ -60,11 +60,17 @@ arguments
     options.Intensity string = "both"
     options.IncludeMetadata logical = true
     options.Verbose logical = true
-    options.ProgressFcn function_handle = []
+    options.ProgressFcn = []
 end
 
 % Validate format option
 validatestring(options.Format, ["standard", "origin", "com"]);
+
+% Validate ProgressFcn if provided
+if ~isempty(options.ProgressFcn) && ~isa(options.ProgressFcn, 'function_handle')
+    error("scripts:batchConvertXRD:badProgressFcn", ...
+        "ProgressFcn must be a function handle or empty");
+end
 
 % Resolve file list
 fileList = resolveFileList(files, options.Recursive);
@@ -82,8 +88,12 @@ if options.Verbose
     fprintf("batchConvertXRD: found %d XRD file(s)\n", nFiles);
 end
 
-% Initialize results array
-results = struct('name', {}, 'filepath', {}, 'outputFile', {}, 'data', {}, 'error', {});
+% Initialize results array (pre-allocate if possible, otherwise start empty)
+if nFiles > 0
+    results = repmat(struct('name', '', 'filepath', '', 'outputFile', '', 'data', [], 'error', ''), nFiles, 1);
+else
+    results = struct.empty;
+end
 
 % For COM format, open one workbook to accumulate sheets
 if strcmp(options.Format, "com")
@@ -100,7 +110,7 @@ nErr = 0;
 for k = 1:nFiles
     filepath = fileList{k};
     [~, filename, ext] = fileparts(filepath);
-    fullFilename = filename + ext;
+    fullFilename = string(filename) + string(ext);  % Convert to string for concatenation
 
     try
         % Parse the file
