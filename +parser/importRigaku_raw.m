@@ -21,9 +21,11 @@ function data = importRigaku_raw(filepath, options)
 %       filepath - Path to the .raw file (string or char).
 %
 %   OPTIONAL NAME-VALUE PAIRS:
-%       UseCountsPerSec - false (default) → intensity in raw counts
-%                         true            → intensity / counting_time (counts/s)
-%       Verbose         - Print a one-line import summary (default: false).
+%       UseCountsPerSec     - false (default) → intensity in raw counts
+%                             true            → intensity / counting_time (counts/s)
+%       AllowPartialImport  - false (default) → error if multi-range file detected
+%                             true            → warn and import first range only
+%       Verbose             - Print a one-line import summary (default: false).
 %
 %   OUTPUT:
 %       data - Unified data struct:
@@ -40,6 +42,11 @@ function data = importRigaku_raw(filepath, options)
 %                            .source       - source file path
 %                            .importDate   - datetime of import
 %
+%   LIMITATIONS:
+%       • Multi-range files: only the first scan range is imported (see AllowPartialImport).
+%       • Variable-step scans: not supported (errors on stepSize = 0).
+%       • Rigaku magic bytes "FI" are required; Bruker files (magic "RAW") are rejected.
+%
 %   EXAMPLES:
 %       data = parser.importRigaku_raw('YIG_Py_S7.raw');
 %       plot(data.time, data.values);
@@ -48,12 +55,16 @@ function data = importRigaku_raw(filepath, options)
 %       % counts/s instead of raw counts
 %       data = parser.importRigaku_raw('scan.raw', 'UseCountsPerSec', true);
 %
+%       % Import multi-range file (warning only, no error)
+%       data = parser.importRigaku_raw('multirange.raw', 'AllowPartialImport', true);
+%
 %   See also parser.importAuto, parser.importCSV, parser.importQDVSM
 
     arguments
-        filepath                (1,1) string {mustBeFile}
-        options.UseCountsPerSec (1,1) logical = false
-        options.Verbose         (1,1) logical = false
+        filepath                    (1,1) string {mustBeFile}
+        options.UseCountsPerSec     (1,1) logical = false
+        options.Verbose             (1,1) logical = false
+        options.AllowPartialImport  (1,1) logical = false
     end
 
     % ════════════════════════════════════════════════════════════════
@@ -121,14 +132,26 @@ function data = importRigaku_raw(filepath, options)
 
     % ── Detect multi-range files ──────────────────────────────────────
     % After the first range's data block, any remaining bytes indicate
-    % additional scan ranges. Only the first range is imported.
+    % additional scan ranges. By default, error on multi-range detection.
     firstRangeEnd = 3158 + numPoints * 4;
     if nBytes > firstRangeEnd + 3
-        warning('parser:importRigaku_raw:multiRange', ...
-            ['Multi-range .raw file detected (%d bytes remain after first range). ' ...
-             'Only the first scan range (%.4f\xB0\x2013%.4f\xB0) is imported. ' ...
-             'Use Rigaku software to split ranges if full data is required.'], ...
-            nBytes - firstRangeEnd, startAngle, endAngle);
+        if options.AllowPartialImport
+            % User opted in: warn and continue with first range only
+            warning('parser:importRigaku_raw:multiRange', ...
+                ['Multi-range .raw file detected (%d bytes remain after first range). ' ...
+                 'Only the first scan range (%.4f\xB0\x2013%.4f\xB0) is imported. ' ...
+                 'Use Rigaku software to split ranges if full data is required.'], ...
+                nBytes - firstRangeEnd, startAngle, endAngle);
+        else
+            % Default: prevent silent data loss
+            error('parser:importRigaku_raw:multiRangeNotSupported', ...
+                ['Multi-range .raw file detected (%d bytes remain after first range). ' ...
+                 'This parser only imports the first range, which would result in silent data loss. ' ...
+                 'Use AllowPartialImport=true to proceed with the first range only, ' ...
+                 'or use Rigaku software to split ranges into separate files. ' ...
+                 'File: %s'], ...
+                nBytes - firstRangeEnd, filepath);
+        end
     end
 
     % ════════════════════════════════════════════════════════════════

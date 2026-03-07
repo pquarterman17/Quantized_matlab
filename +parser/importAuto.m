@@ -65,69 +65,25 @@ function [data, parserName] = importAuto(filepath, varargin)
     end
 
     % ════════════════════════════════════════════════════════════════
-    %  Dispatch by extension
+    %  Dispatch by extension (via centralized resolveParser)
     % ════════════════════════════════════════════════════════════════
 
-    switch ext
-        case '.xrdml'
-            parserName = 'importXRDML';
-            data = parser.importXRDML(filepath, varargin{:});
+    resolveResult = parser.resolveParser(filepath);
+    parserName = resolveResult.name;
 
-        case '.brml'
-            parserName = 'importBruker';
-            data = parser.importBruker(filepath, varargin{:});
-
-        case '.raw'
-            magic = readFileMagic(filepath, 7);
-            if strncmp(magic, 'RAW', 3)
-                parserName = 'importBruker';
-                data = parser.importBruker(filepath, varargin{:});
-            else
-                parserName = 'importRigaku_raw';
-                data = parser.importRigaku_raw(filepath, varargin{:});
-            end
-
-        case {'.xlsx', '.xls', '.xlsm', '.xlsb', '.ods'}
-            parserName = 'importExcel';
-            data = parser.importExcel(filepath, varargin{:});
-
-        case {'.csv', '.tsv', '.txt'}
-            parserName = 'importCSV';
-            data = parser.importCSV(filepath, varargin{:});
-
-        case '.refl'
-            parserName = 'importNCNRRefl';
-            data = parser.importNCNRRefl(filepath, varargin{:});
-
-        case '.pnr'
-            parserName = 'importNCNRPNR';
-            data = parser.importNCNRPNR(filepath, varargin{:});
-
-        case {'.data', '.datb', '.datc', '.datd'}
-            % NCNR refl1d output files: polarization encoded in extension
-            % .data = .datA (R++), .datb = .datB (R+-), .datc = .datC (R-+), .datd = .datD (--)
-            parserName = 'importNCNRDat';
-            data = parser.importNCNRDat(filepath, varargin{:});
-
-        case '.dat'
-            % Try QD VSM format first (has [Header]/[Data] markers)
-            try
-                data = parser.importQDVSM(filepath, 'Verbose', false, varargin{:});
-                parserName = 'importQDVSM';
-            catch ME
-                if contains(ME.message, '[Data]', 'IgnoreCase', true)
-                    % Not a QD file — fall back to legacy PPMS CSV
-                    data = parser.importPPMS(filepath, varargin{:});
-                    parserName = 'importPPMS';
-                else
-                    rethrow(ME);
-                end
-            end
-
-        otherwise
-            error('parser:importAuto:unknownExtension', ...
-                ['No parser registered for extension "%s".\n' ...
-                 'Supported: .xrdml, .brml, .raw, .xlsx/.xls/.xlsm, .csv/.tsv/.txt, .refl, .pnr, .datA/B/C/D, .dat'], ext);
+    % Dispatch to the primary parser
+    parserFunc = str2func(['parser.' parserName]);
+    try
+        data = parserFunc(filepath, varargin{:});
+    catch ME
+        % For .dat files, try fallback parser if primary failed
+        if ~isempty(resolveResult.fallback) && contains(ME.message, '[Data]', 'IgnoreCase', true)
+            parserName = resolveResult.fallback;
+            fallbackFunc = str2func(['parser.' parserName]);
+            data = fallbackFunc(filepath, varargin{:});
+        else
+            rethrow(ME);
+        end
     end
 
     % ════════════════════════════════════════════════════════════════

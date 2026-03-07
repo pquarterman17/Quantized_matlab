@@ -5956,59 +5956,69 @@ end
 
 function [data, parserName] = guiImport(fp)
 %GUIIMPORT  Dispatch to the correct parser and return both data and parser name.
-    [~,~,ext] = fileparts(fp);
-    ext = lower(ext);
-    switch ext
-        case '.raw'
-            data       = parser.importRigaku_raw(fp);
-            parserName = 'importRigaku_raw';
+%   Uses centralized resolveParser for extension→parser mapping.
 
-        case '.xrdml'
+    resolveResult = parser.resolveParser(fp);
+    parserName = resolveResult.name;
+
+    % GUI-specific parameters for each parser
+    switch parserName
+        case 'importRigaku_raw'
+            data = parser.importRigaku_raw(fp);
+
+        case 'importXRDML'
             % Load raw counts; the GUI's Cts/s toggle handles cps conversion.
-            data       = parser.importXRDML(fp, Intensity='counts');
-            parserName = 'importXRDML';
+            data = parser.importXRDML(fp, Intensity='counts');
 
-        case {'.xlsx','.xls','.xlsm','.xlsb','.ods'}
-            data       = parser.importExcel(fp);
-            parserName = 'importExcel';
+        case 'importBruker'
+            data = parser.importBruker(fp);
 
-        case {'.csv','.tsv','.txt'}
-            data       = parser.importCSV(fp);
-            parserName = 'importCSV';
+        case 'importExcel'
+            data = parser.importExcel(fp);
 
-        case '.refl'
-            data       = parser.importNCNRRefl(fp);
-            parserName = 'importNCNRRefl';
+        case 'importCSV'
+            data = parser.importCSV(fp);
 
-        case '.pnr'
-            data       = parser.importNCNRPNR(fp);
-            parserName = 'importNCNRPNR';
+        case 'importNCNRRefl'
+            data = parser.importNCNRRefl(fp);
 
-        case {'.data', '.datb', '.datc', '.datd'}
+        case 'importNCNRPNR'
+            data = parser.importNCNRPNR(fp);
+
+        case 'importNCNRDat'
             % NCNR refl1d output: polarization encoded in extension
-            data       = parser.importNCNRDat(fp);
-            parserName = 'importNCNRDat';
+            data = parser.importNCNRDat(fp);
 
-        case '.dat'
+        case 'importQDVSM'
             % Load every available channel so the user can explore them in the GUI.
             try
-                data       = parser.importQDVSM(fp, 'Verbose', false, 'YAxis', 'all');
-                parserName = 'importQDVSM';
+                data = parser.importQDVSM(fp, 'Verbose', false, 'YAxis', 'all');
             catch ME
                 if contains(ME.message,'[Data]','IgnoreCase',true)
-                    data       = parser.importPPMS(fp, 'YAxis', 'all');
+                    % Fall back to PPMS format
+                    data = parser.importPPMS(fp, 'YAxis', 'all');
                     parserName = 'importPPMS';
                 else
                     rethrow(ME);
                 end
             end
 
+        case 'importPPMS'
+            data = parser.importPPMS(fp, 'YAxis', 'all');
+
         otherwise
             error('dataImportGUI:unknownExt', ...
-                ['No parser for extension "%s".\n' ...
-                 'Supported: .raw  .xrdml  .xlsx/.xls/.xlsm  .csv/.tsv/.txt  .refl  .pnr  .datA/B/C/D  .dat'], ...
-                ext);
+                ['No parser for extension "%s" (resolved as "%s").\n' ...
+                 'Supported: .raw, .xrdml, .brml, .xlsx/.xls/.xlsm/.xlsb/.ods, ' ...
+                 '.csv/.tsv/.txt, .refl, .pnr, .datA/B/C/D, .dat'], ...
+                extractFileExt(fp), parserName);
     end
+end
+
+% ────────────────────────────────────────────────────────────────────
+function ext = extractFileExt(fp)
+    [~, ~, ext] = fileparts(fp);
+    ext = lower(ext);
 end
 
 

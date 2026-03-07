@@ -200,4 +200,90 @@ impl# TODO — thin_film_toolkit_matlab
 - [x] **Axes offset from center** — fixed: changed tbGL to span columns [1 2] instead of just [1] to align with content/analysis panels
 - [x] **Missing GUI panels** — unclear which panels are missing; most are created but some hidden per data type
 
+---
+
+## Code Quality Scan — 2026-03-07
+
+Comprehensive automated scan of codebase identified **22 issues** across error handling, test coverage, documentation, performance, and architecture. See detailed analysis below.
+
+### Priority 1: Critical Fixes (Est. 17 hrs) — **COMPLETE** ✓
+
+- [x] **#1: Fix dual dispatcher bug** — Created `+parser/resolveParser.m` as centralized dispatcher for extension→parser mapping + magic-byte detection. Updated `importAuto.m` and `guiImport()` to use it. Now `.brml` and `.raw` magic-byte detection work in both paths. **COMPLETE**
+
+- [x] **#2: Add error logging to silent catch blocks** — Added `warning()` calls to silent catch blocks in `importCSV.m`, `importExcel.m`, `importXRDML.m`. Tracks parse failures with counters, emits one warning per operation. **COMPLETE**
+
+- [x] **#3: Create parser edge-case test suite** — Built `test_parsers_edge_cases.m` with 10 comprehensive edge case tests: empty files, truncated binaries, inconsistent columns, multi-range detection, magic-byte detection, datetime parse failures. **COMPLETE**
+
+- [x] **#4: Standardize metadata schema** — Enforced canonical schema across all 14 parsers. All now have: `source` (filepath), `importDate`, `parserName`, `xColumnName`, `xColumnUnit`, `parserSpecific` (instrument-specific). Updated NCNR*, LakeShore, MPMS, XRDML, Bruker parsers. **COMPLETE**
+
+- [x] **#5: Convert multi-range XRD warning to error** — Added `AllowPartialImport` parameter to `importRigaku_raw.m`. Default=false: error on multi-range. True: warn (user opt-in). Updated docstring with Limitations section. **COMPLETE**
+
+### Priority 2: Test & Validation (Est. 12 hrs)
+
+- [ ] **#6: Automated GUI test harness** — No automated tests for 6700-line `dataImportGUI.m` (100+ features). Create test suite using `matlab.uitest` (R2022b+) covering:
+  - [ ] Session save/load roundtrip with real data
+  - [ ] Batch corrections applied to multiple datasets
+  - [ ] Peak fitting with overlapping peaks
+  - [ ] Undo/redo state management
+  - Impact: Detects regressions in critical workflows (est. 12 hrs)
+
+- [ ] **#7: Round-trip data export tests** — Verify imported data → exported CSV → re-imported data = original. Test in `test_parsers.m`. *Est. 2 hrs*
+  - Test: `data1 → writeXRDcsv() → importCSV() → data2 ≈ data1` (tolerance 1e-6)
+
+- [ ] **#8: Batch processing integration tests** — Test `batchConvertXRD.m` and `batchImport.m` with:
+  - [ ] Permissions errors (read-only files)
+  - [ ] Mixed file types (XRD + CSV in same folder)
+  - [ ] Large folders (1000+ files)
+  - [ ] Recursion depth limits
+  - [ ] Output directory collisions
+  - Est. 4 hrs
+
+### Priority 3: Documentation (Est. 6 hrs)
+
+- [ ] **#9: Document GUI state machine** — Create ASCII diagram of callback flow in `dataImportGUI.m` header. Document invariants and valid state transitions. *Est. 2 hrs*
+
+- [ ] **#10: Update TODO.md** — Many features marked `[/]` with vague status. Consolidate into GitHub issues with test results, or add completion checklist. *Est. 1 hr*
+
+- [ ] **#11: Parser-specific metadata** — Document what metadata fields each parser guarantees in `+parser/README.md`. E.g., Rigaku sets `.stepSize`, `.countingTime`, `.startAngle`. *Est. 1 hr*
+
+- [ ] **#12: GUI usage docstring** — Add comprehensive header to `dataImportGUI.m` documenting supported file types, auto-detection heuristics, graceful fallbacks, error handling. *Est. 2 hrs*
+
+### Priority 4: Performance & Architecture (Est. 10 hrs)
+
+- [ ] **#13: Streaming support for large files** — Replace line-by-line parsing in CSV/XRD with vectorized I/O. Use `readmatrix()` with format spec. Pre-allocate arrays. Document file size limits. *Est. 6 hrs*
+  - Files: `importCSV.m`, `importQDVSM.m`
+  - Current: Fails for >500MB; dynamic cell arrays O(n²)
+  - Impact: Handles large datasets without GUI freeze
+
+- [ ] **#14: GUI render caching** — Don't redraw all datasets every cycle. Cache line handles; update only visibility/color/data. *Est. 2 hrs*
+  - Impact: Smooth panning/zooming with 50+ datasets
+
+- [ ] **#15: Add progress indication for batch** — Add `waitbar()` or progress text in `xrdConvertGUI.m` conversion loop. *Est. 1 hr*
+
+- [ ] **#16: Replace magic numbers with constants** — In `importRigaku_raw.m` (lines 90-94, 110, 125, 137), define binary offsets as named constants (e.g., `OFFSET_COUNTING_TIME = 2959:2962`). *Est. 1 hr*
+
+### Lower Priority: Architecture Cleanup (Backlog)
+
+- [ ] **#17: Unify column resolution logic** — Extract column shorthand resolution to shared function `+parser/resolveColumnShorthand.m`. Each parser calls this. *Est. 2 hrs*
+  - Current: Each parser (QDVSM, LakeShore, MPMS, CSV) defines own semantics
+
+- [ ] **#18: Add version tracking in exports** — Parsers add `data.metadata.parserVersion` field. GUI checks compatibility on load. *Est. 2 hrs*
+
+- [ ] **#19: Add input validation to batch operations** — `xrdConvertGUI.m`: validate selected files exist before conversion starts. *Est. 1 hr*
+
+- [ ] **#20: Boundary checks in array access** — After column name resolution (`importExcel.m`, `importCSV.m`), assert `1 <= idx <= numCols`. *Est. 1 hr*
+
+- [ ] **#21: Document file size limitations** — Add to all parser docstrings tested max file size. E.g., "Tested up to 500MB; larger files may cause memory errors." *Est. 1 hr*
+
+- [ ] **#22: Excel formula error handling** — Document that Excel formula errors (e.g., `#DIV/0!`) become NaN. Add validation warning if >10% of columns are NaN. *Est. 2 hrs*
+
+### Summary
+
+| Category | High | Medium | Total |
+|----------|------|--------|-------|
+| Code Quality | 7 | 15 | **22** |
+| **Est. Effort** | **Priority 1-3: ~35 hrs** | **Priority 4+: ~15 hrs** | **~50 hrs total** |
+
+**Recommended next step:** Start with Priority 1 items (#1, #2, #5) — quick wins that prevent architectural debt and silent failures.
+
 

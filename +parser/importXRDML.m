@@ -129,7 +129,10 @@ function data = importXRDML(filepath, options)
     try
         nsURI         = char(dom.getDocumentElement().getNamespaceURI());
         schemaVersion = regexp(nsURI, '[\d.]+$', 'match', 'once');
-    catch; end
+    catch ME
+        warning('parser:importXRDML:schemaVersionExtract', ...
+            'Could not extract XRDML schema version from namespace URI.');
+    end
 
     % Sample identification.  Schema 1.x stores the label in <id>; schema 2.x
     % uses <name>.  Target the <sample> element directly to avoid picking up
@@ -266,7 +269,10 @@ function data = importXRDML(filepath, options)
                     try
                         startTimeStamp = datetime(t0, 'InputFormat', ...
                             "yyyy-MM-dd'T'HH:mm:ssXXX", 'TimeZone', 'local');
-                    catch; end
+                    catch ME
+                        warning('parser:importXRDML:startTimeStampParseFailed', ...
+                            'Could not parse startTimeStamp "%s": %s', t0, ME.message);
+                    end
                 end
             end
             t1 = nodeText(hdr, 'endTimeStamp');
@@ -274,7 +280,10 @@ function data = importXRDML(filepath, options)
                 try
                     endTimeStamp = datetime(t1, 'InputFormat', ...
                         "yyyy-MM-dd'T'HH:mm:ssXXX", 'TimeZone', 'local');
-                catch; end
+                catch ME
+                    warning('parser:importXRDML:endTimeStampParseFailed', ...
+                        'Could not parse endTimeStamp "%s": %s', t1, ME.message);
+                end
             end
         end
 
@@ -421,11 +430,8 @@ function data = importXRDML(filepath, options)
     meta.parserName   = 'importXRDML';
     meta.xColumnName  = '2-Theta';
     meta.xColumnUnit  = 'deg';
-    meta.numPoints    = ps.numPoints;
-    meta.startAngle   = ps.startAngle;
-    meta.endAngle     = ps.endAngle;
-    meta.stepSize     = ps.stepSize;
-    meta.countingTime = countingTime;
+    % Note: geometry parameters (numPoints, startAngle, endAngle, stepSize, countingTime)
+    % are stored in meta.parserSpecific (canonical schema compliance)
     meta.parserSpecific = ps;
 
     % ════════════════════════════════════════════════════════════════════════

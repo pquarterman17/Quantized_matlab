@@ -165,11 +165,12 @@ function data = importNCNRDat(filepath, options)
         end
     end
 
-    metadata.filename = filepath;
-    metadata.source = 'refl1d fitting';
-    metadata.xColumnName = 'Q';
+    metadata.source = char(filepath);
     metadata.importDate = datetime('now');
     metadata.parserName = 'importNCNRDat';
+    metadata.xColumnName = 'Q';
+    metadata.xColumnUnit = '1/Ang';
+    metadata.parserSpecific.dataSource = 'refl1d fitting';
     metadata.parserSpecific.instrument = 'NCNR reflectometer';
     metadata.parserSpecific.polarization = polarization;
 

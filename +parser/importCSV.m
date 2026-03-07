@@ -412,6 +412,7 @@ function timeVec = parseTimeColumn(numCol, textCol, timeFmt, treatAs)
     elseif treatAs == "datetime" || timeFmt ~= ""
         % Parse as datetime
         timeVec = NaT(N, 1);
+        nFail = 0;
         for i = 1:N
             try
                 if timeFmt ~= ""
@@ -420,22 +421,34 @@ function timeVec = parseTimeColumn(numCol, textCol, timeFmt, treatAs)
                     timeVec(i) = datetime(textCol{i});
                 end
             catch
-                % leave as NaT
+                nFail = nFail + 1;
             end
+        end
+        if nFail > 0
+            warning('parser:importCSV:timestampParseFailed', ...
+                '%d of %d timestamps could not be parsed and were set to NaT.', nFail, N);
         end
     else
         % Try auto-parsing datetime, fall back to numeric index
         try
             test = datetime(textCol{1});
             timeVec = NaT(N, 1);
+            nFail = 0;
             for i = 1:N
                 try
                     timeVec(i) = datetime(textCol{i});
                 catch
+                    nFail = nFail + 1;
                 end
+            end
+            if nFail > 0
+                warning('parser:importCSV:timestampAutoParseFailed', ...
+                    '%d of %d timestamps could not be auto-parsed and were set to NaT.', nFail, N);
             end
         catch
             timeVec = (1:N)';  % fallback: sample index
+            warning('parser:importCSV:noDatetimeDetected', ...
+                'Time column could not be parsed as datetime; using sample index [1..N] instead.');
         end
     end
 end

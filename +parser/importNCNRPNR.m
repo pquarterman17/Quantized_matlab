@@ -97,11 +97,12 @@ function data = importNCNRPNR(filepath, options)
     % Build units: skip the first unit (Q) and keep the rest
     outUnits = units(2:end);
 
-    metadata.filename = filepath;
-    metadata.source = 'NCNR reductus';
-    metadata.xColumnName = 'Q';
+    metadata.source = char(filepath);
     metadata.importDate = datetime('now');
     metadata.parserName = 'importNCNRPNR';
+    metadata.xColumnName = 'Q';
+    metadata.xColumnUnit = '1/Ang';
+    metadata.parserSpecific.dataSource = 'NCNR reductus';
     metadata.parserSpecific.instrument = 'NCNR polarized reflectometer';
     metadata.parserSpecific.variant = variant;
 

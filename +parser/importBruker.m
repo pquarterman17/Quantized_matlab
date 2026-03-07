@@ -241,13 +241,13 @@ function data = parseBRML(filepath, options)
     meta.parserName   = 'importBruker';
     meta.xColumnName  = '2-Theta';
     meta.xColumnUnit  = 'deg';
-    meta.numPoints    = numel(twoTheta);
-    meta.startAngle   = twoTheta(1);
-    meta.endAngle     = twoTheta(end);
-    meta.stepSize     = mean(diff(twoTheta), 'omitnan');
-    meta.countingTime = measuredTimePerStep;
-
+    % Note: geometry parameters are stored in parserSpecific (canonical schema compliance)
     meta.parserSpecific.formatType     = 'brml';
+    meta.parserSpecific.numPoints      = numel(twoTheta);
+    meta.parserSpecific.startAngle     = twoTheta(1);
+    meta.parserSpecific.endAngle       = twoTheta(end);
+    meta.parserSpecific.stepSize       = mean(diff(twoTheta), 'omitnan');
+    meta.parserSpecific.countingTime   = measuredTimePerStep;
     meta.parserSpecific.wavelength_A   = wavelength_A;
     meta.parserSpecific.scanAxis       = sweepScanAxis;
     meta.parserSpecific.rangeIndex     = rangeIdx;
@@ -408,13 +408,13 @@ function data = parseRawBinary(filepath, options)
             meta.parserName   = 'importBruker';
             meta.xColumnName  = '2-Theta';
             meta.xColumnUnit  = 'deg';
-            meta.numPoints    = nSteps;
-            meta.startAngle   = startAngle;
-            meta.endAngle     = twoTheta(end);
-            meta.stepSize     = stepSize;
-            meta.countingTime = timePerStep;
-
+            % Note: geometry parameters are stored in parserSpecific (canonical schema compliance)
             meta.parserSpecific.formatType  = 'raw_binary_v3';
+            meta.parserSpecific.numPoints   = nSteps;
+            meta.parserSpecific.startAngle  = startAngle;
+            meta.parserSpecific.endAngle    = twoTheta(end);
+            meta.parserSpecific.stepSize    = stepSize;
+            meta.parserSpecific.countingTime = timePerStep;
             meta.parserSpecific.wavelength_A = wavelength_A;
             meta.parserSpecific.rangeIndex  = rangeIdx;
             meta.parserSpecific.totalRanges = nRanges;

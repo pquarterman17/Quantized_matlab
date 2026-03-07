@@ -201,11 +201,11 @@ function data = importLakeShore(filepath, options)
     meta.source       = char(filepath);
     meta.importDate   = datetime('now');
     meta.parserName   = 'importLakeShore';
-    meta.instrumentType = 'Lake Shore VSM/Magnetometer';
     meta.xColumnName  = colNames{xColIdx};
     meta.xColumnUnit  = colUnits{xColIdx};
-    meta.allColumnNames = colNames;
-    meta.allColumnUnits = colUnits;
+    meta.parserSpecific.instrumentType = 'Lake Shore VSM/Magnetometer';
+    meta.parserSpecific.allColumnNames = colNames;
+    meta.parserSpecific.allColumnUnits = colUnits;
 
     data = parser.createDataStruct(timeVec, valuesMatrix, ...
         'labels',   yLabels, ...

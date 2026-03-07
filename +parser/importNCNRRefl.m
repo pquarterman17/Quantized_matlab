@@ -159,12 +159,13 @@ function data = importNCNRRefl(filepath, options)
     outLabels = valueLabels;
     outUnits = valueUnits;
 
-    % Store metadata
-    metadata.filename = filepath;
-    metadata.source = 'NCNR reductus';
-    metadata.xColumnName = 'Qz';
+    % Store metadata (canonical schema)
+    metadata.source = char(filepath);
     metadata.importDate = datetime('now');
     metadata.parserName = 'importNCNRRefl';
+    metadata.xColumnName = 'Qz';
+    metadata.xColumnUnit = '1/Ang';
+    metadata.parserSpecific.dataSource = 'NCNR reductus';
     metadata.parserSpecific.instrument = 'NCNR reflectometer';
     metadata.parserSpecific.name = name;
 

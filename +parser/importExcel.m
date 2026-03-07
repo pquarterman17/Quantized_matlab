@@ -379,6 +379,7 @@ function timeVec = buildTimeVector(numCol, rawCol)
     N = numel(rawCol);
     timeVec = NaT(N, 1);
     anyParsed = false;
+    nFail = 0;
     for i = 1:N
         v = rawCol{i};
         if isdatetime(v)
@@ -389,11 +390,18 @@ function timeVec = buildTimeVector(numCol, rawCol)
                 timeVec(i) = datetime(strtrim(v));
                 anyParsed = true;
             catch
+                nFail = nFail + 1;
             end
         end
     end
+    if nFail > 0
+        warning('parser:importExcel:timestampParseFailed', ...
+            '%d cells could not be parsed as datetime and were set to NaT.', nFail);
+    end
     if ~anyParsed
         timeVec = (1:N)';  % fallback: sample index
+        warning('parser:importExcel:noDatetimeDetected', ...
+            'Time column could not be parsed as datetime; using sample index [1..N] instead.');
     end
 end
 
