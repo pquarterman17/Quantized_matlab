@@ -244,23 +244,12 @@ else
         assert(size(d.values, 2) == 1,             'expected exactly 1 intensity channel');
         assert(strcmp(d.units{1}, 'cps'),          'default Intensity=cps should yield units "cps"');
 
-        % Metadata scalar fields (should be directly on metadata, not nested)
-        assert(isfield(d.metadata, 'startAngle'),  'missing metadata.startAngle');
-        assert(isfield(d.metadata, 'endAngle'),    'missing metadata.endAngle');
-        assert(isfield(d.metadata, 'stepSize'),    'missing metadata.stepSize');
-        assert(isfield(d.metadata, 'countingTime'),'missing metadata.countingTime');
-        assert(isfield(d.metadata, 'numPoints'),   'missing metadata.numPoints');
+        % Metadata top-level fields
         assert(strcmp(d.metadata.xColumnName, '2-Theta'), 'xColumnName should be "2-Theta"');
         assert(strcmp(d.metadata.xColumnUnit, 'deg'),     'xColumnUnit should be "deg"');
         assert(strcmp(d.metadata.parserName, 'importXRDML'), 'parserName wrong');
 
-        % Sanity-check geometry: 2θ range and point count
-        assert(d.metadata.startAngle > 0,          'startAngle should be positive');
-        assert(d.metadata.endAngle > d.metadata.startAngle, 'endAngle must exceed startAngle');
-        assert(d.metadata.stepSize  > 0,           'stepSize should be positive');
-        assert(d.metadata.numPoints == numel(d.time), 'numPoints mismatch with time vector');
-
-        % parserSpecific instrument fields
+        % parserSpecific instrument and geometry fields
         ps = d.metadata.parserSpecific;
         assert(isstruct(ps),                       'parserSpecific must be a struct');
         assert(isfield(ps, 'wavelength'),          'missing parserSpecific.wavelength');
@@ -268,11 +257,22 @@ else
         assert(isfield(ps, 'detectorName'),        'missing parserSpecific.detectorName');
         assert(isfield(ps, 'comments'),            'missing parserSpecific.comments');
         assert(~isnan(ps.wavelength.kAlpha1),      'kAlpha1 should be a number');
+        assert(isfield(ps, 'startAngle'),          'missing parserSpecific.startAngle');
+        assert(isfield(ps, 'endAngle'),            'missing parserSpecific.endAngle');
+        assert(isfield(ps, 'stepSize'),            'missing parserSpecific.stepSize');
+        assert(isfield(ps, 'countingTime'),        'missing parserSpecific.countingTime');
+        assert(isfield(ps, 'numPoints'),           'missing parserSpecific.numPoints');
+
+        % Sanity-check geometry: 2θ range and point count
+        assert(ps.startAngle > 0,                  'startAngle should be positive');
+        assert(ps.endAngle > ps.startAngle,        'endAngle must exceed startAngle');
+        assert(ps.stepSize  > 0,                   'stepSize should be positive');
+        assert(ps.numPoints == numel(d.time),      'numPoints mismatch with time vector');
 
         fprintf('  Points        : %d\n',   numel(d.time));
-        fprintf('  2\xB0 range     : %.4f to %.4f deg\n', d.metadata.startAngle, d.metadata.endAngle);
-        fprintf('  Step size     : %.6f deg\n',  d.metadata.stepSize);
-        fprintf('  Counting time : %.3f s\n',    d.metadata.countingTime);
+        fprintf('  2\xB0 range     : %.4f to %.4f deg\n', ps.startAngle, ps.endAngle);
+        fprintf('  Step size     : %.6f deg\n',  ps.stepSize);
+        fprintf('  Counting time : %.3f s\n',    ps.countingTime);
         fprintf('  Peak cps      : %.2f\n',       max(d.values));
         fprintf('  Anode         : %s\n',         ps.anodeMaterial);
         fprintf('  K\xCE\xB11           : %.7f \xC3\x85\n', ps.wavelength.kAlpha1);
@@ -281,7 +281,7 @@ else
         dCts = parser.importXRDML(XRDML_FILE2, Intensity='counts');
         assert(strcmp(dCts.units{1}, 'counts'),    'Intensity=counts should yield units "counts"');
 
-        ct  = d.metadata.countingTime;
+        ct  = ps.countingTime;
         tol = 1e-9;
         assert(abs(max(dCts.values) / max(d.values) - ct) < tol, ...
             sprintf('counts / cps ratio (%.6f) should equal countingTime (%.3f)', ...
@@ -329,13 +329,14 @@ else
             assert(isfield(d, 'metadata'),             'missing field: metadata');
             assert(~isempty(d.time),                   '2θ vector is empty');
             assert(size(d.values, 2) == 1,             'expected exactly 1 intensity channel');
-            assert(isfield(d.metadata, 'startAngle'),  'missing metadata.startAngle');
-            assert(isfield(d.metadata, 'endAngle'),    'missing metadata.endAngle');
-            assert(isfield(d.metadata, 'stepSize'),    'missing metadata.stepSize');
-            assert(isfield(d.metadata, 'countingTime'),'missing metadata.countingTime');
+            ps2 = d.metadata.parserSpecific;
+            assert(isfield(ps2, 'startAngle'),  'missing parserSpecific.startAngle');
+            assert(isfield(ps2, 'endAngle'),    'missing parserSpecific.endAngle');
+            assert(isfield(ps2, 'stepSize'),    'missing parserSpecific.stepSize');
+            assert(isfield(ps2, 'countingTime'),'missing parserSpecific.countingTime');
 
             fprintf('  Points        : %d\n',   numel(d.time));
-            fprintf('  2θ range      : %.4f to %.4f deg\n', d.metadata.startAngle, d.metadata.endAngle);
+            fprintf('  2θ range      : %.4f to %.4f deg\n', ps2.startAngle, ps2.endAngle);
             fprintf('  Format        : .brml (ZIP+XML)\n');
         end
 
@@ -349,8 +350,9 @@ else
             assert(size(d.values, 2) == 1,             'expected 1 intensity channel');
             assert(strcmp(d.units{1}, 'counts/s'),     'UseCountsPerSec=true should yield counts/s');
 
+            ps3 = d.metadata.parserSpecific;
             fprintf('  Points        : %d\n',   numel(d.time));
-            fprintf('  2θ range      : %.4f to %.4f deg\n', d.metadata.startAngle, d.metadata.endAngle);
+            fprintf('  2θ range      : %.4f to %.4f deg\n', ps3.startAngle, ps3.endAngle);
             fprintf('  Format        : .raw (Bruker binary v3)\n');
         end
 

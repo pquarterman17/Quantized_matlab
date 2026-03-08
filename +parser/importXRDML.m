@@ -80,6 +80,11 @@ function data = importXRDML(filepath, options)
 %   semilogy(d.time, d.values);
 %   xlabel('2\theta (deg)');  ylabel('Intensity (cps)');
 %
+%   Limitations
+%   ───────────
+%   File size: tested up to ~20 MB.  Uses fileread + regexp (text-based
+%   parsing) for speed; avoids the much slower xmlread DOM parser.
+%
 %   See also IMPORTRIGAKU_RAW, IMPORTAUTO
 
     arguments
@@ -95,13 +100,13 @@ function data = importXRDML(filepath, options)
     end
 
     % ════════════════════════════════════════════════════════════════════════
-    %  1. Parse XML document
+    %  1. Read file as text (much faster than xmlread DOM parser)
     % ════════════════════════════════════════════════════════════════════════
     try
-        dom = xmlread(filepath);
+        xml = fileread(filepath);
     catch ME
-        error('parser:importXRDML:xmlParseFailed', ...
-            'Failed to parse "%s" as XML: %s', filepath, ME.message);
+        error('parser:importXRDML:readFailed', ...
+            'Failed to read "%s": %s', filepath, ME.message);
     end
 
     % ════════════════════════════════════════════════════════════════════════
@@ -109,142 +114,97 @@ function data = importXRDML(filepath, options)
     % ════════════════════════════════════════════════════════════════════════
     wl = struct('kAlpha1', NaN, 'kAlpha2', NaN, 'kBeta', NaN, ...
                 'ratioKAlpha2KAlpha1', NaN, 'intended', '');
-    wlNodes = dom.getElementsByTagName('usedWavelength');
-    if wlNodes.getLength > 0
-        wlNode                 = wlNodes.item(0);
-        wl.kAlpha1             = nodeDouble(wlNode, 'kAlpha1');
-        wl.kAlpha2             = nodeDouble(wlNode, 'kAlpha2');
-        wl.kBeta               = nodeDouble(wlNode, 'kBeta');
-        wl.ratioKAlpha2KAlpha1 = nodeDouble(wlNode, 'ratioKAlpha2KAlpha1');
-        wl.intended            = char(wlNode.getAttribute('intended'));
+    wlBlock = rxBlock(xml, 'usedWavelength');
+    if ~isempty(wlBlock)
+        wl.kAlpha1             = rxDouble(wlBlock, 'kAlpha1');
+        wl.kAlpha2             = rxDouble(wlBlock, 'kAlpha2');
+        wl.kBeta               = rxDouble(wlBlock, 'kBeta');
+        wl.ratioKAlpha2KAlpha1 = rxDouble(wlBlock, 'ratioKAlpha2KAlpha1');
+        wl.intended            = rxAttr(wlBlock, 'usedWavelength', 'intended');
     end
 
     % ════════════════════════════════════════════════════════════════════════
     %  3. Instrument metadata
     % ════════════════════════════════════════════════════════════════════════
 
-    % Schema version — encoded in the xmlns URI on the root element,
-    % e.g. "http://www.xrdml.com/XRDMeasurement/1.5"
-    schemaVersion = '';
-    try
-        nsURI         = char(dom.getDocumentElement().getNamespaceURI());
-        schemaVersion = regexp(nsURI, '[\d.]+$', 'match', 'once');
-    catch ME
-        warning('parser:importXRDML:schemaVersionExtract', ...
-            'Could not extract XRDML schema version from namespace URI.');
-    end
+    % Schema version from xmlns URI (e.g. ".../XRDMeasurement/2.1")
+    schemaVersion = rxMatch(xml, '(?:xmlns[^=]*=\s*"[^"]*/)(\d[\d.]+)"');
 
-    % Sample identification.  Schema 1.x stores the label in <id>; schema 2.x
-    % uses <name>.  Target the <sample> element directly to avoid picking up
-    % the author <name> node that lives elsewhere in the document.
-    sampleName = '';
-    sampleID   = '';
-    smpNodes = dom.getElementsByTagName('sample');
-    if smpNodes.getLength > 0
-        sn         = smpNodes.item(0);
-        sampleName = nodeText(sn, 'name');
-        sampleID   = nodeText(sn, 'id');
-    end
+    % Sample
+    smpBlock   = rxBlock(xml, 'sample');
+    sampleName = rxText(smpBlock, 'name');
+    sampleID   = rxText(smpBlock, 'id');
 
     % X-ray tube
-    tubeName      = '';
-    anodeMaterial = '';
-    tension_kV    = NaN;
-    current_mA    = NaN;
-    tubeNodes = dom.getElementsByTagName('xRayTube');
-    if tubeNodes.getLength > 0
-        tn            = tubeNodes.item(0);
-        tubeName      = char(tn.getAttribute('name'));
-        anodeMaterial = nodeText(tn, 'anodeMaterial');
-        tension_kV    = nodeDouble(tn, 'tension');
-        current_mA    = nodeDouble(tn, 'current');
-    end
+    tubeBlock     = rxBlock(xml, 'xRayTube');
+    tubeName      = rxAttr(xml, 'xRayTube', 'name');
+    anodeMaterial = rxText(tubeBlock, 'anodeMaterial');
+    tension_kV    = rxDouble(tubeBlock, 'tension');
+    current_mA    = rxDouble(tubeBlock, 'current');
 
     % Detector
-    detectorName = '';
-    detNodes = dom.getElementsByTagName('detector');
-    if detNodes.getLength > 0
-        detectorName = char(detNodes.item(0).getAttribute('name'));
-    end
+    detectorName = rxAttr(xml, 'detector', 'name');
 
-    % Acquisition software (<applicationSoftware>) and instrument control
-    % software (<instrumentControlSoftware>) — both may be present
-    appSoftware         = '';
-    appSoftwareVer      = '';
-    ctrlSoftware        = '';
-    ctrlSoftwareVer     = '';
-    appNodes = dom.getElementsByTagName('applicationSoftware');
-    if appNodes.getLength > 0
-        an             = appNodes.item(0);
-        appSoftware    = strtrim(char(an.getTextContent()));
-        appSoftwareVer = char(an.getAttribute('version'));
-    end
-    ctrlNodes = dom.getElementsByTagName('instrumentControlSoftware');
-    if ctrlNodes.getLength > 0
-        cn              = ctrlNodes.item(0);
-        ctrlSoftware    = strtrim(char(cn.getTextContent()));
-        ctrlSoftwareVer = char(cn.getAttribute('version'));
-    end
+    % Software
+    appSoftware     = rxText(xml, 'applicationSoftware');
+    appSoftwareVer  = rxAttr(xml, 'applicationSoftware', 'version');
+    ctrlSoftware    = rxText(xml, 'instrumentControlSoftware');
+    ctrlSoftwareVer = rxAttr(xml, 'instrumentControlSoftware', 'version');
 
     % Instrument ID
-    instrumentID = nodeText(dom, 'instrumentID');
+    instrumentID = rxText(xml, 'instrumentID');
 
-    % Sample spinner (present when sampleMovement xsi:type="spinningSampleMovementType")
-    spinnerPeriod_s = NaN;
-    spinNodes = dom.getElementsByTagName('spinnerRevolutionTime');
-    if spinNodes.getLength > 0
-        spinnerPeriod_s = str2double(char(spinNodes.item(0).getTextContent()));
-    end
+    % Spinner revolution time
+    spinnerPeriod_s = rxDouble(xml, 'spinnerRevolutionTime');
 
-    % Comment entries (all <comment><entry> elements in the document)
-    comments = extractComments(dom);
+    % Comments — all <entry> elements
+    comments = regexp(xml, '<entry[^>]*>\s*(.*?)\s*</entry>', 'tokens', 'dotall');
+    comments = cellfun(@(c) c{1}, comments, 'UniformOutput', false);
+    comments = comments(~cellfun(@isempty, comments));
 
-    % Measurement-level attributes
-    measType   = '';
-    sampleMode = '';
-    measNodes  = dom.getElementsByTagName('xrdMeasurement');
-    if measNodes.getLength > 0
-        mn         = measNodes.item(0);
-        measType   = char(mn.getAttribute('measurementType'));
-        sampleMode = char(mn.getAttribute('sampleMode'));
-    end
+    % Measurement attributes
+    measType   = rxAttr(xml, 'xrdMeasurement', 'measurementType');
+    sampleMode = rxAttr(xml, 'xrdMeasurement', 'sampleMode');
 
     % ════════════════════════════════════════════════════════════════════════
     %  4. Collect scan data (handles multi-scan / appended ranges)
     % ════════════════════════════════════════════════════════════════════════
-    scanNodes = dom.getElementsByTagName('scan');
-    nScans    = scanNodes.getLength;
+
+    % Extract all <scan ...>...</scan> blocks using strfind (robust for large
+    % blocks that can overwhelm MATLAB's regex backtracking engine).
+    scanBlocks = extractBlocks(xml, 'scan');
+    nScans     = numel(scanBlocks);
     if nScans == 0
         error('parser:importXRDML:noScans', ...
             'No <scan> elements found in "%s".', filepath);
     end
 
-    % Sort by appendNumber attribute so ranges concatenate in angular order
+    % Sort by appendNumber attribute
     appendNums = zeros(1, nScans);
-    for s = 0 : nScans - 1
-        anStr = char(scanNodes.item(s).getAttribute('appendNumber'));
+    for s = 1:nScans
+        anStr = rxAttr(scanBlocks{s}, 'scan', 'appendNumber');
         val   = str2double(anStr);
-        if ~isempty(anStr) && ~isnan(val)
-            appendNums(s + 1) = val;
+        if ~isnan(val)
+            appendNums(s) = val;
         end
     end
-    [~, sortIdx] = sort(appendNums);   % ascending appendNumber order
+    [~, sortIdx] = sort(appendNums);
 
     twoTheta_all      = [];
     counts_all        = [];
-    countingTime      = NaN;    % seconds per point (from first valid scan)
-    countingTimes_all = [];     % all per-scan counting times (for consistency check)
+    countingTime      = NaN;
+    countingTimes_all = [];
     scanMode          = '';
     scanAxis          = '';
     startTimeStamp    = NaT;
     endTimeStamp      = NaT;
-    intensityTag      = '';     % 'counts' (schema 2.x) or 'intensities' (schema 1.x)
+    intensityTag      = '';
 
-    for si = 1 : nScans
-        scanNode = scanNodes.item(sortIdx(si) - 1);
+    for si = 1:nScans
+        sb = scanBlocks{sortIdx(si)};
 
-        % Skip scans that did not reach Completed status
-        statusAttr = char(scanNode.getAttribute('status'));
+        % Skip non-Completed scans
+        statusAttr = rxAttr(sb, 'scan', 'status');
         if ~isempty(statusAttr) && ~strcmpi(statusAttr, 'Completed')
             if options.Verbose
                 fprintf('  [importXRDML] Skipping scan (appendNumber=%d, status=%s)\n', ...
@@ -253,48 +213,38 @@ function data = importXRDML(filepath, options)
             continue;
         end
 
-        % Capture scan mode/axis strings from first valid scan
+        % Capture scan mode/axis from first valid scan
         if isempty(scanMode)
-            scanMode = char(scanNode.getAttribute('mode'));
-            scanAxis = char(scanNode.getAttribute('scanAxis'));
+            scanMode = rxAttr(sb, 'scan', 'mode');
+            scanAxis = rxAttr(sb, 'scan', 'scanAxis');
         end
 
-        % Timestamps from <scan><header>
-        hdrNodes = scanNode.getElementsByTagName('header');
-        if hdrNodes.getLength > 0
-            hdr = hdrNodes.item(0);
-            if isnat(startTimeStamp)
-                t0 = nodeText(hdr, 'startTimeStamp');
-                if ~isempty(t0)
-                    try
-                        startTimeStamp = datetime(t0, 'InputFormat', ...
-                            "yyyy-MM-dd'T'HH:mm:ssXXX", 'TimeZone', 'local');
-                    catch ME
-                        warning('parser:importXRDML:startTimeStampParseFailed', ...
-                            'Could not parse startTimeStamp "%s": %s', t0, ME.message);
-                    end
+        % Timestamps
+        if isnat(startTimeStamp)
+            t0 = rxText(sb, 'startTimeStamp');
+            if ~isempty(t0)
+                try
+                    startTimeStamp = datetime(t0, 'InputFormat', ...
+                        "yyyy-MM-dd'T'HH:mm:ssXXX", 'TimeZone', 'local');
+                catch
                 end
             end
-            t1 = nodeText(hdr, 'endTimeStamp');
-            if ~isempty(t1)
-                try
-                    endTimeStamp = datetime(t1, 'InputFormat', ...
-                        "yyyy-MM-dd'T'HH:mm:ssXXX", 'TimeZone', 'local');
-                catch ME
-                    warning('parser:importXRDML:endTimeStampParseFailed', ...
-                        'Could not parse endTimeStamp "%s": %s', t1, ME.message);
-                end
+        end
+        t1 = rxText(sb, 'endTimeStamp');
+        if ~isempty(t1)
+            try
+                endTimeStamp = datetime(t1, 'InputFormat', ...
+                    "yyyy-MM-dd'T'HH:mm:ssXXX", 'TimeZone', 'local');
+            catch
             end
         end
 
         % ── Data points ────────────────────────────────────────────────────
-        dpNodes = scanNode.getElementsByTagName('dataPoints');
-        if dpNodes.getLength == 0; continue; end
-        dp = dpNodes.item(0);
+        dpBlock = rxBlock(sb, 'dataPoints');
+        if isempty(dpBlock); continue; end
 
-        % Counting time — collect from every scan for consistency check.
-        % The first valid value is used for cps normalisation of all data.
-        ct = nodeDouble(dp, 'commonCountingTime');
+        % Counting time
+        ct = rxDouble(dpBlock, 'commonCountingTime');
         if ~isnan(ct)
             countingTimes_all(end+1) = ct; %#ok<AGROW>
             if isnan(countingTime)
@@ -302,35 +252,25 @@ function data = importXRDML(filepath, options)
             end
         end
 
-        % 2θ axis: XRDML stores only startPosition / endPosition; angles are
-        % NOT written per-point.  Reconstruct via linspace over nPts steps.
-        ttRange = extractPositions(dp, '2Theta');
+        % 2θ positions: find the <positions axis="2Theta"> block
+        ttRange = rxPositions(dpBlock, '2Theta');
         if isempty(ttRange); continue; end
 
-        % Raw counts — tag name differs by schema version:
-        %   schema 2.x: <counts unit="counts"> ...integers... </counts>
-        %   schema 1.x: <intensities unit="counts"> ...integers... </intensities>
-        cntNodes = dp.getElementsByTagName('counts');
-        thisTag  = 'counts';
-        if cntNodes.getLength == 0
-            cntNodes = dp.getElementsByTagName('intensities');
-            thisTag  = 'intensities';
+        % Intensity data — schema 2.x: <counts>, schema 1.x: <intensities>
+        cntStr  = rxText(dpBlock, 'counts');
+        thisTag = 'counts';
+        if isempty(cntStr)
+            cntStr  = rxText(dpBlock, 'intensities');
+            thisTag = 'intensities';
         end
-        if cntNodes.getLength == 0; continue; end
-        if isempty(intensityTag); intensityTag = thisTag; end   % record first found
-        cntStr  = strtrim(char(cntNodes.item(0).getTextContent()));
-
-        % Guard: strsplit('') returns {''} → str2double gives [NaN] → nPts=1.
-        % An empty text node means this scan has no data — skip it.
         if isempty(cntStr); continue; end
+        if isempty(intensityTag); intensityTag = thisTag; end
 
-        cntVals = str2double(strsplit(cntStr));
+        cntVals = sscanf(cntStr, '%f')';    % sscanf is faster than str2double(strsplit())
         nPts    = numel(cntVals);
         if nPts < 1; continue; end
 
-        % Build this scan's 2θ vector then trim its first point if it exactly
-        % overlaps the last already-accumulated angle (common at range boundaries
-        % in multi-range measurements, e.g. two scans both including 40.000°).
+        % Build 2θ vector; trim overlap at range boundaries
         ttVec = linspace(ttRange(1), ttRange(2), nPts);
         if ~isempty(twoTheta_all) && ttVec(1) == twoTheta_all(end)
             ttVec   = ttVec(2:end);
@@ -339,12 +279,10 @@ function data = importXRDML(filepath, options)
         if isempty(ttVec); continue; end
 
         twoTheta_all = [twoTheta_all, ttVec];    %#ok<AGROW>
-        counts_all   = [counts_all,   cntVals];  %#ok<AGROW>
+        counts_all   = [counts_all,   cntVals];   %#ok<AGROW>
     end
 
-    % Warn if different scan ranges were measured with different counting times —
-    % cps normalisation uses only the first value, so the result is incorrect for
-    % any range whose counting time differs.
+    % Warn on mixed counting times
     if numel(countingTimes_all) > 1
         uniqueCT = unique(countingTimes_all);
         if numel(uniqueCT) > 1
@@ -367,8 +305,8 @@ function data = importXRDML(filepath, options)
              'All scans may have a non-Completed status.'], filepath);
     end
 
-    twoTheta_col = twoTheta_all(:);   % Nx1 column
-    counts_col   = counts_all(:);     % Nx1 column
+    twoTheta_col = twoTheta_all(:);
+    counts_col   = counts_all(:);
 
     % ════════════════════════════════════════════════════════════════════════
     %  6. Intensity output
@@ -384,7 +322,7 @@ function data = importXRDML(filepath, options)
             intensity  = counts_col / countingTime;
             intensUnit = 'cps';
         end
-    else   % "counts"
+    else
         intensity  = counts_col;
         intensUnit = 'counts';
     end
@@ -416,8 +354,6 @@ function data = importXRDML(filepath, options)
     ps.startTime               = startTimeStamp;
     ps.endTime                 = endTimeStamp;
     ps.comments                = comments;
-    % Scan summary — mirrored into parserSpecific so guiMetaLines can display
-    % them (it only iterates parserSpecific fields, not top-level meta).
     ps.countingTime            = countingTime;
     ps.numPoints               = numel(twoTheta_col);
     ps.startAngle              = twoTheta_col(1);
@@ -429,10 +365,8 @@ function data = importXRDML(filepath, options)
     meta.importDate    = datetime('now');
     meta.parserName    = 'importXRDML';
     meta.parserVersion = '1.0';
-    meta.xColumnName  = '2-Theta';
-    meta.xColumnUnit  = 'deg';
-    % Note: geometry parameters (numPoints, startAngle, endAngle, stepSize, countingTime)
-    % are stored in meta.parserSpecific (canonical schema compliance)
+    meta.xColumnName   = '2-Theta';
+    meta.xColumnUnit   = 'deg';
     meta.parserSpecific = ps;
 
     % ════════════════════════════════════════════════════════════════════════
@@ -453,71 +387,148 @@ end
 
 
 % ════════════════════════════════════════════════════════════════════════════
-%  Local helpers
+%  Regex-based XML helpers (replace DOM-based nodeDouble/nodeText/etc.)
 % ════════════════════════════════════════════════════════════════════════════
 
-% ── nodeDouble ──────────────────────────────────────────────────────────────
-function val = nodeDouble(parent, tagName)
-%NODEDOUBLE  Numeric value of the first matching child element, or NaN.
-    val   = NaN;
-    nodes = parent.getElementsByTagName(tagName);
-    if nodes.getLength > 0
-        val = str2double(strtrim(char(nodes.item(0).getTextContent())));
+function blocks = extractBlocks(xml, tag)
+%EXTRACTBLOCKS  Extract all <tag ...>...</tag> blocks using strfind.
+%   Returns a cell array of strings, each containing a complete block
+%   including the outer tags.  Handles nested same-name tags by tracking
+%   nesting depth.  Uses strfind instead of regex to avoid backtracking
+%   issues with very large content (e.g. 30 KB count data lines).
+    openPat  = ['<' tag];        % matches <tag  or <tag> or <tag ...>
+    closePat = ['</' tag '>'];
+    openLen  = numel(openPat);
+    closeLen = numel(closePat);
+
+    openStarts  = strfind(xml, openPat);
+    closeStarts = strfind(xml, closePat);
+
+    % Filter openStarts: next char after '<tag' must be whitespace, '>', or '/'
+    % to avoid matching e.g. <scanner> when looking for <scan>
+    validOpen = false(size(openStarts));
+    for k = 1:numel(openStarts)
+        nextIdx = openStarts(k) + openLen;
+        if nextIdx <= numel(xml)
+            ch = xml(nextIdx);
+            validOpen(k) = (ch == ' ' || ch == '>' || ch == '/' || ...
+                            ch == char(9) || ch == char(10) || ch == char(13));
+        end
+    end
+    openStarts = openStarts(validOpen);
+
+    blocks = {};
+    oi = 1;  % open index cursor
+    ci = 1;  % close index cursor
+    while oi <= numel(openStarts) && ci <= numel(closeStarts)
+        blockStart = openStarts(oi);
+        depth = 1;
+        oi = oi + 1;
+        % Walk through remaining opens/closes to find matching close
+        while depth > 0 && ci <= numel(closeStarts)
+            % Check if another open comes before the next close
+            if oi <= numel(openStarts) && openStarts(oi) < closeStarts(ci)
+                depth = depth + 1;
+                oi = oi + 1;
+            else
+                depth = depth - 1;
+                if depth == 0
+                    blockEnd = closeStarts(ci) + closeLen - 1;
+                    blocks{end+1} = xml(blockStart:blockEnd); %#ok<AGROW>
+                end
+                ci = ci + 1;
+            end
+        end
     end
 end
 
-% ── nodeText ────────────────────────────────────────────────────────────────
-function txt = nodeText(parent, tagName)
-%NODETEXT  Trimmed text of the first matching child element, or ''.
-    txt   = '';
-    nodes = parent.getElementsByTagName(tagName);
-    if nodes.getLength > 0
-        txt = strtrim(char(nodes.item(0).getTextContent()));
+function blk = rxBlock(xml, tag)
+%RXBLOCK  Extract the content of the first <tag ...>...</tag> block.
+%   Returns the full match including outer tags, or '' if not found.
+%   Uses strfind for robustness against large content that can overwhelm
+%   MATLAB's regex backtracking engine.
+    blocks = extractBlocks(xml, tag);
+    if ~isempty(blocks)
+        blk = blocks{1};
+    else
+        blk = '';
     end
 end
 
-% ── extractPositions ────────────────────────────────────────────────────────
-function range = extractPositions(dpNode, axisName)
-%EXTRACTPOSITIONS  [startPos, endPos] for the named axis, or [].
-%   Handles startPosition/endPosition pairs (scanned axes) and
-%   commonPosition (fixed axes such as Phi and Chi in a standard
-%   coupled Theta/2Theta scan).
-    range    = [];
-    posNodes = dpNode.getElementsByTagName('positions');
-    for p = 0 : posNodes.getLength - 1
-        pn   = posNodes.item(p);
-        attr = char(pn.getAttribute('axis'));
-        if ~strcmpi(attr, axisName); continue; end
+function val = rxDouble(xml, tag)
+%RXDOUBLE  Numeric value inside the first <tag>...</tag>, or NaN.
+    tok = regexp(xml, ['<' tag '(?=[\s>/])[^>]*>\s*([\d.eE+\-]+)\s*</' tag '>'], 'tokens', 'once', 'dotall');
+    if ~isempty(tok)
+        val = str2double(tok{1});
+    else
+        val = NaN;
+    end
+end
 
-        startN = pn.getElementsByTagName('startPosition');
-        endN   = pn.getElementsByTagName('endPosition');
-        commN  = pn.getElementsByTagName('commonPosition');
+function txt = rxText(xml, tag)
+%RXTEXT  Trimmed text content of the first <tag>...</tag>, or ''.
+%   Uses strfind-based extraction to handle large content (e.g. counts data
+%   with thousands of values) that can overwhelm regex backtracking.
+    blk = rxBlock(xml, tag);
+    if isempty(blk)
+        txt = '';
+        return;
+    end
+    % Strip the opening tag: find end of first '>'
+    gt = strfind(blk, '>');
+    if isempty(gt); txt = ''; return; end
+    % Strip the closing tag: find last '<'
+    lt = strfind(blk, '<');
+    if numel(lt) < 2; txt = ''; return; end
+    txt = strtrim(blk(gt(1)+1 : lt(end)-1));
+end
 
-        if startN.getLength > 0 && endN.getLength > 0
-            s     = str2double(char(startN.item(0).getTextContent()));
-            e     = str2double(char(endN.item(0).getTextContent()));
+function val = rxAttr(xml, tag, attr)
+%RXATTR  Value of a named attribute on the first <tag> element, or ''.
+    tok = regexp(xml, ['<' tag '(?=[\s>/])[^>]*\s' attr '="([^"]*)"'], 'tokens', 'once');
+    if ~isempty(tok)
+        val = tok{1};
+    else
+        val = '';
+    end
+end
+
+function val = rxMatch(xml, pat)
+%RXMATCH  First capture group from a general regex, or ''.
+    tok = regexp(xml, pat, 'tokens', 'once');
+    if ~isempty(tok)
+        val = tok{1};
+    else
+        val = '';
+    end
+end
+
+function range = rxPositions(dpBlock, axisName)
+%RXPOSITIONS  Extract [startPos, endPos] for the named axis from a dataPoints block.
+%   Handles both scanned axes (startPosition/endPosition) and fixed axes
+%   (commonPosition).
+    range = [];
+    % Find all <positions ...>...</positions> blocks
+    posBlocks = extractBlocks(dpBlock, 'positions');
+    for k = 1:numel(posBlocks)
+        pb = posBlocks{k};
+        axVal = rxAttr(pb, 'positions', 'axis');
+        if ~strcmpi(axVal, axisName); continue; end
+
+        s = rxDouble(pb, 'startPosition');
+        e = rxDouble(pb, 'endPosition');
+        if ~isnan(s) && ~isnan(e)
             range = [s, e];
-        elseif commN.getLength > 0
-            v     = str2double(char(commN.item(0).getTextContent()));
-            range = [v, v];   % fixed axis — return as a degenerate pair
+            return;
         end
-        return;   % stop after the first matching axis node
+        c = rxDouble(pb, 'commonPosition');
+        if ~isnan(c)
+            range = [c, c];
+            return;
+        end
     end
 end
 
-% ── extractComments ─────────────────────────────────────────────────────────
-function comments = extractComments(dom)
-%EXTRACTCOMMENTS  Cell array of non-empty <entry> text strings from all
-%   <comment> blocks in the document.
-    comments = {};
-    entries  = dom.getElementsByTagName('entry');
-    for k = 0 : entries.getLength - 1
-        txt = strtrim(char(entries.item(k).getTextContent()));
-        if ~isempty(txt)
-            comments{end+1} = txt; %#ok<AGROW>
-        end
-    end
-end
 
 % ── printSummary ────────────────────────────────────────────────────────────
 function printSummary(data, filepath)
@@ -526,13 +537,12 @@ function printSummary(data, filepath)
     ps = m.parserSpecific;
     wl = ps.wavelength;
 
-    SEP = repmat('═', 1, 62);
+    SEP = repmat(char(9552), 1, 62);
     fprintf('\n%s\n', SEP);
     fprintf('  importXRDML  (schema %s)\n', ps.schemaVersion);
     fprintf('  File       : %s\n', filepath);
     fprintf('%s\n', SEP);
 
-    % Sample label: prefer <name>, fall back to <id>
     sampleLabel = ps.sampleName;
     if isempty(sampleLabel); sampleLabel = ps.sampleID; end
     if ~isempty(sampleLabel)
@@ -541,14 +551,14 @@ function printSummary(data, filepath)
 
     fprintf('  Anode      : %s  (%.1f kV / %.1f mA)\n', ...
         ps.anodeMaterial, ps.tension_kV, ps.current_mA);
-    fprintf('  Wavelength : K\u03b11 = %.7f \u00c5\n', wl.kAlpha1);
+    fprintf('  Wavelength : K%s1 = %.7f %s\n', char(945), wl.kAlpha1, char(197));
     if ~isnan(wl.kAlpha2)
-        fprintf('             : K\u03b12 = %.7f \u00c5  (ratio %.4f)\n', ...
-            wl.kAlpha2, wl.ratioKAlpha2KAlpha1);
+        fprintf('             : K%s2 = %.7f %s  (ratio %.4f)\n', ...
+            char(945), wl.kAlpha2, char(197), wl.ratioKAlpha2KAlpha1);
     end
-    fprintf('  2\u03b8 range  : %.4f \u2192 %.4f deg\n', m.startAngle, m.endAngle);
-    fprintf('  Step size  : %.6f deg  (%d points)\n', m.stepSize, m.numPoints);
-    fprintf('  Count time : %.3f s/point\n', m.countingTime);
+    fprintf('  2%s range  : %.4f %s %.4f deg\n', char(952), ps.startAngle, char(8594), ps.endAngle);
+    fprintf('  Step size  : %.6f deg  (%d points)\n', ps.stepSize, ps.numPoints);
+    fprintf('  Count time : %.3f s/point\n', ps.countingTime);
     if ~isnan(ps.spinnerPeriod_s)
         fprintf('  Spinner    : %.1f s/rev\n', ps.spinnerPeriod_s);
     end

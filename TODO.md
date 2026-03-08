@@ -191,35 +191,6 @@
 - [x] **Axes offset from center** — fixed: changed tbGL to span columns [1 2] instead of just [1] to align with content/analysis panels
 - [x] **Missing GUI panels** — unclear which panels are missing; most are created but some hidden per data type
 
----
-
-## Testing & Validation
-
-### Running Tests
-
-All tests are self-contained and use repository-relative paths (no external dependencies):
-
-```matlab
-% Core parser tests with fixed paths
-test_parsers                    % Smoke tests for all +parser functions
-test_importAuto                 % importAuto dispatch tests
-test_parsers_edge_cases         % Edge case / error handling
-
-% Priority 2 Test & Validation suites
-test_gui_harness                % 15 tests of GUI programmatic API
-test_data_roundtrip             % 10 tests of CSV export/re-import
-test_batch_processing           % 14 tests of batch operations
-```
-
-**Test Summary:**
-- **GUI Harness** — File loading, corrections, peaks, undo, sessions, visibility
-- **Round-Trip** — CSV formats (standard/Origin), precision (1e-5 deg, 1e-4 rel.), metadata
-- **Batch Processing** — `batchImport` scan/filter; `batchConvertXRD` magic bytes/collision/recursion
-
-**Test Data Location:**
-- `+test_datasets/XRDML/` — XRD files
-- `+test_datasets/QuantumDesign/` — VSM files
-- `+test_datasets/NCNR/` — Neutron reflectometry files
 
 ---
 
@@ -361,28 +332,17 @@ Comprehensive automated scan of codebase identified **22 issues** across error h
   - Warning message names common Excel formula error types (#DIV/0!, #VALUE!, #REF!) and directs user to source spreadsheet
   - Docstring `Limitations` section documents NaN conversion behavior
 
-### Summary
+### GUI Improvements
+- [ ] **Space usage** there are boxes with few buttons that take large amounts of visual space in the GUI which forces boxes with more features
+                      to be cut off, or overly crammed. optimize the button and box sizes to be readable, and so nothing is hidden unintentionally
 
-| Status | Category | Count | Effort |
-|--------|----------|-------|--------|
-| ✓ **DONE** | Priority 1 (Critical) | 5/5 | **5 hrs** |
-| ✓ **DONE** | Priority 2 (Testing) | 3/3 | **4 hrs** |
-| ✓ **DONE** | Priority 3 (Docs) | 4/4 | **3 hrs** |
-| ✓ **DONE** | Priority 4 (Perf) | 4/4 | **2 hrs** |
-| ✓ **DONE** | Backlog (Architecture) | 6/6 | **4 hrs** |
-| **TOTAL** | Code Quality Issues | **22** | **0 hrs remaining** |
-
-**Completed 2026-03-07:**
-- **Priority 1 (5 hrs):** Critical fixes — dispatcher divergence, error logging, test suite, metadata standardization, multi-range warnings
-- **Priority 2 (4 hrs):** Test & Validation — GUI programmatic API (15 tests), round-trip export validation (10 tests), batch processing integration (14 tests)
-- **Priority 3 (3 hrs):** Documentation — GUI state machine + callback flow diagram, `+parser/README.md` with per-parser field tables, comprehensive `dataImportGUI.m` docstring, TODO.md cleanup
-- **Priority 4 (2 hrs):** Performance — file I/O streaming (readlines + vectorized str2double), GUI render caching (softUpdateLines for instant color/visibility), progress bar (uiprogressdlg), magic number constants
-- **Commits:** `daab853` (P1/P2/P4), `f33fa79` (P4), priority 3 pending commit
-
-- **Backlog (4 hrs):** Architecture — shared `resolveColumnShorthand`, `parserVersion` across all 11 parsers + GUI session check, xrdConvertGUI file-existence validation, Excel NaN warning, parser file-size docstrings
-
-**All 22 code quality issues resolved. ✓**
-
+- [ ] **Reflectivity anallysis** for XRR and neutron reflectometry data, add FFT analysis to extract
+        thicknesses. for wavelength allow manual typing of wavelength as in the XRD
+        analysis but add rop down menu to select between various common k-alpha
+        sources, with Cu K-alpha being the starting default.
+- [ ] **XRD FFT** for wavelength allow manual typing of wavelength as in the XRD
+        analysis but add rop down menu to select between various common k-alpha
+        sources, with Cu K-alpha being the starting default.
 
 ### Bugs
 - [x] **xrdConvertGUI errors** — **FIXED (2026-03-07, commits 4d793da + 3536617)**
@@ -403,3 +363,5 @@ Comprehensive automated scan of codebase identified **22 issues** across error h
 - [x] **xrdConvertGUI struct field name bug** — **FIXED (commit d2ba59f)**
   - `struct('Standard CSV', ...)` is invalid — field names cannot contain spaces
   - Replaced `formatMap`/`intensityMap` structs with `switch` statements
+
+- [x] **starting dataImportGUI Issue** — FIXED: `efWavelength` set `AllowEmpty=false` which rejected `NaN` as initial value; changed to `AllowEmpty=true`.

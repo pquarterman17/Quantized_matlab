@@ -1,4 +1,4 @@
-function api = dataImportGUI()
+function varargout = dataImportGUI()
 %DATAIMPORTGUI  Browse, import and preview data files using the +parser toolkit.
 %
 % ── Syntax ────────────────────────────────────────────────────────────────
@@ -255,6 +255,8 @@ function api = dataImportGUI()
     appData.bgFile            = '';        % short filename of background dataset for display
     appData.showFitCurves     = true;               % toggle Lorentzian fit overlay on/off
     appData.fitCurveColor     = [0.85 0.20 0.00];   % default warm red-orange
+    appData.kFactor           = 0.9;                % Scherrer shape factor K (0.9 spherical default)
+    appData.instBroadening_deg = 0;                 % Instrument broadening FWHM (°); 0 = uncorrected
     appData.panelResizeDir    = '';   % '' | 'h_row12' | 'h_row23' | 'v_col12' | 'v_col23' | 'v_col34'
     appData.panelResizeStart  = [];   % [mousePixX, mousePixY] at resize drag start
     appData.panelResizeOrig   = [];   % panel dimension (px) at resize drag start
@@ -625,14 +627,15 @@ function api = dataImportGUI()
     ddSmoothMethod.Layout.Row = 4; ddSmoothMethod.Layout.Column = [3 4];
 
     % Row 5: Fit BG from Box | Est. Y Offset 2-click
-    btnFitBG = uibutton(corrGL,'Text','Fit Linear BG from Box', ...
+    btnFitBG = uibutton(corrGL,'Text','Fit BG from Box', ...
         'ButtonPushedFcn',@onFitBGRegion, ...
         'BackgroundColor',[0.50 0.28 0.05], ...
         'FontColor',[1 1 1], ...
         'Tooltip', ['Draw a rectangle on the preview axes.  ' ...
-                    'All selected-Y data points inside the box are used to fit ' ...
-                    'a linear background (polyfit deg-1).  ' ...
-                    'BG Slope and Intercept are auto-populated then corrections are applied.']);
+                    'All selected-Y data points inside the box are fitted with ' ...
+                    'a polynomial of the order chosen in "BG Order" (Linear = 1st-order).  ' ...
+                    'For Linear: BG Slope and Intercept are auto-populated.  ' ...
+                    'For higher orders: polynomial is stored per-dataset and applied on corrections.']);
     btnFitBG.Layout.Row = 5; btnFitBG.Layout.Column = [1 2];
 
     btnPickY = uibutton(corrGL,'Text','Est. Y Offset  (2 pts)', ...
@@ -670,7 +673,16 @@ function api = dataImportGUI()
         'Visible','off');
     btnManualPeak.Layout.Row = 5; btnManualPeak.Layout.Column = 4;
 
-    % Row 6: Remove Peak (click-to-remove mode; only visible for XRD data)
+    % Row 6: BG polynomial order selector (cols 1-3) + Remove Peak for XRD (col 4)
+    lblBGOrder = uibutton(corrGL,'Text','BG Order:','Enable','off','FontSize',10);
+    lblBGOrder.Layout.Row = 6; lblBGOrder.Layout.Column = 1;
+
+    ddBGOrder = uidropdown(corrGL, ...
+        'Items',   {'Linear', 'Poly 2', 'Poly 3', 'Poly 4', 'Poly 5', 'Poly 6'}, ...
+        'Value',   'Linear', ...
+        'Tooltip', 'Polynomial order used by "Fit BG from Box": Linear=1st-order, Poly N=Nth-order');
+    ddBGOrder.Layout.Row = 6; ddBGOrder.Layout.Column = [2 3];
+
     btnRemovePeakClick = uibutton(corrGL,'Text','Remove Peak', ...
         'ButtonPushedFcn',@onRemovePeakClickMode, ...
         'BackgroundColor',[0.55 0.15 0.15],'FontColor',[1 1 1], ...
@@ -1152,25 +1164,25 @@ function api = dataImportGUI()
         'ColumnSpacing', 8);
 
     peakTable = uitable(peakGL, ...
-        'ColumnName',     {'#','Center (°)','FWHM (°)','Height','Area','Status'}, ...
-        'ColumnWidth',    {28, 85, 72, 68, 72, 60}, ...
+        'ColumnName',     {'#','Center (°)','d (Å)','Size (nm)','FWHM (°)','Height','Area',char(951),'Status'}, ...
+        'ColumnWidth',    {28, 80, 62, 62, 65, 65, 65, 38, 55}, ...
         'Data',           {}, ...
         'RowName',        {}, ...
-        'ColumnEditable', [false false false false false false], ...
+        'ColumnEditable', [false false false false false false false false false], ...
         'CellSelectionCallback', @onPeakTableSelect, ...
         'Tooltip','Detected peaks — select a row to highlight it on the plot');
     peakTable.Layout.Column = 1;
 
-    peakBtnGL = uigridlayout(peakGL,[10 1], ...
-        'RowHeight',    {20,24,24,24,24,24,20,24,24,'1x'}, ...
+    peakBtnGL = uigridlayout(peakGL,[13 1], ...
+        'RowHeight',    {20,24,24,24,24,24,20,24,24,24,24,24,'1x'}, ...
         'Padding',      [0 0 0 0], ...
         'RowSpacing',   4);
     peakBtnGL.Layout.Column = 2;
 
     ddFitModel = uidropdown(peakBtnGL, ...
-        'Items',   {'Lorentzian', 'Gaussian'}, ...
+        'Items',   {'Lorentzian', 'Gaussian', 'Pseudo-Voigt'}, ...
         'Value',   'Lorentzian', ...
-        'Tooltip', 'Peak shape model used by Fit Peaks');
+        'Tooltip', 'Peak shape model: Lorentzian, Gaussian, or Pseudo-Voigt (η·L + (1-η)·G)');
     ddFitModel.Layout.Row = 1;
 
     btnFitPeaks = uibutton(peakBtnGL,'Text','Fit Peaks', ...
@@ -1219,6 +1231,75 @@ function api = dataImportGUI()
         'ButtonPushedFcn',   @onPickFitColor);
     btnFitColor.Layout.Row = 9;
     btnFitColor.BackgroundColor = appData.fitCurveColor;
+
+    btnWHPlot = uibutton(peakBtnGL, 'Text', 'W-H Plot', ...
+        'ButtonPushedFcn', @onWilliamsonHallPlot, ...
+        'BackgroundColor', [0.40 0.20 0.55], 'FontColor', [1 1 1], ...
+        'Tooltip', ['Williamson-Hall strain analysis: plot ' char(946) char(183) ...
+                    'cos' char(952) ' vs 4' char(183) 'sin' char(952) ...
+                    '.  Needs ' char(8805) '3 fitted peaks.']);
+    btnWHPlot.Layout.Row = 10;
+
+    btnFFTThickness = uibutton(peakBtnGL, 'Text', 'FFT Thickness', ...
+        'ButtonPushedFcn', @onFFTThickness, ...
+        'BackgroundColor', [0.55 0.30 0.15], 'FontColor', [1 1 1], ...
+        'Tooltip', 'Compute film thickness from Laue / Kiessig fringe periodicity via FFT');
+    btnFFTThickness.Layout.Row = 11;
+
+    btnRefineLattice = uibutton(peakBtnGL, 'Text', 'Refine Lattice...', ...
+        'ButtonPushedFcn', @onRefineLattice, ...
+        'BackgroundColor', [0.15 0.50 0.30], 'FontColor', [1 1 1], ...
+        'Tooltip', 'Refine lattice parameters from fitted peak positions + hkl Miller indices');
+    btnRefineLattice.Layout.Row = 12;
+
+    % Row 13: Min sep / wavelength / K factor / instrument broadening (shared sub-grid)
+    minSepGL = uigridlayout(peakBtnGL, [4 2], ...
+        'RowHeight', {'1x','1x','1x','1x'}, 'ColumnWidth', {64, '1x'}, ...
+        'Padding', [0 0 0 0], 'ColumnSpacing', 4, 'RowSpacing', 2);
+    minSepGL.Layout.Row = 13;
+    uilabel(minSepGL, 'Text', 'Min sep:', 'FontSize', 9, ...
+        'HorizontalAlignment', 'right', ...
+        'Tooltip', 'Minimum peak separation in degrees');
+    efMinSep = uispinner(minSepGL, ...
+        'Value', 0, 'Limits', [0 20], 'Step', 0.05, ...
+        'Tooltip', ['Minimum peak separation (°) for auto-detect.  ' ...
+                    '0 = automatic (~1% of x-range).  ' ...
+                    'Decrease to resolve closely-spaced peaks.'], ...
+        'ValueDisplayFormat', '%.2f');
+    efMinSep.Layout.Row = 1; efMinSep.Layout.Column = 2;
+    uilabel(minSepGL, 'Text', [char(955), ' (', char(197), '):'], 'FontSize', 9, ...
+        'HorizontalAlignment', 'right', ...
+        'Tooltip', 'X-ray wavelength in Ångströms for d-spacing / Scherrer calculations');
+    efWavelength = uieditfield(minSepGL, 'numeric', ...
+        'Value', 0, 'Limits', [0 Inf], ...
+        'Tooltip', ['Wavelength in Å for d-spacing & Scherrer.  ' ...
+                    'Auto-filled from file metadata when available.  ' ...
+                    'Cu K' char(945) '1 = 1.5406 Å.  0 = not set.'], ...
+        'ValueChangedFcn', @onWavelengthChanged);
+    efWavelength.Layout.Row = 2; efWavelength.Layout.Column = 2;
+    uilabel(minSepGL, 'Text', 'K factor:', 'FontSize', 9, ...
+        'HorizontalAlignment', 'right', ...
+        'Tooltip', 'Scherrer shape factor K (0.9 for spherical grains, 1.0 for cubic)');
+    efKFactor = uieditfield(minSepGL, 'numeric', ...
+        'Value', appData.kFactor, 'Limits', [0.1 2], ...
+        'Placeholder', '0.9', ...
+        'Tooltip', 'Scherrer shape factor K — 0.9 (spherical) or 1.0 (cubic). Affects Size (nm) column.', ...
+        'ValueChangedFcn', @onKFactorChanged);
+    efKFactor.Layout.Row = 3; efKFactor.Layout.Column = 2;
+    uilabel(minSepGL, 'Text', ['Inst ', char(946), ' (', char(176), '):'], 'FontSize', 9, ...
+        'HorizontalAlignment', 'right', ...
+        'Tooltip', ['Instrument broadening FWHM in degrees (e.g. LaB6 standard).  ' ...
+                    '0 = no correction.  Subtracted in quadrature: ' ...
+                    char(946), char(8321), char(8325), char(8331), ...
+                    ' = sqrt(', char(946), char(8322), char(8320), char(8322), char(8331), ...
+                    ' - ', char(946), char(8321), char(8326), char(8331), char(8322), ')']);
+    efInstBroadening = uieditfield(minSepGL, 'numeric', ...
+        'Value', appData.instBroadening_deg, 'Limits', [0 5], ...
+        'Placeholder', '0', ...
+        'Tooltip', ['Instrument broadening FWHM (°). Enter the FWHM of a standard (e.g. LaB6) peak.  ' ...
+                    '0 = no correction applied.'], ...
+        'ValueChangedFcn', @onInstBroadeningChanged);
+    efInstBroadening.Layout.Row = 4; efInstBroadening.Layout.Column = 2;
 
     % ── Drag-and-drop: register every major surface as a drop target (R2023a+) ──
     % In uifigure the CEF renderer consumes drag events at whichever child
@@ -1969,12 +2050,31 @@ function api = dataImportGUI()
         efYOffset.Value      = ds.yOff;
         efBGSlope.Value      = ds.bgSlope;
         efBGIntercept.Value  = ds.bgInt;
+        % Restore BG polynomial order dropdown
+        if isfield(ds,'bgPoly') && numel(ds.bgPoly) > 2
+            bgPolyOrd = numel(ds.bgPoly) - 1;   % poly order = nCoeffs - 1
+            if bgPolyOrd >= 2 && bgPolyOrd <= 6
+                ddBGOrder.Value = sprintf('Poly %d', bgPolyOrd);
+            end
+        else
+            ddBGOrder.Value = 'Linear';
+        end
         cbSmooth.Value       = guiTernary(isfield(ds,'smoothEnabled'), ds.smoothEnabled, false);
         efSmoothWin.Value    = guiTernary(isfield(ds,'smoothWindow'),  ds.smoothWindow,  5);
         ddSmoothMethod.Value = guiTernary(isfield(ds,'smoothMethod'),  ds.smoothMethod,  'Moving');
         efXTrimMin.Value     = nan2str(guiTernary(isfield(ds,'xTrimMin'),      ds.xTrimMin,      NaN));
         efXTrimMax.Value     = nan2str(guiTernary(isfield(ds,'xTrimMax'),      ds.xTrimMax,      NaN));
         ddNormalize.Value    = guiTernary(isfield(ds,'normMethod'),    ds.normMethod,    'None');
+
+        % Restore wavelength override field; auto-fill from metadata if no override set
+        wl_meta = extractWavelength_A(ds);
+        if isfield(ds,'wavelengthOverride_A') && ~isnan(ds.wavelengthOverride_A) && ds.wavelengthOverride_A > 0
+            efWavelength.Value = ds.wavelengthOverride_A;
+        elseif ~isnan(wl_meta) && wl_meta > 0
+            efWavelength.Value = wl_meta;
+        else
+            efWavelength.Value = 0;
+        end
 
         % Restore per-dataset axis limits (auto-scale if not yet saved)
         if isfield(ds, 'axLims')
@@ -2284,15 +2384,13 @@ function api = dataImportGUI()
     % ── Auto peak find (XRD) ─────────────────────────────────────────────
 
     function onAutoPeak(~,~)
-    %ONAUTOPEAK  Two-pass peak detection: global auto-find + forced local search
-    %            at any pre-existing manual seeds missed by the global pass.
+    %ONAUTOPEAK  Three-pass peak detection with second-derivative shoulder finding.
     %
-    %  Pass 1 — global findpeaks with a 5%-prominence threshold.
-    %  Pass 2 — for each manual seed NOT within 0.5% of an auto-found peak,
-    %            run a local unconstrained search in a ±2% x-window and force
-    %            that location into the merged list regardless of prominence.
-    %  Output  — ds.peaks is REPLACED (not appended) with the deduplicated,
-    %            centre-sorted merged result so repeated presses stay clean.
+    %  Pass 1  — global findpeaks with prominence threshold.
+    %  Pass 1b — second-derivative analysis: smoothed y'' local minima detect
+    %            shoulder peaks that findpeaks misses (low prominence).
+    %  Pass 2  — force local search at missed manual seeds.
+    %  Output  — ds.peaks is REPLACED with deduplicated, centre-sorted result.
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig,'Load a file first.','No data'); return;
         end
@@ -2321,24 +2419,30 @@ function api = dataImportGUI()
         end
 
         % ── Restrict to visible x-range if limits are set ─────────────────
-        % This lets users exclude sloping background regions (e.g., low-angle
-        % XRD background) simply by zooming into the region of interest first.
         xMinLim = str2double(efXMin.Value);
         xMaxLim = str2double(efXMax.Value);
         if ~isnan(xMinLim) && ~isnan(xMaxLim) && xMinLim < xMaxLim
             inView = xv >= xMinLim & xv <= xMaxLim;
-            if sum(inView) >= 5   % only restrict if the window contains enough data
+            if sum(inView) >= 5
                 xv = xv(inView);
                 yv = yv(inView);
             end
         end
 
         xSpan = diff([min(xv), max(xv)]);
+        yRange = max(yv) - min(yv);
 
-        PEAK_MIN_PROM_FRAC  = 0.05;   % min prominence as fraction of y-range
-        PEAK_MIN_DIST_FRAC  = 0.01;   % min separation as fraction of x-span
-        PEAK_SEP_TOL_FRAC   = 0.005;  % seeds closer than this fraction of x-span are merged
-        PEAK_LOCAL_WIN_FRAC = 0.02;   % ±fraction of x-span for missed-seed local search
+        PEAK_MIN_PROM_FRAC  = 0.005;  % min prominence as fraction of y-range (low to catch small peaks)
+        PEAK_SEP_TOL_FRAC   = 0.005;  % seeds closer than this are merged
+        PEAK_LOCAL_WIN_FRAC = 0.02;   % ±fraction of x-span for missed-seed search
+
+        % ── User-configurable minimum separation ─────────────────────────
+        userMinSep = efMinSep.Value;
+        if userMinSep > 0
+            minDist = userMinSep;
+        else
+            minDist = xSpan * 0.005;   % tighter default than before (was 0.01)
+        end
 
         % ── Save existing manual seeds BEFORE rebuilding the list ─────────
         if ~isempty(ds.peaks) && isfield(ds.peaks, 'status')
@@ -2349,9 +2453,8 @@ function api = dataImportGUI()
                                   'xRange',{},'status',{});
         end
 
-        % ── Pass 1: global auto-detection ────────────────────────────────
-        minProm = (max(yv) - min(yv)) * PEAK_MIN_PROM_FRAC;
-        minDist = xSpan * PEAK_MIN_DIST_FRAC;
+        % ── Pass 1: global auto-detection via findpeaks ──────────────────
+        minProm = yRange * PEAK_MIN_PROM_FRAC;
         try
             [pkH, pkX, pkW, ~] = findpeaks(yv, xv, ...
                 'MinPeakProminence', minProm, ...
@@ -2362,7 +2465,9 @@ function api = dataImportGUI()
         end
 
         % Build initial merged list from auto results
-        merged = struct('center',{},'fwhm',{},'height',{},'area',{},'xRange',{},'status',{},'bg',{},'model',{});
+        emptyPk = struct('center',{},'fwhm',{},'height',{},'area',{}, ...
+                         'xRange',{},'status',{},'bg',{},'model',{},'eta',{});
+        merged  = emptyPk;
         for pi = 1:numel(pkX)
             newPk.center = pkX(pi);
             newPk.fwhm   = pkW(pi);
@@ -2372,35 +2477,85 @@ function api = dataImportGUI()
             newPk.status = 'auto';
             newPk.bg     = NaN;
             newPk.model  = '';
+            newPk.eta    = NaN;
             merged(end+1) = newPk;  %#ok<AGROW>
         end
 
-        % ── Pass 2: force local search at missed manual seeds ─────────────
-        % "Missed" = no auto peak within minSep of the seed's centre.
+        % ── Pass 1b: second-derivative shoulder detection ────────────────
+        %  The second derivative of y(x) is strongly negative at a peak centre.
+        %  When two peaks overlap, y'' shows distinct local minima even if the
+        %  raw signal only has a shoulder.  A Gaussian smooth suppresses noise.
+        d2Peaks = secondDerivativePeaks(xv, yv, minDist, yRange);
+        for si = 1:numel(d2Peaks)
+            candidate = d2Peaks(si);
+            % Skip if too close to an already-found peak
+            if ~isempty(merged)
+                if any(abs([merged.center] - candidate.center) < minDist)
+                    continue;
+                end
+            end
+            candidate.status = 'auto(d2)';
+            candidate.bg     = NaN;
+            candidate.model  = '';
+            candidate.eta    = NaN;
+            merged(end+1) = candidate;  %#ok<AGROW>
+        end
+
+        % ── Local prominence filter: reject peaks on rising/falling background
+        %  For each auto-detected peak, estimate the local background from
+        %  the minimum y-values on either side (±window).  Accept a peak if
+        %  it stands above local background by EITHER:
+        %    (a) a relative ratio (signal-to-local-bg), OR
+        %    (b) an absolute fraction of global y-range.
+        %  The dual criterion lets small thin-film peaks pass (via relative
+        %  test) while still catching noise bumps on large peaks.
+        LOCAL_PROM_REL   = 0.05;   % peak must be ≥5% above local background
+        LOCAL_PROM_ABS   = 0.003;  % OR ≥0.3% of global y-range (tiny floor)
+        bgWinPts = max(5, round(numel(xv) * 0.02));  % ±2% of data points
+        survivors = [];
+        for mi = 1:numel(merged)
+            if strcmp(merged(mi).status, 'manual')
+                survivors(end+1) = mi; %#ok<AGROW>
+                continue;
+            end
+            ctr = merged(mi).center;
+            ci  = find(xv >= ctr, 1, 'first');
+            if isempty(ci), ci = numel(xv); end
+            % Left/right window boundaries
+            iL = max(1, ci - bgWinPts);
+            iR = min(numel(xv), ci + bgWinPts);
+            % Local background = mean of the two edge minima
+            yLeft  = min(yv(iL:max(ci-1,iL)));
+            yRight = min(yv(min(ci+1,iR):iR));
+            localBG   = max((yLeft + yRight) / 2, 1e-12);  % avoid division by zero
+            localProm = merged(mi).height - localBG;
+            % Accept if relative prominence OR absolute prominence is sufficient
+            if localProm / localBG >= LOCAL_PROM_REL || localProm >= yRange * LOCAL_PROM_ABS
+                survivors(end+1) = mi; %#ok<AGROW>
+            end
+        end
+        merged = merged(survivors);
+
+        % ── Pass 2: force local search at missed manual seeds ────────────
         minSep  = xSpan * PEAK_SEP_TOL_FRAC;
         halfWin = xSpan * PEAK_LOCAL_WIN_FRAC;
 
         for si = 1:numel(manualSeeds)
             seedX = manualSeeds(si).center;
-
-            % Skip if an auto peak already covers this seed
             if ~isempty(merged)
                 if any(abs([merged.center] - seedX) <= minSep)
                     continue;
                 end
             end
 
-            % Local unconstrained search within the window
             inWin = xv >= (seedX - halfWin) & xv <= (seedX + halfWin);
             if ~any(inWin)
-                % Seed is outside data — preserve as-is
                 merged(end+1) = manualSeeds(si);  %#ok<AGROW>
                 continue;
             end
             xWin = xv(inWin);  yWin = yv(inWin);
 
             try
-                % No prominence filter — pick closest local max to seed
                 [lH, lX, lW, ~] = findpeaks(yWin, xWin, 'SortStr', 'none');
                 if isempty(lX)
                     [lH, mi] = max(yWin);  lX = xWin(mi);  lW = halfWin * 0.5;
@@ -2417,9 +2572,10 @@ function api = dataImportGUI()
             newPk.height = lH;
             newPk.area   = NaN;
             newPk.xRange = [];
-            newPk.status = 'manual';   % retains 'manual' — forced by seed
+            newPk.status = 'manual';
             newPk.bg     = NaN;
             newPk.model  = '';
+            newPk.eta    = NaN;
             merged(end+1) = newPk;  %#ok<AGROW>
         end
 
@@ -2486,13 +2642,37 @@ function api = dataImportGUI()
         if isempty(yIdx), return; end
         yv = d.values(:, yIdx);
 
-        % Search within 3 % of x-axis range of click for local maximum
+        % Search within 3 % of x-axis range of click for the NEAREST local
+        % maximum (not the global max — which misses the smaller of two close peaks).
         xWin  = diff(ax.XLim) * 0.03;
         inWin = xv >= (xClick - xWin) & xv <= (xClick + xWin) & ~isnan(yv);
         if any(inWin)
-            [pkH, maxI] = max(yv(inWin));
-            xInWin      = xv(inWin);
-            pkX         = xInWin(maxI);
+            xInWin = xv(inWin);
+            yInWin = yv(inWin);
+            % Find all local maxima in the window
+            nW = numel(yInWin);
+            if nW >= 3
+                isLMax = false(nW,1);
+                isLMax(2:end-1) = yInWin(2:end-1) > yInWin(1:end-2) & ...
+                                  yInWin(2:end-1) > yInWin(3:end);
+                if any(isLMax)
+                    % Pick the local max nearest to the click x-position
+                    lmX = xInWin(isLMax);
+                    lmH = yInWin(isLMax);
+                    [~, nearI] = min(abs(lmX - xClick));
+                    pkX = lmX(nearI);
+                    pkH = lmH(nearI);
+                else
+                    % No local max — fall back to nearest point
+                    [~, nearI] = min(abs(xInWin - xClick));
+                    pkX = xInWin(nearI);
+                    pkH = yInWin(nearI);
+                end
+            else
+                [~, nearI] = min(abs(xInWin - xClick));
+                pkX = xInWin(nearI);
+                pkH = yInWin(nearI);
+            end
         else
             pkX = xClick;
             pkH = yClick;
@@ -2506,6 +2686,7 @@ function api = dataImportGUI()
         newPk.status = 'manual';
         newPk.bg     = NaN;
         newPk.model  = '';
+        newPk.eta    = NaN;
         ds.peaks(end+1) = newPk;
         appData.datasets{appData.activeIdx} = ds;
 
@@ -2600,9 +2781,14 @@ function api = dataImportGUI()
         FIT_MAX_FWHM_FRAC   = 0.5;    % reject fit if FWHM exceeds this × x-span
         FIT_EXPAND_WIN      = 0.025;  % expanded window fraction when < 5 pts in window
 
+        isPV = strcmp(ddFitModel.Value, 'Pseudo-Voigt');
         switch ddFitModel.Value
             case 'Gaussian'
                 modelFun = @(p,x) p(1) .* exp(-4.*log(2).*((x-p(2))./p(3)).^2) + p(4);
+            case 'Pseudo-Voigt'
+                % p = [H, x0, fwhm, bg, eta]  eta in [0,1] (Lorentzian fraction)
+                modelFun = @(p,x) p(1) .* (p(5) ./ (1 + 4.*((x-p(2))./p(3)).^2) + ...
+                                  (1-p(5)) .* exp(-4.*log(2).*((x-p(2))./p(3)).^2)) + p(4);
             otherwise  % 'Lorentzian' (default)
                 modelFun = @(p,x) p(1) ./ (1 + 4.*((x - p(2))./p(3)).^2) + p(4);
         end
@@ -2634,28 +2820,48 @@ function api = dataImportGUI()
             if sum(inWin) < 4, nFailed = nFailed + 1; continue; end
 
             xFit = xv(inWin);  yFit = yv(inWin);
-            [H0, maxI] = max(yFit);
-            x0_0  = xFit(maxI);
-            fw0   = max(diff([min(xFit), max(xFit)]) * FIT_INIT_WIDTH_FRAC, (xFit(2)-xFit(1))*2);
             bg0   = min(yFit);
+            % Use the DETECTED peak center, not max of window — max can snap
+            % to a neighboring larger peak that partially overlaps the window.
+            x0_0  = pk.center;
+            % Interpolate y at the detected center for height estimate
+            H0    = interp1(xFit, yFit, x0_0, 'linear', max(yFit)) - bg0;
+            if H0 <= 0, H0 = max(yFit) - bg0; end   % fallback if interp fails
+            % Use detected FWHM as initial guess when available; otherwise
+            % fall back to 30% of window width (or 2× point spacing minimum)
+            dx    = xFit(2) - xFit(1);
+            if ~isnan(pk.fwhm) && pk.fwhm > 0
+                fw0 = pk.fwhm;
+            else
+                fw0 = max(diff([min(xFit), max(xFit)]) * FIT_INIT_WIDTH_FRAC, dx*2);
+            end
 
+            p0 = [H0, x0_0, fw0, bg0];
+            if isPV, p0(end+1) = 0.5; end  % initial eta guess: 50% Lorentzian
             objFun = @(p) sum((modelFun(p, xFit) - yFit).^2);
             try
-                pFit = fminsearch(objFun, [H0, x0_0, fw0, bg0], opts);
+                pFit = fminsearch(objFun, p0, opts);
                 fwhmFit = abs(pFit(3));
+                etaFit  = guiTernary(isPV, max(0, min(1, pFit(5))), NaN);
                 % Accept only if center is inside fit window and fwhm is sane
                 if pFit(2) >= xLo && pFit(2) <= xHi && ...
                    fwhmFit > 0     && fwhmFit < xSpan * FIT_MAX_FWHM_FRAC
                     ds.peaks(pi).center = pFit(2);
                     ds.peaks(pi).fwhm   = fwhmFit;
-                    ds.peaks(pi).height = pFit(1);   % amplitude H above background
-                    ds.peaks(pi).bg     = pFit(4);   % background level at peak
+                    ds.peaks(pi).height = pFit(1);
+                    ds.peaks(pi).bg     = pFit(4);
+                    ds.peaks(pi).eta    = etaFit;
                     ds.peaks(pi).status = 'fitted';
                     ds.peaks(pi).model  = ddFitModel.Value;
                     % Compute area analytically
                     switch ddFitModel.Value
                         case 'Gaussian'
                             fittedArea = pFit(1) * fwhmFit * sqrt(pi / log(2)) / 2;
+                        case 'Pseudo-Voigt'
+                            % Area = H*fwhm*(eta*pi/2 + (1-eta)*sqrt(pi)/(2*sqrt(ln2)))
+                            A_L = pi / 2;
+                            A_G = sqrt(pi) / (2 * sqrt(log(2)));
+                            fittedArea = pFit(1) * fwhmFit * (etaFit * A_L + (1-etaFit) * A_G);
                         otherwise  % Lorentzian
                             fittedArea = pFit(1) * fwhmFit * pi / 2;
                     end
@@ -2718,28 +2924,55 @@ function api = dataImportGUI()
         nP = numel(ds.peaks);
 
         % Build composite model.
-        % Parameter vector: [H1,x0_1,fwhm1, H2,x0_2,fwhm2, ..., HnP,x0_nP,fwhmNP, m, b]
-        % The inner loop is compiled into a single anonymous function using a
-        % shared helper that iterates over peak blocks.
-        isGauss = strcmp(ddFitModel.Value,'Gaussian');
-        modelFun = @(p,x) evalMultiPeak(p, x, nP, isGauss);
+        % Lorentzian/Gaussian: [H1,x0_1,fwhm1, H2,..., HnP,x0_nP,fwhmNP, m, b]  (3 params/peak)
+        % Pseudo-Voigt:        [H1,x0_1,fwhm1,eta1, ...,                  m, b]  (4 params/peak)
+        isPVGlobal = strcmp(ddFitModel.Value,'Pseudo-Voigt');
+        if isPVGlobal
+            modelFun = @(p,x) evalMultiPeakPV(p, x, nP);
+        else
+            isGauss  = strcmp(ddFitModel.Value,'Gaussian');
+            modelFun = @(p,x) evalMultiPeak(p, x, nP, isGauss);
+        end
 
         % Build initial parameter vector from current peak seeds
-        xSpan = diff([min(xv), max(xv)]);
-        p0 = zeros(1, nP*3 + 2);
+        xSpan   = diff([min(xv), max(xv)]);
+        bgEst   = min(yv);
+        nPPeak  = guiTernary(isPVGlobal, 4, 3);
+        p0      = zeros(1, nP*nPPeak + 2);
         for k = 1:nP
-            pk = ds.peaks(k);
-            H0   = guiTernary(~isnan(pk.height) && pk.height > 0, pk.height, max(yv) - min(yv));
-            fwhm0 = guiTernary(~isnan(pk.fwhm) && pk.fwhm > 0, pk.fwhm, xSpan * 0.02);
-            p0((k-1)*3+1) = H0;
-            p0((k-1)*3+2) = pk.center;
-            p0((k-1)*3+3) = fwhm0;
+            pk    = ds.peaks(k);
+            % pk.height is the absolute y-value; subtract background for model amplitude
+            H0    = guiTernary(~isnan(pk.height) && pk.height > bgEst, pk.height - bgEst, max(yv) - bgEst);
+            fwhm0 = guiTernary(~isnan(pk.fwhm)  && pk.fwhm  > 0, pk.fwhm,  xSpan * 0.02);
+            p0((k-1)*nPPeak+1) = H0;
+            p0((k-1)*nPPeak+2) = pk.center;
+            p0((k-1)*nPPeak+3) = fwhm0;
+            if isPVGlobal
+                eta0 = guiTernary(isfield(pk,'eta') && ~isempty(pk.eta) && ~isnan(pk.eta), pk.eta, 0.5);
+                p0((k-1)*nPPeak+4) = eta0;
+            end
         end
-        % Linear BG initial guess: slope from first/last points
-        p0(end-1) = 0;   % slope
-        p0(end)   = min(yv);  % intercept
+        p0(end-1) = 0;       % shared linear BG slope
+        p0(end)   = min(yv); % shared linear BG intercept
 
-        objFun = @(p) sum((modelFun(p, xv) - yv).^2);
+        % ── Build constrained objective function ─────────────────────────
+        % Add a soft penalty when a peak center drifts more than 3 × its
+        % initial FWHM from its seed position.  This prevents peaks from
+        % swapping positions or collapsing onto each other during the
+        % unconstrained fminsearch optimization.
+        centerIdx = zeros(1, nP);
+        centerBnd = zeros(1, nP);   % allowed half-window for each peak center
+        for k = 1:nP
+            centerIdx(k) = (k-1)*nPPeak + 2;
+            fwInit       = abs(p0((k-1)*nPPeak + 3));
+            centerBnd(k) = max(3 * fwInit, xSpan * 0.02);
+        end
+        seedCenters = p0(centerIdx);
+        penaltyWt   = sum((yv - mean(yv)).^2) * 10;  % scale penalty to data magnitude
+
+        objFun = @(p) sum((modelFun(p, xv) - yv).^2) + ...
+            penaltyWt * sum(max(0, ((p(centerIdx) - seedCenters) ./ centerBnd).^2 - 1));
+
         opts   = optimset('Display','off','MaxIter',20000,'TolX',1e-10,'TolFun',1e-14);
         try
             pFit = fminsearch(objFun, p0, opts);
@@ -2750,20 +2983,26 @@ function api = dataImportGUI()
 
         % Extract fitted parameters and update ds.peaks
         mFit = pFit(end-1);  bFit = pFit(end);
+        A_L  = pi / 2;
+        A_G  = sqrt(pi) / (2 * sqrt(log(2)));
         for k = 1:nP
-            Hk    = pFit((k-1)*3+1);
-            x0k   = pFit((k-1)*3+2);
-            fwhmk = abs(pFit((k-1)*3+3));
+            Hk    = pFit((k-1)*nPPeak+1);
+            x0k   = pFit((k-1)*nPPeak+2);
+            fwhmk = abs(pFit((k-1)*nPPeak+3));
+            etak  = guiTernary(isPVGlobal, max(0, min(1, pFit((k-1)*nPPeak+4))), NaN);
             if fwhmk > 0 && fwhmk < xSpan * 0.8
                 ds.peaks(k).center = x0k;
                 ds.peaks(k).fwhm   = fwhmk;
                 ds.peaks(k).height = Hk;
                 ds.peaks(k).bg     = mFit * x0k + bFit;
+                ds.peaks(k).eta    = etak;
                 ds.peaks(k).status = 'fitted(global)';
                 ds.peaks(k).model  = ddFitModel.Value;
                 switch ddFitModel.Value
                     case 'Gaussian'
                         ds.peaks(k).area = Hk * fwhmk * sqrt(pi / log(2)) / 2;
+                    case 'Pseudo-Voigt'
+                        ds.peaks(k).area = Hk * fwhmk * (etak * A_L + (1-etak) * A_G);
                     otherwise  % Lorentzian
                         ds.peaks(k).area = Hk * fwhmk * pi / 2;
                 end
@@ -2781,7 +3020,7 @@ function api = dataImportGUI()
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
         cancelInteractions();
         ds       = appData.datasets{appData.activeIdx};
-        ds.peaks = struct('center',{},'fwhm',{},'height',{},'area',{},'xRange',{},'status',{},'bg',{},'model',{});
+        ds.peaks = struct('center',{},'fwhm',{},'height',{},'area',{},'xRange',{},'status',{},'bg',{},'model',{},'eta',{});
         appData.datasets{appData.activeIdx} = ds;
         appData.selectedPeakIdx = 0;
         refreshPeakTable();
@@ -2814,23 +3053,54 @@ function api = dataImportGUI()
 
     function refreshPeakTable()
     %REFRESHPEAKTABLE  Sync peakTable.Data from the active dataset's ds.peaks.
+    %   Columns: #, Center(°), d(Å), Size(nm), FWHM(°), Height, Area, η, Status
         if isempty(appData.datasets) || appData.activeIdx < 1
             peakTable.Data = {}; return;
         end
-        ds = appData.datasets{appData.activeIdx};
-        n  = numel(ds.peaks);
+        ds  = appData.datasets{appData.activeIdx};
+        n   = numel(ds.peaks);
         if n == 0
             peakTable.Data = {}; return;
         end
-        tbl = cell(n, 6);
-        for pi = 1:n
-            pk        = ds.peaks(pi);
-            tbl{pi,1} = pi;
-            tbl{pi,2} = sprintf('%.4f', pk.center);
-            tbl{pi,3} = guiTernary(isnan(pk.fwhm) || pk.fwhm <= 0, '—', sprintf('%.4f', pk.fwhm));
-            tbl{pi,4} = sprintf('%.4g',  pk.height);
-            tbl{pi,5} = guiTernary(isnan(pk.area) || pk.area <= 0, '—', sprintf('%.4g', pk.area));
-            tbl{pi,6} = pk.status;
+        wl_A      = extractWavelength_A(ds);   % NaN if no wavelength available
+        K         = appData.kFactor;
+        inst_rad  = appData.instBroadening_deg * (pi / 180);
+        DEG2RAD   = pi / 180;
+        tbl       = cell(n, 9);
+        for pIdx = 1:n
+            pk          = ds.peaks(pIdx);
+            tbl{pIdx,1} = pIdx;
+            tbl{pIdx,2} = sprintf('%.4f', pk.center);
+            % d-spacing via Bragg: d = λ / (2·sin(θ)), θ = 2θ/2 in radians
+            canCalc = ~isnan(wl_A) && ~isnan(pk.center) && pk.center > 0;
+            if canCalc
+                theta_rad   = (pk.center / 2) * DEG2RAD;
+                d_A         = wl_A / (2 * sin(theta_rad));
+                tbl{pIdx,3} = sprintf('%.4f', d_A);
+            else
+                tbl{pIdx,3} = '—';
+            end
+            % Scherrer size: D = Kλ / (β·cosθ), β corrected for instrument broadening
+            hasFWHM = ~isnan(pk.fwhm) && pk.fwhm > 0;
+            if canCalc && hasFWHM
+                beta_meas = pk.fwhm * DEG2RAD;
+                beta_sq   = beta_meas^2 - inst_rad^2;
+                if beta_sq > 0
+                    beta_corr   = sqrt(beta_sq);
+                    size_nm     = (K * wl_A * 0.1) / (beta_corr * cos(theta_rad));
+                    tbl{pIdx,4} = sprintf('%.1f', size_nm);
+                else
+                    tbl{pIdx,4} = '—';   % inst broadening >= measured (unphysical)
+                end
+            else
+                tbl{pIdx,4} = '—';
+            end
+            tbl{pIdx,5} = guiTernary(~hasFWHM, '—', sprintf('%.4f', pk.fwhm));
+            tbl{pIdx,6} = sprintf('%.4g',  pk.height);
+            tbl{pIdx,7} = guiTernary(isnan(pk.area) || pk.area <= 0, '—', sprintf('%.4g', pk.area));
+            hasEta      = isfield(pk,'eta') && ~isempty(pk.eta) && ~isnan(pk.eta);
+            tbl{pIdx,8} = guiTernary(hasEta, sprintf('%.2f', pk.eta), '—');
+            tbl{pIdx,9} = pk.status;
         end
         peakTable.Data = tbl;
     end
@@ -2858,13 +3128,34 @@ function api = dataImportGUI()
         try
             fid = fopen(fp, 'w');
             if fid < 0, error('Cannot open file for writing: %s', fp); end
-            fprintf(fid, 'Peak,Center_deg,FWHM_deg,Height,Area,Status\n');
+            fprintf(fid, 'Peak,Center_deg,d_Angstrom,Size_nm,FWHM_deg,Height,Area,Status\n');
+            wl_A      = extractWavelength_A(ds);
+            K         = appData.kFactor;
+            inst_rad  = appData.instBroadening_deg * (pi / 180);
+            DEG2RAD   = pi / 180;
             for pi = 1:numel(ds.peaks)
                 pk      = ds.peaks(pi);
-                fwhmStr = guiTernary(isnan(pk.fwhm), '', sprintf('%.6f', pk.fwhm));
-                areaStr = guiTernary(isnan(pk.area), '', sprintf('%.6g', pk.area));
-                fprintf(fid, '%d,%.6f,%s,%.6g,%s,%s\n', ...
-                    pi, pk.center, fwhmStr, pk.height, areaStr, pk.status);
+                fwhmStr = guiTernary(isnan(pk.fwhm) || pk.fwhm <= 0, '', sprintf('%.6f', pk.fwhm));
+                areaStr = guiTernary(isnan(pk.area) || pk.area <= 0, '', sprintf('%.6g', pk.area));
+                canCalc = ~isnan(wl_A) && ~isnan(pk.center) && pk.center > 0;
+                if canCalc
+                    theta_rad = (pk.center / 2) * DEG2RAD;
+                    dStr      = sprintf('%.6f', wl_A / (2 * sin(theta_rad)));
+                else
+                    dStr = '';
+                end
+                if canCalc && ~isnan(pk.fwhm) && pk.fwhm > 0
+                    beta_sq = (pk.fwhm * DEG2RAD)^2 - inst_rad^2;
+                    if beta_sq > 0
+                        sizeStr = sprintf('%.2f', (K * wl_A * 0.1) / (sqrt(beta_sq) * cos(theta_rad)));
+                    else
+                        sizeStr = '';
+                    end
+                else
+                    sizeStr = '';
+                end
+                fprintf(fid, '%d,%.6f,%s,%s,%s,%.6g,%s,%s\n', ...
+                    pi, pk.center, dStr, sizeStr, fwhmStr, pk.height, areaStr, pk.status);
             end
             fclose(fid);
             uialert(fig, sprintf('Saved:\n%s', fp), 'Peak Summary Exported');
@@ -2936,17 +3227,35 @@ function api = dataImportGUI()
             end
 
             % Build cell array: header + data rows
-            nPk = numel(ds.peaks);
-            C   = cell(nPk + 1, 6);
-            C(1,:) = {'Peak #', 'Center', 'FWHM', 'Height', 'Area', 'Status'};
+            nPk      = numel(ds.peaks);
+            wl_A     = extractWavelength_A(ds);
+            K        = appData.kFactor;
+            inst_rad = appData.instBroadening_deg * (pi / 180);
+            DEG2RAD  = pi / 180;
+            C   = cell(nPk + 1, 8);
+            C(1,:) = {'Peak #', 'Center (deg)', 'd (A)', 'Size (nm)', 'FWHM (deg)', 'Height', 'Area', 'Status'};
             for pi = 1:nPk
-                pk       = ds.peaks(pi);
+                pk        = ds.peaks(pi);
                 C{pi+1,1} = pi;
                 C{pi+1,2} = pk.center;
-                C{pi+1,3} = guiTernary(isnan(pk.fwhm) || pk.fwhm <= 0, '', pk.fwhm);
-                C{pi+1,4} = pk.height;
-                C{pi+1,5} = guiTernary(isnan(pk.area) || pk.area <= 0, '', pk.area);
-                C{pi+1,6} = pk.status;
+                canCalc   = ~isnan(wl_A) && ~isnan(pk.center) && pk.center > 0;
+                if canCalc
+                    theta_rad  = (pk.center / 2) * DEG2RAD;
+                    C{pi+1,3}  = wl_A / (2 * sin(theta_rad));
+                else
+                    C{pi+1,3} = '';
+                end
+                if canCalc && ~isnan(pk.fwhm) && pk.fwhm > 0
+                    beta_sq = (pk.fwhm * DEG2RAD)^2 - inst_rad^2;
+                    C{pi+1,4} = guiTernary(beta_sq > 0, ...
+                        (K * wl_A * 0.1) / (sqrt(max(beta_sq,0)) * cos(theta_rad)), '');
+                else
+                    C{pi+1,4} = '';
+                end
+                C{pi+1,5} = guiTernary(isnan(pk.fwhm) || pk.fwhm <= 0, '', pk.fwhm);
+                C{pi+1,6} = pk.height;
+                C{pi+1,7} = guiTernary(isnan(pk.area) || pk.area <= 0, '', pk.area);
+                C{pi+1,8} = pk.status;
             end
 
             try
@@ -2971,6 +3280,610 @@ function api = dataImportGUI()
     end
 
     % ── Fit curve visibility / color ─────────────────────────────────────
+
+    function onWavelengthChanged(src, ~)
+    %ONWAVELENGTHCHANGED  User edited the wavelength override field.
+    %   Saves the override to the active dataset and refreshes d-spacing column.
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        ds = appData.datasets{appData.activeIdx};
+        v  = src.Value;
+        ds.wavelengthOverride_A = guiTernary(isnan(v) || v <= 0, NaN, v);
+        appData.datasets{appData.activeIdx} = ds;
+        refreshPeakTable();
+    end
+
+    function onKFactorChanged(src, ~)
+    %ONKFACTORCHANGED  User edited the Scherrer K factor field.
+    %   Saves value to appData and refreshes the Size (nm) column.
+        v = src.Value;
+        if ~isnan(v) && v > 0
+            appData.kFactor = v;
+        end
+        refreshPeakTable();
+    end
+
+    function onInstBroadeningChanged(src, ~)
+    %ONINSTBROADENINGCHANGED  User edited the instrument broadening field.
+    %   Saves value to appData and refreshes the Size (nm) column.
+        v = src.Value;
+        appData.instBroadening_deg = guiTernary(isnan(v) || v < 0, 0, v);
+        refreshPeakTable();
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  2.3  LATTICE PARAMETER REFINEMENT
+    % ════════════════════════════════════════════════════════════════════
+
+    function onRefineLattice(~, ~)
+    %ONREFINELATTICE  Open a dialog to assign hkl indices and refine lattice parameters.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig, 'Load a file first.', 'No data'); return;
+        end
+        ds  = appData.datasets{appData.activeIdx};
+        wl_A = extractWavelength_A(ds);
+        if isnan(wl_A) || wl_A <= 0
+            uialert(fig, ['Wavelength is required for lattice refinement.  ' ...
+                          'Enter a value in the ' char(955) ' field or load an XRDML/Bruker file.'], ...
+                'No wavelength'); return;
+        end
+        fitted = ~isempty(ds.peaks) && any(strcmp({ds.peaks.status}, 'fitted') | ...
+                                           strcmp({ds.peaks.status}, 'fitted(global)'));
+        if ~fitted
+            uialert(fig, 'Fit peaks first (at least one fitted peak required).', ...
+                'No fitted peaks'); return;
+        end
+
+        % ── Collect fitted peaks ────────────────────────────────────────
+        DEG2RAD = pi / 180;
+        fittedIdx = find(strcmp({ds.peaks.status}, 'fitted') | ...
+                         strcmp({ds.peaks.status}, 'fitted(global)'));
+        nPk = numel(fittedIdx);
+        centers  = [ds.peaks(fittedIdx).center];
+        theta    = centers / 2 * DEG2RAD;
+        d_obs    = wl_A ./ (2 * sin(theta));
+
+        % ── Create dialog figure ────────────────────────────────────────
+        dlgFig = uifigure('Name', 'Lattice Parameter Refinement', ...
+            'Position', [200 200 520 480], 'Resize', 'on');
+        dlgGL = uigridlayout(dlgFig, [5 1], ...
+            'RowHeight', {24, '1x', 28, 28, '0.6x'}, ...
+            'Padding', [10 10 10 10], 'RowSpacing', 8);
+
+        % Row 1: Crystal system selector
+        sysGL = uigridlayout(dlgGL, [1 2], 'ColumnWidth', {120, '1x'}, ...
+            'Padding', [0 0 0 0]);
+        sysGL.Layout.Row = 1;
+        uilabel(sysGL, 'Text', 'Crystal system:', 'FontWeight', 'bold');
+        ddSystem = uidropdown(sysGL, ...
+            'Items', {'Cubic', 'Tetragonal', 'Hexagonal', 'Orthorhombic'}, ...
+            'Value', 'Cubic');
+
+        % Row 2: hkl assignment table
+        tblData = cell(nPk, 6);
+        for i = 1:nPk
+            tblData{i,1} = fittedIdx(i);
+            tblData{i,2} = sprintf('%.4f', centers(i));
+            tblData{i,3} = sprintf('%.4f', d_obs(i));
+            tblData{i,4} = 0;   % h
+            tblData{i,5} = 0;   % k
+            tblData{i,6} = 0;   % l
+        end
+        hklTable = uitable(dlgGL, ...
+            'ColumnName', {'Peak#', ['2' char(952) ' (' char(176) ')'], ...
+                           'd (Å)', 'h', 'k', 'l'}, ...
+            'ColumnWidth', {50, 75, 75, 55, 55, 55}, ...
+            'ColumnEditable', [false false false true true true], ...
+            'ColumnFormat', {'numeric','char','char','numeric','numeric','numeric'}, ...
+            'Data', tblData, 'RowName', {});
+        hklTable.Layout.Row = 2;
+
+        % Row 3: Refine button
+        btnRefine = uibutton(dlgGL, 'Text', 'Refine Lattice Parameters', ...
+            'ButtonPushedFcn', @doRefine, ...
+            'BackgroundColor', [0.15 0.50 0.30], 'FontColor', [1 1 1]);
+        btnRefine.Layout.Row = 3;
+
+        % Row 4: Nelson-Riley plot button
+        btnNR = uibutton(dlgGL, 'Text', 'Nelson-Riley Plot (cubic only)', ...
+            'ButtonPushedFcn', @doNelsonRiley, 'Enable', 'off');
+        btnNR.Layout.Row = 4;
+
+        % Row 5: Results text area
+        taResults = uitextarea(dlgGL, 'Value', {'Assign hkl indices and click Refine.'}, ...
+            'Editable', false, 'FontName', 'Consolas');
+        taResults.Layout.Row = 5;
+
+        % ── Stored refinement results (closure variable) ────────────────
+        refinedResult = [];
+
+        function doRefine(~, ~)
+        %DOREFINE  Run least-squares lattice parameter refinement.
+            tData  = hklTable.Data;
+            h_arr  = cell2mat(tData(:,4));
+            k_arr  = cell2mat(tData(:,5));
+            l_arr  = cell2mat(tData(:,6));
+            % Validate: at least one non-zero hkl
+            hklSum = abs(h_arr) + abs(k_arr) + abs(l_arr);
+            valid  = hklSum > 0;
+            if sum(valid) < 1
+                taResults.Value = {'Error: assign non-zero hkl to at least one peak.'};
+                return;
+            end
+            hv = h_arr(valid);  kv = k_arr(valid);  lv = l_arr(valid);
+            dv = d_obs(valid);
+            inv_d2 = (1 ./ dv.^2)';
+
+            sys = ddSystem.Value;
+            lines_out = {};
+            switch sys
+                case 'Cubic'
+                    % a = d * sqrt(h^2 + k^2 + l^2) for each peak
+                    a_each = dv' .* sqrt(hv.^2 + kv.^2 + lv.^2);
+                    a_mean = mean(a_each);
+                    a_std  = std(a_each);
+                    % Least-squares: 1/d^2 = (h^2+k^2+l^2) / a^2
+                    A_mat  = hv.^2 + kv.^2 + lv.^2;
+                    inv_a2 = A_mat \ inv_d2;
+                    a_ls   = 1 / sqrt(inv_a2);
+                    d_calc = a_ls ./ sqrt(hv.^2 + kv.^2 + lv.^2);
+                    resid  = dv' - d_calc;
+                    lines_out = {
+                        sprintf('Crystal system: Cubic')
+                        sprintf('Refined a = %.5f %s', a_ls, char(197))
+                        sprintf('Mean a   = %.5f %s %s %.5f', a_mean, char(197), char(177), a_std)
+                        ''
+                        'Per-peak residuals (d_obs - d_calc):'
+                    };
+                    for ri = 1:numel(dv')
+                        lines_out{end+1} = sprintf('  (%d%d%d)  d=%.4f  calc=%.4f  %s=%.4f', ...
+                            hv(ri), kv(ri), lv(ri), dv(ri), d_calc(ri), char(916), resid(ri)); %#ok<AGROW>
+                    end
+                    refinedResult = struct('system','Cubic','a',a_ls,'residuals',resid, ...
+                        'hkl',[hv kv lv],'d_obs',dv','d_calc',d_calc, ...
+                        'theta_rad',theta(valid)');
+                    btnNR.Enable = 'on';
+
+                case 'Tetragonal'
+                    % 1/d^2 = (h^2+k^2)/a^2 + l^2/c^2
+                    A_mat = [hv.^2+kv.^2, lv.^2];
+                    if size(A_mat,1) < 2
+                        taResults.Value = {'Error: tetragonal needs >= 2 peaks with hkl.'};
+                        return;
+                    end
+                    x = A_mat \ inv_d2;
+                    a_ref = 1/sqrt(x(1));  c_ref = 1/sqrt(x(2));
+                    d_calc = 1 ./ sqrt(A_mat * x);
+                    resid  = dv' - d_calc;
+                    lines_out = {
+                        sprintf('Crystal system: Tetragonal')
+                        sprintf('Refined a = %.5f %s', a_ref, char(197))
+                        sprintf('Refined c = %.5f %s', c_ref, char(197))
+                        sprintf('c/a = %.5f', c_ref/a_ref)
+                        ''
+                        'Per-peak residuals:'
+                    };
+                    for ri = 1:numel(dv')
+                        lines_out{end+1} = sprintf('  (%d%d%d)  d=%.4f  calc=%.4f  %s=%.4f', ...
+                            hv(ri), kv(ri), lv(ri), dv(ri), d_calc(ri), char(916), resid(ri)); %#ok<AGROW>
+                    end
+                    refinedResult = struct('system','Tetragonal','a',a_ref,'c',c_ref, ...
+                        'residuals',resid,'hkl',[hv kv lv],'d_obs',dv','d_calc',d_calc);
+                    btnNR.Enable = 'off';
+
+                case 'Hexagonal'
+                    % 1/d^2 = (4/3)(h^2+hk+k^2)/a^2 + l^2/c^2
+                    A_mat = [(4/3)*(hv.^2 + hv.*kv + kv.^2), lv.^2];
+                    if size(A_mat,1) < 2
+                        taResults.Value = {'Error: hexagonal needs >= 2 peaks with hkl.'};
+                        return;
+                    end
+                    x = A_mat \ inv_d2;
+                    a_ref = 1/sqrt(x(1));  c_ref = 1/sqrt(x(2));
+                    d_calc = 1 ./ sqrt(A_mat * x);
+                    resid  = dv' - d_calc;
+                    lines_out = {
+                        sprintf('Crystal system: Hexagonal')
+                        sprintf('Refined a = %.5f %s', a_ref, char(197))
+                        sprintf('Refined c = %.5f %s', c_ref, char(197))
+                        sprintf('c/a = %.5f', c_ref/a_ref)
+                        ''
+                        'Per-peak residuals:'
+                    };
+                    for ri = 1:numel(dv')
+                        lines_out{end+1} = sprintf('  (%d%d%d)  d=%.4f  calc=%.4f  %s=%.4f', ...
+                            hv(ri), kv(ri), lv(ri), dv(ri), d_calc(ri), char(916), resid(ri)); %#ok<AGROW>
+                    end
+                    refinedResult = struct('system','Hexagonal','a',a_ref,'c',c_ref, ...
+                        'residuals',resid,'hkl',[hv kv lv],'d_obs',dv','d_calc',d_calc);
+                    btnNR.Enable = 'off';
+
+                case 'Orthorhombic'
+                    % 1/d^2 = h^2/a^2 + k^2/b^2 + l^2/c^2
+                    A_mat = [hv.^2, kv.^2, lv.^2];
+                    if size(A_mat,1) < 3
+                        taResults.Value = {'Error: orthorhombic needs >= 3 peaks with hkl.'};
+                        return;
+                    end
+                    x = A_mat \ inv_d2;
+                    a_ref = 1/sqrt(x(1));  b_ref = 1/sqrt(x(2));  c_ref = 1/sqrt(x(3));
+                    d_calc = 1 ./ sqrt(A_mat * x);
+                    resid  = dv' - d_calc;
+                    lines_out = {
+                        sprintf('Crystal system: Orthorhombic')
+                        sprintf('Refined a = %.5f %s', a_ref, char(197))
+                        sprintf('Refined b = %.5f %s', b_ref, char(197))
+                        sprintf('Refined c = %.5f %s', c_ref, char(197))
+                        ''
+                        'Per-peak residuals:'
+                    };
+                    for ri = 1:numel(dv')
+                        lines_out{end+1} = sprintf('  (%d%d%d)  d=%.4f  calc=%.4f  %s=%.4f', ...
+                            hv(ri), kv(ri), lv(ri), dv(ri), d_calc(ri), char(916), resid(ri)); %#ok<AGROW>
+                    end
+                    refinedResult = struct('system','Orthorhombic','a',a_ref,'b',b_ref,'c',c_ref, ...
+                        'residuals',resid,'hkl',[hv kv lv],'d_obs',dv','d_calc',d_calc);
+                    btnNR.Enable = 'off';
+            end
+
+            rms = sqrt(mean(resid.^2));
+            lines_out{end+1} = '';
+            lines_out{end+1} = sprintf('RMS residual = %.6f %s', rms, char(197));
+            taResults.Value = lines_out;
+
+            % Persist to dataset
+            ds2 = appData.datasets{appData.activeIdx};
+            ds2.latticeParams = refinedResult;
+            appData.datasets{appData.activeIdx} = ds2;
+        end
+
+        function doNelsonRiley(~, ~)
+        %DONELSONRILEY  Nelson-Riley extrapolation plot for cubic systems.
+        %   Plots a_individual vs NR(θ) = cos²θ/sinθ + cos²θ/θ; extrapolates to NR=0.
+            if isempty(refinedResult) || ~strcmp(refinedResult.system, 'Cubic')
+                return;
+            end
+            th  = refinedResult.theta_rad;
+            hkl = refinedResult.hkl;
+            dObs = refinedResult.d_obs;
+            % a from each peak
+            a_each = dObs .* sqrt(hkl(:,1).^2 + hkl(:,2).^2 + hkl(:,3).^2);
+            % Nelson-Riley function
+            NR = cos(th).^2 ./ sin(th) + cos(th).^2 ./ th;
+            % Linear extrapolation
+            p = polyfit(NR, a_each, 1);
+            a_extrap = p(2);  % intercept at NR=0
+            NR_fit = linspace(0, max(NR)*1.1, 100);
+            a_fit  = polyval(p, NR_fit);
+
+            nrFig = figure('Name', 'Nelson-Riley Extrapolation', ...
+                'NumberTitle', 'off', 'Position', [300 250 500 380]);
+            nrAx = axes(nrFig);
+            plot(nrAx, NR, a_each, 'ko', 'MarkerSize', 8, 'MarkerFaceColor', [0.2 0.5 0.8]);
+            hold(nrAx, 'on');
+            plot(nrAx, NR_fit, a_fit, 'r-', 'LineWidth', 1.5);
+            plot(nrAx, 0, a_extrap, 'r^', 'MarkerSize', 12, 'MarkerFaceColor', 'r');
+            hold(nrAx, 'off');
+            xlabel(nrAx, ['cos' char(178) char(952) '/sin' char(952) ' + cos' char(178) char(952) '/' char(952)]);
+            ylabel(nrAx, ['a (' char(197) ')']);
+            title(nrAx, sprintf('Nelson-Riley:  a_0 = %.5f %s (extrapolated)', a_extrap, char(197)));
+            grid(nrAx, 'on');
+            box(nrAx, 'on');
+            legend(nrAx, 'Per-peak a', 'Linear fit', ...
+                sprintf('a_0 = %.5f', a_extrap), 'Location', 'best');
+
+            % Add hkl labels
+            for li = 1:numel(NR)
+                text(nrAx, NR(li), a_each(li), ...
+                    sprintf(' (%d%d%d)', hkl(li,1), hkl(li,2), hkl(li,3)), ...
+                    'FontSize', 8);
+            end
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  3.1  FILM THICKNESS FROM LAUE FRINGES (FFT)
+    % ════════════════════════════════════════════════════════════════════
+
+    function onFFTThickness(~, ~)
+    %ONFFTTHICKNESS  Compute film thickness from fringe periodicity via FFT.
+    %   Converts intensity data to Q-space, applies FFT, and finds dominant
+    %   periodicity corresponding to film thickness.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig, 'Load a file first.', 'No data'); return;
+        end
+        ds  = appData.datasets{appData.activeIdx};
+        wl_A = extractWavelength_A(ds);
+        if isnan(wl_A) || wl_A <= 0
+            uialert(fig, ['Wavelength is required for FFT thickness.  ' ...
+                          'Enter a value in the ' char(955) ' field.'], ...
+                'No wavelength'); return;
+        end
+
+        % Get current data (corrected if available)
+        d = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
+        xAll = d.time(:);
+        % Use first y-channel (primary intensity)
+        yAll = d.values(:,1);
+
+        % Pre-fill range from current axis limits
+        xLo = ax.XLim(1);
+        xHi = ax.XLim(2);
+
+        % ── Create dialog figure ────────────────────────────────────────
+        fftFig = uifigure('Name', 'FFT Film Thickness', ...
+            'Position', [250 200 600 500], 'Resize', 'on');
+        fftGL = uigridlayout(fftFig, [3 1], ...
+            'RowHeight', {60, 28, '1x'}, ...
+            'Padding', [10 10 10 10], 'RowSpacing', 8);
+
+        % Row 1: Range controls
+        rangeGL = uigridlayout(fftGL, [2 4], ...
+            'ColumnWidth', {80, '1x', 80, '1x'}, ...
+            'RowHeight', {24, 24}, ...
+            'Padding', [0 0 0 0], 'ColumnSpacing', 6, 'RowSpacing', 4);
+        rangeGL.Layout.Row = 1;
+        uilabel(rangeGL, 'Text', ['2' char(952) ' min (' char(176) '):'], 'FontWeight', 'bold');
+        efFFTMin = uieditfield(rangeGL, 'numeric', 'Value', xLo, 'Limits', [-10 180]);
+        efFFTMin.Layout.Row = 1; efFFTMin.Layout.Column = 2;
+        uilabel(rangeGL, 'Text', ['2' char(952) ' max (' char(176) '):'], 'FontWeight', 'bold');
+        efFFTMax = uieditfield(rangeGL, 'numeric', 'Value', xHi, 'Limits', [-10 180]);
+        efFFTMax.Layout.Row = 1; efFFTMax.Layout.Column = 4;
+        uilabel(rangeGL, 'Text', 'Max t (nm):', 'FontWeight', 'bold');
+        efMaxThick = uieditfield(rangeGL, 'numeric', 'Value', 200, 'Limits', [1 10000], ...
+            'Tooltip', 'Maximum thickness to display on x-axis (nm)');
+        efMaxThick.Layout.Row = 2; efMaxThick.Layout.Column = 2;
+        uilabel(rangeGL, 'Text', 'Window:');
+        ddWindow = uidropdown(rangeGL, ...
+            'Items', {'Hann', 'None', 'Blackman'}, 'Value', 'Hann', ...
+            'Tooltip', 'Windowing function applied before FFT');
+        ddWindow.Layout.Row = 2; ddWindow.Layout.Column = 4;
+
+        % Row 2: Compute button
+        btnCompute = uibutton(fftGL, 'Text', 'Compute FFT', ...
+            'ButtonPushedFcn', @doFFT, ...
+            'BackgroundColor', [0.55 0.30 0.15], 'FontColor', [1 1 1]);
+        btnCompute.Layout.Row = 2;
+
+        % Row 3: Axes for FFT plot
+        fftAxPanel = uipanel(fftGL, 'BorderType', 'none');
+        fftAxPanel.Layout.Row = 3;
+        fftAx = axes(fftAxPanel);
+
+        function doFFT(~, ~)
+        %DOFFT  Run the FFT computation and plot results.
+            twoThMin = efFFTMin.Value;
+            twoThMax = efFFTMax.Value;
+            if twoThMin >= twoThMax
+                uialert(fftFig, 'Min must be less than Max.', 'Invalid range');
+                return;
+            end
+
+            % Extract data in selected range
+            mask = xAll >= twoThMin & xAll <= twoThMax;
+            if sum(mask) < 10
+                uialert(fftFig, 'Too few data points in selected range (need >= 10).', 'Insufficient data');
+                return;
+            end
+            twoTh_sel = xAll(mask);
+            I_sel     = yAll(mask);
+
+            % Convert 2θ → Q (Å⁻¹)
+            Q = (4 * pi / wl_A) * sin(twoTh_sel / 2 * pi / 180);
+
+            % Interpolate to uniform Q grid
+            nPts     = numel(Q);
+            Q_uniform = linspace(min(Q), max(Q), nPts);
+            I_uniform = interp1(Q, I_sel, Q_uniform, 'pchip');
+
+            % Subtract mean (remove DC)
+            I_uniform = I_uniform - mean(I_uniform);
+
+            % Apply window function
+            N = numel(I_uniform);
+            switch ddWindow.Value
+                case 'Hann'
+                    w = 0.5 * (1 - cos(2*pi*(0:N-1)/(N-1)));
+                case 'Blackman'
+                    w = 0.42 - 0.5*cos(2*pi*(0:N-1)/(N-1)) + 0.08*cos(4*pi*(0:N-1)/(N-1));
+                otherwise
+                    w = ones(1, N);
+            end
+            I_windowed = I_uniform(:)' .* w;
+
+            % FFT with zero-padding for better resolution
+            N_fft = 2^nextpow2(4 * N);
+            F     = abs(fft(I_windowed, N_fft));
+            F     = F(1:N_fft/2);
+
+            % Build thickness axis (Å → nm)
+            dQ           = Q_uniform(2) - Q_uniform(1);
+            thickness_A  = 2*pi*(0:N_fft/2-1) / (N_fft * dQ);
+            thickness_nm = thickness_A / 10;
+
+            % Find dominant peak (skip DC component, bins 1-3)
+            searchMin = 4;
+            maxT_nm   = efMaxThick.Value;
+            searchMax = find(thickness_nm <= maxT_nm, 1, 'last');
+            if isempty(searchMax) || searchMax < searchMin + 1
+                searchMax = numel(F);
+            end
+            [peakVal, peakIdx] = max(F(searchMin:searchMax));
+            peakIdx = peakIdx + searchMin - 1;
+            t_nm    = thickness_nm(peakIdx);
+
+            % Estimate uncertainty from FFT peak width (FWHM of FFT peak)
+            halfMax = peakVal / 2;
+            leftIdx  = find(F(1:peakIdx) < halfMax, 1, 'last');
+            rightIdx = peakIdx + find(F(peakIdx:end) < halfMax, 1, 'first') - 1;
+            if ~isempty(leftIdx) && ~isempty(rightIdx)
+                fwhm_bins = rightIdx - leftIdx;
+                dt_nm = thickness_nm(min(peakIdx + ceil(fwhm_bins/2), numel(thickness_nm))) - ...
+                        thickness_nm(max(peakIdx - ceil(fwhm_bins/2), 1));
+            else
+                dt_nm = NaN;
+            end
+
+            % ── Plot ────────────────────────────────────────────────────
+            cla(fftAx);
+            plot(fftAx, thickness_nm(1:searchMax), F(1:searchMax), '-', ...
+                'Color', [0.2 0.4 0.7], 'LineWidth', 1.2);
+            hold(fftAx, 'on');
+            plot(fftAx, t_nm, peakVal, 'rv', 'MarkerSize', 12, 'MarkerFaceColor', 'r');
+            hold(fftAx, 'off');
+            xlabel(fftAx, 'Film thickness (nm)');
+            ylabel(fftAx, 'FFT magnitude');
+            if ~isnan(dt_nm)
+                title(fftAx, sprintf('t = %.1f %s %.1f nm', t_nm, char(177), dt_nm/2));
+            else
+                title(fftAx, sprintf('t = %.1f nm', t_nm));
+            end
+            grid(fftAx, 'on');
+            box(fftAx, 'on');
+            xlim(fftAx, [0 maxT_nm]);
+
+            % Persist to dataset
+            ds2 = appData.datasets{appData.activeIdx};
+            fftResult.thickness_nm = t_nm;
+            fftResult.uncertainty_nm = guiTernary(isnan(dt_nm), NaN, dt_nm/2);
+            fftResult.wavelength_A = wl_A;
+            fftResult.twoTheta_range = [twoThMin twoThMax];
+            fftResult.fft_magnitude = F(1:searchMax);
+            fftResult.thickness_axis = thickness_nm(1:searchMax);
+            ds2.filmThickness = fftResult;
+            appData.datasets{appData.activeIdx} = ds2;
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  3.2  WILLIAMSON-HALL STRAIN ANALYSIS
+    % ════════════════════════════════════════════════════════════════════
+
+    function onWilliamsonHallPlot(~, ~)
+    %ONWILLIAMSONHALLPLOT  Williamson-Hall analysis: β·cosθ vs 4·sinθ.
+    %   Linear fit: β·cosθ = Kλ/D + 4ε·sinθ
+    %   intercept → crystallite size D,  slope → microstrain ε.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig, 'Load a file first.', 'No data'); return;
+        end
+        ds  = appData.datasets{appData.activeIdx};
+        wl_A = extractWavelength_A(ds);
+        if isnan(wl_A) || wl_A <= 0
+            uialert(fig, ['Wavelength is required for Williamson-Hall analysis.  ' ...
+                          'Enter a value in the ' char(955) ' field.'], ...
+                'No wavelength'); return;
+        end
+
+        % Collect fitted peaks with valid FWHM
+        if isempty(ds.peaks)
+            uialert(fig, 'No peaks available.  Find and fit peaks first.', 'No peaks');
+            return;
+        end
+        DEG2RAD  = pi / 180;
+        K        = appData.kFactor;
+        inst_rad = appData.instBroadening_deg * DEG2RAD;
+
+        validIdx = [];
+        for pi = 1:numel(ds.peaks)
+            pk = ds.peaks(pi);
+            isFitted = strcmp(pk.status,'fitted') || strcmp(pk.status,'fitted(global)');
+            hasFWHM  = ~isnan(pk.fwhm) && pk.fwhm > 0;
+            if isFitted && hasFWHM
+                beta_meas = pk.fwhm * DEG2RAD;
+                beta_sq   = beta_meas^2 - inst_rad^2;
+                if beta_sq > 0
+                    validIdx(end+1) = pi; %#ok<AGROW>
+                end
+            end
+        end
+        if numel(validIdx) < 3
+            uialert(fig, ...
+                sprintf('Williamson-Hall needs %s 3 fitted peaks with valid FWHM.\nCurrently have %d.', ...
+                    char(8805), numel(validIdx)), ...
+                'Insufficient peaks');
+            return;
+        end
+
+        % ── Compute W-H data ───────────────────────────────────────────
+        nWH      = numel(validIdx);
+        sinTh    = zeros(nWH, 1);
+        betaCos  = zeros(nWH, 1);
+        peakLabels = cell(nWH, 1);
+        for wi = 1:nWH
+            pk        = ds.peaks(validIdx(wi));
+            theta_rad = (pk.center / 2) * DEG2RAD;
+            beta_meas = pk.fwhm * DEG2RAD;
+            beta_corr = sqrt(beta_meas^2 - inst_rad^2);
+            sinTh(wi)   = sin(theta_rad);
+            betaCos(wi)  = beta_corr * cos(theta_rad);
+            peakLabels{wi} = sprintf('%.2f%s', pk.center, char(176));
+        end
+        xWH = 4 * sinTh;
+        yWH = betaCos;
+
+        % ── Linear fit: yWH = slope·xWH + intercept ───────────────────
+        p  = polyfit(xWH, yWH, 1);
+        slope     = p(1);   % = microstrain ε
+        intercept = p(2);   % = Kλ/D
+
+        if intercept > 0
+            D_nm = (K * wl_A * 0.1) / intercept;   % Å→nm via ×0.1
+        else
+            D_nm = NaN;   % unphysical negative intercept
+        end
+        epsilon = slope;   % microstrain (dimensionless)
+
+        % R²
+        yFit = polyval(p, xWH);
+        SS_res = sum((yWH - yFit).^2);
+        SS_tot = sum((yWH - mean(yWH)).^2);
+        R2 = 1 - SS_res / SS_tot;
+
+        % ── Plot ────────────────────────────────────────────────────────
+        whFig = figure('Name', 'Williamson-Hall Plot', ...
+            'NumberTitle', 'off', 'Position', [300 220 540 400]);
+        whAx = axes(whFig);
+        plot(whAx, xWH, yWH, 'ko', 'MarkerSize', 8, 'MarkerFaceColor', [0.2 0.5 0.8]);
+        hold(whAx, 'on');
+        xFitLine = linspace(0, max(xWH)*1.15, 100);
+        yFitLine = polyval(p, xFitLine);
+        plot(whAx, xFitLine, yFitLine, 'r-', 'LineWidth', 1.5);
+        hold(whAx, 'off');
+
+        xlabel(whAx, ['4' char(183) 'sin(' char(952) ')']);
+        ylabel(whAx, [char(946) char(183) 'cos(' char(952) ')  (rad)']);
+        if ~isnan(D_nm)
+            title(whAx, sprintf('D = %.1f nm,  %s = %.2e,  R%s = %.4f', ...
+                D_nm, char(949), epsilon, char(178), R2));
+        else
+            title(whAx, sprintf('%s = %.2e,  R%s = %.4f  (negative intercept)', ...
+                char(949), epsilon, char(178), R2));
+        end
+        grid(whAx, 'on');
+        box(whAx, 'on');
+        legend(whAx, 'Peak data', sprintf('%s%scos%s = %.2e%s4sin%s + %.4e', ...
+            char(946), char(183), char(952), epsilon, char(183), char(952), intercept), ...
+            'Location', 'best');
+
+        % Add 2θ labels to points
+        for li = 1:nWH
+            text(whAx, xWH(li), yWH(li), ['  ' peakLabels{li}], 'FontSize', 8);
+        end
+
+        % Persist to dataset
+        ds2 = appData.datasets{appData.activeIdx};
+        ds2.williamsonHall = struct( ...
+            'D_nm',      D_nm, ...
+            'epsilon',   epsilon, ...
+            'R2',        R2, ...
+            'slope',     slope, ...
+            'intercept', intercept, ...
+            'xWH',       xWH, ...
+            'yWH',       yWH, ...
+            'K',         K, ...
+            'wavelength_A', wl_A, ...
+            'instBroadening_deg', appData.instBroadening_deg);
+        appData.datasets{appData.activeIdx} = ds2;
+    end
 
     function onToggleFitCurves(src, ~)
     %ONTOGGLEFITCURVES  Show or hide Lorentzian fit overlays on the plot.
@@ -3038,6 +3951,7 @@ function api = dataImportGUI()
             undoState.yOff           = ds.yOff;
             undoState.bgSlope        = ds.bgSlope;
             undoState.bgInt          = ds.bgInt;
+            undoState.bgPoly         = guiTernary(isfield(ds,'bgPoly'), ds.bgPoly, []);
             undoState.smoothEnabled  = ds.smoothEnabled;
             undoState.smoothWindow   = ds.smoothWindow;
             undoState.smoothMethod   = ds.smoothMethod;
@@ -3073,6 +3987,7 @@ function api = dataImportGUI()
                     end
                 end
             else
+                hasPolyAll = isfield(ds,'bgPoly') && numel(ds.bgPoly) > 2;
                 for k = 1:size(corrData.values, 2)
                     yRaw = corrData.values(:, k);
                     if isdatetime(corrData.time)
@@ -3080,7 +3995,11 @@ function api = dataImportGUI()
                     else
                         xForBG = double(corrData.time);
                     end
-                    yBG = bgSlope .* xForBG + bgIntcpt;
+                    if hasPolyAll
+                        yBG = polyval(ds.bgPoly, xForBG);
+                    else
+                        yBG = bgSlope .* xForBG + bgIntcpt;
+                    end
                     corrData.values(:, k) = yRaw - yBG - yOff;
                 end
             end
@@ -3163,6 +4082,7 @@ function api = dataImportGUI()
         undoState.yOff           = ds.yOff;
         undoState.bgSlope        = ds.bgSlope;
         undoState.bgInt          = ds.bgInt;
+        undoState.bgPoly         = guiTernary(isfield(ds,'bgPoly'), ds.bgPoly, []);
         undoState.smoothEnabled  = ds.smoothEnabled;
         undoState.smoothWindow   = ds.smoothWindow;
         undoState.smoothMethod   = ds.smoothMethod;
@@ -3204,7 +4124,9 @@ function api = dataImportGUI()
                 end
             end
         else
-            % Standard: y_corrected = y_raw - (bgSlope * x_raw + bgIntcpt) - yOff
+            % Standard: y_corrected = y_raw - yBG(x) - yOff
+            % yBG is polynomial (ds.bgPoly) when order > 1, else linear slope+intercept
+            hasPoly = isfield(ds,'bgPoly') && numel(ds.bgPoly) > 2;
             for k = 1:size(corrData.values, 2)
                 yRaw = corrData.values(:, k);
                 if isdatetime(corrData.time)
@@ -3212,7 +4134,11 @@ function api = dataImportGUI()
                 else
                     xForBG = double(corrData.time);
                 end
-                yBG = bgSlope .* xForBG + bgIntcpt;
+                if hasPoly
+                    yBG = polyval(ds.bgPoly, xForBG);
+                else
+                    yBG = bgSlope .* xForBG + bgIntcpt;
+                end
                 corrData.values(:, k) = yRaw - yBG - yOff;
             end
         end
@@ -3262,6 +4188,7 @@ function api = dataImportGUI()
         ds.yOff          = yOff;
         ds.bgSlope       = bgSlope;
         ds.bgInt         = bgIntcpt;
+        % bgPoly already set on ds by onBGMouseUp; preserve it here (don't overwrite)
         ds.smoothEnabled = cbSmooth.Value;
         ds.smoothWindow  = efSmoothWin.Value;
         ds.smoothMethod  = ddSmoothMethod.Value;
@@ -3364,6 +4291,7 @@ function api = dataImportGUI()
         efYOffset.Value     = yOffDefault;
         efBGSlope.Value     = 0;
         efBGIntercept.Value = 0;
+        ddBGOrder.Value     = 'Linear';
         cbSmooth.Value      = false;
         efSmoothWin.Value   = 5;
         ddSmoothMethod.Value = 'Moving';
@@ -3379,6 +4307,7 @@ function api = dataImportGUI()
             ds.yOff          = yOffDefault;
             ds.bgSlope       = 0;
             ds.bgInt         = 0;
+            ds.bgPoly        = [];
             ds.smoothEnabled = false;
             ds.smoothWindow  = 5;
             ds.smoothMethod  = 'Moving';
@@ -3386,7 +4315,7 @@ function api = dataImportGUI()
             ds.xTrimMax      = NaN;
             ds.normMethod    = 'None';
             ds.peaks         = struct('center',{},'fwhm',{},'height',{},'area',{}, ...
-                                      'xRange',{},'status',{},'bg',{},'model',{});
+                                      'xRange',{},'status',{},'bg',{},'model',{},'eta',{});
             appData.datasets{appData.activeIdx} = ds;
             appData.selectedPeakIdx = 0;
         end
@@ -3430,6 +4359,9 @@ function api = dataImportGUI()
         end
         if isfield(undoState, 'normMethod')
             ds.normMethod = undoState.normMethod;
+        end
+        if isfield(undoState, 'bgPoly')
+            ds.bgPoly = undoState.bgPoly;
         end
 
         % Clear the undo state after restoring (one-level undo)
@@ -3790,9 +4722,28 @@ function api = dataImportGUI()
             return;
         end
 
-        p = polyfit(xPool, yPool, 1);
-        efBGSlope.Value     = p(1);
-        efBGIntercept.Value = p(2);
+        % Determine polynomial order from ddBGOrder
+        bgOrderStr = ddBGOrder.Value;
+        if strcmp(bgOrderStr, 'Linear')
+            bgOrder = 1;
+        else
+            bgOrder = str2double(bgOrderStr(6:end));  % 'Poly N' → N
+        end
+
+        p = polyfit(xPool, yPool, bgOrder);
+
+        % Store per-dataset and update widgets
+        ds = appData.datasets{appData.activeIdx};
+        if bgOrder == 1
+            % Linear: also populate slope/intercept widgets for manual editing
+            efBGSlope.Value     = p(1);
+            efBGIntercept.Value = p(2);
+            ds.bgPoly = [];   % clear polynomial storage (use widget values)
+        else
+            % Higher order: store in ds.bgPoly; slope/intercept widgets stay as-is
+            ds.bgPoly = p;
+        end
+        appData.datasets{appData.activeIdx} = ds;
 
         onApplyCorrections([],[]);
     end
@@ -5349,12 +6300,16 @@ function api = dataImportGUI()
                             xFitPlot = linspace(gxLo, gxHi, 300);
                             pkModel = '';
                             if isfield(pk,'model'), pkModel = pk.model; end
+                            u = (xFitPlot - pk.center) ./ pk.fwhm;
                             if strcmp(pkModel, 'Gaussian')
-                                yFitPlot = pk.height .* ...
-                                    exp(-4.*log(2).*((xFitPlot-pk.center)./pk.fwhm).^2) + pk.bg;
+                                yFitPlot = pk.height .* exp(-4.*log(2).*u.^2) + pk.bg;
+                            elseif strcmp(pkModel, 'Pseudo-Voigt')
+                                eta = guiTernary(isfield(pk,'eta') && ~isempty(pk.eta) && ~isnan(pk.eta), pk.eta, 0.5);
+                                L   = 1 ./ (1 + 4.*u.^2);
+                                G   = exp(-4.*log(2).*u.^2);
+                                yFitPlot = pk.height .* (eta.*L + (1-eta).*G) + pk.bg;
                             else   % Lorentzian (default)
-                                yFitPlot = pk.height ./ ...
-                                    (1 + 4.*((xFitPlot - pk.center)./pk.fwhm).^2) + pk.bg;
+                                yFitPlot = pk.height ./ (1 + 4.*u.^2) + pk.bg;
                             end
                             yFitPlot = yFitPlot + pkYOff;
 
@@ -6391,6 +7346,11 @@ function api = dataImportGUI()
         end
     end
 
+    % Return api struct only when caller requests it (suppress command-window dump)
+    if nargout > 0
+        varargout{1} = api;
+    end
+
 end  % dataImportGUI
 
 
@@ -6425,6 +7385,124 @@ function merged = deduplicatePeaks(peaks, minSep)
     end
     merged = peaks(keep);
 end
+
+function peaks = secondDerivativePeaks(xv, yv, minDist, yRange)
+%SECONDDERIVATIVEPEAKS  Detect shoulder peaks via smoothed second derivative.
+%
+%   The second derivative of a peak is strongly negative at the center.
+%   Where two peaks overlap, the blended y'' shows distinct local minima —
+%   one per peak center — even when the raw signal only has a shoulder.
+%
+%   Algorithm:
+%     1. Gaussian-smooth y to suppress noise (adaptive window based on
+%        minDist, so we don't smooth away the very features we seek).
+%     2. Compute y'' via second-order central differences.
+%     3. Find local minima of y'' (i.e., peaks of -y'').
+%     4. Keep only candidates where y'' is strongly negative (not baseline
+%        noise) and the raw y value is above the background level.
+%
+%   Returns a struct array with fields: center, fwhm, height, area, xRange.
+
+    peaks = struct('center',{},'fwhm',{},'height',{},'area',{},'xRange',{});
+    n = numel(xv);
+    if n < 7, return; end
+
+    % ── Adaptive Gaussian smoothing ──────────────────────────────────────
+    dx     = median(diff(xv));
+    if dx <= 0, return; end
+    % Smooth over ~0.6× minDist so the shoulder structure is preserved
+    sigma  = max(2, round(0.3 * minDist / dx));
+    % Build normalised Gaussian kernel
+    hw     = min(3 * sigma, floor((n-1)/2));
+    if hw < 1, return; end
+    kx     = (-hw:hw)';
+    kernel = exp(-kx.^2 / (2*sigma^2));
+    kernel = kernel / sum(kernel);
+    ys     = conv(yv, kernel, 'same');
+
+    % ── Second derivative via central differences ────────────────────────
+    d2y = zeros(n, 1);
+    for i = 2:(n-1)
+        d2y(i) = (ys(i+1) - 2*ys(i) + ys(i-1)) / (dx^2);
+    end
+    % Extend endpoints to avoid edge effects
+    d2y(1) = d2y(2);
+    d2y(n) = d2y(n-1);
+
+    % ── Find local minima of d2y (= peaks of -d2y) ──────────────────────
+    isMin = false(n, 1);
+    for i = 2:(n-1)
+        isMin(i) = d2y(i) < d2y(i-1) && d2y(i) < d2y(i+1);
+    end
+
+    % ── Filter: keep only strongly negative d2y (real peaks, not noise) ──
+    d2yThresh = -0.001 * yRange / (dx^2);   % 0.1% of y-range scaled by step² (low to catch small peaks)
+    isMin = isMin & (d2y < d2yThresh);
+
+    % ── Filter: raw y must be above 20th percentile (exclude baseline) ───
+    yFloor = prctile(yv, 20);
+    isMin  = isMin & (yv > yFloor);
+
+    % ── Filter: must be a local maximum of smoothed y (not on a slope) ──
+    %  A real peak has ys(i) > ys on both sides within a neighborhood.
+    %  This rejects noise bumps on monotonic background slopes.
+    localWin = max(3, round(0.5 * minDist / dx));
+    for i = find(isMin)'
+        iL = max(1, i - localWin);
+        iR = min(n, i + localWin);
+        leftMin  = min(ys(iL:max(i-1, iL)));
+        rightMin = min(ys(min(i+1, iR):iR));
+        localBG   = max((leftMin + rightMin) / 2, 1e-12);
+        localProm = ys(i) - localBG;
+        % Accept if relative prominence (vs local BG) OR absolute prominence is enough
+        if localProm / localBG < 0.05 && localProm < 0.003 * yRange
+            isMin(i) = false;
+        end
+    end
+
+    candidateIdx = find(isMin);
+    if isempty(candidateIdx), return; end
+
+    % ── Enforce minimum distance between candidates ──────────────────────
+    % Greedily keep the candidate with the most negative d2y first.
+    candX   = xv(candidateIdx);
+    candD2  = d2y(candidateIdx);
+    [~, srt] = sort(candD2, 'ascend');  % most negative first
+    candidateIdx = candidateIdx(srt);
+    candX        = candX(srt);
+    keep = true(size(candX));
+    for i = 1:numel(candX)
+        if ~keep(i), continue; end
+        for j = (i+1):numel(candX)
+            if ~keep(j), continue; end
+            if abs(candX(i) - candX(j)) < minDist
+                keep(j) = false;
+            end
+        end
+    end
+    candidateIdx = candidateIdx(keep);
+
+    % ── Build peak struct for each survivor ──────────────────────────────
+    for ci = 1:numel(candidateIdx)
+        idx = candidateIdx(ci);
+        pk.center = xv(idx);
+        pk.height = yv(idx);
+        % Rough FWHM estimate: distance to where d2y crosses zero on each side
+        left  = idx;
+        while left > 1 && d2y(left) < 0
+            left = left - 1;
+        end
+        right = idx;
+        while right < n && d2y(right) < 0
+            right = right + 1;
+        end
+        pk.fwhm   = max(xv(right) - xv(left), 2*dx);
+        pk.area   = NaN;
+        pk.xRange = [];
+        peaks(end+1) = pk;  %#ok<AGROW>
+    end
+end
+
 
 function [pkX, pkH, pkW] = simplePeakFind(xv, yv, minProm, minDist)
 %SIMPLEPEAKFIND  Minimal local-maxima detector (no Signal Processing Toolbox).
@@ -6482,6 +7560,7 @@ function ds = buildDs(fp, data, parserName)
     ds.yOff        = guiTernary(isNeutronParser(parserName), 1, 0);
     ds.bgSlope     = 0;
     ds.bgInt       = 0;
+    ds.bgPoly      = [];          % polynomial BG coefficients (polyfit output); [] = use linear
     ds.undoState   = struct();    % Stores previous correction state for one-level undo
     ds.annotations = {};          % Cell array of annotation structs {x, y, text}
     ds.color         = [];        % [] = Auto (lines() palette); [r g b] = override
@@ -6494,11 +7573,15 @@ function ds = buildDs(fp, data, parserName)
     ds.normMethod    = 'None';
     ds.xTrimMin      = NaN;
     ds.xTrimMax      = NaN;
+    ds.wavelengthOverride_A = NaN; % NaN = use metadata; set by user efWavelength field
     ds.peaks       = struct('center',{},'fwhm',{},'height',{},'area',{}, ...
-                            'xRange',{},'status',{},'bg',{},'model',{});
+                            'xRange',{},'status',{},'bg',{},'model',{},'eta',{});
     ds.axLims      = struct('xMin','','xMax','','xStep','', ...
                             'yMin','','yMax','','yStep','', ...
                             'y2Min','','y2Max','','y2Step','');
+    ds.latticeParams  = [];   % struct with refined lattice parameters (set by Refine Lattice)
+    ds.filmThickness  = [];   % struct with FFT-derived film thickness (set by FFT Thickness)
+    ds.williamsonHall = [];   % struct with W-H analysis results (set by W-H Plot)
 end
 
 
@@ -7174,6 +8257,70 @@ function y = evalMultiPeak(p, x, nP, isGauss)
             y = y + H .* exp(-4.*log(2) .* ((x - x0) ./ fwhm).^2);
         else
             y = y + H ./ (1 + 4.*((x - x0) ./ fwhm).^2);
+        end
+    end
+end
+
+function y = evalMultiPeakPV(p, x, nP)
+%EVALMULTIPEAKPV  Evaluate a composite pseudo-Voigt multi-peak model at x.
+%  p layout: [H1, x0_1, fwhm1, eta1,  H2, x0_2, fwhm2, eta2, …,  m, b]
+%  where eta_k in [0,1] is the Lorentzian fraction for peak k,
+%  and m, b are the shared linear background slope and intercept.
+    y = p(end-1) .* x + p(end);   % linear background
+    for k = 1:nP
+        H    = p((k-1)*4 + 1);
+        x0   = p((k-1)*4 + 2);
+        fwhm = p((k-1)*4 + 3);
+        eta  = max(0, min(1, p((k-1)*4 + 4)));
+        u    = (x - x0) ./ fwhm;
+        L    = 1 ./ (1 + 4.*u.^2);
+        G    = exp(-4.*log(2) .* u.^2);
+        y    = y + H .* (eta .* L + (1 - eta) .* G);
+    end
+end
+
+
+function wl_A = extractWavelength_A(ds)
+%EXTRACTWAVELENGTH_A  Return X-ray wavelength in Ångströms for a dataset.
+%
+%   Priority:
+%     1. ds.wavelengthOverride_A  — user-edited value (set via efWavelength)
+%     2. XRDML   : ds.data.metadata.parserSpecific.wavelength.kAlpha1  (Å)
+%     3. Bruker  : ds.data.metadata.parserSpecific.wavelength_A        (Å)
+%     4. NaN     — wavelength unknown; d-spacing column shows '—'
+%
+%   Output unit is always Ångströms (Å).
+
+    % 1. User override takes highest priority
+    if isfield(ds, 'wavelengthOverride_A') && ~isnan(ds.wavelengthOverride_A) ...
+            && ds.wavelengthOverride_A > 0
+        wl_A = ds.wavelengthOverride_A;
+        return
+    end
+
+    wl_A = NaN;
+    if ~isfield(ds,'data') || ~isstruct(ds.data), return; end
+    if ~isfield(ds.data,'metadata') || ~isstruct(ds.data.metadata), return; end
+    meta = ds.data.metadata;
+    if ~isfield(meta,'parserSpecific') || ~isstruct(meta.parserSpecific), return; end
+    ps = meta.parserSpecific;
+
+    % 2. XRDML: wavelength.kAlpha1 (Å)
+    if isfield(ps,'wavelength') && isstruct(ps.wavelength) ...
+            && isfield(ps.wavelength,'kAlpha1')
+        v = ps.wavelength.kAlpha1;
+        if isnumeric(v) && isscalar(v) && ~isnan(v) && v > 0
+            wl_A = v;
+            return
+        end
+    end
+
+    % 3. Bruker: wavelength_A (Å)
+    if isfield(ps,'wavelength_A')
+        v = ps.wavelength_A;
+        if isnumeric(v) && isscalar(v) && ~isnan(v) && v > 0
+            wl_A = v;
+            return
         end
     end
 end
