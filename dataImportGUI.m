@@ -2432,7 +2432,16 @@ function varargout = dataImportGUI()
         xSpan = diff([min(xv), max(xv)]);
         yRange = max(yv) - min(yv);
 
-        PEAK_MIN_PROM_FRAC  = 0.005;  % min prominence as fraction of y-range (low to catch small peaks)
+        % ── Robust noise estimation ─────────────────────────────────────
+        %  MAD of first differences: unaffected by peaks or dynamic range.
+        %  1.4826 converts MAD to σ for normally distributed noise.
+        dy = diff(yv);
+        noiseSigma = 1.4826 * median(abs(dy - median(dy)));
+        if noiseSigma < eps
+            noiseSigma = yRange * 0.001;  % fallback for constant data
+        end
+
+        PEAK_SNR_THRESHOLD  = 3;      % initial filter: peaks ≥ 3× noise
         PEAK_SEP_TOL_FRAC   = 0.005;  % seeds closer than this are merged
         PEAK_LOCAL_WIN_FRAC = 0.02;   % ±fraction of x-span for missed-seed search
 
@@ -2454,7 +2463,9 @@ function varargout = dataImportGUI()
         end
 
         % ── Pass 1: global auto-detection via findpeaks ──────────────────
-        minProm = yRange * PEAK_MIN_PROM_FRAC;
+        %  Noise-adaptive: prominence must exceed SNR_THRESHOLD × noise.
+        %  Floor of 1 count prevents zero threshold on perfectly clean data.
+        minProm = max(PEAK_SNR_THRESHOLD * noiseSigma, 1);
         try
             [pkH, pkX, pkW, ~] = findpeaks(yv, xv, ...
                 'MinPeakProminence', minProm, ...
@@ -2485,7 +2496,7 @@ function varargout = dataImportGUI()
         %  The second derivative of y(x) is strongly negative at a peak centre.
         %  When two peaks overlap, y'' shows distinct local minima even if the
         %  raw signal only has a shoulder.  A Gaussian smooth suppresses noise.
-        d2Peaks = secondDerivativePeaks(xv, yv, minDist, yRange);
+        d2Peaks = secondDerivativePeaks(xv, yv, minDist, yRange, noiseSigma);
         for si = 1:numel(d2Peaks)
             candidate = d2Peaks(si);
             % Skip if too close to an already-found peak
@@ -2501,16 +2512,17 @@ function varargout = dataImportGUI()
             merged(end+1) = candidate;  %#ok<AGROW>
         end
 
-        % ── Local prominence filter: reject peaks on rising/falling background
-        %  For each auto-detected peak, estimate the local background from
-        %  the minimum y-values on either side (±window).  Accept a peak if
-        %  it stands above local background by EITHER:
-        %    (a) a relative ratio (signal-to-local-bg), OR
-        %    (b) an absolute fraction of global y-range.
-        %  The dual criterion lets small thin-film peaks pass (via relative
-        %  test) while still catching noise bumps on large peaks.
-        LOCAL_PROM_REL   = 0.05;   % peak must be ≥5% above local background
-        LOCAL_PROM_ABS   = 0.003;  % OR ≥0.3% of global y-range (tiny floor)
+        % ── Local prominence filter ──────────────────────────────────────
+        %  Two-tier acceptance using local height above background:
+        %    • High SNR (≥10×noise): always accept — unambiguously real.
+        %    • Moderate SNR (≥3×noise) AND ≥15% above local background:
+        %      accept — real peak confirmed by both criteria.
+        %  This rejects noise bumps (high relative % but low SNR) while
+        %  keeping thin-film peaks on high substrate backgrounds (high SNR
+        %  even when relative % is modest).
+        LOCAL_PROM_REL   = 0.15;   % ≥15% above local background (was 5%)
+        LOCAL_SNR_HIGH   = 10;     % unambiguous peak threshold
+        LOCAL_SNR_MOD    = 3;      % moderate SNR with relative check
         bgWinPts = max(5, round(numel(xv) * 0.02));  % ±2% of data points
         survivors = [];
         for mi = 1:numel(merged)
@@ -2521,20 +2533,32 @@ function varargout = dataImportGUI()
             ctr = merged(mi).center;
             ci  = find(xv >= ctr, 1, 'first');
             if isempty(ci), ci = numel(xv); end
-            % Left/right window boundaries
             iL = max(1, ci - bgWinPts);
             iR = min(numel(xv), ci + bgWinPts);
-            % Local background = mean of the two edge minima
             yLeft  = min(yv(iL:max(ci-1,iL)));
             yRight = min(yv(min(ci+1,iR):iR));
-            localBG   = max((yLeft + yRight) / 2, 1e-12);  % avoid division by zero
+            localBG   = max((yLeft + yRight) / 2, 1e-12);
             localProm = merged(mi).height - localBG;
-            % Accept if relative prominence OR absolute prominence is sufficient
-            if localProm / localBG >= LOCAL_PROM_REL || localProm >= yRange * LOCAL_PROM_ABS
+            highSNR = localProm >= LOCAL_SNR_HIGH * noiseSigma;
+            modSNR  = localProm >= LOCAL_SNR_MOD  * noiseSigma;
+            promOK  = localProm / localBG >= LOCAL_PROM_REL;
+            if highSNR || (promOK && modSNR)
                 survivors(end+1) = mi; %#ok<AGROW>
             end
         end
         merged = merged(survivors);
+
+        % ── Safety cap: keep at most 50 auto-detected peaks ─────────────
+        MAX_AUTO_PEAKS = 50;
+        autoMask = ~strcmp({merged.status}, 'manual');
+        nAuto    = sum(autoMask);
+        if nAuto > MAX_AUTO_PEAKS
+            autoIdx = find(autoMask);
+            autoH   = [merged(autoIdx).height];
+            [~, srt] = sort(autoH, 'descend');
+            drop = autoIdx(srt(MAX_AUTO_PEAKS+1:end));
+            merged(drop) = [];
+        end
 
         % ── Pass 2: force local search at missed manual seeds ────────────
         minSep  = xSpan * PEAK_SEP_TOL_FRAC;
@@ -7386,7 +7410,7 @@ function merged = deduplicatePeaks(peaks, minSep)
     merged = peaks(keep);
 end
 
-function peaks = secondDerivativePeaks(xv, yv, minDist, yRange)
+function peaks = secondDerivativePeaks(xv, yv, minDist, yRange, noiseSigma)
 %SECONDDERIVATIVEPEAKS  Detect shoulder peaks via smoothed second derivative.
 %
 %   The second derivative of a peak is strongly negative at the center.
@@ -7436,11 +7460,14 @@ function peaks = secondDerivativePeaks(xv, yv, minDist, yRange)
     end
 
     % ── Filter: keep only strongly negative d2y (real peaks, not noise) ──
-    d2yThresh = -0.001 * yRange / (dx^2);   % 0.1% of y-range scaled by step² (low to catch small peaks)
+    %  Noise-based: measure actual noise in d2y via MAD and require 5σ.
+    d2yCore  = d2y(2:end-1);   % exclude copied endpoints
+    d2yNoise = 1.4826 * median(abs(d2yCore - median(d2yCore)));
+    d2yThresh = -5 * max(d2yNoise, 1e-12);
     isMin = isMin & (d2y < d2yThresh);
 
-    % ── Filter: raw y must be above 20th percentile (exclude baseline) ───
-    yFloor = prctile(yv, 20);
+    % ── Filter: raw y must be above noise floor (exclude baseline) ───
+    yFloor = max(prctile(yv, 20), min(yv) + 3 * noiseSigma);
     isMin  = isMin & (yv > yFloor);
 
     % ── Filter: must be a local maximum of smoothed y (not on a slope) ──
@@ -7454,8 +7481,8 @@ function peaks = secondDerivativePeaks(xv, yv, minDist, yRange)
         rightMin = min(ys(min(i+1, iR):iR));
         localBG   = max((leftMin + rightMin) / 2, 1e-12);
         localProm = ys(i) - localBG;
-        % Accept if relative prominence (vs local BG) OR absolute prominence is enough
-        if localProm / localBG < 0.05 && localProm < 0.003 * yRange
+        % Reject if BOTH relative prominence and SNR are low
+        if localProm / localBG < 0.15 && localProm < 5 * noiseSigma
             isMin(i) = false;
         end
     end
@@ -7505,9 +7532,9 @@ end
 
 
 function [pkX, pkH, pkW] = simplePeakFind(xv, yv, minProm, minDist)
-%SIMPLEPEAKFIND  Minimal local-maxima detector (no Signal Processing Toolbox).
-%   Returns peak x-positions (pkX), heights (pkH) and estimated half-widths (pkW).
-%   Used as fallback when findpeaks is unavailable.
+%SIMPLEPEAKFIND  Local-maxima detector with topographic prominence (no toolbox).
+%   Returns peak x-positions (pkX), heights (pkH) and estimated widths (pkW).
+%   Computes true topographic prominence matching MATLAB's findpeaks behavior.
 %
 %   simplePeakFind(xv, yv, minProm)           – prominence filter only
 %   simplePeakFind(xv, yv, minProm, minDist)  – also enforce minimum x-separation
@@ -7516,14 +7543,38 @@ function [pkX, pkH, pkW] = simplePeakFind(xv, yv, minProm, minDist)
     if n < 3
         pkX = []; pkH = []; pkW = []; return;
     end
-    % A point is a local max if it exceeds both neighbours
+    % Local maxima: point exceeds both neighbours
     isMax = false(n,1);
     isMax(2:end-1) = yv(2:end-1) > yv(1:end-2) & yv(2:end-1) > yv(3:end);
-    % Apply minimum prominence filter
-    yMin = min(yv);
-    isMax = isMax & (yv > yMin + minProm);
-    pkX = xv(isMax);
-    pkH = yv(isMax);
+    maxIdx = find(isMax);
+    if isempty(maxIdx)
+        pkX = []; pkH = []; pkW = []; return;
+    end
+    % ── Topographic prominence ──────────────────────────────────────────
+    %  For each local max, scan left and right to find the deepest valley
+    %  before reaching a taller point (or the signal boundary).
+    %  Prominence = peak height − max(left valley, right valley).
+    pkProm = zeros(numel(maxIdx), 1);
+    for k = 1:numel(maxIdx)
+        idx = maxIdx(k);
+        h   = yv(idx);
+        leftMin = h;
+        for j = (idx-1):-1:1
+            leftMin = min(leftMin, yv(j));
+            if yv(j) > h, break; end
+        end
+        rightMin = h;
+        for j = (idx+1):n
+            rightMin = min(rightMin, yv(j));
+            if yv(j) > h, break; end
+        end
+        pkProm(k) = h - max(leftMin, rightMin);
+    end
+    % Filter by prominence
+    keep   = pkProm >= minProm;
+    maxIdx = maxIdx(keep);
+    pkX = xv(maxIdx);
+    pkH = yv(maxIdx);
     % Minimum-distance suppression: greedy, highest peak wins
     if minDist > 0 && numel(pkX) > 1
         [pkH_s, ord] = sort(pkH, 'descend');
@@ -7544,7 +7595,7 @@ function [pkX, pkH, pkW] = simplePeakFind(xv, yv, minProm, minDist)
         [pkX, reord] = sort(pkX);
         pkH = pkH(reord);
     end
-    % Rough width estimate: 2% of x-span per peak
+    % Rough width estimate: 2% of x-span per peak (refined during fitting)
     pkW = ones(size(pkX)) * diff([min(xv) max(xv)]) * 0.02;
 end
 
