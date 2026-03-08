@@ -3,20 +3,12 @@
     "allow": [
       "Bash(dir:*)",
       "Bash(winget upgrade:*)",
-      "WebFetch(domain:scholar.google.com)",
-      "WebFetch(domain:www.nist.gov)",
       "Bash(cd:*)",
-      "WebSearch",
-      "WebFetch(domain:arxiv.org)",
-      "WebFetch(domain:mres.uni-potsdam.de)",
-      "WebFetch(domain:xrayutilities.sourceforge.io)",
-      "WebFetch(domain:www.researchgate.net)",
       "Bash(wc:*)",
       "Bash(cut:*)",
       "Bash(find:*)",
       "Bash(matlab:*)",
       "Bash(ls:*)",
-      "Bash(git add:*)",
       "Bash(git:*)",
       "Bash(gh api:*)",
       "Bash(where gh:*)",
@@ -26,7 +18,21 @@
       "Bash(python3:*)",
       "Bash(python:*)",
       "Bash(mkdir:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(sed:*)",
+      "Bash(for:*)",
+      "Grep",
+      "Read",
+      "Glob",
+      "WebSearch",
+      "WebFetch(domain:scholar.google.com)",
+      "WebFetch(domain:www.nist.gov)",
+      "WebFetch(domain:arxiv.org)",
+      "WebFetch(domain:mres.uni-potsdam.de)",
+      "WebFetch(domain:xrayutilities.sourceforge.io)",
+      "WebFetch(domain:www.researchgate.net)",
+      "Bash(echo $USERPROFILE:*)",
+      "Bash(powershell.exe:*)"
     ]
   }
 }

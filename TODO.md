@@ -76,7 +76,7 @@
     - [x] Remove spin asymmetry from all but neutron reflectomery data types in 'analysis and corrections'
     -
 - [x] **axis settings and plot appearance** looks section of GUI takes up a lot of horozontal space, input boxes can be narrower to make entire box narrower.
-- [ ] **Control panel to set GUI arrangement defaults** create a separate GUI to control the size and arrangement of plot and analysis GUI. activate it with a separate GUI control. Use same color styles
+- [x] **Control panel to set GUI arrangement defaults** — `layoutSettingsGUI.m`: standalone uifigure with spinners for figure W/H, corrections panel width, axes panel width, controls sidebar width, toolbar height. Launched from "Layout Settings..." button in Save panel (row 13). Apply/Save as Defaults/Reset/Close buttons; defaults persist to `layoutPrefs.mat` in toolbox root and are auto-loaded on GUI launch.
 
 
 ---

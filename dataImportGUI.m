@@ -274,6 +274,9 @@ function api = dataImportGUI()
                    'Position',[80 60 1080 1000], ...
                    'AutoResizeChildren','off');
     MIN_FIG_H = 820;   % minimum height so the analysis panel is never clipped
+    LAYOUT_DEFAULTS = struct('figW',1080,'figH',1000,'ctrlPanelW',215, ...
+        'corrPanelW',350,'axLimPanelW',220,'toolbarH',130);
+    PREFS_FILE = fullfile(fileparts(mfilename('fullpath')),'layoutPrefs.mat');
     fig.SizeChangedFcn = @onFigSizeChanged;
     try
         fig.DropFcn = @onDropFiles;   % drag-and-drop from Explorer (R2023a+)
@@ -1018,8 +1021,8 @@ function api = dataImportGUI()
     savePanel = uipanel(analysisGL,'Title','Save / Export','FontSize',13);
     savePanel.Layout.Row = 1; savePanel.Layout.Column = 4;
 
-    saveGL = uigridlayout(savePanel,[12 2], ...
-        'RowHeight',    {26,28,32,32,32,32,32,32,32,32,32,32}, ...
+    saveGL = uigridlayout(savePanel,[13 2], ...
+        'RowHeight',    {26,28,32,32,32,32,32,32,32,32,32,32,28}, ...
         'ColumnWidth',  {'1x','1x'}, ...
         'Padding',      [6 6 6 6], ...
         'RowSpacing',   4, ...
@@ -1130,6 +1133,14 @@ function api = dataImportGUI()
         'Tooltip', 'Open batch XRD file converter (XRDML, Rigaku, Bruker)');
     btnBatchConvertXRD.Layout.Row = 12; btnBatchConvertXRD.Layout.Column = [1 2];
 
+    % Row 13: Layout Settings
+    btnLayoutSettings = uibutton(saveGL,'Text','Layout Settings...', ...
+        'ButtonPushedFcn', @onOpenLayoutSettings, ...
+        'BackgroundColor', [0.30 0.30 0.50], ...
+        'FontColor', [1 1 1], ...
+        'Tooltip', 'Open the Layout Settings window to configure panel sizes and figure dimensions');
+    btnLayoutSettings.Layout.Row = 13; btnLayoutSettings.Layout.Column = [1 2];
+
     % ── Peak Analysis sub-panel (row 2, full width) ───────────────────────
     % Always visible; XRD buttons in corrGL activate it contextually.
     peakPanel = uipanel(analysisGL,'Title','Peak Analysis','FontSize',13);
@@ -1225,6 +1236,16 @@ function api = dataImportGUI()
         end
     end
     clear dsi dropSurfaces;
+
+    % ── Load persistent layout prefs (if saved) ──────────────────────────
+    if isfile(PREFS_FILE)
+        try
+            pv = load(PREFS_FILE, 'layoutPrefs');
+            applyLayoutSettings(pv.layoutPrefs);
+        catch
+            % Prefs file unreadable — silently proceed with defaults
+        end
+    end
 
     % ════════════════════════════════════════════════════════════════════
     %  PROGRAMMATIC API (for automated testing / scripting)
@@ -4418,6 +4439,37 @@ function api = dataImportGUI()
     function onBatchConvertXRD(~,~)
     %ONBATCHCONVERTXRD  Launch the standalone XRD batch converter GUI.
         xrdConvertGUI();
+    end
+
+    function onOpenLayoutSettings(~,~)
+    %ONOPENLAYOUTSETTINGS  Launch the Layout Settings GUI.
+        current = struct( ...
+            'figW',       fig.Position(3), ...
+            'figH',       fig.Position(4), ...
+            'ctrlPanelW', contentGL.ColumnWidth{1}, ...
+            'corrPanelW', appData.corrPanelWidth, ...
+            'axLimPanelW', appData.axLimPanelWidth, ...
+            'toolbarH',   rootGL.RowHeight{1} ...
+        );
+        layoutSettingsGUI(@applyLayoutSettings, current, LAYOUT_DEFAULTS, PREFS_FILE);
+    end
+
+    function applyLayoutSettings(s)
+    %APPLYLAYOUTSETTINGS  Apply layout dimensions from a settings struct to the live GUI.
+        % Figure size
+        pos    = fig.Position;
+        pos(3) = max(s.figW, 400);
+        pos(4) = max(s.figH, MIN_FIG_H);
+        fig.Position = pos;
+        % Toolbar height
+        rootGL.RowHeight{1} = s.toolbarH;
+        % Controls panel (dataset list sidebar)
+        contentGL.ColumnWidth{1} = s.ctrlPanelW;
+        % Corrections and axes+appearance panel widths
+        appData.corrPanelWidth  = s.corrPanelW;
+        appData.axLimPanelWidth = s.axLimPanelW;
+        % Propagate to live analysisGL column widths
+        applyParserAnalysisConfig(resolvedCorrStyle());
     end
 
     function onExportHDF5(~,~)
