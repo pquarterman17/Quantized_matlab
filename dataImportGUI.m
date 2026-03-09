@@ -172,8 +172,7 @@ function varargout = dataImportGUI()
 %   PEAK DETECTION / FITTING
 %   ────────────────────────
 %   onAutoPeak()
-%     ├─ Uses Signal Processing Toolbox findpeaks if available
-%     ├─ Falls back to simplePeakFind() (built-in only)
+%     ├─ Uses utilities.findPeaksRobust (SNIP background + SNR filtering)
 %     └─ Populates ds.peaks struct array
 %
 %   onFitPeaks()  — fits each peak independently
@@ -254,6 +253,7 @@ function varargout = dataImportGUI()
     appData.bgDataset         = [];        % background data struct loaded via importAuto (or [])
     appData.bgFile            = '';        % short filename of background dataset for display
     appData.showFitCurves     = true;               % toggle Lorentzian fit overlay on/off
+    appData.showSnipBg        = true;               % toggle SNIP background overlay on/off
     appData.fitCurveColor     = [0.85 0.20 0.00];   % default warm red-orange
     appData.kFactor           = 0.9;                % Scherrer shape factor K (0.9 spherical default)
     appData.instBroadening_deg = 0;                 % Instrument broadening FWHM (°); 0 = uncorrected
@@ -662,7 +662,7 @@ function varargout = dataImportGUI()
     btnAutoPeak = uibutton(corrGL,'Text','Auto Find Peaks', ...
         'ButtonPushedFcn',@onAutoPeak, ...
         'BackgroundColor',[0.55 0.20 0.05],'FontColor',[1 1 1], ...
-        'Tooltip','Detect peaks automatically using findpeaks (Signal Processing Toolbox) or a built-in local-max fallback', ...
+        'Tooltip','Detect peaks automatically using SNIP background estimation and SNR-based filtering', ...
         'Visible','off');
     btnAutoPeak.Layout.Row = 5; btnAutoPeak.Layout.Column = 3;
 
@@ -1253,8 +1253,8 @@ function varargout = dataImportGUI()
     btnRefineLattice.Layout.Row = 12;
 
     % Row 13: Min sep / wavelength / K factor / instrument broadening (shared sub-grid)
-    minSepGL = uigridlayout(peakBtnGL, [4 2], ...
-        'RowHeight', {'1x','1x','1x','1x'}, 'ColumnWidth', {64, '1x'}, ...
+    minSepGL = uigridlayout(peakBtnGL, [5 2], ...
+        'RowHeight', {'1x','1x','1x','1x','1x'}, 'ColumnWidth', {64, '1x'}, ...
         'Padding', [0 0 0 0], 'ColumnSpacing', 4, 'RowSpacing', 2);
     minSepGL.Layout.Row = 13;
     uilabel(minSepGL, 'Text', 'Min sep:', 'FontSize', 9, ...
@@ -1300,6 +1300,13 @@ function varargout = dataImportGUI()
                     '0 = no correction applied.'], ...
         'ValueChangedFcn', @onInstBroadeningChanged);
     efInstBroadening.Layout.Row = 4; efInstBroadening.Layout.Column = 2;
+    chkShowBG = uicheckbox(minSepGL, ...
+        'Text',            'Show BG', ...
+        'Value',           true, ...
+        'FontSize',        9, ...
+        'Tooltip',         'Overlay the estimated SNIP background curve on the plot', ...
+        'ValueChangedFcn', @onToggleShowBG);
+    chkShowBG.Layout.Row = 5; chkShowBG.Layout.Column = [1 2];
 
     % ── Drag-and-drop: register every major surface as a drop target (R2023a+) ──
     % In uifigure the CEF renderer consumes drag events at whichever child
@@ -2141,7 +2148,7 @@ function varargout = dataImportGUI()
     function applyParserAnalysisConfig(pName)
     %APPLYPARSERANALYSISCONFIG  Relabel Analysis panel controls for data type.
         switch pName
-            case {'importRigaku_raw', 'importXRDML'}
+            case {'importRigaku_raw', 'importXRDML', 'importBruker'}
                 % Re-enable controls for non-neutron case
                 for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
                           btnApply, btnReset, btnApplyAll, btnUndo, ...
@@ -2384,12 +2391,10 @@ function varargout = dataImportGUI()
     % ── Auto peak find (XRD) ─────────────────────────────────────────────
 
     function onAutoPeak(~,~)
-    %ONAUTOPEAK  Three-pass peak detection with second-derivative shoulder finding.
+    %ONAUTOPEAK  SNIP-based peak detection with manual seed preservation.
     %
-    %  Pass 1  — global findpeaks with prominence threshold.
-    %  Pass 1b — second-derivative analysis: smoothed y'' local minima detect
-    %            shoulder peaks that findpeaks misses (low prominence).
-    %  Pass 2  — force local search at missed manual seeds.
+    %  Uses utilities.findPeaksRobust for background-aware peak finding.
+    %  Manual seeds from previous runs are preserved via Pass 2 re-detection.
     %  Output  — ds.peaks is REPLACED with deduplicated, centre-sorted result.
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig,'Load a file first.','No data'); return;
@@ -2430,28 +2435,12 @@ function varargout = dataImportGUI()
         end
 
         xSpan = diff([min(xv), max(xv)]);
-        yRange = max(yv) - min(yv);
 
-        % ── Robust noise estimation ─────────────────────────────────────
-        %  MAD of first differences: unaffected by peaks or dynamic range.
-        %  1.4826 converts MAD to σ for normally distributed noise.
-        dy = diff(yv);
-        noiseSigma = 1.4826 * median(abs(dy - median(dy)));
-        if noiseSigma < eps
-            noiseSigma = yRange * 0.001;  % fallback for constant data
-        end
-
-        PEAK_SNR_THRESHOLD  = 3;      % initial filter: peaks ≥ 3× noise
         PEAK_SEP_TOL_FRAC   = 0.005;  % seeds closer than this are merged
         PEAK_LOCAL_WIN_FRAC = 0.02;   % ±fraction of x-span for missed-seed search
 
         % ── User-configurable minimum separation ─────────────────────────
         userMinSep = efMinSep.Value;
-        if userMinSep > 0
-            minDist = userMinSep;
-        else
-            minDist = xSpan * 0.005;   % tighter default than before (was 0.01)
-        end
 
         % ── Save existing manual seeds BEFORE rebuilding the list ─────────
         if ~isempty(ds.peaks) && isfield(ds.peaks, 'status')
@@ -2462,103 +2451,15 @@ function varargout = dataImportGUI()
                                   'xRange',{},'status',{});
         end
 
-        % ── Pass 1: global auto-detection via findpeaks ──────────────────
-        %  Noise-adaptive: prominence must exceed SNR_THRESHOLD × noise.
-        %  Floor of 1 count prevents zero threshold on perfectly clean data.
-        minProm = max(PEAK_SNR_THRESHOLD * noiseSigma, 1);
-        try
-            [pkH, pkX, pkW, ~] = findpeaks(yv, xv, ...
-                'MinPeakProminence', minProm, ...
-                'MinPeakDistance',   minDist, ...
-                'WidthReference',    'halfprom');
-        catch
-            [pkX, pkH, pkW] = simplePeakFind(xv, yv, minProm, minDist);
-        end
+        % ── SNIP-based peak detection ───────────────────────────────────
+        [merged, bgEst] = utilities.findPeaksRobust(xv(:), yv(:), ...
+            'SNRThreshold',  5, ...
+            'MinSeparation', guiTernary(userMinSep > 0, userMinSep, 0), ...
+            'MaxPeaks',      50, ...
+            'MaxWindowDeg',  2.0);
 
-        % Build initial merged list from auto results
-        emptyPk = struct('center',{},'fwhm',{},'height',{},'area',{}, ...
-                         'xRange',{},'status',{},'bg',{},'model',{},'eta',{});
-        merged  = emptyPk;
-        for pi = 1:numel(pkX)
-            newPk.center = pkX(pi);
-            newPk.fwhm   = pkW(pi);
-            newPk.height = pkH(pi);
-            newPk.area   = NaN;
-            newPk.xRange = [];
-            newPk.status = 'auto';
-            newPk.bg     = NaN;
-            newPk.model  = '';
-            newPk.eta    = NaN;
-            merged(end+1) = newPk;  %#ok<AGROW>
-        end
-
-        % ── Pass 1b: second-derivative shoulder detection ────────────────
-        %  The second derivative of y(x) is strongly negative at a peak centre.
-        %  When two peaks overlap, y'' shows distinct local minima even if the
-        %  raw signal only has a shoulder.  A Gaussian smooth suppresses noise.
-        d2Peaks = secondDerivativePeaks(xv, yv, minDist, yRange, noiseSigma);
-        for si = 1:numel(d2Peaks)
-            candidate = d2Peaks(si);
-            % Skip if too close to an already-found peak
-            if ~isempty(merged)
-                if any(abs([merged.center] - candidate.center) < minDist)
-                    continue;
-                end
-            end
-            candidate.status = 'auto(d2)';
-            candidate.bg     = NaN;
-            candidate.model  = '';
-            candidate.eta    = NaN;
-            merged(end+1) = candidate;  %#ok<AGROW>
-        end
-
-        % ── Local prominence filter ──────────────────────────────────────
-        %  Two-tier acceptance using local height above background:
-        %    • High SNR (≥10×noise): always accept — unambiguously real.
-        %    • Moderate SNR (≥3×noise) AND ≥15% above local background:
-        %      accept — real peak confirmed by both criteria.
-        %  This rejects noise bumps (high relative % but low SNR) while
-        %  keeping thin-film peaks on high substrate backgrounds (high SNR
-        %  even when relative % is modest).
-        LOCAL_PROM_REL   = 0.15;   % ≥15% above local background (was 5%)
-        LOCAL_SNR_HIGH   = 10;     % unambiguous peak threshold
-        LOCAL_SNR_MOD    = 3;      % moderate SNR with relative check
-        bgWinPts = max(5, round(numel(xv) * 0.02));  % ±2% of data points
-        survivors = [];
-        for mi = 1:numel(merged)
-            if strcmp(merged(mi).status, 'manual')
-                survivors(end+1) = mi; %#ok<AGROW>
-                continue;
-            end
-            ctr = merged(mi).center;
-            ci  = find(xv >= ctr, 1, 'first');
-            if isempty(ci), ci = numel(xv); end
-            iL = max(1, ci - bgWinPts);
-            iR = min(numel(xv), ci + bgWinPts);
-            yLeft  = min(yv(iL:max(ci-1,iL)));
-            yRight = min(yv(min(ci+1,iR):iR));
-            localBG   = max((yLeft + yRight) / 2, 1e-12);
-            localProm = merged(mi).height - localBG;
-            highSNR = localProm >= LOCAL_SNR_HIGH * noiseSigma;
-            modSNR  = localProm >= LOCAL_SNR_MOD  * noiseSigma;
-            promOK  = localProm / localBG >= LOCAL_PROM_REL;
-            if highSNR || (promOK && modSNR)
-                survivors(end+1) = mi; %#ok<AGROW>
-            end
-        end
-        merged = merged(survivors);
-
-        % ── Safety cap: keep at most 50 auto-detected peaks ─────────────
-        MAX_AUTO_PEAKS = 50;
-        autoMask = ~strcmp({merged.status}, 'manual');
-        nAuto    = sum(autoMask);
-        if nAuto > MAX_AUTO_PEAKS
-            autoIdx = find(autoMask);
-            autoH   = [merged(autoIdx).height];
-            [~, srt] = sort(autoH, 'descend');
-            drop = autoIdx(srt(MAX_AUTO_PEAKS+1:end));
-            merged(drop) = [];
-        end
+        % Store background estimate for overlay plotting
+        ds.snipBackground = struct('x', xv(:), 'bg', bgEst(:));
 
         % ── Pass 2: force local search at missed manual seeds ────────────
         minSep  = xSpan * PEAK_SEP_TOL_FRAC;
@@ -3912,6 +3813,12 @@ function varargout = dataImportGUI()
     function onToggleFitCurves(src, ~)
     %ONTOGGLEFITCURVES  Show or hide Lorentzian fit overlays on the plot.
         appData.showFitCurves = src.Value;
+        onPlot([],[]);
+    end
+
+    function onToggleShowBG(src, ~)
+    %ONTOGGLESHOWBG  Show or hide the SNIP background estimate on the plot.
+        appData.showSnipBg = src.Value;
         onPlot([],[]);
     end
 
@@ -5639,6 +5546,7 @@ function varargout = dataImportGUI()
             % Peak markers and zoom rect use HandleVisibility='off' so ax.Children may
             % omit them in some MATLAB releases. findall() bypasses this filter.
             delete(findall(targetAx, 'Tag', 'GUIPeakAnnotation'));
+            delete(findall(targetAx, 'Tag', 'GUISNIPBackground'));
             delete(findall(targetAx, 'Tag', 'GUIZoomBox'));
             delete(targetAx.Children);
             cla(targetAx);
@@ -6392,6 +6300,26 @@ function varargout = dataImportGUI()
                 end
             end
 
+            % ── SNIP background overlay ──────────────────────────────────
+            if appData.showSnipBg && appData.activeIdx >= 1 && ...
+               ~isempty(appData.datasets)
+                dsBg = appData.datasets{appData.activeIdx};
+                if isfield(dsBg, 'snipBackground') && ...
+                   ~isempty(dsBg.snipBackground) && ...
+                   ~isempty(dsBg.snipBackground.x)
+                    bgYOff = (appData.activeIdx - 1) * effectiveSpacing;
+                    hold(targetAx, 'on');
+                    plot(targetAx, dsBg.snipBackground.x, ...
+                        dsBg.snipBackground.bg + bgYOff, '--', ...
+                        'Color',            [0.2 0.8 0.2], ...
+                        'LineWidth',        1.5, ...
+                        'HitTest',          'off', ...
+                        'Tag',              'GUISNIPBackground', ...
+                        'HandleVisibility', 'off');
+                    hold(targetAx, 'off');
+                end
+            end
+
             % ── User annotations ──────────────────────────────────────────
             % Render text labels placed by user in annotation mode.
             if appData.activeIdx >= 1 && ~isempty(appData.datasets)
@@ -6987,6 +6915,13 @@ function varargout = dataImportGUI()
                  'Data should load correctly; re-import files to attach version metadata.'], nLegacy);
         end
 
+        % Backward-compat: ensure snipBackground field exists for old sessions
+        for di = 1:numel(appData.datasets)
+            if ~isfield(appData.datasets{di}, 'snipBackground')
+                appData.datasets{di}.snipBackground = struct('x', [], 'bg', []);
+            end
+        end
+
         if isempty(appData.datasets)
             rebuildDatasetList(false);
             return;
@@ -7410,195 +7345,6 @@ function merged = deduplicatePeaks(peaks, minSep)
     merged = peaks(keep);
 end
 
-function peaks = secondDerivativePeaks(xv, yv, minDist, yRange, noiseSigma)
-%SECONDDERIVATIVEPEAKS  Detect shoulder peaks via smoothed second derivative.
-%
-%   The second derivative of a peak is strongly negative at the center.
-%   Where two peaks overlap, the blended y'' shows distinct local minima —
-%   one per peak center — even when the raw signal only has a shoulder.
-%
-%   Algorithm:
-%     1. Gaussian-smooth y to suppress noise (adaptive window based on
-%        minDist, so we don't smooth away the very features we seek).
-%     2. Compute y'' via second-order central differences.
-%     3. Find local minima of y'' (i.e., peaks of -y'').
-%     4. Keep only candidates where y'' is strongly negative (not baseline
-%        noise) and the raw y value is above the background level.
-%
-%   Returns a struct array with fields: center, fwhm, height, area, xRange.
-
-    peaks = struct('center',{},'fwhm',{},'height',{},'area',{},'xRange',{});
-    n = numel(xv);
-    if n < 7, return; end
-
-    % ── Adaptive Gaussian smoothing ──────────────────────────────────────
-    dx     = median(diff(xv));
-    if dx <= 0, return; end
-    % Smooth over ~0.6× minDist so the shoulder structure is preserved
-    sigma  = max(2, round(0.3 * minDist / dx));
-    % Build normalised Gaussian kernel
-    hw     = min(3 * sigma, floor((n-1)/2));
-    if hw < 1, return; end
-    kx     = (-hw:hw)';
-    kernel = exp(-kx.^2 / (2*sigma^2));
-    kernel = kernel / sum(kernel);
-    ys     = conv(yv, kernel, 'same');
-
-    % ── Second derivative via central differences ────────────────────────
-    d2y = zeros(n, 1);
-    for i = 2:(n-1)
-        d2y(i) = (ys(i+1) - 2*ys(i) + ys(i-1)) / (dx^2);
-    end
-    % Extend endpoints to avoid edge effects
-    d2y(1) = d2y(2);
-    d2y(n) = d2y(n-1);
-
-    % ── Find local minima of d2y (= peaks of -d2y) ──────────────────────
-    isMin = false(n, 1);
-    for i = 2:(n-1)
-        isMin(i) = d2y(i) < d2y(i-1) && d2y(i) < d2y(i+1);
-    end
-
-    % ── Filter: keep only strongly negative d2y (real peaks, not noise) ──
-    %  Noise-based: measure actual noise in d2y via MAD and require 5σ.
-    d2yCore  = d2y(2:end-1);   % exclude copied endpoints
-    d2yNoise = 1.4826 * median(abs(d2yCore - median(d2yCore)));
-    d2yThresh = -5 * max(d2yNoise, 1e-12);
-    isMin = isMin & (d2y < d2yThresh);
-
-    % ── Filter: raw y must be above noise floor (exclude baseline) ───
-    yFloor = max(prctile(yv, 20), min(yv) + 3 * noiseSigma);
-    isMin  = isMin & (yv > yFloor);
-
-    % ── Filter: must be a local maximum of smoothed y (not on a slope) ──
-    %  A real peak has ys(i) > ys on both sides within a neighborhood.
-    %  This rejects noise bumps on monotonic background slopes.
-    localWin = max(3, round(0.5 * minDist / dx));
-    for i = find(isMin)'
-        iL = max(1, i - localWin);
-        iR = min(n, i + localWin);
-        leftMin  = min(ys(iL:max(i-1, iL)));
-        rightMin = min(ys(min(i+1, iR):iR));
-        localBG   = max((leftMin + rightMin) / 2, 1e-12);
-        localProm = ys(i) - localBG;
-        % Reject if BOTH relative prominence and SNR are low
-        if localProm / localBG < 0.15 && localProm < 5 * noiseSigma
-            isMin(i) = false;
-        end
-    end
-
-    candidateIdx = find(isMin);
-    if isempty(candidateIdx), return; end
-
-    % ── Enforce minimum distance between candidates ──────────────────────
-    % Greedily keep the candidate with the most negative d2y first.
-    candX   = xv(candidateIdx);
-    candD2  = d2y(candidateIdx);
-    [~, srt] = sort(candD2, 'ascend');  % most negative first
-    candidateIdx = candidateIdx(srt);
-    candX        = candX(srt);
-    keep = true(size(candX));
-    for i = 1:numel(candX)
-        if ~keep(i), continue; end
-        for j = (i+1):numel(candX)
-            if ~keep(j), continue; end
-            if abs(candX(i) - candX(j)) < minDist
-                keep(j) = false;
-            end
-        end
-    end
-    candidateIdx = candidateIdx(keep);
-
-    % ── Build peak struct for each survivor ──────────────────────────────
-    for ci = 1:numel(candidateIdx)
-        idx = candidateIdx(ci);
-        pk.center = xv(idx);
-        pk.height = yv(idx);
-        % Rough FWHM estimate: distance to where d2y crosses zero on each side
-        left  = idx;
-        while left > 1 && d2y(left) < 0
-            left = left - 1;
-        end
-        right = idx;
-        while right < n && d2y(right) < 0
-            right = right + 1;
-        end
-        pk.fwhm   = max(xv(right) - xv(left), 2*dx);
-        pk.area   = NaN;
-        pk.xRange = [];
-        peaks(end+1) = pk;  %#ok<AGROW>
-    end
-end
-
-
-function [pkX, pkH, pkW] = simplePeakFind(xv, yv, minProm, minDist)
-%SIMPLEPEAKFIND  Local-maxima detector with topographic prominence (no toolbox).
-%   Returns peak x-positions (pkX), heights (pkH) and estimated widths (pkW).
-%   Computes true topographic prominence matching MATLAB's findpeaks behavior.
-%
-%   simplePeakFind(xv, yv, minProm)           – prominence filter only
-%   simplePeakFind(xv, yv, minProm, minDist)  – also enforce minimum x-separation
-    if nargin < 4, minDist = 0; end
-    n   = numel(yv);
-    if n < 3
-        pkX = []; pkH = []; pkW = []; return;
-    end
-    % Local maxima: point exceeds both neighbours
-    isMax = false(n,1);
-    isMax(2:end-1) = yv(2:end-1) > yv(1:end-2) & yv(2:end-1) > yv(3:end);
-    maxIdx = find(isMax);
-    if isempty(maxIdx)
-        pkX = []; pkH = []; pkW = []; return;
-    end
-    % ── Topographic prominence ──────────────────────────────────────────
-    %  For each local max, scan left and right to find the deepest valley
-    %  before reaching a taller point (or the signal boundary).
-    %  Prominence = peak height − max(left valley, right valley).
-    pkProm = zeros(numel(maxIdx), 1);
-    for k = 1:numel(maxIdx)
-        idx = maxIdx(k);
-        h   = yv(idx);
-        leftMin = h;
-        for j = (idx-1):-1:1
-            leftMin = min(leftMin, yv(j));
-            if yv(j) > h, break; end
-        end
-        rightMin = h;
-        for j = (idx+1):n
-            rightMin = min(rightMin, yv(j));
-            if yv(j) > h, break; end
-        end
-        pkProm(k) = h - max(leftMin, rightMin);
-    end
-    % Filter by prominence
-    keep   = pkProm >= minProm;
-    maxIdx = maxIdx(keep);
-    pkX = xv(maxIdx);
-    pkH = yv(maxIdx);
-    % Minimum-distance suppression: greedy, highest peak wins
-    if minDist > 0 && numel(pkX) > 1
-        [pkH_s, ord] = sort(pkH, 'descend');
-        pkX_s = pkX(ord);
-        keep  = true(size(pkX_s));
-        for ii = 1:numel(pkX_s)
-            if ~keep(ii), continue; end
-            for jj = (ii+1):numel(pkX_s)
-                if ~keep(jj), continue; end
-                if abs(pkX_s(ii) - pkX_s(jj)) < minDist
-                    keep(jj) = false;
-                end
-            end
-        end
-        pkX = pkX_s(keep);
-        pkH = pkH_s(keep);
-        % Restore original x-order so downstream code sees sorted positions
-        [pkX, reord] = sort(pkX);
-        pkH = pkH(reord);
-    end
-    % Rough width estimate: 2% of x-span per peak (refined during fitting)
-    pkW = ones(size(pkX)) * diff([min(xv) max(xv)]) * 0.02;
-end
-
 function ds = buildDs(fp, data, parserName)
 %BUILDDS  Assemble the standard dataset struct from a parsed data struct.
     ds.data        = data;
@@ -7633,6 +7379,7 @@ function ds = buildDs(fp, data, parserName)
     ds.latticeParams  = [];   % struct with refined lattice parameters (set by Refine Lattice)
     ds.filmThickness  = [];   % struct with FFT-derived film thickness (set by FFT Thickness)
     ds.williamsonHall = [];   % struct with W-H analysis results (set by W-H Plot)
+    ds.snipBackground = struct('x', [], 'bg', []);  % SNIP-estimated background (set by Auto Peak)
 end
 
 
