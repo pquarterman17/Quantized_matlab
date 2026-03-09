@@ -2,8 +2,6 @@
 
 ## dataImportGUI.m — Improvements & Features
 
-### High impact, moderate effort
-
 
 - [x] **Waterfall / stacked-offset plot mode** — toggle that adds a configurable vertical
   offset between datasets when plotting; common for comparing XRD scans in a temperature
@@ -22,10 +20,6 @@
   Area (integral=1) / Z-score. `utilities.normalize` already exists; just wire it into
   the GUI corrections pipeline.
 
----
-
-### High impact, low effort
-
 - [x] **Show legend name / parser badge in dataset list** — `rebuildDatasetList` currently
   shows `[N] filename.ext`. When `ds.legendName` is set, display it instead of the
   filename; always prefix with a short type tag (`[VSM]`, `[XRD]`, `[CSV]`) derived from
@@ -37,12 +31,9 @@
 - [x] **Batch export CSV** — "Export All CSV" button in the Save panel writes one
   `_corrected.csv` per loaded dataset using their auto-generated paths.
 
-- [x] **Copy plot to clipboard** — button that copies the current plot as an image
-  (e.g. `print(fig, '-clipboard', '-dbitmap')`). **Already implemented.**
-
 ---
 
-### Analysis enhancements
+## Analysis enhancements
 
 - [x] **Region statistics readout** — when drawing the BG-fit box, display mean, std,
   min, max, and centroid of the enclosed data in a tooltip or status label. Reuses
@@ -58,39 +49,19 @@
 
 ---
 
-### Visualization
+## Visualization
 
 - [x] **Colormap for parameter series** — when many datasets are loaded (e.g. 20
   temperature-series XRD scans), auto-assign colors from a chosen colormap (jet,
   viridis, etc.) rather than the fixed 10-color palette.
 
-- [x] **Second Y-axis** — checkbox to plot a selected channel on a right-side Y-axis
-  with its own scale. Useful for overlaying moment and temperature vs time in PPMS data.
-
-- [x] **Annotation tool** — click on the plot to drop a text label (peak index, sample
-  name, etc.) that follows data coordinates. Store in `ds.annotations`; re-render in
-  `drawToAxes`.
-- [x] **Clean up Analysis & Corrections Section** - there are analysis options that only apply to certain data types but are displayed for all. For example, spin asymmetry should only be shown in Neutron Refelectomery analysis
-    - [x] Enable other data corrections for Neutron Reflectomery, but remove: subtract BG and smoothing from this data type
-    - [x] For Neutron reflectomery corrections, apply R and Q offset equally to all polarizations with same data file name
-    - [x] Remove spin asymmetry from all but neutron reflectomery data types in 'analysis and corrections'
-    -
-- [x] **axis settings and plot appearance** looks section of GUI takes up a lot of horozontal space, input boxes can be narrower to make entire box narrower.
-- [x] **Control panel to set GUI arrangement defaults** — `layoutSettingsGUI.m`: standalone uifigure with spinners for figure W/H, corrections panel width, axes panel width, controls sidebar width, toolbar height. Launched from "Layout Settings..." button in Save panel (row 13). Apply/Save as Defaults/Reset/Close buttons; defaults persist to `layoutPrefs.mat` in toolbox root and are auto-loaded on GUI launch.
-
-
 ---
 
-### Workflow / UX
+## Workflow / UX
 
 - [x] **Drag-and-drop file loading** — use `fig.DropFcn` (MATLAB R2023a+) to accept
   files dragged from Explorer. Add a version guard; fall back gracefully on older MATLAB.
 
-- [x] **Undo for corrections** — one-level undo: snapshot `ds.corrData`, offsets, etc.
-  into `ds.undoState` before "Apply Corrections"; an "Undo" button restores it.
-
-- [x] **Dataset reorder (drag in list)** — allow dragging rows in `lbDatasets` to
-  reorder datasets, affecting legend order and waterfall offset order.
 
 - [x] **"Set active dataset as background" button** — one-click to copy the active
   dataset into `appData.bgDataset`, instead of requiring a separate file-browse. Eliminates
@@ -112,20 +83,7 @@
 
 ---
 
-### Export
-
-- [x] **Publication-ready direct save** — "Save Figure..." button that calls
-  `exportgraphics` directly on the GUI axes with user-selectable format (PNG/TIFF 300 dpi,
-  PDF/SVG vector). Avoids the current Export-to-Figure → manual-save workflow.
-
-- [x] **Peak report export to Excel** — "Export Peaks XLSX" button writes an `.xlsx`
-  file with one sheet per dataset containing peak fit parameters (Center, FWHM, Height, Area, Status).
-
----
-
-
-
-### File Handling
+## File Handling
 
 - [/] **NCNR Neutron Data Files** — support file formats in `+parser/file_examples_implementation/NCNR/` directory:
   - [x] **`.refl` files** (reductus reduced data) — `importNCNRRefl.m` reads JSON headers + space-delimited data; auto-detects CANDOR (polychromatic) vs PBR (monochromatic) variants
@@ -141,7 +99,7 @@
 
 ## New Parsers — File Format Support
 
-### Tier 1 — XRD (XML-based, no example files needed)
+### XRD (XML-based, no example files needed)
 
 - [x] **`importXRDML.m`** — PANalytical / Malvern Empyrean `.xrdml` format. Well-documented
   XML schema; parse with `readstruct` or `xmlread`. Extract 2θ array, intensity counts,
@@ -154,7 +112,7 @@
 
 ---
 
-### Tier 2 — Magnetometry / Transport
+### Magnetometry / Transport
 
 - [/] **`importMPMS.m`** — Quantum Design MPMS SQUID `.dat`. Same `[Header]/[Data]`
   block structure as the existing VSM/PPMS parsers; different column layout (DC moment,
@@ -171,7 +129,7 @@
 
 ---
 
-### Tier 3 — Spectroscopy
+### Spectroscopy
 
 - [ ] **`importRaman.m`** (or extend `importCSV`) — Raman text exports from Horiba LabSpec
   (`.txt`) and Renishaw ASCII export. Wavenumber + intensity columns; likely already
@@ -185,20 +143,7 @@
 
 ---
 
-### Bugs
-- [x] **Drag and Drop Files** — fixed: added `AllowDrop=true` (R2024a+) and corrected string-array normalisation in `onDropFiles`
-- [x] **uieditfield NaN error (line 681)** — fixed: changed trim min/max fields from numeric to text type with empty-string default, added helper functions `nan2str()` and `str2num_trim()`
-- [x] **Axes offset from center** — fixed: changed tbGL to span columns [1 2] instead of just [1] to align with content/analysis panels
-- [x] **Missing GUI panels** — unclear which panels are missing; most are created but some hidden per data type
-
-
----
-
-## Code Quality Scan — 2026-03-07 — **PRIORITY 1 & 2 COMPLETE** ✓
-
-Comprehensive automated scan of codebase identified **22 issues** across error handling, test coverage, documentation, performance, and architecture. See detailed analysis below.
-
-### Priority 1: Critical Fixes — **COMPLETE ✓ (2026-03-07, 5 hrs)**
+## Critical Fixes — **COMPLETE ✓ (2026-03-07, 5 hrs)**
 
 **Status:** All 5 critical items completed. Commit: c7be785
 
@@ -228,14 +173,8 @@ Comprehensive automated scan of codebase identified **22 issues** across error h
   - Updated: `importXRDML.m`, `importBruker.m` (moved geometry fields to parserSpecific)
   - All parsers now follow consistent schema
 
-- [x] **#5: Convert multi-range XRD warning to error** — **COMPLETE**
-  - Added `AllowPartialImport` parameter to `importRigaku_raw.m` (default=false)
-  - Default: error on multi-range detection (prevents silent data loss)
-  - AllowPartialImport=true: warn and proceed (user opt-in)
-  - Updated docstring with Limitations section and examples
-  - File: `+parser/importRigaku_raw.m`
 
-### Priority 2: Test & Validation — **COMPLETE ✓ (2026-03-07, 4 hrs)**
+## Test & Validation — 
 
 **Status:** All 3 test suites created and integrated. Programmatic API added to `dataImportGUI.m`.
 
@@ -257,86 +196,20 @@ Comprehensive automated scan of codebase identified **22 issues** across error h
   - `batchConvertXRD` tests (8): error handling, collision, magic byte filtering, recursion, progress callback
   - Files: `test_batch_processing.m` (NEW)
 
-### Priority 3: Documentation — **COMPLETE ✓ (2026-03-07)**
+## Documentation — 
 
-**Status:** All 4 documentation items completed.
+- [ ] **Example Scripts** Create examples scripts for different types of tasks and data types to serve as starting
+    point for codebase users
 
-- [x] **#9: Document GUI state machine** — Added ASCII callback-flow diagram to `dataImportGUI.m` header: file loading, dataset selection, corrections pipeline (7 steps), peak detection/fitting, session save/load, mouse interaction, render caching. Invariants documented.
+- [ ] **update documentaiton within code**
 
-- [x] **#10: Update TODO.md** — All `[/]` "implemented, needs testing" items resolved to `[x]` (confirmed implemented). Parser stubs without test files remain `[/]`. This item.
+- [ ] **Update Github wiki documentation** github wiki documentation is out of date
 
-- [x] **#11: Parser-specific metadata** — Created `+parser/README.md`: canonical schema table, per-parser `parserSpecific` field tables for all 11 parsers, column shorthand table, auto-detection priority order.
-
-- [x] **#12: GUI usage docstring** — Replaced 44-line header with ~130-line comprehensive docstring in `dataImportGUI.m`: supported formats, GUI overview, programmatic API reference, dataset struct fields, callback flow, state machine, invariants, MATLAB requirements.
-
-### Priority 4: Performance & Architecture — **COMPLETE ✓ (2026-03-07, 2 hrs)**
-
-**Status:** All 4 performance items completed. Commit pending.
-
-- [x] **#13: Streaming support for large files** — **COMPLETE**
-  - Replaced `fgetl` while loops with `readlines()` (R2020b+) in `importCSV.m` and `importQDVSM.m`
-  - Vectorized `str2double()` calls on 2D cell arrays (was O(n·m) per-cell, now single vectorized call)
-  - Impact: O(n) file I/O vs O(n²) dynamic cell growth; 2–4× speedup on typical CSV files
-  - Files: `+parser/importCSV.m`, `+parser/importQDVSM.m`
-
-- [x] **#14: GUI render caching** — **COMPLETE**
-  - Added `appData.lineCache.valid` flag and line handle storage (left/right axes)
-  - Created `softUpdateLines()` nested function for instant color/visibility updates (no full redraw)
-  - Wired into `onDatasetColorChanged()` and `onToggleDatasetVisibility()` callbacks
-  - Invalidation on full redraw (data changes, axis selection, etc.)
-  - Impact: Color/visibility toggling now instant with 50+ datasets (was multi-second full redraws)
-  - Files: `dataImportGUI.m`
-
-- [x] **#15: Add progress indication for batch** — **COMPLETE**
-  - Added `uiprogressdlg` modal dialog in `xrdConvertGUI.m` onConvert callback
-  - Live percentage + file count in both dialog message and `lblStatus` label
-  - User cancellation support (propagates error through `progressCallback`)
-  - Auto-closes on completion or user cancel
-  - Files: `xrdConvertGUI.m`
-
-- [x] **#16: Replace magic numbers with constants** — **COMPLETE**
-  - Added named constants block in `importRigaku_raw.m` (RGK_MAGIC, RGK_COUNTING_TIME, RGK_START_ANGLE, etc.)
-  - Replaced all 9 byte-offset literals with named constants (RGK_*)
-  - Improved maintainability; docstring still holds spec; constants document intent
-  - Files: `+parser/importRigaku_raw.m`
-
-### Lower Priority: Architecture Cleanup — **COMPLETE ✓ (2026-03-07)**
-
-**Status:** All 6 backlog items completed.
-
-- [x] **#17: Unify column resolution logic** — **COMPLETE**
-  - Created `+parser/resolveColumnShorthand.m`: shared resolver (numeric bounds check, optional shorthand map, exact+partial name match)
-  - `importQDVSM.m` / `importPPMS.m`: local resolver bodies replaced — delegate to shared function via `persistent` shorthand maps
-  - `importCSV.m` / `importExcel.m`: identical local `resolveColumnIndex` replaced with 1-line delegation
-  - Net effect: 4 copies of resolution logic → 1; numeric bounds checking added to CSV/Excel (was missing)
-
-- [x] **#18: Add version tracking in exports** — **COMPLETE**
-  - Added `meta.parserVersion = '1.0'` to all 11 parsers
-  - `dataImportGUI.m` session load (`onLoadSession` + `loadSessionDirect`): counts datasets missing `parserVersion` and emits `warning()` with re-import suggestion
-  - Old sessions load without error; warning is informational only
-
-- [x] **#19: Add input validation to batch operations** — **COMPLETE**
-  - `xrdConvertGUI.m` `onConvert`: after resolving selected paths, calls `isfile()` on each
-  - If any file no longer exists: `uialert` with list of missing paths; conversion aborted
-  - Prevents cryptic errors when files are moved/deleted between scan and convert
-
-- [x] **#20: Boundary checks in array access** — **COMPLETE**
-  - Handled by #17: `resolveColumnShorthand` validates numeric index is in `[1, N]` before returning
-  - Applied automatically to all callers: importCSV, importExcel, importQDVSM, importPPMS
-
-- [x] **#21: Document file size limitations** — **COMPLETE**
-  - Added `Limitations` section to `importCSV.m` (~200 MB), `importExcel.m` (~50 MB), `importQDVSM.m` (~100 MB), `importPPMS.m` (~50 MB), `importRigaku_raw.m` (~20 MB, single-range note)
-
-- [x] **#22: Excel formula error handling** — **COMPLETE**
-  - `importExcel.m`: after building `valuesMatrix`, computes `nanFrac`; emits `warning()` if >10% NaN
-  - Warning message names common Excel formula error types (#DIV/0!, #VALUE!, #REF!) and directs user to source spreadsheet
-  - Docstring `Limitations` section documents NaN conversion behavior
-
-### GUI Improvements
+## GUI Improvements
 - [ ] **Space usage** there are boxes with few buttons that take large amounts of visual space in the GUI which forces boxes with more features
                       to be cut off, or overly crammed. optimize the button and box sizes to be readable, and so nothing is hidden unintentionally
 
-- [ ] **Reflectivity anallysis** for XRR and neutron reflectometry data, add FFT analysis to extract
+- [ ] **Reflectivity analysis** for XRR and neutron reflectometry data, add FFT analysis to extract
         thicknesses. for wavelength allow manual typing of wavelength as in the XRD
         analysis but add rop down menu to select between various common k-alpha
         sources, with Cu K-alpha being the starting default.
@@ -344,24 +217,19 @@ Comprehensive automated scan of codebase identified **22 issues** across error h
         analysis but add rop down menu to select between various common k-alpha
         sources, with Cu K-alpha being the starting default.
 
-### Bugs
-- [x] **xrdConvertGUI errors** — **FIXED (2026-03-07, commits 4d793da + 3536617)**
+## Clean up codebase
+- [ ] **Organize test files** Place the test files (e.g. test_parsers.m, test_gui_harness.m, etc) into a consolidated folder
+    to tidy up the root folder of the codebase. If any of these test modules are obsolute, put them into an archive folder with 
+    a date so they can be easily removed in future
 
-  **Bug #1: "Index exceeds array bounds"** (line 405)
-  - Root cause: Unsafe array indexing without bounds checking
-  - Fix: Restructured mapping logic with safety checks and bounds verification
-  - Added defensive programming: verify array sizes, validate indices
-
-  **Bug #2: "listbox items (N) do not match file paths (0)"**
-  - Root cause: State overwriting in `onBrowseFolder()` after files were loaded
-  - Timeline: `scanAndPopulateFileList()` updates state → then old state saved, overwrites it
-  - Fix: Removed redundant state save; ensured file paths persist across callbacks
-  - Added: folderPath update in `scanAndPopulateFileList()` for consistency
-
-  **Combined impact:** Both crashes eliminated; state synchronization now robust
-
+## Bugs
 - [x] **xrdConvertGUI struct field name bug** — **FIXED (commit d2ba59f)**
   - `struct('Standard CSV', ...)` is invalid — field names cannot contain spaces
   - Replaced `formatMap`/`intensityMap` structs with `switch` statements
 
-- [x] **starting dataImportGUI Issue** — FIXED: `efWavelength` set `AllowEmpty=false` which rejected `NaN` as initial value; changed to `AllowEmpty=true`.
+- [x] **starting dataImportGUI Issue** — FIXED: `efWavelength` set `AllowEmpty=false` 
+        which rejected `NaN` as initial value; changed to `AllowEmpty=true`.
+
+- [ ] **Waterfall does not work right with PNR multiple cross sections** When waterfalling neutron reflectometry datasets
+    polarizations should water fall the same amount-- if ++ is shifted vertically 10%, -- should also shift that amount if
+    the data sets share the same name prior to the file extneion, where the file extension defines the polarizaiton state
