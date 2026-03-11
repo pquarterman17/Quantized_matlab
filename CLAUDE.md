@@ -10,8 +10,16 @@ Scientific data analysis toolbox for processing and visualizing magnetometry and
 thin_film_toolkit_matlab/
 ├── setupToolbox.m          # Entry point — adds toolbox root to MATLAB path
 ├── dataImportGUI.m         # Interactive uifigure GUI: browse, preview, correct, peaks, export
-├── test_parsers.m          # Smoke tests for all +parser functions
-├── test_importAuto.m       # Smoke tests for parser.importAuto dispatch
+├── xrdConvertGUI.m         # Standalone batch XRD file converter GUI
+├── tests/                  # All test scripts (run via: run tests/test_parsers)
+│   ├── test_parsers.m              # Smoke tests for all +parser functions
+│   ├── test_importAuto.m           # Smoke tests for parser.importAuto dispatch
+│   ├── test_parsers_edge_cases.m   # Edge-case and error-handling tests
+│   ├── test_gui_harness.m          # Automated GUI API tests
+│   ├── test_data_roundtrip.m       # CSV export round-trip tests
+│   ├── test_batch_processing.m     # batchImport / batchConvertXRD integration
+│   ├── test_batch_xrd_converter.m  # XRD converter edge cases
+│   └── archive_2026-03-10/         # Superseded tests (kept for reference)
 ├── +parser/                # Data import namespace
 │   ├── importAuto.m        # Auto-detect file type and dispatch to correct parser
 │   ├── importCSV.m         # Universal CSV/TSV importer with auto-detection

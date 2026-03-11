@@ -198,8 +198,9 @@
 
 ## Documentation — 
 
-- [ ] **Example Scripts** Create examples scripts for different types of tasks and data types to serve as starting
+- [x] **Example Scripts** Create examples scripts for different types of tasks and data types to serve as starting
     point for codebase users
+    **DONE**: 5 scripts in `examples/`: VSM magnetometry, XRD analysis, neutron reflectometry, generic CSV/utilities, batch import. `examples/README.md` added.
 
 - [ ] **update documentaiton within code**
 
@@ -209,18 +210,25 @@
 - [ ] **Space usage** there are boxes with few buttons that take large amounts of visual space in the GUI which forces boxes with more features
                       to be cut off, or overly crammed. optimize the button and box sizes to be readable, and so nothing is hidden unintentionally
 
-- [ ] **Reflectivity analysis** for XRR and neutron reflectometry data, add FFT analysis to extract
+- [x] **Reflectivity analysis** for XRR and neutron reflectometry data, add FFT analysis to extract
         thicknesses. for wavelength allow manual typing of wavelength as in the XRD
-        analysis but add rop down menu to select between various common k-alpha
+        analysis but add dropdown menu to select between various common k-alpha
         sources, with Cu K-alpha being the starting default.
-- [ ] **XRD FFT** for wavelength allow manual typing of wavelength as in the XRD
-        analysis but add rop down menu to select between various common k-alpha
+        **DONE**: `onReflectivityFFT` added — works in Q-space (neutron) or converts from 2θ
+        (XRR). "Reflectivity Analysis" panel shown in neutron mode. R×Q⁴ normalization option.
+- [x] **XRD FFT** for wavelength allow manual typing of wavelength as in the XRD
+        analysis but add dropdown menu to select between various common k-alpha
         sources, with Cu K-alpha being the starting default.
+        **DONE**: `ddXraySource` dropdown added next to λ field in peak analysis panel.
+        9 presets (Cu Kα1, Cu Kα2, Mo, Co, Cr, Fe, Ag Kα1, Custom). Bidirectional sync with λ field.
 
 ## Clean up codebase
-- [ ] **Organize test files** Place the test files (e.g. test_parsers.m, test_gui_harness.m, etc) into a consolidated folder
-    to tidy up the root folder of the codebase. If any of these test modules are obsolute, put them into an archive folder with 
+- [x] **Organize test files** Place the test files (e.g. test_parsers.m, test_gui_harness.m, etc) into a consolidated folder
+    to tidy up the root folder of the codebase. If any of these test modules are obsolute, put them into an archive folder with
     a date so they can be easily removed in future
+    **DONE**: All 7 test scripts moved to `tests/`. Paths fixed (fileparts×2 for project root).
+    `testNCNRDatVerification.m` archived to `tests/archive_2026-03-10/` (superseded by test_parsers.m).
+    Added `tests/README.md` with run instructions.
 
 ## Bugs
 - [x] **xrdConvertGUI struct field name bug** — **FIXED (commit d2ba59f)**

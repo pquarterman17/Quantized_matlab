@@ -1,7 +1,7 @@
 %TEST_IMPORTAUTO  Quick manual test of parser.importAuto dispatch.
 clear; clc;
 
-ROOT = fileparts(mfilename('fullpath'));
+ROOT = fileparts(fileparts(mfilename('fullpath')));  % go up from tests/ to project root
 DAT1 = fullfile(ROOT, '+test_datasets', 'QuantumDesign', 'EDP136_Perp_StrawNew.dat');
 RAW1 = fullfile(ROOT, '+test_datasets', 'rigaku_sample.raw');
 
@@ -80,7 +80,7 @@ catch ME; fprintf('FAIL: %s\n', ME.message); failed = failed+1; end
 % ── Unknown extension (expected rejection) ────────────────────────
 fprintf('=== 6. Unknown extension (.md) ===\n');
 try
-    mdFile = fullfile(fileparts(mfilename('fullpath')), 'CLAUDE.md');
+    mdFile = fullfile(ROOT, 'CLAUDE.md');
     if isfile(mdFile)
         parser.importAuto(mdFile);
         fprintf('FAIL: should have errored\n'); failed = failed+1;

@@ -10,7 +10,7 @@
 
 clear; clc;
 
-ROOT = fileparts(mfilename('fullpath'));
+ROOT = fileparts(fileparts(mfilename('fullpath')));  % go up from tests/ to project root
 XRDML_FILE = fullfile(ROOT, '+test_datasets', 'XRDML', 'La2NiO4_1.xrdml');
 
 % Setup temporary directory for test output files

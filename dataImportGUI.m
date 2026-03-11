@@ -1173,8 +1173,8 @@ function varargout = dataImportGUI()
         'Tooltip','Detected peaks — select a row to highlight it on the plot');
     peakTable.Layout.Column = 1;
 
-    peakBtnGL = uigridlayout(peakGL,[13 1], ...
-        'RowHeight',    {20,24,24,24,24,24,20,24,24,24,24,24,'1x'}, ...
+    peakBtnGL = uigridlayout(peakGL,[14 1], ...
+        'RowHeight',    {20,24,24,24,24,24,20,24,24,24,24,24,24,'1x'}, ...
         'Padding',      [0 0 0 0], ...
         'RowSpacing',   4);
     peakBtnGL.Layout.Column = 2;
@@ -1246,20 +1246,41 @@ function varargout = dataImportGUI()
         'Tooltip', 'Compute film thickness from Laue / Kiessig fringe periodicity via FFT');
     btnFFTThickness.Layout.Row = 11;
 
+    btnReflFFT = uibutton(peakBtnGL, 'Text', 'Reflectivity FFT', ...
+        'ButtonPushedFcn', @onReflectivityFFT, ...
+        'BackgroundColor', [0.20 0.45 0.55], 'FontColor', [1 1 1], ...
+        'Tooltip', ['Compute film thickness from Kiessig fringes via FFT.' newline ...
+                    'For neutron/XRR data (Q-space). Also works for XRD in 2' char(952) ...
+                    '-space if wavelength is set.']);
+    btnReflFFT.Layout.Row = 12;
+
     btnRefineLattice = uibutton(peakBtnGL, 'Text', 'Refine Lattice...', ...
         'ButtonPushedFcn', @onRefineLattice, ...
         'BackgroundColor', [0.15 0.50 0.30], 'FontColor', [1 1 1], ...
         'Tooltip', 'Refine lattice parameters from fitted peak positions + hkl Miller indices');
-    btnRefineLattice.Layout.Row = 12;
+    btnRefineLattice.Layout.Row = 13;
 
-    % Row 13: Min sep / wavelength / K factor / instrument broadening (shared sub-grid)
-    minSepGL = uigridlayout(peakBtnGL, [5 2], ...
-        'RowHeight', {'1x','1x','1x','1x','1x'}, 'ColumnWidth', {64, '1x'}, ...
+    % Row 14: Min sep / wavelength / source / K factor / instrument broadening (shared sub-grid)
+    % X-ray source lookup table: {display name, wavelength_A}
+    XRAY_SOURCES = { ...
+        ['Cu K' char(945) '1 (1.5406 ' char(197) ')'],   1.5406; ...
+        ['Cu K' char(945) '2 (1.5444 ' char(197) ')'],   1.5444; ...
+        ['Cu K' char(945) ' avg (1.5418 ' char(197) ')'],1.5418; ...
+        ['Mo K' char(945) '1 (0.7093 ' char(197) ')'],   0.7093; ...
+        ['Co K' char(945) '1 (1.7889 ' char(197) ')'],   1.7889; ...
+        ['Cr K' char(945) '1 (2.2909 ' char(197) ')'],   2.2909; ...
+        ['Fe K' char(945) '1 (1.9373 ' char(197) ')'],   1.9373; ...
+        ['Ag K' char(945) '1 (0.5594 ' char(197) ')'],   0.5594; ...
+        'Custom',                                          NaN};
+
+    minSepGL = uigridlayout(peakBtnGL, [6 2], ...
+        'RowHeight', {'1x','1x','1x','1x','1x','1x'}, 'ColumnWidth', {64, '1x'}, ...
         'Padding', [0 0 0 0], 'ColumnSpacing', 4, 'RowSpacing', 2);
-    minSepGL.Layout.Row = 13;
-    uilabel(minSepGL, 'Text', 'Min sep:', 'FontSize', 9, ...
+    minSepGL.Layout.Row = 14;
+    lblMinSep = uilabel(minSepGL, 'Text', 'Min sep:', 'FontSize', 9, ...
         'HorizontalAlignment', 'right', ...
         'Tooltip', 'Minimum peak separation in degrees');
+    lblMinSep.Layout.Row = 1; lblMinSep.Layout.Column = 1;
     efMinSep = uispinner(minSepGL, ...
         'Value', 0, 'Limits', [0 20], 'Step', 0.05, ...
         'Tooltip', ['Minimum peak separation (°) for auto-detect.  ' ...
@@ -1267,9 +1288,10 @@ function varargout = dataImportGUI()
                     'Decrease to resolve closely-spaced peaks.'], ...
         'ValueDisplayFormat', '%.2f');
     efMinSep.Layout.Row = 1; efMinSep.Layout.Column = 2;
-    uilabel(minSepGL, 'Text', [char(955), ' (', char(197), '):'], 'FontSize', 9, ...
+    lblWavelength = uilabel(minSepGL, 'Text', [char(955), ' (', char(197), '):'], 'FontSize', 9, ...
         'HorizontalAlignment', 'right', ...
         'Tooltip', 'X-ray wavelength in Ångströms for d-spacing / Scherrer calculations');
+    lblWavelength.Layout.Row = 2; lblWavelength.Layout.Column = 1;
     efWavelength = uieditfield(minSepGL, 'numeric', ...
         'Value', 0, 'Limits', [0 Inf], ...
         'Tooltip', ['Wavelength in Å for d-spacing & Scherrer.  ' ...
@@ -1277,36 +1299,46 @@ function varargout = dataImportGUI()
                     'Cu K' char(945) '1 = 1.5406 Å.  0 = not set.'], ...
         'ValueChangedFcn', @onWavelengthChanged);
     efWavelength.Layout.Row = 2; efWavelength.Layout.Column = 2;
-    uilabel(minSepGL, 'Text', 'K factor:', 'FontSize', 9, ...
+    % Row 3: X-ray source dropdown (spans both columns)
+    ddXraySource = uidropdown(minSepGL, ...
+        'Items',   XRAY_SOURCES(:,1)', ...
+        'Value',   XRAY_SOURCES{1,1}, ...
+        'FontSize', 9, ...
+        'Tooltip', 'Select X-ray source to auto-fill wavelength; pick Custom to type manually', ...
+        'ValueChangedFcn', @onXraySourceChanged);
+    ddXraySource.Layout.Row = 3; ddXraySource.Layout.Column = [1 2];
+    lblKFactor = uilabel(minSepGL, 'Text', 'K factor:', 'FontSize', 9, ...
         'HorizontalAlignment', 'right', ...
         'Tooltip', 'Scherrer shape factor K (0.9 for spherical grains, 1.0 for cubic)');
+    lblKFactor.Layout.Row = 4; lblKFactor.Layout.Column = 1;
     efKFactor = uieditfield(minSepGL, 'numeric', ...
         'Value', appData.kFactor, 'Limits', [0.1 2], ...
         'Placeholder', '0.9', ...
         'Tooltip', 'Scherrer shape factor K — 0.9 (spherical) or 1.0 (cubic). Affects Size (nm) column.', ...
         'ValueChangedFcn', @onKFactorChanged);
-    efKFactor.Layout.Row = 3; efKFactor.Layout.Column = 2;
-    uilabel(minSepGL, 'Text', ['Inst ', char(946), ' (', char(176), '):'], 'FontSize', 9, ...
+    efKFactor.Layout.Row = 4; efKFactor.Layout.Column = 2;
+    lblInstB = uilabel(minSepGL, 'Text', ['Inst ', char(946), ' (', char(176), '):'], 'FontSize', 9, ...
         'HorizontalAlignment', 'right', ...
         'Tooltip', ['Instrument broadening FWHM in degrees (e.g. LaB6 standard).  ' ...
                     '0 = no correction.  Subtracted in quadrature: ' ...
                     char(946), char(8321), char(8325), char(8331), ...
                     ' = sqrt(', char(946), char(8322), char(8320), char(8322), char(8331), ...
                     ' - ', char(946), char(8321), char(8326), char(8331), char(8322), ')']);
+    lblInstB.Layout.Row = 5; lblInstB.Layout.Column = 1;
     efInstBroadening = uieditfield(minSepGL, 'numeric', ...
         'Value', appData.instBroadening_deg, 'Limits', [0 5], ...
         'Placeholder', '0', ...
         'Tooltip', ['Instrument broadening FWHM (°). Enter the FWHM of a standard (e.g. LaB6) peak.  ' ...
                     '0 = no correction applied.'], ...
         'ValueChangedFcn', @onInstBroadeningChanged);
-    efInstBroadening.Layout.Row = 4; efInstBroadening.Layout.Column = 2;
+    efInstBroadening.Layout.Row = 5; efInstBroadening.Layout.Column = 2;
     chkShowBG = uicheckbox(minSepGL, ...
         'Text',            'Show BG', ...
         'Value',           true, ...
         'FontSize',        9, ...
         'Tooltip',         'Overlay the estimated SNIP background curve on the plot', ...
         'ValueChangedFcn', @onToggleShowBG);
-    chkShowBG.Layout.Row = 5; chkShowBG.Layout.Column = [1 2];
+    chkShowBG.Layout.Row = 6; chkShowBG.Layout.Column = [1 2];
 
     % ── Drag-and-drop: register every major surface as a drop target (R2023a+) ──
     % In uifigure the CEF renderer consumes drag events at whichever child
@@ -2175,7 +2207,14 @@ function varargout = dataImportGUI()
                 btnRemovePeakClick.Visible = 'on';
                 % Peak analysis panel — visible for XRD (col 3 and col 4 split flexible width)
                 peakPanel.Visible          = 'on';
+                peakPanel.Title            = 'Peak Analysis';
                 analysisGL.ColumnWidth     = {appData.corrPanelWidth, appData.axLimPanelWidth, '7x', '3x'};
+                % Restore all XRD peak buttons
+                for hh = {ddFitModel, btnFitPeaks, btnFitAllPeaks, btnClearPeaks, ...
+                          btnRemovePeak, btnSavePeaks, btnExportPeakXLSX, chkShowFit, ...
+                          btnFitColor, btnWHPlot, btnFFTThickness, btnRefineLattice, btnReflFFT}
+                    hh{1}.Visible = 'on';
+                end
                 % Hide asymmetry rows (save 48px); restore BG rows
                 corrGL.RowHeight{7}  = 24; corrGL.RowHeight{8}  = 24;
                 corrGL.RowHeight{15} = 0;  corrGL.RowHeight{16} = 0;
@@ -2266,8 +2305,17 @@ function varargout = dataImportGUI()
                 btnManualPeak.Visible      = 'off';
                 btnRemovePeakClick.Visible = 'off';
                 btnApply.Tooltip = 'Apply Q offset / R scale, trim, and normalization to all polarizations from the same measurement';
-                peakPanel.Visible          = 'off';
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '7x', 0, '3x'};
+                % Show peak panel (reduced: only Reflectivity FFT + wavelength controls)
+                peakPanel.Visible          = 'on';
+                peakPanel.Title            = 'Reflectivity Analysis';
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, appData.axLimPanelWidth, '4x', '3x'};
+                % Hide XRD-specific peak buttons; show only Reflectivity FFT
+                for hh = {ddFitModel, btnFitPeaks, btnFitAllPeaks, btnClearPeaks, ...
+                          btnRemovePeak, btnSavePeaks, btnExportPeakXLSX, chkShowFit, ...
+                          btnFitColor, btnWHPlot, btnFFTThickness, btnRefineLattice}
+                    hh{1}.Visible = 'off';
+                end
+                btnReflFFT.Visible = 'on';
                 % Hide BG file rows (not applicable); show asymmetry rows
                 corrGL.RowHeight{7}  = 0;  corrGL.RowHeight{8}  = 0;
                 corrGL.RowHeight{15} = 24; corrGL.RowHeight{16} = 24;
@@ -3209,12 +3257,39 @@ function varargout = dataImportGUI()
     function onWavelengthChanged(src, ~)
     %ONWAVELENGTHCHANGED  User edited the wavelength override field.
     %   Saves the override to the active dataset and refreshes d-spacing column.
+    %   Also syncs the source dropdown to 'Custom' when value doesn't match a preset.
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
         ds = appData.datasets{appData.activeIdx};
         v  = src.Value;
         ds.wavelengthOverride_A = guiTernary(isnan(v) || v <= 0, NaN, v);
         appData.datasets{appData.activeIdx} = ds;
+        % Sync dropdown: if value matches a preset, select it; else set Custom
+        matchIdx = find(abs([XRAY_SOURCES{:,2}] - v) < 1e-4, 1);
+        if ~isempty(matchIdx)
+            ddXraySource.Value = XRAY_SOURCES{matchIdx, 1};
+        else
+            ddXraySource.Value = 'Custom';
+        end
         refreshPeakTable();
+    end
+
+    function onXraySourceChanged(src, ~)
+    %ONXRAYSOURCECHANGED  User selected an X-ray source from the dropdown.
+    %   Auto-fills the wavelength edit field and propagates to the dataset.
+        selectedName = src.Value;
+        matchIdx = strcmp(XRAY_SOURCES(:,1), selectedName);
+        wl = XRAY_SOURCES{matchIdx, 2};
+        if ~isnan(wl)
+            efWavelength.Value = wl;
+            % Propagate to dataset
+            if ~isempty(appData.datasets) && appData.activeIdx >= 1
+                ds = appData.datasets{appData.activeIdx};
+                ds.wavelengthOverride_A = wl;
+                appData.datasets{appData.activeIdx} = ds;
+                refreshPeakTable();
+            end
+        end
+        % 'Custom' selected: leave efWavelength unchanged for manual entry
     end
 
     function onKFactorChanged(src, ~)
@@ -3675,6 +3750,392 @@ function varargout = dataImportGUI()
             fftResult.fft_magnitude = F(1:searchMax);
             fftResult.thickness_axis = thickness_nm(1:searchMax);
             ds2.filmThickness = fftResult;
+            appData.datasets{appData.activeIdx} = ds2;
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  3.1b  REFLECTIVITY FFT (KIESSIG FRINGES)
+    % ════════════════════════════════════════════════════════════════════
+
+    function onReflectivityFFT(~, ~)
+    %ONREFLECTIVITYFFT  Compute film thickness from Kiessig fringe periodicity.
+    %   Works in Q-space directly (neutron NR data) or converts from 2θ (XRR).
+    %   Supports multilayer / superlattice structures by detecting multiple
+    %   FFT peaks (harmonics + independent layer thicknesses).
+    %   Preprocessing: log(R), R×Q⁴, log(R×Q⁴), or raw R.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig, 'Load a file first.', 'No data'); return;
+        end
+        ds = appData.datasets{appData.activeIdx};
+
+        % Determine if data is already in Q-space (neutron) or 2θ-space (XRR)
+        isNeutronDS = isfield(ds, 'parserName') && isNeutronParser(ds.parserName);
+
+        % For XRR (2θ-space), wavelength is required
+        wl_A = NaN;
+        if ~isNeutronDS
+            wl_A = extractWavelength_A(ds);
+            if isnan(wl_A) || wl_A <= 0
+                uialert(fig, ['Wavelength is required for XRR FFT thickness.  ' ...
+                    'Enter a value in the ' char(955) ' field or select an X-ray source.'], ...
+                    'No wavelength'); return;
+            end
+        end
+
+        % Get current corrected data
+        d    = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
+        xAll = d.time(:);      % Q (Å⁻¹) for neutron; 2θ (°) for XRR
+        yAll = d.values(:,1);  % R (reflectivity) or counts
+
+        % Pre-fill range from current axis limits
+        xLo = ax.XLim(1);
+        xHi = ax.XLim(2);
+
+        % ── Dialog figure ────────────────────────────────────────────────
+        rfFig = uifigure('Name', 'Reflectivity FFT — Kiessig Thickness', ...
+            'Position', [200 150 780 640], 'Resize', 'on');
+        rfGL = uigridlayout(rfFig, [4 1], ...
+            'RowHeight', {80, 28, '2x', '1x'}, ...
+            'Padding', [10 10 10 10], 'RowSpacing', 6);
+
+        % ── Row 1: Controls ──────────────────────────────────────────────
+        ctrlGL = uigridlayout(rfGL, [3 6], ...
+            'ColumnWidth', {80, '1x', 80, '1x', 90, '1x'}, ...
+            'RowHeight', {24, 24, 24}, ...
+            'Padding', [0 0 0 0], 'ColumnSpacing', 6, 'RowSpacing', 4);
+        ctrlGL.Layout.Row = 1;
+
+        if isNeutronDS
+            xLabel = ['Q min (' char(197) char(8315) char(185) '):'];
+            xMaxLabel = ['Q max (' char(197) char(8315) char(185) '):'];
+        else
+            xLabel = ['2' char(952) ' min (' char(176) '):'];
+            xMaxLabel = ['2' char(952) ' max (' char(176) '):'];
+        end
+        lblRFXMin = uilabel(ctrlGL, 'Text', xLabel, 'FontWeight', 'bold');
+        lblRFXMin.Layout.Row = 1; lblRFXMin.Layout.Column = 1;
+        efRFMin = uieditfield(ctrlGL, 'numeric', 'Value', max(0, xLo), 'Limits', [-10 180]);
+        efRFMin.Layout.Row = 1; efRFMin.Layout.Column = 2;
+        lblRFXMax = uilabel(ctrlGL, 'Text', xMaxLabel, 'FontWeight', 'bold');
+        lblRFXMax.Layout.Row = 1; lblRFXMax.Layout.Column = 3;
+        efRFMax = uieditfield(ctrlGL, 'numeric', 'Value', xHi, 'Limits', [-10 180]);
+        efRFMax.Layout.Row = 1; efRFMax.Layout.Column = 4;
+        lblRFMaxT = uilabel(ctrlGL, 'Text', 'Max t (nm):', 'FontWeight', 'bold');
+        lblRFMaxT.Layout.Row = 1; lblRFMaxT.Layout.Column = 5;
+        efRFMaxThick = uieditfield(ctrlGL, 'numeric', 'Value', 500, 'Limits', [1 100000], ...
+            'Tooltip', 'Maximum thickness to show on x-axis (nm)');
+        efRFMaxThick.Layout.Row = 1; efRFMaxThick.Layout.Column = 6;
+
+        lblRFWin = uilabel(ctrlGL, 'Text', 'Window:', 'FontWeight', 'bold');
+        lblRFWin.Layout.Row = 2; lblRFWin.Layout.Column = 1;
+        ddRFWindow = uidropdown(ctrlGL, ...
+            'Items', {'Hann', 'None', 'Blackman'}, 'Value', 'Hann', ...
+            'Tooltip', 'Windowing function applied before FFT (Hann reduces spectral leakage)');
+        ddRFWindow.Layout.Row = 2; ddRFWindow.Layout.Column = 2;
+        lblRFPrep = uilabel(ctrlGL, 'Text', 'Preprocess:', 'FontWeight', 'bold');
+        lblRFPrep.Layout.Row = 2; lblRFPrep.Layout.Column = 3;
+        ddRFPreprocess = uidropdown(ctrlGL, ...
+            'Items', {'log(R)', ['log(R' char(183) 'Q' char(8308) ')'], ...
+                      'R', ['R' char(183) 'Q' char(8308)]}, ...
+            'Value', 'log(R)', ...
+            'Tooltip', ['Preprocessing applied before FFT:' newline ...
+                        '  log(R) — log-scale; equalises fringe visibility across Q (default)' newline ...
+                        '  log(R' char(183) 'Q' char(8308) ') — Fresnel-corrected log' newline ...
+                        '  R — raw linear reflectivity' newline ...
+                        '  R' char(183) 'Q' char(8308) ' — Fresnel-corrected linear']);
+        ddRFPreprocess.Layout.Row = 2; ddRFPreprocess.Layout.Column = 4;
+        lblRFPeakThr = uilabel(ctrlGL, 'Text', 'Peak thr.:', 'FontWeight', 'bold', ...
+            'Tooltip', ['Minimum peak prominence as a fraction of the strongest peak.' newline ...
+                        'Lower = more peaks detected.  0.05 = 5% of max.']);
+        lblRFPeakThr.Layout.Row = 2; lblRFPeakThr.Layout.Column = 5;
+        efRFPeakThr = uieditfield(ctrlGL, 'numeric', ...
+            'Value', 0.05, 'Limits', [0.001 1], ...
+            'Tooltip', 'Minimum prominence threshold (fraction of max peak). Lower → more peaks.');
+        efRFPeakThr.Layout.Row = 2; efRFPeakThr.Layout.Column = 6;
+
+        % Row 3: wavelength controls (XRR) or compute button (neutron)
+        if ~isNeutronDS
+            row3GL = uigridlayout(ctrlGL, [1 6], ...
+                'ColumnWidth', {55, 80, 55, '1x', 20, 100}, ...
+                'Padding', [0 0 0 0], 'ColumnSpacing', 4, 'RowSpacing', 0);
+            row3GL.Layout.Row = 3; row3GL.Layout.Column = [1 6];
+            uilabel(row3GL, 'Text', [char(955) ' (' char(197) '):'], 'FontSize', 10);
+            efRFWavelength = uieditfield(row3GL, 'numeric', 'Value', wl_A, 'Limits', [0 Inf], ...
+                'Tooltip', 'X-ray wavelength in Å for 2θ → Q conversion');
+            efRFWavelength.Layout.Row = 1; efRFWavelength.Layout.Column = 2;
+            lblRFSrc2 = uilabel(row3GL, 'Text', 'Source:', 'FontSize', 10, ...
+                'HorizontalAlignment', 'right');
+            lblRFSrc2.Layout.Row = 1; lblRFSrc2.Layout.Column = 3;
+            ddRFSource = uidropdown(row3GL, ...
+                'Items', XRAY_SOURCES(:,1)', ...
+                'Value', XRAY_SOURCES{1,1}, 'FontSize', 9, ...
+                'Tooltip', 'Select X-ray source to auto-fill wavelength', ...
+                'ValueChangedFcn', @(s,~) set(efRFWavelength, 'Value', ...
+                    guiTernary(isnan(XRAY_SOURCES{strcmp(XRAY_SOURCES(:,1), s.Value), 2}), ...
+                               efRFWavelength.Value, ...
+                               XRAY_SOURCES{strcmp(XRAY_SOURCES(:,1), s.Value), 2})));
+            ddRFSource.Layout.Row = 1; ddRFSource.Layout.Column = 4;
+            % Sync dropdown to current wavelength
+            rfSrcMatch = find(abs([XRAY_SOURCES{:,2}] - wl_A) < 1e-4, 1);
+            if ~isempty(rfSrcMatch), ddRFSource.Value = XRAY_SOURCES{rfSrcMatch,1}; end
+        else
+            efRFWavelength = [];  % not needed for neutron
+            % Fill row 3 with empty space (auto-layout handles it)
+        end
+
+        % ── Row 2: Compute button ────────────────────────────────────────
+        btnRFCompute = uibutton(rfGL, 'Text', 'Compute FFT', ...
+            'ButtonPushedFcn', @doReflFFT, ...
+            'BackgroundColor', [0.20 0.45 0.55], 'FontColor', [1 1 1]);
+        btnRFCompute.Layout.Row = 2;
+
+        % ── Row 3: FFT plot ──────────────────────────────────────────────
+        rfAxPanel = uipanel(rfGL, 'BorderType', 'none');
+        rfAxPanel.Layout.Row = 3;
+        rfAx = axes(rfAxPanel);
+
+        % ── Row 4: Peak results table ────────────────────────────────────
+        rfTblPanel = uipanel(rfGL, 'Title', 'Detected Thickness Peaks', 'FontSize', 11);
+        rfTblPanel.Layout.Row = 4;
+        rfTblGL = uigridlayout(rfTblPanel, [1 1], 'Padding', [4 4 4 4]);
+        rfPeakTable = uitable(rfTblGL, ...
+            'ColumnName',  {'#', 'Thickness (nm)', 'Amplitude', 'Rel (%)', 'Harmonic?'}, ...
+            'ColumnWidth', {30, 110, 80, 60, 100}, ...
+            'Data',        {}, ...
+            'RowName',     {});
+
+        % ── Auto-compute on open ─────────────────────────────────────────
+        doReflFFT([], []);
+
+        function doReflFFT(~, ~)
+        %DOREFLEFFT  FFT with multi-peak detection for multilayer / superlattice.
+            xMin = efRFMin.Value;
+            xMax = efRFMax.Value;
+            if xMin >= xMax
+                rfPeakTable.Data = {};
+                title(rfAx, 'Error: min must be less than max');
+                return;
+            end
+
+            % Select data in range
+            mask = xAll >= xMin & xAll <= xMax;
+            if sum(mask) < 10
+                rfPeakTable.Data = {};
+                title(rfAx, 'Too few points in range (need >= 10)');
+                return;
+            end
+            x_sel = xAll(mask);
+            R_sel = yAll(mask);
+
+            % Convert x to Q (Å⁻¹)
+            if isNeutronDS
+                Q = x_sel;
+            else
+                curWL = efRFWavelength.Value;
+                if isnan(curWL) || curWL <= 0
+                    rfPeakTable.Data = {};
+                    title(rfAx, 'Wavelength required for XRR mode');
+                    return;
+                end
+                Q = (4 * pi / curWL) .* sin(x_sel / 2 * pi / 180);
+            end
+
+            % ── Preprocessing ─────────────────────────────────────────
+            prepMode = ddRFPreprocess.Value;
+            useQ4 = contains(prepMode, 'Q');
+            useLog = startsWith(prepMode, 'log');
+
+            R_proc = R_sel;
+            if useQ4
+                Q_safe = max(Q, 1e-6);
+                R_proc = R_proc .* Q_safe.^4;
+            end
+            if useLog
+                R_proc = log10(max(R_proc, 1e-30));  % floor at 1e-30 to avoid -Inf
+            end
+
+            % ── Interpolate to uniform Q grid ─────────────────────────
+            nPts      = numel(Q);
+            Q_uniform = linspace(min(Q), max(Q), nPts);
+            R_uniform = interp1(Q, R_proc, Q_uniform, 'pchip');
+
+            % Subtract linear trend (remove low-frequency drift / DC)
+            p_trend   = polyfit(Q_uniform(:), R_uniform(:), 1);
+            R_uniform = R_uniform - polyval(p_trend, Q_uniform);
+
+            % ── Apply window function ─────────────────────────────────
+            N = numel(R_uniform);
+            switch ddRFWindow.Value
+                case 'Hann'
+                    w = 0.5 * (1 - cos(2*pi*(0:N-1)/(N-1)));
+                case 'Blackman'
+                    w = 0.42 - 0.5*cos(2*pi*(0:N-1)/(N-1)) + ...
+                        0.08*cos(4*pi*(0:N-1)/(N-1));
+                otherwise
+                    w = ones(1, N);
+            end
+            R_windowed = R_uniform(:)' .* w;
+
+            % ── Zero-padded FFT ───────────────────────────────────────
+            N_fft = 2^nextpow2(4 * N);
+            F     = abs(fft(R_windowed, N_fft));
+            F     = F(1:N_fft/2);
+
+            % Thickness axis: t = 2π / ΔQ  (Å → nm via /10)
+            dQ           = Q_uniform(2) - Q_uniform(1);
+            thickness_A  = 2*pi*(0:N_fft/2-1) / (N_fft * dQ);
+            thickness_nm = thickness_A / 10;
+
+            % ── Restrict search range ─────────────────────────────────
+            searchMin = 4;   % skip DC bins 1–3
+            maxT_nm   = efRFMaxThick.Value;
+            searchMax = find(thickness_nm <= maxT_nm, 1, 'last');
+            if isempty(searchMax) || searchMax < searchMin + 1
+                searchMax = numel(F);
+            end
+            F_search = F(searchMin:searchMax);
+            t_search = thickness_nm(searchMin:searchMax);
+
+            % ── Multi-peak detection (no toolbox needed) ──────────────
+            % Find local maxima: F(i) > F(i-1) AND F(i) > F(i+1)
+            nS      = numel(F_search);
+            isLocalMax = false(1, nS);
+            for ki = 2:nS-1
+                isLocalMax(ki) = F_search(ki) > F_search(ki-1) && ...
+                                 F_search(ki) > F_search(ki+1);
+            end
+            maxIdxRel = find(isLocalMax);
+
+            if isempty(maxIdxRel)
+                % Fallback: just take the global max
+                [~, maxIdxRel] = max(F_search);
+            end
+
+            pkAmps = F_search(maxIdxRel);
+            pkThick = t_search(maxIdxRel);
+            pkAbsIdx = maxIdxRel + searchMin - 1;  % index into full F array
+
+            % Filter by prominence: compute local prominence for each peak
+            % Prominence = peak height minus the higher of the two nearest minima
+            prominences = zeros(size(pkAmps));
+            for pi2 = 1:numel(pkAmps)
+                idx = maxIdxRel(pi2);
+                % Find nearest minimum to the left
+                leftMin = min(F_search(1:idx));
+                % Find nearest minimum to the right
+                rightMin = min(F_search(idx:end));
+                prominences(pi2) = pkAmps(pi2) - max(leftMin, rightMin);
+            end
+
+            % Threshold: keep peaks whose prominence > threshold × max(prominence)
+            promThresh = efRFPeakThr.Value * max(prominences);
+            keep = prominences > promThresh;
+            pkAmps   = pkAmps(keep);
+            pkThick  = pkThick(keep);
+            pkAbsIdx = pkAbsIdx(keep);
+            prominences = prominences(keep);
+
+            % Sort by amplitude (descending)
+            [pkAmps, sortOrd] = sort(pkAmps, 'descend');
+            pkThick     = pkThick(sortOrd);
+            pkAbsIdx    = pkAbsIdx(sortOrd);
+            prominences = prominences(sortOrd);
+
+            % Cap at 20 peaks
+            maxPeaks = 20;
+            if numel(pkAmps) > maxPeaks
+                pkAmps   = pkAmps(1:maxPeaks);
+                pkThick  = pkThick(1:maxPeaks);
+                pkAbsIdx = pkAbsIdx(1:maxPeaks);
+            end
+
+            % ── Identify harmonic relationships ───────────────────────
+            % A peak at thickness T is a harmonic of a fundamental T0 if
+            % T ≈ n × T0 for integer n (within 10% tolerance).
+            nPk = numel(pkThick);
+            harmonicLabels = cell(nPk, 1);
+            for hi = 1:nPk
+                harmonicLabels{hi} = '';
+            end
+            if nPk >= 2
+                % Sort peaks by thickness for harmonic analysis
+                [tSorted, tSortIdx] = sort(pkThick, 'ascend');
+                for hi = 2:nPk
+                    for hj = 1:hi-1
+                        ratio = tSorted(hi) / tSorted(hj);
+                        nHarm = round(ratio);
+                        if nHarm >= 2 && abs(ratio - nHarm) < 0.10 * nHarm
+                            % hi is the n-th harmonic of hj
+                            origIdx = tSortIdx(hi);   % amplitude-sorted index of harmonic
+                            refIdx  = tSortIdx(hj);   % amplitude-sorted index of fundamental
+                            harmonicLabels{origIdx} = sprintf('%d%s #%d (%.1f nm)', ...
+                                nHarm, char(215), refIdx, pkThick(refIdx));
+                            break;  % only label as harmonic of the first match
+                        end
+                    end
+                end
+            end
+
+            % ── Plot FFT spectrum with peak markers ───────────────────
+            cla(rfAx);
+            plot(rfAx, t_search, F_search, '-', ...
+                'Color', [0.20 0.45 0.55], 'LineWidth', 1.2);
+            hold(rfAx, 'on');
+
+            % Colour-code peaks: harmonics grey, fundamentals red
+            peakColors = repmat([0.85 0.15 0.15], nPk, 1);  % red default
+            for ci = 1:nPk
+                if ~isempty(harmonicLabels{ci})
+                    peakColors(ci,:) = [0.55 0.55 0.55];  % grey for harmonics
+                end
+            end
+            for mi = 1:nPk
+                plot(rfAx, pkThick(mi), pkAmps(mi), 'v', ...
+                    'MarkerSize', 10, 'MarkerFaceColor', peakColors(mi,:), ...
+                    'MarkerEdgeColor', peakColors(mi,:));
+                text(rfAx, pkThick(mi), pkAmps(mi) * 1.06, ...
+                    sprintf('%.1f', pkThick(mi)), ...
+                    'HorizontalAlignment', 'center', 'FontSize', 8, ...
+                    'Color', peakColors(mi,:));
+            end
+            hold(rfAx, 'off');
+            xlabel(rfAx, 'Film thickness (nm)');
+            ylabel(rfAx, 'FFT magnitude');
+            grid(rfAx, 'on');  box(rfAx, 'on');
+            xlim(rfAx, [0 maxT_nm]);
+            if nPk >= 1
+                title(rfAx, sprintf('%d peaks detected  —  strongest: %.1f nm', nPk, pkThick(1)));
+            else
+                title(rfAx, 'No peaks detected');
+            end
+
+            % ── Fill peak results table ───────────────────────────────
+            relPct = 100 * pkAmps / max(pkAmps);
+            tblData = cell(nPk, 5);
+            for ti = 1:nPk
+                tblData{ti,1} = ti;
+                tblData{ti,2} = round(pkThick(ti), 2);
+                tblData{ti,3} = round(pkAmps(ti), 4);
+                tblData{ti,4} = round(relPct(ti), 1);
+                tblData{ti,5} = harmonicLabels{ti};
+            end
+            rfPeakTable.Data = tblData;
+
+            % ── Persist all peaks to dataset ──────────────────────────
+            ds2 = appData.datasets{appData.activeIdx};
+            rfResult.thicknesses_nm = pkThick(:);
+            rfResult.amplitudes     = pkAmps(:);
+            rfResult.harmonicLabels = harmonicLabels;
+            rfResult.Q_range        = [min(Q) max(Q)];
+            rfResult.preprocess     = prepMode;
+            rfResult.fft_magnitude  = F_search(:);
+            rfResult.thickness_axis = t_search(:);
+            rfResult.isNeutron      = isNeutronDS;
+            if ~isNeutronDS && ~isempty(efRFWavelength)
+                rfResult.wavelength_A = efRFWavelength.Value;
+            end
+            ds2.kiessigThickness = rfResult;
             appData.datasets{appData.activeIdx} = ds2;
         end
     end

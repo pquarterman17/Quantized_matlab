@@ -9,7 +9,7 @@
 
 clear; clc;
 
-ROOT = fileparts(mfilename('fullpath'));
+ROOT = fileparts(fileparts(mfilename('fullpath')));  % go up from tests/ to project root
 
 % Setup temporary directory for test operations
 tmpDir = fullfile(tempdir, 'batch_test_' + string(datetime('now','Format','yyyyMMdd_HHmmss')));

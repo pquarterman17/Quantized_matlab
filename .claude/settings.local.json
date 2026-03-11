@@ -37,7 +37,12 @@
       "Bash(head:*)",
       "Bash(xxd:*)",
       "Bash(where matlab:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(do)",
+      "Bash(echo \"=== $f ===\")",
+      "Read(//g/Onedrive/Coding/git/thin_film_toolkit_matlab/**)",
+      "Bash(done)",
+      "Bash(do:*)"
     ]
   }
 }

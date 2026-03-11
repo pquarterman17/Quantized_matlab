@@ -14,7 +14,7 @@
 
 clear; clc;
 
-ROOT = fileparts(mfilename('fullpath'));
+ROOT = fileparts(fileparts(mfilename('fullpath')));  % go up from tests/ to project root
 XRDML_F = fullfile(ROOT, '+test_datasets', 'XRDML', 'La2NiO4_1.xrdml');
 VSM_F   = fullfile(ROOT, '+test_datasets', 'QuantumDesign', 'EDP136_Perp_StrawNew.dat');
 
