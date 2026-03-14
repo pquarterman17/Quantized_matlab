@@ -14,35 +14,16 @@ UX audit performed 2026-03-14.
   `onDropFiles` `supported` list was missing `.brml`, `.refl`, `.pnr`, `.datA/.datB/.datC/.datD`, `.data/.datb/.datc/.datd`. Accepted by the Add Files dialog but silently rejected on drag-and-drop.
   **Commit:** `4b61ecf`
 
-- [ ] **H3 — No status bar or busy indicator** *(Medium)*
+- [x] **H3 — No status bar or busy indicator** *(Medium)*
   Long operations (batch export, global peak fit, session load) give no feedback — GUI appears frozen.
-  **Fix:** Add an 18px status label row at the bottom of `rootGL` + `setStatus(msg)` helper. Set `fig.Pointer = 'watch'` at start of long operations.
-  **Affected:** `rootGL` construction; `onBatchExportCSV`, `onFitAllPeaks`, `onSaveSession`, `onLoadSession`, `onApplyCorrectionsAll`.
+  **Fix:** Added 18px `lblStatusBar` uilabel as row 3 of `rootGL` (changed from `[2 1]` to `[3 1]`). Added `setStatus(msg)` helper. Added `fig.Pointer = 'watch'` + `setStatus` at start of `onBatchExportCSV`, `onFitAllPeaks`, `onSaveSession`, `onLoadSession`, `onApplyCorrectionsAll`. Reset pointer and status on completion/error. Also updates `onPanelResizeMove` to preserve row 3 in `rootGL.RowHeight` assignments.
+  **Commit:** `873b401` (this session)
 
-  ```matlab
-  % Sketch:
-  rootGL.RowHeight = {185, '1x', '1x', 18};
-  lblStatusBar = uilabel(rootGL, 'Text', 'Ready', ...
-      'FontSize', 9, 'FontColor', [0.5 0.5 0.5]);
-  lblStatusBar.Layout.Row = 4; lblStatusBar.Layout.Column = 1;
-
-  function setStatus(msg)
-      lblStatusBar.Text = msg;
-      drawnow limitrate;
-  end
-  ```
-
-- [ ] **H4 — Save/Export panel is a flat wall of 14 unlabelled buttons** *(Small–Medium)*
+- [x] **H4 — Save/Export panel is a flat wall of 14 unlabelled buttons** *(Small–Medium)*
   No visual grouping between data export / figure export / Origin integration / session / tools.
-  **Fix:** Insert thin `uilabel` separator rows. Restructure `saveGL` to 18 rows with 4 separator rows (14px each).
-
-  | Group | Buttons |
-  |-------|---------|
-  | Data Export | Save CSV, Batch Export All CSV, Export HDF5, Copy Data to Clipboard |
-  | Figure Export | Export to Figure Window, Copy Plot to Clipboard, Save Figure |
-  | Origin / Excel | Send to Origin, Export Origin Script, Export Peak Summary XLSX |
-  | Session | Save Session, Load Session |
-  | Tools | Batch Convert XRD, Layout Settings |
+  **Fix:** Restructured `saveGL` from 14 to 19 rows; inserted 5 thin (14px) `uilabel` section headers. Reordered buttons to match groups (BatchExport and CopyDataClip moved into Data Export group). All row assignments updated.
+  **Groups:** Data Export (rows 1–7), Figure Export (rows 8–11), Session (rows 12–13), Origin / Excel (rows 14–16), Tools (rows 17–19).
+  **Commit:** `873b401` (this session)
 
 ---
 
@@ -50,8 +31,7 @@ UX audit performed 2026-03-14.
 
 - [ ] **M1 — Empty row 7 in file list panel wastes 26px** *(Small)*
   `tbGL` has 8 rows; row 7 is empty dead space between the buttons and the listbox.
-  **Fix A:** Remove the row (7-row grid, listbox at row 7).
-  **Fix B:** Use it for a dataset count label: `"3 files loaded"`.
+  **Partially fixed:** Row 6 now split: `btnAnimate` at col 1, `btnShortcuts` (? Shortcuts) at col 2. Row 7 still exists as 26px dead space — could be removed in a future pass.
 
 - [ ] **M2 — 25+ disabled buttons used as static labels** *(Medium)*
   `lblXOff`, `lblYOff`, `lblSmooth`, etc. are `uibutton(..., 'Enable','off')`. Renders as greyed-out broken buttons, not labels.
@@ -66,44 +46,19 @@ UX audit performed 2026-03-14.
       'HorizontalAlignment', 'right');
   ```
 
-- [ ] **M4 — Keyboard shortcuts not discoverable in the UI** *(Small)*
+- [x] **M4 — Keyboard shortcuts not discoverable in the UI** *(Small)*
   10 shortcuts exist but most have no in-app reference.
-
-  | Shortcut | Action | Documented? |
-  |----------|--------|-------------|
-  | Ctrl+S | Save Session | No |
-  | Ctrl+Z | Undo Corrections | No |
-  | Ctrl+C | Copy Plot | No |
-  | Left / Right | Switch dataset | No |
-  | Space | Toggle visibility | No |
-  | Delete | Remove dataset | Yes |
-  | Ctrl+Up / Down | Reorder dataset | Yes |
-
-  **Fix:** Add `[Shortcut]` hints to button tooltips. Optionally add a `?` button that opens a shortcut reference `uialert`.
-
-  ```matlab
-  btnSaveSession.Tooltip = 'Save all datasets, corrections, and peaks to a .mat file  [Ctrl+S]';
-  btnUndo.Tooltip        = 'Restore corrections to the state before the last Apply  [Ctrl+Z]';
-  btnCopyClip.Tooltip    = 'Copy the current plot to the clipboard as an image  [Ctrl+C]';
-  ```
+  **Fix:** Added `[Ctrl+Z]` to `btnUndo` tooltip, `[Space]` to `btnToggleVis`, `[Ctrl+C]` to `btnCopyClip`, `[Ctrl+S]` to `btnSaveSession`. Added `btnShortcuts` ("? Shortcuts") button at row 6 col 2 of `tbGL`, launching `onShowShortcuts()` which calls `uialert` with full shortcut list. Shrunk `btnAnimate` to half-width (col 1 only) to make room.
+  **Commit:** `873b401` (this session)
 
 - [x] **M5 — Correction style dropdown tooltip was misleading** *(Trivial)*
   Tooltip said `"Choose correction labels"` but the style actually controls which panels and analysis features are visible.
   **Commit:** `b4ad77a`
 
-- [ ] **M6 — No dirty-state indicator when corrections are unapplied** *(Medium)*
+- [x] **M6 — No dirty-state indicator when corrections are unapplied** *(Medium)*
   No visual cue that the plot is stale after editing offset/smoothing/normalization fields.
-  **Fix:** Change `btnApply` text to `"Apply  *"` and tint it yellow when any correction field changes; reset on apply.
-
-  ```matlab
-  % In each correction field ValueChangedFcn:
-  btnApply.Text = 'Apply  *';
-  btnApply.FontColor = [1 0.85 0.2];
-
-  % In onApplyCorrections, after applying:
-  btnApply.Text = 'Apply Corrections';
-  btnApply.FontColor = [1 1 1];
-  ```
+  **Fix:** Added `markCorrectionsDirty()` helper. Added `ValueChangedFcn` callbacks to `efXOffset`, `efYOffset`, `efBGSlope`, `efBGIntercept`, `ddNormalize`, `efXTrimMin`, `efXTrimMax` — each calls `markCorrectionsDirty()`. In `onApplyCorrections`, reset `btnApply.Text = 'Apply Corrections'` and `btnApply.FontColor = [1 1 1]` after applying.
+  **Commit:** `873b401` (this session)
 
 - [x] **M7 — Peak table columns clipped values at narrow widths** *(Trivial)*
   `#` column was 28px (oversized); d-spacing/size columns were 62px (too narrow for decimal values).
@@ -114,23 +69,15 @@ UX audit performed 2026-03-14.
 
 ## LOW PRIORITY
 
-- [ ] **L1 — Animate button occupies prime real estate** *(Small)*
-  `btnAnimate` takes a full row in the file list panel with a distinctive colour. Rarely used.
-  **Fix:** Move to half-width paired with another control, or to the bottom of the panel.
+- [x] **L1 — Animate button occupies prime real estate** *(Small)*
+  `btnAnimate` was full-width in row 6 of `tbGL`.
+  **Fix:** Shrunk to column 1 only; column 2 used for `btnShortcuts` (implemented alongside M4).
+  **Commit:** `873b401` (this session)
 
-- [ ] **L2 — No confirmation for destructive one-click actions** *(Small)*
-  "Clear All Peaks" and "Reset" execute immediately — irreversible with one misclick (undo covers corrections only, not peaks).
-  **Fix:** Add `uiconfirm` in `onClearPeaks` when fitted peaks exist.
-
-  ```matlab
-  if ~isempty(ds.peaks) && any([ds.peaks.isFitted])
-      sel = uiconfirm(fig, ...
-          sprintf('Remove all %d peaks (%d fitted)?', numel(ds.peaks), sum([ds.peaks.isFitted])), ...
-          'Clear Peaks', 'Options', {'Clear', 'Cancel'}, ...
-          'DefaultOption', 2, 'CancelOption', 2);
-      if ~strcmp(sel, 'Clear'), return; end
-  end
-  ```
+- [x] **L2 — No confirmation for destructive one-click actions** *(Small)*
+  "Clear All Peaks" and "Reset" execute immediately — irreversible with one misclick.
+  **Fix:** Added `uiconfirm` in `onClearPeaks` when fitted peaks exist (checks `ds.peaks.status` for 'fitted'/'fitted(global)'). Added `uiconfirm` in `onResetCorrections` when `ds.corrData` is non-empty.
+  **Commit:** `873b401` (this session)
 
 - [x] **L3 — Axis limit placeholder text failed WCAG contrast** *(Trivial)*
   Default placeholder grey (~2.6:1 contrast ratio) on dark `[0.17 0.17 0.17]` background failed WCAG AA.
@@ -144,17 +91,21 @@ UX audit performed 2026-03-14.
 - [ ] **L5 — Unnecessary 2px spacer rows in ctrlGL** *(Small)*
   Rows 2, 4, 6 of `ctrlGL` are 2px spacers that add indexing complexity without meaningful visual separation (`RowSpacing` already handles gaps).
   **Fix:** Remove spacer rows and rely on `RowSpacing`, or increase to 8–12px for intentional grouping.
+  **Skipped:** High renumbering risk, low visual benefit. Defer to future pass.
 
 - [x] **L6 — "Replot" button implied plot could be stale** *(Trivial)*
   Renamed to `"Refresh"` with tooltip `"Force a full redraw of the current plot"`.
   **Commit:** `b4ad77a`
 
-- [ ] **L7 — Save panel uses 11 different button colours with no semantic system** *(Small)*
-  Each button has a unique colour; colours carry no consistent meaning.
-  **Fix:** Adopt a 3-colour palette:
-  - **Primary** `[0.20 0.35 0.55]` — data export actions
-  - **Secondary** `[0.25 0.28 0.32]` — figure and clipboard actions
-  - **Accent** `[0.15 0.40 0.40]` — external integrations (Origin, HDF5)
+- [x] **L7 — Save panel uses 11 different button colours with no semantic system** *(Small)*
+  Each button had a unique colour; colours carried no consistent meaning.
+  **Fix:** Applied 5-category semantic palette:
+  - Data export: `[0.18 0.32 0.52]` — btnSave, btnBatchExport, btnCopyDataClip
+  - Figure/clipboard: `[0.25 0.28 0.35]` — btnExportFig, btnCopyClip, btnSaveFig
+  - External/Origin: `[0.12 0.38 0.38]` — btnSendOrigin, btnExportOriginScript, btnExportHDF5
+  - Session: `[0.22 0.32 0.42]` — btnSaveSession, btnLoadSession
+  - Tools: `[0.28 0.28 0.28]` — btnBatchConvertXRD, btnLayoutSettings
+  **Commit:** `873b401` (this session)
 
 ---
 
@@ -162,9 +113,11 @@ UX audit performed 2026-03-14.
 
 - [x] Step 1 — H1, H2 (`4b61ecf`)
 - [x] Step 2 — M5, M7, L3, L4, L6 (`b4ad77a`)
-- [ ] Step 3 — M4 (shortcut hints in tooltips)
-- [ ] Step 4 — L2 (`uiconfirm` for destructive actions)
-- [ ] Step 5 — H4 (save panel section headers)
-- [ ] Step 6 — M6 (dirty-state indicator on Apply button)
-- [ ] Step 7 — H3 (status bar — requires `rootGL` restructure)
+- [x] Step 3 — M4 (shortcut hints in tooltips + ? button)
+- [x] Step 4 — L2 (`uiconfirm` for destructive actions)
+- [x] Step 5 — H4 (save panel section headers)
+- [x] Step 6 — M6 (dirty-state indicator on Apply button)
+- [x] Step 7 — H3 (status bar — rootGL restructure)
+- [x] Step 7b — L1 (Animate half-width), L7 (semantic colours)
 - [ ] Step 8 — M2 (replace disabled buttons with labels — large but mechanical)
+- [ ] Step 9 — L5 (remove ctrlGL spacer rows — deferred, risky)

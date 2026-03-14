@@ -319,8 +319,8 @@ function varargout = dataImportGUI()
     % Root grid  (2 rows × 1 col: content row 1, analysis row 2)
     % Row 1 holds file-list | controls | preview side-by-side (contentGL).
     % Row 2 (analysis) is resizable via the h_row12 drag border.
-    rootGL = uigridlayout(fig,[2 1], ...
-        'RowHeight',    {'1x','1x'}, ...
+    rootGL = uigridlayout(fig,[3 1], ...
+        'RowHeight',    {'1x','1x',18}, ...
         'ColumnWidth',  {'1x'}, ...
         'Padding',      [8 8 8 8], ...
         'RowSpacing',   6, ...
@@ -393,7 +393,15 @@ function varargout = dataImportGUI()
         'BackgroundColor',[0.50 0.35 0.15], ...
         'FontColor',[1 1 1], ...
         'Tooltip','Cycle through datasets as animation frames (2 fps). Click again to stop.');
-    btnAnimate.Layout.Row = 6; btnAnimate.Layout.Column = [1 2];
+    btnAnimate.Layout.Row = 6; btnAnimate.Layout.Column = 1;
+
+    btnShortcuts = uibutton(tbGL,'Text','?  Shortcuts', ...
+        'ButtonPushedFcn',@onShowShortcuts, ...
+        'BackgroundColor',[0.22 0.22 0.22], ...
+        'FontColor',[0.75 0.75 0.75], ...
+        'FontSize',10, ...
+        'Tooltip','Show keyboard shortcuts');
+    btnShortcuts.Layout.Row = 6; btnShortcuts.Layout.Column = 2;
 
     lbDatasets = uilistbox(tbGL, ...
         'Items',     {'(no files loaded — click  Add File(s)...  to begin)'}, ...
@@ -573,7 +581,13 @@ function varargout = dataImportGUI()
         'Tag',                'GUICursorReadout', ...
         'Visible',            'off');
 
-    % ── Analysis & Corrections panel (row 3, full width) ─────────────────
+    % ── Status bar (row 3 of rootGL) ──────────────────────────────────────
+    lblStatusBar = uilabel(rootGL, 'Text', 'Ready', ...
+        'FontSize', 9, 'FontColor', [0.5 0.5 0.5], ...
+        'HorizontalAlignment', 'left');
+    lblStatusBar.Layout.Row = 3; lblStatusBar.Layout.Column = 1;
+
+    % ── Analysis & Corrections panel (row 2, full width) ─────────────────
     analysisPanel = uipanel(rootGL,'Title','Analysis & Corrections','FontSize',13);
     analysisPanel.Layout.Row = 2; analysisPanel.Layout.Column = 1;
 
@@ -624,7 +638,8 @@ function varargout = dataImportGUI()
 
     efXOffset = uieditfield(corrGL,'numeric','Value',0, ...
         'Tooltip','X-offset: x_corrected = x − this value (0 = no shift)', ...
-        'Limits',[-Inf Inf],'LowerLimitInclusive','off','UpperLimitInclusive','off');
+        'Limits',[-Inf Inf],'LowerLimitInclusive','off','UpperLimitInclusive','off', ...
+        'ValueChangedFcn',@(~,~) markCorrectionsDirty());
     efXOffset.Layout.Row = 2; efXOffset.Layout.Column = 2;
 
     lblBGSlope = uibutton(corrGL,'Text','BG Slope:','Enable','off');
@@ -632,7 +647,8 @@ function varargout = dataImportGUI()
 
     efBGSlope = uieditfield(corrGL,'numeric','Value',0, ...
         'Tooltip','Linear BG slope m: y_BG = m·x + b  (0 = no BG subtraction)', ...
-        'Limits',[-Inf Inf],'LowerLimitInclusive','off','UpperLimitInclusive','off');
+        'Limits',[-Inf Inf],'LowerLimitInclusive','off','UpperLimitInclusive','off', ...
+        'ValueChangedFcn',@(~,~) markCorrectionsDirty());
     efBGSlope.Layout.Row = 2; efBGSlope.Layout.Column = 4;
 
     % Row 3: Y Offset | BG Intercept
@@ -641,7 +657,8 @@ function varargout = dataImportGUI()
 
     efYOffset = uieditfield(corrGL,'numeric','Value',0, ...
         'Tooltip','Y-offset: applied after BG subtraction  (0 = no shift)', ...
-        'Limits',[-Inf Inf],'LowerLimitInclusive','off','UpperLimitInclusive','off');
+        'Limits',[-Inf Inf],'LowerLimitInclusive','off','UpperLimitInclusive','off', ...
+        'ValueChangedFcn',@(~,~) markCorrectionsDirty());
     efYOffset.Layout.Row = 3; efYOffset.Layout.Column = 2;
 
     lblBGInt = uibutton(corrGL,'Text','BG Intercept:','Enable','off');
@@ -649,7 +666,8 @@ function varargout = dataImportGUI()
 
     efBGIntercept = uieditfield(corrGL,'numeric','Value',0, ...
         'Tooltip','Linear BG intercept b: y_BG = m·x + b  (0 = no BG subtraction)', ...
-        'Limits',[-Inf Inf],'LowerLimitInclusive','off','UpperLimitInclusive','off');
+        'Limits',[-Inf Inf],'LowerLimitInclusive','off','UpperLimitInclusive','off', ...
+        'ValueChangedFcn',@(~,~) markCorrectionsDirty());
     efBGIntercept.Layout.Row = 3; efBGIntercept.Layout.Column = 4;
 
     % Row 4: Smoothing controls (all data types)
@@ -794,14 +812,14 @@ function varargout = dataImportGUI()
 
     btnUndo = uibutton(corrGL,'Text','Undo', ...
         'ButtonPushedFcn',@onUndoCorrections, ...
-        'Tooltip','Restore previous correction state (one-level undo)', ...
+        'Tooltip','Restore previous correction state (one-level undo)  [Ctrl+Z]', ...
         'FontColor',[0.6 0.6 0.6]);
     btnUndo.Layout.Row = 10; btnUndo.Layout.Column = 3;
 
     % Row 11: Visibility toggle
     btnToggleVis = uibutton(corrGL,'Text','Hide Dataset', ...
         'ButtonPushedFcn',@onToggleDatasetVisibility, ...
-        'Tooltip','Hide/show the active dataset in the plot without removing it', ...
+        'Tooltip','Hide/show the active dataset in the plot without removing it  [Space]', ...
         'FontColor',[0.5 0.5 0.5]);
     btnToggleVis.Layout.Row = 11; btnToggleVis.Layout.Column = [1 2];
 
@@ -817,7 +835,8 @@ function varargout = dataImportGUI()
     ddNormalize = uidropdown(corrGL, ...
         'Items',   {'None', 'Range [0,1]', 'Peak (max=1)', 'Z-score', 'Area (integral=1)'}, ...
         'Value',   'None', ...
-        'Tooltip', 'Normalize corrected data: Range = [0,1], Peak = max height = 1, Z-score = (x-mean)/std, Area = integrate to 1');
+        'Tooltip', 'Normalize corrected data: Range = [0,1], Peak = max height = 1, Z-score = (x-mean)/std, Area = integrate to 1', ...
+        'ValueChangedFcn', @(~,~) markCorrectionsDirty());
     ddNormalize.Layout.Row = 13; ddNormalize.Layout.Column = [2 4];
 
     % Row 14: Data trim / crop
@@ -825,11 +844,13 @@ function varargout = dataImportGUI()
     lblXTrim.Layout.Row = 14; lblXTrim.Layout.Column = 1;
 
     efXTrimMin = uieditfield(corrGL,'text','Value','', ...
-        'Tooltip','Trim x-range: keep only data from this minimum x-value (blank = no limit)');
+        'Tooltip','Trim x-range: keep only data from this minimum x-value (blank = no limit)', ...
+        'ValueChangedFcn', @(~,~) markCorrectionsDirty());
     efXTrimMin.Layout.Row = 14; efXTrimMin.Layout.Column = 2;
 
     efXTrimMax = uieditfield(corrGL,'text','Value','', ...
-        'Tooltip','Trim x-range: keep only data up to this maximum x-value (blank = no limit)');
+        'Tooltip','Trim x-range: keep only data up to this maximum x-value (blank = no limit)', ...
+        'ValueChangedFcn', @(~,~) markCorrectionsDirty());
     efXTrimMax.Layout.Row = 14; efXTrimMax.Layout.Column = [3 4];
 
     % Row 15: Neutron spin asymmetry calculation (neutron data only)
@@ -1080,133 +1101,163 @@ function varargout = dataImportGUI()
     savePanel = uipanel(analysisGL,'Title','Save / Export','FontSize',13);
     savePanel.Layout.Row = 1; savePanel.Layout.Column = 4;
 
-    saveGL = uigridlayout(savePanel,[14 2], ...
-        'RowHeight',    {26,28,32,32,32,32,32,32,32,32,32,32,32,28}, ...
+    saveGL = uigridlayout(savePanel,[19 2], ...
+        'RowHeight',    {14,26,28,32,32,32,32,14,32,32,32,14,32,14,32,32,14,32,28}, ...
         'ColumnWidth',  {'1x','1x'}, ...
         'Padding',      [6 6 6 6], ...
         'RowSpacing',   4, ...
         'ColumnSpacing', 4);
 
+    % Section header: Data Export (row 1)
+    lblSaveHdrData = uilabel(saveGL, 'Text', 'Data Export', ...
+        'FontSize', 9, 'FontColor', [0.55 0.55 0.55], ...
+        'FontAngle', 'italic', 'HorizontalAlignment', 'left');
+    lblSaveHdrData.Layout.Row = 1; lblSaveHdrData.Layout.Column = [1 2];
+
     efSavePath = uieditfield(saveGL,'Value','', ...
         'Placeholder','(auto-set on dataset load or Apply)', ...
         'Tooltip','Output CSV file path — auto-filled on load/Apply, or browse to choose');
-    efSavePath.Layout.Row = 1; efSavePath.Layout.Column = [1 2];
+    efSavePath.Layout.Row = 2; efSavePath.Layout.Column = [1 2];
 
-    % Row 2: CSV format selector
+    % Row 3: CSV format selector
     ddExportFormat = uidropdown(saveGL, ...
         'Items',   {'Standard CSV', 'Origin ASCII'}, ...
         'Value',   'Standard CSV', ...
         'Tooltip', 'CSV format: Standard (single header) or Origin (Long Name / Units / Designation rows)');
-    ddExportFormat.Layout.Row = 2; ddExportFormat.Layout.Column = [1 2];
+    ddExportFormat.Layout.Row = 3; ddExportFormat.Layout.Column = [1 2];
 
     btnSaveBrowse = uibutton(saveGL,'Text','Browse...', ...
         'ButtonPushedFcn',@onSaveBrowse, ...
         'Tooltip','Choose output file location');
-    btnSaveBrowse.Layout.Row = 3; btnSaveBrowse.Layout.Column = 1;
+    btnSaveBrowse.Layout.Row = 4; btnSaveBrowse.Layout.Column = 1;
 
     btnSave = uibutton(saveGL,'Text','Save CSV', ...
         'ButtonPushedFcn',@onSaveCSV, ...
-        'BackgroundColor',[0.15 0.37 0.63], ...
+        'BackgroundColor',[0.18 0.32 0.52], ...
         'FontColor',[1 1 1],'FontWeight','bold', ...
         'Tooltip','Write data to CSV (raw or corrected; consolidated for neutron data)');
-    btnSave.Layout.Row = 3; btnSave.Layout.Column = 2;
+    btnSave.Layout.Row = 4; btnSave.Layout.Column = 2;
 
     btnExportHDF5 = uibutton(saveGL,'Text','Export HDF5...', ...
         'ButtonPushedFcn',@onExportHDF5, ...
-        'BackgroundColor',[0.10 0.45 0.45], ...
+        'BackgroundColor',[0.12 0.38 0.38], ...
         'FontColor',[1 1 1], ...
         'Tooltip','Export data, corrections, and peaks to a self-describing HDF5 file (.h5)');
-    btnExportHDF5.Layout.Row = 4; btnExportHDF5.Layout.Column = [1 2];
+    btnExportHDF5.Layout.Row = 5; btnExportHDF5.Layout.Column = [1 2];
+
+    % Section header: Figure Export (row 8)
+    lblSaveHdrFig = uilabel(saveGL, 'Text', 'Figure Export', ...
+        'FontSize', 9, 'FontColor', [0.55 0.55 0.55], ...
+        'FontAngle', 'italic', 'HorizontalAlignment', 'left');
+    lblSaveHdrFig.Layout.Row = 8; lblSaveHdrFig.Layout.Column = [1 2];
 
     btnExportFig = uibutton(saveGL,'Text','Export to Figure', ...
         'ButtonPushedFcn',@onExportFigure, ...
-        'BackgroundColor',[0.30 0.30 0.60], ...
+        'BackgroundColor',[0.25 0.28 0.35], ...
         'FontColor',[1 1 1], ...
         'Tooltip','Open a new figure window with the current plot (full MATLAB toolbar — ideal for publication-quality editing)');
-    btnExportFig.Layout.Row = 5; btnExportFig.Layout.Column = [1 2];
+    btnExportFig.Layout.Row = 9; btnExportFig.Layout.Column = [1 2];
 
     btnCopyClip = uibutton(saveGL,'Text','Copy Plot to Clipboard', ...
         'ButtonPushedFcn',@onCopyToClipboard, ...
-        'BackgroundColor',[0.22 0.22 0.22], ...
+        'BackgroundColor',[0.25 0.28 0.35], ...
         'FontColor',[1 1 1], ...
-        'Tooltip','Copy the current plot as an image to the system clipboard (Windows only)');
-    btnCopyClip.Layout.Row = 6; btnCopyClip.Layout.Column = [1 2];
+        'Tooltip','Copy the current plot as an image to the system clipboard (Windows only)  [Ctrl+C]');
+    btnCopyClip.Layout.Row = 10; btnCopyClip.Layout.Column = [1 2];
 
     btnBatchExport = uibutton(saveGL,'Text','Batch Export All CSV', ...
         'ButtonPushedFcn',@onBatchExportCSV, ...
-        'BackgroundColor',[0.50 0.40 0.10], ...
+        'BackgroundColor',[0.18 0.32 0.52], ...
         'FontColor',[1 1 1], ...
         'Tooltip','Export all loaded datasets to separate CSV files (one per dataset)');
-    btnBatchExport.Layout.Row = 7; btnBatchExport.Layout.Column = [1 2];
+    btnBatchExport.Layout.Row = 6; btnBatchExport.Layout.Column = [1 2];
 
     % Row 8: Publication figure save — format selector + save button
     ddFigFormat = uidropdown(saveGL, ...
         'Items',   {'PNG (300 dpi)', 'PDF (vector)', 'SVG (vector)', 'TIFF (300 dpi)'}, ...
         'Value',   'PNG (300 dpi)', ...
         'Tooltip', 'Output file format for publication-quality figure save');
-    ddFigFormat.Layout.Row = 8; ddFigFormat.Layout.Column = 1;
+    ddFigFormat.Layout.Row = 11; ddFigFormat.Layout.Column = 1;
 
     btnSaveFig = uibutton(saveGL,'Text','Save Figure', ...
         'ButtonPushedFcn',@onSaveFigure, ...
-        'BackgroundColor',[0.55 0.20 0.55], ...
+        'BackgroundColor',[0.25 0.28 0.35], ...
         'FontColor',[1 1 1], ...
         'Tooltip','Save the current plot to an image or vector file via exportgraphics');
-    btnSaveFig.Layout.Row = 8; btnSaveFig.Layout.Column = 2;
+    btnSaveFig.Layout.Row = 11; btnSaveFig.Layout.Column = 2;
 
     % Row 9: Session save / load
+    % Section header: Session (row 12)
+    lblSaveHdrSession = uilabel(saveGL, 'Text', 'Session', ...
+        'FontSize', 9, 'FontColor', [0.55 0.55 0.55], ...
+        'FontAngle', 'italic', 'HorizontalAlignment', 'left');
+    lblSaveHdrSession.Layout.Row = 12; lblSaveHdrSession.Layout.Column = [1 2];
+
     btnSaveSession = uibutton(saveGL,'Text','Save Session...', ...
         'ButtonPushedFcn',@onSaveSession, ...
-        'BackgroundColor',[0.25 0.35 0.45], ...
+        'BackgroundColor',[0.22 0.32 0.42], ...
         'FontColor',[1 1 1], ...
-        'Tooltip','Save all loaded datasets, corrections, and peaks to a .mat session file');
-    btnSaveSession.Layout.Row = 9; btnSaveSession.Layout.Column = 1;
+        'Tooltip','Save all loaded datasets, corrections, and peaks to a .mat session file  [Ctrl+S]');
+    btnSaveSession.Layout.Row = 13; btnSaveSession.Layout.Column = 1;
 
     btnLoadSession = uibutton(saveGL,'Text','Load Session...', ...
         'ButtonPushedFcn',@onLoadSession, ...
-        'BackgroundColor',[0.25 0.35 0.45], ...
+        'BackgroundColor',[0.22 0.32 0.42], ...
         'FontColor',[1 1 1], ...
         'Tooltip','Restore a previously saved session from a .mat file');
-    btnLoadSession.Layout.Row = 9; btnLoadSession.Layout.Column = 2;
+    btnLoadSession.Layout.Row = 13; btnLoadSession.Layout.Column = 2;
 
     % Row 10: Copy data to clipboard (tab-delimited with Origin headers)
     btnCopyDataClip = uibutton(saveGL,'Text','Copy Data to Clipboard', ...
         'ButtonPushedFcn', @onCopyDataToClipboard, ...
-        'BackgroundColor', [0.35 0.50 0.35], ...
+        'BackgroundColor', [0.18 0.32 0.52], ...
         'FontColor', [1 1 1], ...
         'Tooltip', 'Copy selected datasets as tab-delimited text to clipboard (Origin-ready)');
-    btnCopyDataClip.Layout.Row = 10; btnCopyDataClip.Layout.Column = [1 2];
+    btnCopyDataClip.Layout.Row = 7; btnCopyDataClip.Layout.Column = [1 2];
 
     % Row 11: Send to Origin via COM (falls back to clipboard)
+    % Section header: Origin / Excel (row 14)
+    lblSaveHdrOrigin = uilabel(saveGL, 'Text', 'Origin / Excel', ...
+        'FontSize', 9, 'FontColor', [0.55 0.55 0.55], ...
+        'FontAngle', 'italic', 'HorizontalAlignment', 'left');
+    lblSaveHdrOrigin.Layout.Row = 14; lblSaveHdrOrigin.Layout.Column = [1 2];
+
     btnSendOrigin = uibutton(saveGL,'Text','Send to Origin', ...
         'ButtonPushedFcn', @onSendToOrigin, ...
-        'BackgroundColor', [0.60 0.30 0.15], ...
+        'BackgroundColor', [0.12 0.38 0.38], ...
         'FontColor', [1 1 1], ...
         'Tooltip', 'Send data to OriginPro via COM automation (falls back to clipboard copy)');
-    btnSendOrigin.Layout.Row = 11; btnSendOrigin.Layout.Column = [1 2];
+    btnSendOrigin.Layout.Row = 15; btnSendOrigin.Layout.Column = [1 2];
 
-    % Row 12: Batch Convert XRD
+    % Section header: Tools (row 17)
+    lblSaveHdrTools = uilabel(saveGL, 'Text', 'Tools', ...
+        'FontSize', 9, 'FontColor', [0.55 0.55 0.55], ...
+        'FontAngle', 'italic', 'HorizontalAlignment', 'left');
+    lblSaveHdrTools.Layout.Row = 17; lblSaveHdrTools.Layout.Column = [1 2];
+
+    % Row 18: Batch Convert XRD
     btnBatchConvertXRD = uibutton(saveGL,'Text','Batch Convert XRD', ...
         'ButtonPushedFcn', @onBatchConvertXRD, ...
-        'BackgroundColor', [0.45 0.45 0.20], ...
+        'BackgroundColor', [0.28 0.28 0.28], ...
         'FontColor', [1 1 1], ...
         'Tooltip', 'Open batch XRD file converter (XRDML, Rigaku, Bruker)');
-    btnBatchConvertXRD.Layout.Row = 12; btnBatchConvertXRD.Layout.Column = [1 2];
+    btnBatchConvertXRD.Layout.Row = 18; btnBatchConvertXRD.Layout.Column = [1 2];
 
     % Row 13: Export Origin Script
     btnExportOriginScript = uibutton(saveGL,'Text','Export Origin Script', ...
         'ButtonPushedFcn', @onExportOriginScript, ...
-        'BackgroundColor', [0.55 0.35 0.10], ...
+        'BackgroundColor', [0.12 0.38 0.38], ...
         'FontColor', [1 1 1], ...
         'Tooltip', 'Write a LabTalk (.ogs) script + CSV that Origin can import directly');
-    btnExportOriginScript.Layout.Row = 13; btnExportOriginScript.Layout.Column = [1 2];
+    btnExportOriginScript.Layout.Row = 16; btnExportOriginScript.Layout.Column = [1 2];
 
     % Row 14: Layout Settings
     btnLayoutSettings = uibutton(saveGL,'Text','Layout Settings...', ...
         'ButtonPushedFcn', @onOpenLayoutSettings, ...
-        'BackgroundColor', [0.30 0.30 0.50], ...
+        'BackgroundColor', [0.28 0.28 0.28], ...
         'FontColor', [1 1 1], ...
         'Tooltip', 'Open the Layout Settings window to configure panel sizes and figure dimensions');
-    btnLayoutSettings.Layout.Row = 14; btnLayoutSettings.Layout.Column = [1 2];
+    btnLayoutSettings.Layout.Row = 19; btnLayoutSettings.Layout.Column = [1 2];
 
     % ── Peak Analysis sub-panel (row 2, full width) ───────────────────────
     % Always visible; XRD buttons in corrGL activate it contextually.
@@ -1662,6 +1713,8 @@ function varargout = dataImportGUI()
         cancelInteractions();
         rebuildDatasetList(true);
         updateControlsForActiveDataset();
+        setStatus(sprintf('Loaded %d file(s) — %d dataset(s) total.', ...
+            nLoaded, numel(appData.datasets)));
         onPlot([],[]);
     end
 
@@ -2211,6 +2264,21 @@ function varargout = dataImportGUI()
         appData.activeIdx = idx + 1;
         rebuildDatasetList(true);
         onPlot([],[]);
+    end
+
+    function onShowShortcuts(~,~)
+    %ONSHOWSHORTCUTS  Display a uialert listing all keyboard shortcuts.
+        msg = sprintf(['Keyboard Shortcuts\n\n' ...
+            'Ctrl+S        Save session\n' ...
+            'Ctrl+Z        Undo corrections\n' ...
+            'Ctrl+C        Copy plot to clipboard\n' ...
+            'Ctrl+E        Export CSV\n' ...
+            'Delete        Remove selected dataset\n' ...
+            'Left / Right  Switch dataset\n' ...
+            'Space         Toggle dataset visibility\n' ...
+            'Ctrl+Up       Move dataset up\n' ...
+            'Ctrl+Down     Move dataset down']);
+        uialert(fig, msg, 'Keyboard Shortcuts', 'Icon', 'info');
     end
 
     function saveAxisLimsToActiveDataset()
@@ -3268,8 +3336,13 @@ function varargout = dataImportGUI()
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig,'Load a file first.','No data'); return;
         end
+        setStatus('Fitting all peaks simultaneously...');
+        fig.Pointer = 'watch';
+        drawnow;
         ds = appData.datasets{appData.activeIdx};
         if numel(ds.peaks) < 2
+            fig.Pointer = 'arrow';
+            setStatus('Ready');
             uialert(fig, ...
                 'Need at least 2 peaks for a global fit.  Use "Fit Peaks" for a single peak.', ...
                 'Global Fit: need ≥2 peaks');
@@ -3384,6 +3457,8 @@ function varargout = dataImportGUI()
 
         appData.datasets{appData.activeIdx} = ds;
         refreshPeakTable();
+        fig.Pointer = 'arrow';
+        setStatus('Global peak fit complete.');
         onPlot([],[]);
     end
 
@@ -3393,6 +3468,16 @@ function varargout = dataImportGUI()
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
         cancelInteractions();
         ds       = appData.datasets{appData.activeIdx};
+        if ~isempty(ds.peaks)
+            nFitted = sum(strcmp({ds.peaks.status},'fitted') | strcmp({ds.peaks.status},'fitted(global)'));
+            if nFitted > 0
+                sel = uiconfirm(fig, ...
+                    sprintf('Remove all %d peaks (%d fitted)?', numel(ds.peaks), nFitted), ...
+                    'Clear Peaks', 'Options', {'Clear', 'Cancel'}, ...
+                    'DefaultOption', 2, 'CancelOption', 2);
+                if ~strcmp(sel, 'Clear'), return; end
+            end
+        end
         ds.peaks = struct('center',{},'fwhm',{},'height',{},'area',{},'xRange',{},'status',{},'bg',{},'model',{},'eta',{});
         appData.datasets{appData.activeIdx} = ds;
         appData.selectedPeakIdx = 0;
@@ -4819,6 +4904,10 @@ function varargout = dataImportGUI()
             return;
         end
 
+        setStatus('Applying corrections to all datasets...');
+        fig.Pointer = 'watch';
+        drawnow;
+
         % Get current correction parameters from UI
         xOff     = efXOffset.Value;
         yOff     = efYOffset.Value;
@@ -4948,6 +5037,8 @@ function varargout = dataImportGUI()
         end
 
         % Refresh plot
+        fig.Pointer = 'arrow';
+        setStatus(sprintf('Corrections applied to all %d datasets.', numel(appData.datasets)));
         onPlot([],[]);
         uialert(fig, sprintf('Corrections applied to all %d datasets.', ...
             numel(appData.datasets)), 'Batch Apply Complete');
@@ -4959,6 +5050,9 @@ function varargout = dataImportGUI()
             return;
         end
         ds       = appData.datasets{appData.activeIdx};
+        % 2D datasets have corrections disabled in the UI — skip the full
+        % struct copy (corrData = d) that would otherwise double memory.
+        if is2DDataset(ds), return; end
         d        = ds.data;
         xOff     = efXOffset.Value;
         yOff     = efYOffset.Value;
@@ -5166,10 +5260,42 @@ function varargout = dataImportGUI()
         [fpath, fname, ~] = fileparts(ds.filepath);
         efSavePath.Value = fullfile(fpath, [fname, '_corrected.csv']);
 
+        % Reset dirty-state indicator on Apply button
+        btnApply.Text      = 'Apply Corrections';
+        btnApply.FontColor = [1 1 1];
+
         onPlot([],[]);
     end
 
+    function markCorrectionsDirty()
+    %MARKCORRECTIONSDIRTY  Visually indicate that correction fields have
+    %  changed and the plot may be stale (resets when Apply is pressed).
+        if isvalid(btnApply)
+            btnApply.Text      = 'Apply  *';
+            btnApply.FontColor = [1 0.85 0.2];
+        end
+    end
+
+    function setStatus(msg)
+    %SETSTATUS  Update the status bar text and flush to screen.
+        if isvalid(lblStatusBar)
+            lblStatusBar.Text = msg;
+            drawnow limitrate;
+        end
+    end
+
     function onResetCorrections(~,~)
+        % Guard: confirm if corrections have been applied
+        if appData.activeIdx >= 1 && ~isempty(appData.datasets)
+            dsReset = appData.datasets{appData.activeIdx};
+            if ~isempty(dsReset.corrData)
+                sel = uiconfirm(fig, ...
+                    'Discard all corrections for the active dataset?', ...
+                    'Reset Corrections', 'Options', {'Reset', 'Cancel'}, ...
+                    'DefaultOption', 2, 'CancelOption', 2);
+                if ~strcmp(sel, 'Reset'), return; end
+            end
+        end
         % Determine neutral yOff: 1.0 for neutron (multiplicative), 0 for others (additive)
         isNeutronReset = false;
         if appData.activeIdx >= 1 && ~isempty(appData.datasets)
@@ -6084,6 +6210,10 @@ function varargout = dataImportGUI()
             return;
         end
 
+        setStatus('Exporting CSV files...');
+        fig.Pointer = 'watch';
+        drawnow;
+
         fmt = resolvedExportFormat();
         nDS = numel(appData.datasets);
         nExported = 0;
@@ -6130,12 +6260,16 @@ function varargout = dataImportGUI()
         end
 
         % Show result
+        fig.Pointer = 'arrow';
         if nExported == 0
+            setStatus('Batch export: no datasets exported.');
             uialert(fig, 'No datasets to export.', 'Batch Export');
         elseif isempty(failedFiles)
+            setStatus(sprintf('Batch export complete: %d file(s) saved.', nExported));
             uialert(fig, sprintf('Successfully exported %d file(s) to CSV.', nExported), ...
                 'Batch Export Complete');
         else
+            setStatus(sprintf('Batch export partial: %d exported, %d failed.', nExported, numel(failedFiles)));
             msg = sprintf('Exported: %d\nFailed: %d\n\n', nExported, numel(failedFiles));
             msg = [msg, strjoin(failedFiles, '\n')];
             uialert(fig, msg, 'Batch Export Partial');
@@ -7532,9 +7666,12 @@ function varargout = dataImportGUI()
             xLbl = 'Q_x (Å^{-1})';
             yLbl = 'Q_z (Å^{-1})';
         else
-            [Xmat, Ymat] = meshgrid(x2, x1);   % uniform angle-space grid
             xLbl = [map.axis2Name ' (' map.axis2Unit ')'];
             yLbl = [map.axis1Name ' (' map.axis1Unit ')'];
+            % Defer meshgrid — only needed for Contour modes, not Heatmap.
+            % imagesc uses the axis vectors directly, avoiding two [N×M]
+            % temporary matrices on every replot.
+            Xmat = [];  Ymat = [];
         end
 
         % Log intensity (cbLogY re-purposed as log-I for 2D)
@@ -7574,8 +7711,10 @@ function varargout = dataImportGUI()
                     targetAx.YDir = 'normal';
                 end
             case 'Contour'
+                if isempty(Xmat), [Xmat, Ymat] = meshgrid(x2, x1); end
                 contour(targetAx, Xmat, Ymat, I, nLvl);
             otherwise  % 'Filled Contour'
+                if isempty(Xmat), [Xmat, Ymat] = meshgrid(x2, x1); end
                 contourf(targetAx, Xmat, Ymat, I, nLvl);
         end
 
@@ -8242,6 +8381,9 @@ function varargout = dataImportGUI()
         savedLogX      = cbLogX.Value;
         savedLogY      = cbLogY.Value;
 
+        setStatus('Saving session...');
+        fig.Pointer = 'watch';
+        drawnow;
         try
             save(outPath, 'savedDatasets', 'savedActiveIdx', ...
                           'savedBgFile', 'savedBgDataset', ...
@@ -8250,8 +8392,12 @@ function varargout = dataImportGUI()
                           'savedYSel', 'savedY2Sel', ...
                           'savedLogX', 'savedLogY', ...
                           '-v7.3');
+            fig.Pointer = 'arrow';
+            setStatus(sprintf('Session saved: %s', fname));
             uialert(fig, sprintf('Session saved:\n%s', outPath), 'Session Saved');
         catch ME
+            fig.Pointer = 'arrow';
+            setStatus('Session save failed.');
             logGUIError('Session Save Error', ME.message, ME);
             uialert(fig, sprintf('Save failed:\n%s', ME.message), 'Session Save Error');
         end
@@ -8267,9 +8413,15 @@ function varargout = dataImportGUI()
         if isequal(fname, 0), return; end
         matPath = fullfile(fpath, fname);
 
+        setStatus('Loading session...');
+        fig.Pointer = 'watch';
+        drawnow;
+
         try
             S = load(matPath, '-mat');
         catch ME
+            fig.Pointer = 'arrow';
+            setStatus('Session load failed.');
             logGUIError('Load Error', ME.message, ME);
             uialert(fig, sprintf('Could not load file:\n%s', ME.message), 'Load Error');
             return;
@@ -8350,6 +8502,8 @@ function varargout = dataImportGUI()
         end
 
         onPlot([],[]);
+        fig.Pointer = 'arrow';
+        setStatus(sprintf('Session loaded: %d dataset(s)', numel(appData.datasets)));
         uialert(fig, sprintf('Session loaded: %d dataset(s)', numel(appData.datasets)), ...
             'Session Loaded');
     end
@@ -8482,12 +8636,12 @@ function varargout = dataImportGUI()
             % Mouse moves up (mp(2) increases) → analysis panel gets taller
             delta_y = mp(2) - appData.panelResizeStart(2);
             figH    = fig.Position(4);
-            % Available px after padding + 1 RowSpacing gap
-            %   rootGL: Padding [8 8 8 8] → 16 px;  1 RowSpacing gap of 6 → 6 px
-            availH  = figH - 16 - 6;
+            % Available px after padding + 2 RowSpacing gaps + status bar
+            %   rootGL: Padding [8 8 8 8] → 16 px;  2 RowSpacing gaps of 6 → 12 px;  status bar 18 px
+            availH  = figH - 16 - 12 - 18;
             newH    = round(appData.panelResizeOrig + delta_y);
             newH    = max(200, min(newH, availH - 100));  % leave ≥ 100 px for preview
-            rootGL.RowHeight = {'1x', newH};
+            rootGL.RowHeight = {'1x', newH, 18};
 
         elseif strcmp(appData.panelResizeDir, 'v_col12')
             % Mouse moves right → corrections panel gets wider
