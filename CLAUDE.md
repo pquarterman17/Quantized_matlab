@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Scientific data analysis toolbox for processing and visualizing magnetometry and generic lab data from laboratory instruments. Supports Quantum Design PPMS/VSM/DynaCool, Rigaku XRD, and generic CSV/Excel/TSV data.
+Scientific data analysis toolbox for processing and visualizing magnetometry and generic lab data from laboratory instruments. Supports Quantum Design PPMS/VSM/DynaCool/MPMS, Rigaku XRD, PANalytical XRDML, Bruker XRD, Lake Shore VSM, NCNR neutron reflectometry, and generic CSV/Excel/TSV data.
 
 ## Repository Structure
 
@@ -11,6 +11,7 @@ thin_film_toolkit_matlab/
 ├── setupToolbox.m          # Entry point — adds toolbox root to MATLAB path
 ├── dataImportGUI.m         # Interactive uifigure GUI: browse, preview, correct, peaks, export
 ├── xrdConvertGUI.m         # Standalone batch XRD file converter GUI
+├── runAllTests.m           # Master test runner; groups: parser/batch/xrd2d/gui/all
 ├── tests/                  # All test scripts (run via: run tests/test_parsers)
 │   ├── test_parsers.m              # Smoke tests for all +parser functions
 │   ├── test_importAuto.m           # Smoke tests for parser.importAuto dispatch
@@ -20,15 +21,25 @@ thin_film_toolkit_matlab/
 │   ├── test_batch_processing.m     # batchImport / batchConvertXRD integration
 │   ├── test_batch_xrd_converter.m  # XRD converter edge cases
 │   ├── test_xrdml_2d.m             # 2D area-detector parser tests (8 tests)
+│   ├── test_xrdml_2d_edge.m        # Edge cases: missing wavelength, malformed XML, single-frame files
 │   ├── test_gui_2d.m               # 2D GUI API tests (6 tests)
+│   ├── test_gui_phase4.m           # Phase-4 GUI feature tests (annotations, Y2, waterfall, session)
 │   └── archive_2026-03-10/         # Superseded tests (kept for reference)
 ├── +parser/                # Data import namespace
 │   ├── importAuto.m        # Auto-detect file type and dispatch to correct parser
+│   ├── resolveParser.m     # Dispatch table: map extension + magic-byte → parser function handle
 │   ├── importCSV.m         # Universal CSV/TSV importer with auto-detection
 │   ├── importExcel.m       # Excel (.xlsx/.xls/.ods) importer
 │   ├── importQDVSM.m       # Quantum Design VSM/DynaCool importer (.dat)
 │   ├── importPPMS.m        # Legacy QD PPMS importer (.dat); auto-detects tab/comma
+│   ├── importMPMS.m        # Quantum Design MPMS SQUID magnetometer (.dat); wrapper over importQDVSM
+│   ├── importLakeShore.m   # Lake Shore VSM/cryostat CSV/DAT; auto-detects header block
 │   ├── importRigaku_raw.m  # Rigaku SmartLab binary .raw importer (magic "FI")
+│   ├── importXRDML.m       # PANalytical/Malvern XRDML XML; 1D scan + 2D area-detector; Q-space
+│   ├── importBruker.m      # Bruker .brml ZIP+XML and .raw v3 binary (magic "RAW1.01")
+│   ├── importNCNRRefl.m    # NCNR polarized neutron reflectometry .refl files (R vs Q + errors)
+│   ├── importNCNRPNR.m     # NCNR polarized neutron reflectometry .pnr files; cross-section resolved
+│   ├── importNCNRDat.m     # refl1d fit output .datA/.datB/.datC/.datD; theory + data overlay
 │   └── createDataStruct.m  # Validates and assembles the unified data struct
 ├── +plotting/              # Plot helper functions
 │   ├── formatAxes.m        # Apply theme to an axes object (fonts, grid, labels)
@@ -39,9 +50,14 @@ thin_film_toolkit_matlab/
 ├── +utilities/             # General-purpose data helpers
 │   ├── normalize.m         # Normalise columns: range / peak / z-score
 │   ├── smoothData.m        # Moving-average or Gaussian smoothing (no toolbox)
-│   └── convertUnits.m      # Convert between common lab units (field, moment, temp, …)
+│   ├── convertUnits.m      # Convert between common lab units (field, moment, temp, …)
+│   ├── writeXRDcsv.m       # Write XRD data to CSV (standard or Origin ASCII format)
+│   ├── estimateBackground.m # Polynomial background estimation for XRD/spectroscopy data
+│   ├── findPeaksRobust.m   # Peak detection with prominence filtering (no toolbox required)
+│   └── pseudoVoigt.m       # Pseudo-Voigt peak shape function (eta-weighted Gaussian+Lorentzian)
 └── +scripts/
-    └── batchImport.m       # Walk a directory, call importAuto on each supported file
+    ├── batchImport.m       # Walk a directory, call importAuto on each supported file
+    └── batchConvertXRD.m   # Batch-convert XRD files (.xrdml/.raw/.brml) to CSV via writeXRDcsv
 ```
 
 ## Supported Data Formats
@@ -50,10 +66,16 @@ thin_film_toolkit_matlab/
 |--------|--------|-------------|
 | Quantum Design VSM `.dat` | `importQDVSM.m` | Magnetometry (M vs H, M vs T); [Header]/[Data] markers |
 | QD PPMS `.dat` (legacy) | `importPPMS.m` | Older PPMS magnetometry CSV/TSV format; auto-detects delimiter |
+| QD MPMS `.dat` | `importMPMS.m` | SQUID magnetometry; thin wrapper over `importQDVSM` with MPMS column shortcuts |
+| Lake Shore `.dat` / `.csv` | `importLakeShore.m` | VSM/cryostat; auto-detect header block; flexible x/y column selection |
 | CSV / TSV / TXT | `importCSV.m` | Generic lab data with auto-detection of delimiter, headers, units |
 | Excel `.xlsx/.xls/.ods` | `importExcel.m` | Spreadsheet data with unit row support |
 | Rigaku SmartLab `.raw` | `importRigaku_raw.m` | Binary XRD file (magic "FI"); warns on multi-range files |
-| PANalytical `.xrdml` | `importXRDML.m` | XML XRD scan; auto-detects 1D vs 2D area-detector data; Q-space conversion |
+| PANalytical XRDML `.xrdml` | `importXRDML.m` | XML XRD; 1D scan or 2D area-detector map; Q-space conversion |
+| Bruker `.brml` / `.raw` | `importBruker.m` | Dual-path: ZIP+XML or v3 binary; magic-byte detection ("RAW1.01") |
+| NCNR reflectometry `.refl` | `importNCNRRefl.m` | Polarized neutron reflectometry from NCNR; R vs Q with error bars |
+| NCNR PNR `.pnr` | `importNCNRPNR.m` | Polarized neutron reflectometry; cross-section resolved (R+, R−) |
+| NCNR fit output `.datA/.datB` | `importNCNRDat.m` | refl1d fit output; theory + data overlay; also handles `.datC/.datD` |
 
 ## Conventions
 
@@ -147,6 +169,36 @@ results = scripts.batchImport('measurements/', 'Recursive', true);
 good = results(cellfun(@isempty, {results.error}));
 ```
 
+### Batch XRD conversion (XRDML → CSV)
+```matlab
+% Convert all XRD files in a folder to CSV
+results = scripts.batchConvertXRD('measurements/', ...
+    Format='standard', Intensity='both', OutputDir='csv_out/');
+
+% Or launch the interactive GUI
+xrdConvertGUI
+
+% Or convert a single file directly
+data = parser.importXRDML('scan.xrdml');
+utilities.writeXRDcsv(data, 'scan.csv', Format='origin', Intensity='cps');
+```
+
+### Neutron reflectometry (NCNR)
+```matlab
+% Import polarized neutron data
+data = parser.importNCNRRefl('sample.refl');
+% data.time = Q (Å⁻¹), data.values = [R+, R-, Rerr+, Rerr-]
+
+% Import cross-section-resolved PNR data
+data = parser.importNCNRPNR('sample.pnr');
+
+% Import refl1d fit output (theory + data overlay)
+data = parser.importNCNRDat('fit.datA');
+
+% Or auto-dispatch for any supported format
+data = parser.importAuto('sample.refl');
+```
+
 ### Plotting helpers
 ```matlab
 th = styles.default();
@@ -166,6 +218,26 @@ smI    = utilities.smoothData(data.values, 'Window', 9); % Gaussian smooth
 ### Interactive GUI
 ```matlab
 dataImportGUI   % browse, preview, apply corrections, find/fit peaks, export CSV
+```
+
+### Running the test suite
+```matlab
+runAllTests                     % all 11 suites (~2 min including GUI tests)
+runAllTests(Group="parser")     % fast parser smoke tests only (no GUI, ~5 s)
+runAllTests(Group="xrd2d")      % 2D area-detector parser + edge cases
+runAllTests(Group="gui")        % headless GUI API tests
+runAllTests(Group="batch")      % batchImport / batchConvertXRD integration
+```
+
+Individual suites can still be run directly:
+```matlab
+run tests/test_parsers            % smoke tests for all +parser functions
+run tests/test_importAuto         % auto-dispatch coverage
+run tests/test_parsers_edge_cases % error-handling paths
+run tests/test_xrdml_2d           % 2D XRDML parser (8 tests)
+run tests/test_xrdml_2d_edge      % edge cases: missing wavelength, malformed XML
+run tests/test_gui_harness        % GUI API (requires display)
+run tests/test_gui_phase4         % phase-4 GUI features (annotations, Y2, session)
 ```
 
 ## Key Design Decisions
