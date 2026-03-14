@@ -412,7 +412,7 @@ function blocks = extractBlocks(xml, tag)
         if nextIdx <= numel(xml)
             ch = xml(nextIdx);
             validOpen(k) = (ch == ' ' || ch == '>' || ch == '/' || ...
-                            ch == char(9) || ch == char(10) || ch == char(13));
+                            ch == char(9) || ch == newline || ch == char(13));
         end
     end
     openStarts = openStarts(validOpen);
@@ -570,8 +570,8 @@ function printSummary(data, filepath)
         fprintf('  Software   : %s v%s\n', ps.softwareName, ps.softwareVersion);
     end
     if ~isnat(ps.startTime)
-        fprintf('  Start time : %s\n', datestr(ps.startTime, 'yyyy-mm-dd HH:MM:SS'));
-        fprintf('  End time   : %s\n', datestr(ps.endTime,   'yyyy-mm-dd HH:MM:SS'));
+        fprintf('  Start time : %s\n', char(datetime(ps.startTime, 'Format', 'yyyy-MM-dd HH:mm:ss')));
+        fprintf('  End time   : %s\n', char(datetime(ps.endTime,   'Format', 'yyyy-MM-dd HH:mm:ss')));
     end
     fprintf('  Data tag   : <%s>\n', ps.intensityTag);
     fprintf('%s\n\n', SEP);

@@ -70,7 +70,6 @@ function data = importBruker(filepath, options)
     end
 
     [~, ~, ext] = fileparts(filepath);
-    ext = lower(ext);
 
     % ════════════════════════════════════════════════════════════════════════
     %  Dispatch by extension
@@ -336,7 +335,7 @@ function data = parseRawBinary(filepath, options)
 
         % Extract this range's header
         rangeStart = currentOffset + 1;   % 1-indexed
-        rangeEnd   = currentOffset + rangeHeaderSize;
+        rangeEnd   = currentOffset + rangeHeaderSize; %#ok<NASGU>
 
         headerSizeBytes = raw(rangeStart : rangeStart + 3);
         headerSize = double(typecast(uint8(headerSizeBytes), 'uint32'));

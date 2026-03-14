@@ -110,10 +110,6 @@
   then XML parse; binary `.raw` requires manual byte-level reading similar to
   `importRigaku_raw.m`. Single parser dispatches on extension/magic.
 
-- [ ] **handle panalytical multidimensional x-ray data** datasets from pixel modern panalytical
-    3d detector puts data out in a area detector which the current parser cannot handle well. add capability
-    to handle this data times
-
 ---
 
 ### Magnetometry / Transport
@@ -225,11 +221,8 @@
         sources, with Cu K-alpha being the starting default.
         **DONE**: `ddXraySource` dropdown added next to λ field in peak analysis panel.
         9 presets (Cu Kα1, Cu Kα2, Mo, Co, Cr, Fe, Ag Kα1, Custom). Bidirectional sync with λ field.
-- [x] **waterfall with log y axis** when using waterfall option for log type data, like XRD, the verticaly
-        shifted data set is hard to read due to the vertical offset
-        **DONE**: Log-Y waterfall now uses multiplicative offsets (`y * factor^(group-1)`) instead of additive.
-        Auto-spacing computes a decade ratio from data log-range. Peak fit curves, FWHM bars, SNIP background,
-        and user annotations all shifted consistently. Label positions use log-space fraction of axis range.
+- [ ] **waterfall with log y axis** when using waterfall option for log type data, like XRD, the verticaly 
+        shifted data set is hard to read due to the vertic
 
 ## Clean up codebase
 - [x] **Organize test files** Place the test files (e.g. test_parsers.m, test_gui_harness.m, etc) into a consolidated folder
@@ -254,9 +247,5 @@
     and handles both dash and underscore separators before `refl`/`pnr`. Waterfall grouping code now calls
     `neutronBaseName()` instead of duplicating the regex logic inline.
 
-- [x] **Controls tab has outdated boxes** the controls box is cut off and the right axis log box is separate from the same
+- [ ] **Controls tab has outdated boxes** the controls box is cut off and the right axis log box is separate from the same
         type of controls for left axis. clean this up to be more space efficient and less cut off
-        **DONE**: `ctrlGL` reduced from 13 rows to 10 (fixed-height total drops ~60 px, fewer cut-off risk).
-        All 4 log checkboxes (Log X, Log Y, Log R, Cts/s) consolidated into one `logChkGL` [1×4] row.
-        `cbLogY2` moved from `y2GL` header into this combined row alongside `cbLogX`/`cbLogY`.
-        `btnPlot` (Replot) merged into the waterfall row (`wfGL` now [1×3]: Waterfall | spacing | Replot).

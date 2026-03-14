@@ -72,7 +72,7 @@ try
     api.addFiles({XRDML_F});
 
     datasets = api.getDatasets();
-    assert(numel(datasets) == 1, sprintf('expected 1 dataset, got %d', numel(datasets)));
+    assert(isscalar(datasets), sprintf('expected 1 dataset, got %d', numel(datasets)));
 
     ds = datasets{1};
     assert(isfield(ds, 'data'), 'missing data field');
@@ -100,7 +100,7 @@ try
     api.addFiles({VSM_F});
 
     datasets = api.getDatasets();
-    assert(numel(datasets) == 1, sprintf('expected 1 dataset, got %d', numel(datasets)));
+    assert(isscalar(datasets), sprintf('expected 1 dataset, got %d', numel(datasets)));
 
     ds = datasets{1};
     parserName = ds.parserName;
@@ -156,7 +156,8 @@ try
     api.setCorrections(0.1, 0, 0, 0);
     api.applyCorrections();
 
-    ds = api.getDatasets(){1};
+    allDs = api.getDatasets();
+    ds = allDs{1};
     assert(isfield(ds, 'corrData') && ~isempty(ds.corrData), 'corrData is empty');
     assert(~isempty(ds.corrData.time), 'corrected time is empty');
 
@@ -193,7 +194,8 @@ try
     api.setCorrections(0, 1.5, 0, 0);
     api.applyCorrections();
 
-    ds = api.getDatasets(){1};
+    allDs = api.getDatasets();
+    ds = allDs{1};
     assert(~isempty(ds.corrData), 'corrData is empty');
 
     orig_val = ds.data.values(1,1);
@@ -228,13 +230,15 @@ try
     api.setCorrections(0, 2.0, 0, 0);
     api.applyCorrections();
 
-    ds = api.getDatasets(){1};
+    allDs = api.getDatasets();
+    ds = allDs{1};
     assert(~isempty(ds.corrData), 'corrData should not be empty after applyCorrections');
 
     % Undo
     api.undoCorrections();
 
-    ds = api.getDatasets(){1};
+    allDs = api.getDatasets();
+    ds = allDs{1};
     if isfield(ds, 'corrData')
         assert(isempty(ds.corrData), 'corrData should be empty after undo');
     end
@@ -365,7 +369,7 @@ try
     api2.loadSession(sessionFile);
 
     datasets = api2.getDatasets();
-    assert(numel(datasets) == 1, sprintf('expected 1 dataset, got %d', numel(datasets)));
+    assert(isscalar(datasets), sprintf('expected 1 dataset, got %d', numel(datasets)));
 
     ds = datasets{1};
     assert(~isempty(ds.corrData), 'corrData not restored');

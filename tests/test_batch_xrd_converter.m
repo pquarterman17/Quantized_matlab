@@ -138,12 +138,12 @@ end
 fprintf('─ TEST 3: batchConvertXRD basic operation ─────────────────────────\n');
 try
     % Test with explicit file list
-    files = ["+test_datasets/XRDML/La2NiO4_1.xrdml"];
+    files = "+test_datasets/XRDML/La2NiO4_1.xrdml";
     results = scripts.batchConvertXRD(files, ...
         OutputDir=testDir, ...
         Verbose=false);
 
-    assert(numel(results) == 1, 'Expected 1 result');
+    assert(isscalar(results), 'Expected 1 result');
     assert(isempty(results(1).error), sprintf('Conversion failed: %s', results(1).error));
     assert(isfile(results(1).outputFile), 'Output file not created');
     fprintf('✓ Single file conversion works\n');
@@ -189,7 +189,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('─ TEST 5: batchConvertXRD options ────────────────────────────────\n');
 try
-    files = ["+test_datasets/XRDML/La2NiO4_1.xrdml"];
+    files = "+test_datasets/XRDML/La2NiO4_1.xrdml";
 
     % Test Format="origin"
     subDir1 = fullfile(testDir, 'origin_out');
@@ -234,7 +234,7 @@ try
     % Simple callback that just displays progress
     callbackFcn = @(k, n, fname) fprintf('  Progress: %d/%d\n', k, n);
 
-    files = ["+test_datasets/XRDML/La2NiO4_1.xrdml"];
+    files = "+test_datasets/XRDML/La2NiO4_1.xrdml";
     results = scripts.batchConvertXRD(files, ...
         OutputDir=testDir, ...
         ProgressFcn=callbackFcn, ...
@@ -259,7 +259,7 @@ try
     % Test invalid output directory
     fprintf('  Testing invalid output directory... ');
     try
-        files = ["+test_datasets/XRDML/La2NiO4_1.xrdml"];
+        files = "+test_datasets/XRDML/La2NiO4_1.xrdml";
         results = scripts.batchConvertXRD(files, OutputDir='nonexistent/path/', Verbose=false);
         % Should have an error in results
         assert(~isempty(results(1).error), 'Expected error for invalid directory');
@@ -277,8 +277,8 @@ try
     % Test invalid format
     fprintf('  Testing invalid format... ');
     try
-        files = ["+test_datasets/XRDML/La2NiO4_1.xrdml"];
-        results = scripts.batchConvertXRD(files, Format='invalid_format', Verbose=false);
+        files = "+test_datasets/XRDML/La2NiO4_1.xrdml";
+        results = scripts.batchConvertXRD(files, Format='invalid_format', Verbose=false); %#ok<NASGU>
         fprintf('✗ Should have errored on invalid format\n');
     catch
         fprintf('✓ Caught invalid format\n');
@@ -305,7 +305,7 @@ try
 
     % Batch call with single file
     file2 = fullfile(testDir, 'batch_single.csv');
-    results = scripts.batchConvertXRD(["+test_datasets/XRDML/La2NiO4_1.xrdml"], ...
+    results = scripts.batchConvertXRD("+test_datasets/XRDML/La2NiO4_1.xrdml", ...
         OutputDir=fileparts(file2), ...
         Format='standard', ...
         Intensity='both', ...

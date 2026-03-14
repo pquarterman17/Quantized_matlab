@@ -127,7 +127,7 @@ function data = importQDVSM(filepath, options)
             inHeader = true;
             continue;
         elseif strcmpi(line, '[Data]')
-            inHeader = false;
+            inHeader = false; %#ok<NASGU>
             dataStartLine = i + 1;   % next line is column headers
             break;
         end
@@ -248,7 +248,7 @@ function data = importQDVSM(filepath, options)
         ySpec = {char(ySpec)};
     end
 
-    if numel(ySpec) == 1 && strcmpi(ySpec{1}, 'all')
+    if isscalar(ySpec) && strcmpi(ySpec{1}, 'all')
         % All numeric columns except x and the Comment column
         yColIdx = [];
         for c = 1:numCols

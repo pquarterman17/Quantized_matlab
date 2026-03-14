@@ -175,7 +175,7 @@ function data = importExcel(filepath, options)
     % ════════════════════════════════════════════════════════════════
     dataNumMat = numMat(dataStartRow:end, :);
     dataRaw    = raw(dataStartRow:end, :);
-    numDataRows = size(dataNumMat, 1);
+    numDataRows = size(dataNumMat, 1); %#ok<NASGU>
 
     % Remove completely empty rows
     nonEmpty = any(~isnan(dataNumMat), 2);
@@ -322,7 +322,7 @@ function raw = trimRaw(raw)
 end
 
 
-function [headerRow, dataStartRow] = detectLayout(numMat, nRows, nCols, hdrOpt, dsOpt)
+function [headerRow, dataStartRow] = detectLayout(numMat, ~, nCols, hdrOpt, dsOpt)
 %DETECTLAYOUT Infer header row and first data row from numeric density.
     if hdrOpt >= 0 && dsOpt >= 0
         headerRow    = hdrOpt;

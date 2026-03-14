@@ -366,7 +366,7 @@ function varargout = dataImportGUI()
     % Context menu for dataset list (right-click)
     cmDatasets = uicontextmenu(fig);
     miRemove = uimenu(cmDatasets, 'Text', 'Remove Selected', ...
-        'MenuSelectedFcn', @(~,~) onRemoveDataset([], []));
+        'MenuSelectedFcn', @(~,~) onRemoveDataset([], [])); %#ok<NASGU>
     lbDatasets.ContextMenu = cmDatasets;
 
     % ── Content: controls panel (left) | preview axes (right) ────────────
@@ -391,8 +391,8 @@ function varargout = dataImportGUI()
     ctrlPanel = uipanel(contentGL,'Title','Controls','FontSize',13);
     ctrlPanel.Layout.Column = 1;
 
-    ctrlGL = uigridlayout(ctrlPanel,[13 1], ...
-        'RowHeight', {26,4,'1x',4,'1x',4,36,26,4,30,4,26,26}, ...
+    ctrlGL = uigridlayout(ctrlPanel,[10 1], ...
+        'RowHeight', {26,2,'1x',2,'1x',2,34,24,26,24}, ...
         'Padding',   [6 6 6 6], ...
         'RowSpacing', 0);
 
@@ -406,27 +406,21 @@ function varargout = dataImportGUI()
         'Tooltip','Y axis channel(s) — Ctrl+click to select multiple');
     lbY.Layout.Row = 3;
 
-    % Row 5: Right Y-axis channel selector + log toggle
-    y2GL = uigridlayout(ctrlGL,[2 2], ...
+    % Row 5: Right Y-axis channel selector
+    y2GL = uigridlayout(ctrlGL,[2 1], ...
         'Padding',[0 0 0 0],'RowSpacing',2,'ColumnSpacing',4, ...
-        'RowHeight',{20,'1x'},'ColumnWidth',{'1x',55});
+        'RowHeight',{20,'1x'},'ColumnWidth',{'1x'});
     y2GL.Layout.Row = 5;
 
     lblY2 = uilabel(y2GL,'Text','Right Y-axis:', ...
         'FontSize',12,'FontColor',[0.75 0.75 0.75]);
     lblY2.Layout.Row = 1; lblY2.Layout.Column = 1;
 
-    cbLogY2 = uicheckbox(y2GL,'Text','Log R', ...
-        'Value',false, ...
-        'Tooltip','Use log scale for the right Y-axis', ...
-        'ValueChangedFcn',@(~,~) onPlot([],[]));
-    cbLogY2.Layout.Row = 1; cbLogY2.Layout.Column = 2;
-
     lbY2 = uilistbox(y2GL,'Items',{'(none)'},'Multiselect','on', ...
         'Value',{'(none)'}, ...
         'Tooltip','Right Y-axis channel(s) — plotted against the right-hand scale', ...
         'ValueChangedFcn',@(~,~) onPlot([],[]));
-    lbY2.Layout.Row = 2; lbY2.Layout.Column = [1 2];
+    lbY2.Layout.Row = 2; lbY2.Layout.Column = 1;
 
     % Plot-style buttons (row 7) — three uibutton objects in a nested grid.
     styleGL = uigridlayout(ctrlGL,[2 3], ...
@@ -461,26 +455,29 @@ function varargout = dataImportGUI()
         'ButtonPushedFcn',@(~,~) onStylePick('Line+Pts'));
     btnStyleLineMarkers.Layout.Row = 2; btnStyleLineMarkers.Layout.Column = 3;
 
-    chkGL = uigridlayout(ctrlGL,[1 3], ...
-        'Padding',[0 0 0 0],'ColumnWidth',{'1x','1x','1x'},'ColumnSpacing',4);
-    chkGL.Layout.Row = 8;
-    cbLogX = uicheckbox(chkGL,'Text','Log X','ValueChangedFcn',@onAxisChanged);
+    % Row 8: All log-scale checkboxes + Cts/s in one row
+    logChkGL = uigridlayout(ctrlGL,[1 4], ...
+        'Padding',[0 0 0 0],'ColumnWidth',{'1x','1x','1x','1x'},'ColumnSpacing',2);
+    logChkGL.Layout.Row = 8;
+    cbLogX = uicheckbox(logChkGL,'Text','Log X','ValueChangedFcn',@onAxisChanged);
     cbLogX.Layout.Column = 1;
-    cbLogY = uicheckbox(chkGL,'Text','Log Y','ValueChangedFcn',@onAxisChanged);
+    cbLogY = uicheckbox(logChkGL,'Text','Log Y','ValueChangedFcn',@onAxisChanged);
     cbLogY.Layout.Column = 2;
-    cbCountsPerSec = uicheckbox(chkGL,'Text','Cts/s', ...
+    cbLogY2 = uicheckbox(logChkGL,'Text','Log R', ...
+        'Value',false, ...
+        'Tooltip','Use log scale for the right Y-axis', ...
+        'ValueChangedFcn',@(~,~) onPlot([],[]));
+    cbLogY2.Layout.Column = 3;
+    cbCountsPerSec = uicheckbox(logChkGL,'Text','Cts/s', ...
         'Value', false, 'Enable', 'off', ...
         'Tooltip', 'Divide intensity by counting time (counts → counts/s). XRD files only.', ...
         'ValueChangedFcn', @onAxisChanged);
-    cbCountsPerSec.Layout.Column = 3;
+    cbCountsPerSec.Layout.Column = 4;
 
-    btnPlot = uibutton(ctrlGL,'Text','Replot','ButtonPushedFcn',@onPlot);
-    btnPlot.Layout.Row = 10;
-
-    % Row 12: Waterfall toggle + spacing field
-    wfGL = uigridlayout(ctrlGL,[1 2], ...
-        'Padding',[0 0 0 0],'ColumnSpacing',4,'ColumnWidth',{'1x',55});
-    wfGL.Layout.Row = 12;
+    % Row 9: Waterfall toggle + spacing + Replot button
+    wfGL = uigridlayout(ctrlGL,[1 3], ...
+        'Padding',[0 0 0 0],'ColumnSpacing',4,'ColumnWidth',{'1x',50,55});
+    wfGL.Layout.Row = 9;
 
     cbWaterfall = uicheckbox(wfGL, ...
         'Text',    'Waterfall', ...
@@ -495,13 +492,16 @@ function varargout = dataImportGUI()
         'ValueChangedFcn', @(~,~) onPlot([],[]));
     efWaterfallSpacing.Layout.Column = 2;
 
-    % Row 13: Annotation mode toggle
+    btnPlot = uibutton(wfGL,'Text','Replot','ButtonPushedFcn',@onPlot);
+    btnPlot.Layout.Column = 3;
+
+    % Row 10: Annotation mode toggle
     cbAnnotationMode = uicheckbox(ctrlGL, ...
         'Text',    'Annotation Mode', ...
         'Value',   false, ...
         'Tooltip', 'Click on the plot to add text annotations. Right-click to delete.', ...
         'ValueChangedFcn', @onAnnotationModeChanged);
-    cbAnnotationMode.Layout.Row = 13;
+    cbAnnotationMode.Layout.Row = 10;
 
     % ── Right: preview axes ───────────────────────────────────────────────
     axPanel = uipanel(contentGL,'Title','Preview','FontSize',13);
@@ -1313,7 +1313,6 @@ function varargout = dataImportGUI()
     lblKFactor.Layout.Row = 4; lblKFactor.Layout.Column = 1;
     efKFactor = uieditfield(minSepGL, 'numeric', ...
         'Value', appData.kFactor, 'Limits', [0.1 2], ...
-        'Placeholder', '0.9', ...
         'Tooltip', 'Scherrer shape factor K — 0.9 (spherical) or 1.0 (cubic). Affects Size (nm) column.', ...
         'ValueChangedFcn', @onKFactorChanged);
     efKFactor.Layout.Row = 4; efKFactor.Layout.Column = 2;
@@ -1327,7 +1326,6 @@ function varargout = dataImportGUI()
     lblInstB.Layout.Row = 5; lblInstB.Layout.Column = 1;
     efInstBroadening = uieditfield(minSepGL, 'numeric', ...
         'Value', appData.instBroadening_deg, 'Limits', [0 5], ...
-        'Placeholder', '0', ...
         'Tooltip', ['Instrument broadening FWHM (°). Enter the FWHM of a standard (e.g. LaB6) peak.  ' ...
                     '0 = no correction applied.'], ...
         'ValueChangedFcn', @onInstBroadeningChanged);
@@ -2186,8 +2184,7 @@ function varargout = dataImportGUI()
                           btnApply, btnReset, btnApplyAll, btnUndo, ...
                           cbSmooth, efSmoothWin, ddSmoothMethod, ...
                           efXTrimMin, efXTrimMax, ddNormalize}
-                    hh{1}.Enable = 'on';
-                end
+                    hh{1}.Enable = 'on';                end
                 analysisPanel.Title   = 'Analysis & Corrections  —  XRD';
                 lblXOff.Text          = '2θ Offset (°):';
                 efXOffset.Tooltip     = '2θ-offset: 2θ_corrected = 2θ − this value  (0 = no shift)';
@@ -2213,8 +2210,7 @@ function varargout = dataImportGUI()
                 for hh = {ddFitModel, btnFitPeaks, btnFitAllPeaks, btnClearPeaks, ...
                           btnRemovePeak, btnSavePeaks, btnExportPeakXLSX, chkShowFit, ...
                           btnFitColor, btnWHPlot, btnFFTThickness, btnRefineLattice, btnReflFFT}
-                    hh{1}.Visible = 'on';
-                end
+                    hh{1}.Visible = 'on';                end
                 % Hide asymmetry rows (save 48px); restore BG rows
                 corrGL.RowHeight{7}  = 24; corrGL.RowHeight{8}  = 24;
                 corrGL.RowHeight{15} = 0;  corrGL.RowHeight{16} = 0;
@@ -2225,8 +2221,7 @@ function varargout = dataImportGUI()
                           btnApply, btnReset, btnApplyAll, btnUndo, ...
                           cbSmooth, efSmoothWin, ddSmoothMethod, ...
                           efXTrimMin, efXTrimMax, ddNormalize}
-                    hh{1}.Enable = 'on';
-                end
+                    hh{1}.Enable = 'on';                end
                 analysisPanel.Title   = 'Analysis & Corrections  —  VSM';
                 lblXOff.Text          = 'Field Offset:';
                 efXOffset.Tooltip     = 'Field offset: H_corrected = H − this value  (0 = no shift)';
@@ -2257,8 +2252,7 @@ function varargout = dataImportGUI()
                           btnApply, btnReset, btnApplyAll, btnUndo, ...
                           cbSmooth, efSmoothWin, ddSmoothMethod, ...
                           efXTrimMin, efXTrimMax, ddNormalize}
-                    hh{1}.Enable = 'on';
-                end
+                    hh{1}.Enable = 'on';                end
                 analysisPanel.Title   = 'Analysis & Corrections  —  PPMS';
                 lblXOff.Text          = 'X Offset:';
                 efXOffset.Tooltip     = 'X-offset: x_corrected = x − this value  (0 = no shift)';
@@ -2290,12 +2284,10 @@ function varargout = dataImportGUI()
                 % Enable useful corrections (offsets, trim, normalize, apply/reset)
                 for hh = {efXOffset, efYOffset, btnApply, btnReset, btnApplyAll, btnUndo, ...
                           efXTrimMin, efXTrimMax, ddNormalize}
-                    hh{1}.Enable = 'on';
-                end
+                    hh{1}.Enable = 'on';                end
                 % Keep BG slope/intercept and smoothing disabled (not meaningful for neutron)
                 for hh = {efBGSlope, efBGIntercept, cbSmooth, efSmoothWin, ddSmoothMethod}
-                    hh{1}.Enable = 'off';
-                end
+                    hh{1}.Enable = 'off';                end
                 lblBGSlope.Text = 'BG Slope:';
                 lblBGInt.Text   = 'BG Intercept:';
                 btnFitBG.Visible           = 'off';
@@ -2313,8 +2305,7 @@ function varargout = dataImportGUI()
                 for hh = {ddFitModel, btnFitPeaks, btnFitAllPeaks, btnClearPeaks, ...
                           btnRemovePeak, btnSavePeaks, btnExportPeakXLSX, chkShowFit, ...
                           btnFitColor, btnWHPlot, btnFFTThickness, btnRefineLattice}
-                    hh{1}.Visible = 'off';
-                end
+                    hh{1}.Visible = 'off';                end
                 btnReflFFT.Visible = 'on';
                 % Hide BG file rows (not applicable); show asymmetry rows
                 corrGL.RowHeight{7}  = 0;  corrGL.RowHeight{8}  = 0;
@@ -2334,8 +2325,7 @@ function varargout = dataImportGUI()
                           btnApply, btnReset, btnApplyAll, btnUndo, ...
                           cbSmooth, efSmoothWin, ddSmoothMethod, ...
                           efXTrimMin, efXTrimMax, ddNormalize}
-                    hh{1}.Enable = 'on';
-                end
+                    hh{1}.Enable = 'on';                end
                 analysisPanel.Title   = 'Analysis & Corrections';
                 lblXOff.Text          = 'X Offset:';
                 efXOffset.Tooltip     = 'X-offset: x_corrected = x − this value  (0 = no shift)';
@@ -2810,7 +2800,7 @@ function varargout = dataImportGUI()
             end
 
             p0 = [H0, x0_0, fw0, bg0];
-            if isPV, p0(end+1) = 0.5; end  % initial eta guess: 50% Lorentzian
+            if isPV, p0(end+1) = 0.5; end  %#ok<AGROW> % initial eta guess: 50% Lorentzian
             objFun = @(p) sum((modelFun(p, xFit) - yFit).^2);
             try
                 pFit = fminsearch(objFun, p0, opts);
@@ -3172,7 +3162,10 @@ function varargout = dataImportGUI()
 
         % Delete existing file so writecell starts fresh
         if isfile(outPath)
-            try, delete(outPath); catch, end
+            try
+                delete(outPath);
+            catch
+            end
         end
 
         nWritten = 0;
@@ -4040,14 +4033,14 @@ function varargout = dataImportGUI()
             [pkAmps, sortOrd] = sort(pkAmps, 'descend');
             pkThick     = pkThick(sortOrd);
             pkAbsIdx    = pkAbsIdx(sortOrd);
-            prominences = prominences(sortOrd);
+            prominences = prominences(sortOrd); %#ok<NASGU>
 
             % Cap at 20 peaks
             maxPeaks = 20;
             if numel(pkAmps) > maxPeaks
                 pkAmps   = pkAmps(1:maxPeaks);
                 pkThick  = pkThick(1:maxPeaks);
-                pkAbsIdx = pkAbsIdx(1:maxPeaks);
+                pkAbsIdx = pkAbsIdx(1:maxPeaks); %#ok<NASGU>
             end
 
             % ── Identify harmonic relationships ───────────────────────
@@ -5184,7 +5177,7 @@ function varargout = dataImportGUI()
             xVecPlot = guiTernary(isempty(idx2), primaryD.time, primaryD.values(:, idx2));
         end
         if isdatetime(xVecPlot)
-            xVecPlot = datenum(xVecPlot);
+            xVecPlot = posixtime(xVecPlot);
         else
             xVecPlot = double(xVecPlot);
         end
@@ -5488,24 +5481,24 @@ function varargout = dataImportGUI()
             if ~isempty(iR)
                 Rcol = src.values(:, iR);
                 if needInterp, Rcol = interp1(Qi, Rcol, Q, 'linear', NaN); end
-                allHdrs{end+1} = sprintf('R_%s', suffix);
-                allCols{end+1} = Rcol(:);
+                allHdrs{end+1} = sprintf('R_%s', suffix); %#ok<AGROW>
+                allCols{end+1} = Rcol(:); %#ok<AGROW>
                 if strcmp(pol, '++'), RPP = Rcol(:); hasPP = true; end
                 if strcmp(pol, '--'), RMM = Rcol(:); hasMM = true; end
             end
             if ~isempty(idR)
                 dRcol = src.values(:, idR);
                 if needInterp, dRcol = interp1(Qi, dRcol, Q, 'linear', NaN); end
-                allHdrs{end+1} = sprintf('dR_%s', suffix);
-                allCols{end+1} = dRcol(:);
+                allHdrs{end+1} = sprintf('dR_%s', suffix); %#ok<AGROW>
+                allCols{end+1} = dRcol(:); %#ok<AGROW>
                 if strcmp(pol, '++'), dRPP = dRcol(:); end
                 if strcmp(pol, '--'), dRMM = dRcol(:); end
             end
             if ~isempty(iTh)
                 thcol = src.values(:, iTh);
                 if needInterp, thcol = interp1(Qi, thcol, Q, 'linear', NaN); end
-                allHdrs{end+1} = sprintf('theory_%s', suffix);
-                allCols{end+1} = thcol(:);
+                allHdrs{end+1} = sprintf('theory_%s', suffix); %#ok<AGROW>
+                allCols{end+1} = thcol(:); %#ok<AGROW>
                 if strcmp(pol, '++'), thPP = thcol(:); end
                 if strcmp(pol, '--'), thMM = thcol(:); end
             end
@@ -5551,7 +5544,7 @@ function varargout = dataImportGUI()
             error('saveConsolidatedNeutronCSV:cannotOpen', ...
                 'Cannot open file for writing:\n%s', fp);
         end
-        closeGuard = onCleanup(@() fclose(fid)); %#ok<NASGU>
+        closeGuard = onCleanup(@() fclose(fid));
 
         if strcmp(fmt, 'origin')
             longNames = cellfun(@(h) strtrim(regexprep(h, '\s*\([^)]+\)', '')), ...
@@ -6050,6 +6043,8 @@ function varargout = dataImportGUI()
             else
                 effectiveSpacing = 0;
             end
+            % Log-mode waterfall uses multiplicative offsets instead of additive.
+            wfLogMode = waterfallOn && cbLogY.Value;
 
             % For neutron data, group polarization cross-sections from the
             % same measurement so they share the same waterfall offset.
@@ -6062,10 +6057,7 @@ function varargout = dataImportGUI()
                     gds = appData.datasets{gi};
                     if isfield(gds, 'parserName') && isNeutronParser(gds.parserName)
                         anyNeutron = true;
-                        [~, fn, ~] = fileparts(gds.filepath);
-                        fn = regexprep(fn, '-(refl|pnr)$', '');
-                        fn = regexprep(fn, '-[a-z]$', '', 'ignorecase');
-                        baseNames{gi} = fn;
+                        baseNames{gi} = neutronBaseName(gds.filepath);
                     else
                         baseNames{gi} = sprintf('__unique_%d__', gi);
                     end
@@ -6164,7 +6156,7 @@ function varargout = dataImportGUI()
                             [~, fn, ~] = fileparts(ds.filepath);
                             % Strip trailing polarization suffix (.datA/.datB etc.) from filename
                             fn = regexprep(fn, '-refl$', '');   % strip refl suffix
-                            polLabel = [fn '  ' polLabel];
+                            polLabel = [fn '  ' polLabel]; %#ok<AGROW>
                         end
                         dispName = polLabel;
 
@@ -6180,7 +6172,11 @@ function varargout = dataImportGUI()
 
                         % Apply waterfall offset for multi-dataset display
                         if effectiveSpacing ~= 0
-                            yR = yR + (wfGroupIdx(di) - 1) * effectiveSpacing;
+                            if wfLogMode
+                                yR = yR * effectiveSpacing^(wfGroupIdx(di) - 1);
+                            else
+                                yR = yR + (wfGroupIdx(di) - 1) * effectiveSpacing;
+                            end
                         end
 
                         % Filter NaN
@@ -6237,7 +6233,11 @@ function varargout = dataImportGUI()
 
                             % Apply waterfall offset to theory so it aligns with measured data
                             if effectiveSpacing ~= 0
-                                yTheory = yTheory + (wfGroupIdx(di) - 1) * effectiveSpacing;
+                                if wfLogMode
+                                    yTheory = yTheory * effectiveSpacing^(wfGroupIdx(di) - 1);
+                                else
+                                    yTheory = yTheory + (wfGroupIdx(di) - 1) * effectiveSpacing;
+                                end
                             end
 
                             theoryColor = 0.55 * baseColor + 0.45 * [1 1 1];
@@ -6261,7 +6261,11 @@ function varargout = dataImportGUI()
                             yRaw     = d.values(:, idx);
                             if ctFactor > 0, yRaw = yRaw / ctFactor; end
                             if effectiveSpacing ~= 0
-                                yRaw = yRaw + (wfGroupIdx(di) - 1) * effectiveSpacing;
+                                if wfLogMode
+                                    yRaw = yRaw * effectiveSpacing^(wfGroupIdx(di) - 1);
+                                else
+                                    yRaw = yRaw + (wfGroupIdx(di) - 1) * effectiveSpacing;
+                                end
                             end
                             rawColor = 0.5 * baseColor + 0.5 * [1 1 1];
                             if isdatetime(xVecRaw)
@@ -6279,7 +6283,11 @@ function varargout = dataImportGUI()
                         yPrimary = primaryD.values(:, idx);
                         if ctFactor > 0, yPrimary = yPrimary / ctFactor; end
                         if effectiveSpacing ~= 0
-                            yPrimary = yPrimary + (wfGroupIdx(di) - 1) * effectiveSpacing;
+                            if wfLogMode
+                                yPrimary = yPrimary * effectiveSpacing^(wfGroupIdx(di) - 1);
+                            else
+                                yPrimary = yPrimary + (wfGroupIdx(di) - 1) * effectiveSpacing;
+                            end
                         end
                         if isdatetime(xVecPrimary)
                             good = ~isnat(xVecPrimary) & ~isnan(yPrimary);
@@ -6664,6 +6672,14 @@ function varargout = dataImportGUI()
             % Drawn after axis limits so YLim is finalised.
             % Render order: (1) Lorentzian fit curves, (2) marker lines + labels,
             % so markers visually sit on top of the model overlay.
+
+            % Waterfall group of the active dataset (used for peak/bg/annotation offsets)
+            if waterfallOn && appData.activeIdx >= 1 && appData.activeIdx <= numel(wfGroupIdx)
+                activeGroupIdx = wfGroupIdx(appData.activeIdx);
+            else
+                activeGroupIdx = 1;
+            end
+
             if appData.activeIdx >= 1 && ~isempty(appData.datasets)
                 dsPk = appData.datasets{appData.activeIdx};
                 if ~isempty(dsPk.peaks)
@@ -6672,8 +6688,15 @@ function varargout = dataImportGUI()
                     yHi   = targetAx.YLim(2);
                     ySpan = yHi - yLo;
                     fitColor = appData.fitCurveColor;
-                    % In waterfall mode the active dataset is shifted by this amount
-                    pkYOff = (appData.activeIdx - 1) * effectiveSpacing;
+                    % In waterfall mode the active dataset is shifted by this amount.
+                    % Log mode uses a multiplier; linear mode uses an additive offset.
+                    if wfLogMode
+                        pkYMult = effectiveSpacing^(activeGroupIdx - 1);
+                        pkYOff  = 0;
+                    else
+                        pkYMult = 1;
+                        pkYOff  = (activeGroupIdx - 1) * effectiveSpacing;
+                    end
 
                     % ── (1) Lorentzian fit overlays ───────────────────────
                     if appData.showFitCurves
@@ -6704,7 +6727,11 @@ function varargout = dataImportGUI()
                             else   % Lorentzian (default)
                                 yFitPlot = pk.height ./ (1 + 4.*u.^2) + pk.bg;
                             end
-                            yFitPlot = yFitPlot + pkYOff;
+                            if wfLogMode
+                                yFitPlot = yFitPlot * pkYMult;
+                            else
+                                yFitPlot = yFitPlot + pkYOff;
+                            end
 
                             isSel = (pi == appData.selectedPeakIdx);
                             plot(targetAx, xFitPlot, yFitPlot, '-', ...
@@ -6732,7 +6759,12 @@ function varargout = dataImportGUI()
                             'HandleVisibility', 'off');
 
                         % Peak index + centre label near the bottom (shifted in waterfall)
-                        text(targetAx, pk.center, yLo + ySpan*0.03 + pkYOff, ...
+                        if wfLogMode && yLo > 0 && yHi > 0
+                            pkLabelY = exp(log(yLo) + (log(yHi)-log(yLo))*0.03) * pkYMult;
+                        else
+                            pkLabelY = yLo + ySpan*0.03 + pkYOff;
+                        end
+                        text(targetAx, pk.center, pkLabelY, ...
                             sprintf('#%d  %.3f\xb0', pi, pk.center), ...
                             'FontSize',           7, ...
                             'HorizontalAlignment','center', ...
@@ -6746,7 +6778,12 @@ function varargout = dataImportGUI()
                         % For un-fitted peaks: fall back to H/2 as an estimate.
                         if ~isnan(pk.fwhm) && pk.fwhm > 0
                             hasBg = isfield(pk,'bg') && ~isempty(pk.bg) && ~isnan(pk.bg);
-                            halfH = guiTernary(hasBg, pk.bg + pk.height*0.5, pk.height*0.5) + pkYOff;
+                            halfHBase = guiTernary(hasBg, pk.bg + pk.height*0.5, pk.height*0.5);
+                            if wfLogMode
+                                halfH = halfHBase * pkYMult;
+                            else
+                                halfH = halfHBase + pkYOff;
+                            end
                             plot(targetAx, ...
                                 [pk.center - pk.fwhm/2, pk.center + pk.fwhm/2], ...
                                 [halfH, halfH], '-', ...
@@ -6768,10 +6805,13 @@ function varargout = dataImportGUI()
                 if isfield(dsBg, 'snipBackground') && ...
                    ~isempty(dsBg.snipBackground) && ...
                    ~isempty(dsBg.snipBackground.x)
-                    bgYOff = (appData.activeIdx - 1) * effectiveSpacing;
+                    if wfLogMode
+                        snipBgY = dsBg.snipBackground.bg * effectiveSpacing^(activeGroupIdx - 1);
+                    else
+                        snipBgY = dsBg.snipBackground.bg + (activeGroupIdx - 1) * effectiveSpacing;
+                    end
                     hold(targetAx, 'on');
-                    plot(targetAx, dsBg.snipBackground.x, ...
-                        dsBg.snipBackground.bg + bgYOff, '--', ...
+                    plot(targetAx, dsBg.snipBackground.x, snipBgY, '--', ...
                         'Color',            [0.2 0.8 0.2], ...
                         'LineWidth',        1.5, ...
                         'HitTest',          'off', ...
@@ -6788,11 +6828,13 @@ function varargout = dataImportGUI()
                 if isfield(dsAnn, 'annotations') && ~isempty(dsAnn.annotations)
                     hold(targetAx, 'on');
                     % In waterfall mode, offset annotations by dataset
-                    annYOff = (appData.activeIdx - 1) * effectiveSpacing;
-
                     for ai = 1:numel(dsAnn.annotations)
                         annot = dsAnn.annotations{ai};
-                        yPos = annot.y + annYOff;
+                        if wfLogMode
+                            yPos = annot.y * effectiveSpacing^(activeGroupIdx - 1);
+                        else
+                            yPos = annot.y + (activeGroupIdx - 1) * effectiveSpacing;
+                        end
 
                         % Render text with light background for visibility
                         text(targetAx, annot.x, yPos, annot.text, ...
@@ -7145,7 +7187,7 @@ function varargout = dataImportGUI()
             return;
         end
         expFig = figure('Name','Exported Plot','NumberTitle','off');
-        expAx  = axes(expFig);   %#ok<LAXES>
+        expAx  = axes(expFig);
         box(expAx,'on');
         grid(expAx,'on');
         drawToAxes(expAx);
@@ -7165,7 +7207,7 @@ function varargout = dataImportGUI()
                         'Name','ClipboardCopy','NumberTitle','off', ...
                         'MenuBar','none','ToolBar','none', ...
                         'Color','none');
-        tmpAx = axes(tmpFig);   %#ok<LAXES>
+        tmpAx = axes(tmpFig);
         set(tmpAx, 'Color','none');
         box(tmpAx,'on');
         grid(tmpAx,'on');
@@ -7238,7 +7280,7 @@ function varargout = dataImportGUI()
         tmpFig = figure('Visible','off','Name','SaveFig','NumberTitle','off', ...
                         'MenuBar','none','ToolBar','none', ...
                         'Units','inches','Position',[0 0 7 5]);
-        tmpAx = axes(tmpFig);   %#ok<LAXES>
+        tmpAx = axes(tmpFig);
         box(tmpAx,'on');
         grid(tmpAx,'on');
         drawToAxes(tmpAx);
@@ -7637,25 +7679,45 @@ function varargout = dataImportGUI()
     % ── Waterfall helpers ────────────────────────────────────────────────
 
     function s = computeAutoWaterfallSpacing()
-    %COMPUTEAUTOWATERFALLSPACING  Return 1.1× the maximum data range across all
-    %  loaded datasets for the first selected Y channel.  Used when the spacing
-    %  field is blank so adjacent stacked traces just clear each other.
-        s = 1;   % safe fallback if no data range can be determined
+    %COMPUTEAUTOWATERFALLSPACING  Return spacing for automatic waterfall.
+    %  Linear mode: 1.1× the maximum data range (additive offset).
+    %  Log mode:    10^(1.1 × max log-range) as a multiplicative factor.
         ySel = ensureCell(lbY.Value);
-        if isempty(ySel), return; end
-        maxRange = 0;
-        for ddi = 1:numel(appData.datasets)
-            ds2      = appData.datasets{ddi};
-            primaryD = guiTernary(~isempty(ds2.corrData), ds2.corrData, ds2.data);
-            idx2     = find(strcmp(primaryD.labels, ySel{1}), 1);
-            if isempty(idx2), continue; end
-            yVals = primaryD.values(:, idx2);
-            yVals = yVals(~isnan(yVals));
-            if numel(yVals) < 2, continue; end
-            r = max(yVals) - min(yVals);
-            if r > maxRange, maxRange = r; end
+        if cbLogY.Value
+            % Log mode — return a multiplier (ratio between adjacent traces)
+            s = 10;   % safe fallback: one decade
+            if isempty(ySel), return; end
+            maxLogRange = 0;
+            for ddi = 1:numel(appData.datasets)
+                ds2      = appData.datasets{ddi};
+                primaryD = guiTernary(~isempty(ds2.corrData), ds2.corrData, ds2.data);
+                idx2     = find(strcmp(primaryD.labels, ySel{1}), 1);
+                if isempty(idx2), continue; end
+                yVals = primaryD.values(:, idx2);
+                yVals = yVals(yVals > 0 & ~isnan(yVals));
+                if numel(yVals) < 2, continue; end
+                r = log10(max(yVals)) - log10(min(yVals));
+                if r > maxLogRange, maxLogRange = r; end
+            end
+            if maxLogRange > 0, s = 10^(maxLogRange * 1.1); end
+        else
+            % Linear mode — return an additive offset
+            s = 1;   % safe fallback if no data range can be determined
+            if isempty(ySel), return; end
+            maxRange = 0;
+            for ddi = 1:numel(appData.datasets)
+                ds2      = appData.datasets{ddi};
+                primaryD = guiTernary(~isempty(ds2.corrData), ds2.corrData, ds2.data);
+                idx2     = find(strcmp(primaryD.labels, ySel{1}), 1);
+                if isempty(idx2), continue; end
+                yVals = primaryD.values(:, idx2);
+                yVals = yVals(~isnan(yVals));
+                if numel(yVals) < 2, continue; end
+                r = max(yVals) - min(yVals);
+                if r > maxRange, maxRange = r; end
+            end
+            if maxRange > 0, s = maxRange * 1.1; end
         end
-        if maxRange > 0, s = maxRange * 1.1; end
     end
 
     % ── Dataset list drag-to-reorder ─────────────────────────────────────
@@ -8098,7 +8160,7 @@ function guiSaveCSV(d, fp, dRaw, asymData, fmt)
     if fid < 0
         error('guiSaveCSV:cannotOpen', 'Cannot open file for writing:\n%s', fp);
     end
-    closeGuard = onCleanup(@() fclose(fid)); %#ok<NASGU>
+    closeGuard = onCleanup(@() fclose(fid));
 
     % ── Header ────────────────────────────────────────────────────────
     if strcmp(fmt, 'origin')
@@ -8219,28 +8281,28 @@ function out = guiMetaLines(d, parserName, fp)
             val   = ps.(fname);
             % Scalar numeric or short char
             if isnumeric(val) && isscalar(val)
-                out{end+1} = sprintf('%-14s %g', [fname ':'], val);
+                out{end+1} = sprintf('%-14s %g', [fname ':'], val); %#ok<AGROW>
             elseif (ischar(val) || (isstring(val) && isscalar(val))) && ~isempty(val)
-                out{end+1} = sprintf('%-14s %s', [fname ':'], char(val));
+                out{end+1} = sprintf('%-14s %s', [fname ':'], char(val)); %#ok<AGROW>
             elseif iscell(val) && ~isempty(val) && numel(val) <= 4
-                out{end+1} = sprintf('%-14s %s', [fname ':'], strjoin(val, ', '));
+                out{end+1} = sprintf('%-14s %s', [fname ':'], strjoin(val, ', ')); %#ok<AGROW>
             elseif isstruct(val)
                 % Sub-struct: show up to 4 scalar fields
                 subFn = fieldnames(val);
-                out{end+1} = sprintf('%s:', fname);
+                out{end+1} = sprintf('%s:', fname); %#ok<AGROW>
                 shown = 0;
                 for sfi = 1:numel(subFn)
                     sv = val.(subFn{sfi});
                     if (ischar(sv) || (isnumeric(sv) && isscalar(sv))) && shown < 4
-                        out{end+1} = sprintf('  %-12s %s', [subFn{sfi} ':'], num2str(sv));
+                        out{end+1} = sprintf('  %-12s %s', [subFn{sfi} ':'], num2str(sv)); %#ok<AGROW>
                         shown = shown + 1;
                     end
                 end
             elseif iscell(val) && ~isempty(val)
                 % Cell array (allColumnNames etc.) — list items
-                out{end+1} = sprintf('%s  (%d):', fname, numel(val));
+                out{end+1} = sprintf('%s  (%d):', fname, numel(val)); %#ok<AGROW>
                 for ci = 1:numel(val)
-                    out{end+1} = sprintf('  %s', val{ci});
+                    out{end+1} = sprintf('  %s', val{ci}); %#ok<AGROW>
                 end
             end
         end
@@ -8271,10 +8333,10 @@ function out = guiMetaLines(d, parserName, fp)
         col = d.values(~isnan(d.values(:,k)), k);
         lbl = guiLabel(d.labels{k}, d.units{k});
         if isempty(col)
-            out{end+1} = sprintf('  Y%d: %s  (all NaN)', k, lbl);
+            out{end+1} = sprintf('  Y%d: %s  (all NaN)', k, lbl); %#ok<AGROW>
         else
-            out{end+1} = sprintf('  Y%d: %s', k, lbl);
-            out{end+1} = sprintf('       [%.4g, %.4g]', min(col), max(col));
+            out{end+1} = sprintf('  Y%d: %s', k, lbl); %#ok<AGROW>
+            out{end+1} = sprintf('       [%.4g, %.4g]', min(col), max(col)); %#ok<AGROW>
         end
     end
 end
@@ -8324,11 +8386,13 @@ end
 
 function baseName = neutronBaseName(filepath)
 %NEUTRONBASENAME  Strip polarization suffixes to get the measurement base name.
-%   Removes -(refl|pnr) and trailing -[a-z] so that all cross-sections from
-%   one measurement share the same base name.
+%   Removes [_-](refl|pnr), [_-](NSF|SF), and trailing [_-][a-z] so that
+%   all cross-sections from one measurement share the same base name.
+%   Handles both dash and underscore separators.
     [~, fn, ~] = fileparts(filepath);
-    fn = regexprep(fn, '-(refl|pnr)$', '');
-    fn = regexprep(fn, '-[a-z]$', '', 'ignorecase');
+    fn = regexprep(fn, '[_-](refl|pnr)$', '', 'ignorecase');
+    fn = regexprep(fn, '[_-](NSF|SF)$',   '', 'ignorecase');
+    fn = regexprep(fn, '[_-][a-z]$',       '', 'ignorecase');
     baseName = fn;
 end
 
@@ -8653,9 +8717,9 @@ function pairMap = findPolarizationPairs(datasets)
         % Store pair mapping
         if partnerIdx > 0
             if strcmp(pol_i, '++')
-                pairMap{i} = [i, partnerIdx];
+                pairMap{i} = [i, partnerIdx]; %#ok<AGROW>
             else
-                pairMap{i} = [partnerIdx, i];  % always [++, --]
+                pairMap{i} = [partnerIdx, i];  %#ok<AGROW> % always [++, --]
             end
         end
     end

@@ -166,8 +166,8 @@ function [intensityVals, labels, units] = resolveIntensityColumns(data, intensit
             if isnan(countingTime)
                 % Can't convert; write only cps with note
                 intensityVals = originalVals;
-                labels = ["Intensity (cps)"];
-                units = ["cps"];
+                labels = "Intensity (cps)";
+                units = "cps";
             else
                 counts = originalVals * countingTime;
                 intensityVals = [originalVals, counts];
@@ -179,8 +179,8 @@ function [intensityVals, labels, units] = resolveIntensityColumns(data, intensit
             if isnan(countingTime)
                 % Can't convert; write only counts with note
                 intensityVals = originalVals;
-                labels = ["Intensity (counts)"];
-                units = ["counts"];
+                labels = "Intensity (counts)";
+                units = "counts";
             else
                 cps = originalVals / countingTime;
                 intensityVals = [cps, originalVals];
@@ -201,8 +201,8 @@ function [intensityVals, labels, units] = resolveIntensityColumns(data, intensit
                 intensityVals = originalVals / countingTime;
             end
         end
-        labels = ["Intensity (cps)"];
-        units = ["cps"];
+        labels = "Intensity (cps)";
+        units = "cps";
     else
         % intensityOpt == "counts"
         if contains(originalUnit, 'counts', 'IgnoreCase', true)
@@ -217,8 +217,8 @@ function [intensityVals, labels, units] = resolveIntensityColumns(data, intensit
                 intensityVals = originalVals * countingTime;
             end
         end
-        labels = ["Intensity (counts)"];
-        units = ["counts"];
+        labels = "Intensity (counts)";
+        units = "counts";
     end
 end
 
@@ -228,7 +228,7 @@ end
 
 function writeMetadataBlock(fid, data, isOriginFormat)
     if isOriginFormat
-        prefix = "# ";
+        prefix = "#\t";
     else
         prefix = "# ";
     end
@@ -337,7 +337,7 @@ end
 % HELPER: Extract axis label (legacy, not used)
 % ════════════════════════════════════════════════════════════════════════
 
-function label = extractLabel(fullLabel)
+function label = extractLabel(fullLabel) %#ok<DEFNU>
     % Input: e.g., "2-Theta (deg)" or "Temperature (K)"
     % Output: e.g., "2-Theta (deg)"
     label = fullLabel;

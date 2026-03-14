@@ -184,7 +184,7 @@ btnClose.Layout.Row = 1; btnClose.Layout.Column = 4;
         try
             s = readSpinners();
             applyFn(s);
-            layoutPrefs = s; %#ok<NASGU>
+            layoutPrefs = s;
             save(prefsFile, 'layoutPrefs');
             lblStatus.Text = ['Saved to ' prefsFile];
             lblStatus.FontColor = [0.2 0.5 0.2];

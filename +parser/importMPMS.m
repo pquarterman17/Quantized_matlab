@@ -135,8 +135,8 @@ function printSummary(data, filepath)
 
     % X-axis summary
     if isdatetime(data.time)
-        tMin = datestr(min(data.time), 'yyyy-mm-dd HH:MM');
-        tMax = datestr(max(data.time), 'yyyy-mm-dd HH:MM');
+        tMin = char(datetime(min(data.time), 'Format', 'yyyy-MM-dd HH:mm'));
+        tMax = char(datetime(max(data.time), 'Format', 'yyyy-MM-dd HH:mm'));
         fprintf('  X : (datetime)  %s  to  %s\n', tMin, tMax);
     else
         xRange = [min(data.time), max(data.time)];

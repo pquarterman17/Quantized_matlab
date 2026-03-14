@@ -427,7 +427,7 @@ function timeVec = parseTimeColumn(numCol, textCol, timeFmt, treatAs)
     else
         % Try auto-parsing datetime, fall back to numeric index
         try
-            test = datetime(textCol{1});
+            test = datetime(textCol{1}); %#ok<NASGU>
             timeVec = NaT(N, 1);
             nFail = 0;
             for i = 1:N

@@ -48,7 +48,7 @@ function saveFigure(fig, filepath, options)
     end
 
     % ── Set figure paper size (cm → inch conversion for MATLAB's PaperSize) ─
-    cmPerInch = 2.54;
+    cmPerInch = 2.54; %#ok<NASGU>
     fig.Units         = 'centimeters';
     fig.Position(3:4) = [options.Width, options.Height];
     fig.PaperUnits    = 'centimeters';
@@ -61,11 +61,11 @@ function saveFigure(fig, filepath, options)
 
     switch ext
         case '.pdf'
-            print(fig, char(filepath), '-dpdf', '-painters');
+            print(fig, char(filepath), '-dpdf', '-vector');
         case '.svg'
-            print(fig, char(filepath), '-dsvg', '-painters');
+            print(fig, char(filepath), '-dsvg', '-vector');
         case '.eps'
-            print(fig, char(filepath), '-depsc', '-painters');
+            print(fig, char(filepath), '-depsc', '-vector');
         case {'.tif', '.tiff'}
             print(fig, char(filepath), '-dtiff', sprintf('-r%d', options.DPI));
         case '.png'

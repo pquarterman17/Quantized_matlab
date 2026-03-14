@@ -59,7 +59,7 @@ function success = toOrigin(data, options)
         return;
     end
 
-    cleanupObj = onCleanup(@() safeRelease(origin)); %#ok<NASGU>
+    cleanupObj = onCleanup(@() safeRelease(origin));
 
     try
         if options.Visible

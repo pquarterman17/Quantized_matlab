@@ -259,7 +259,7 @@ function fileList = resolveFileList(filesInput, recursive)
 
             if isXRD
                 fullPath = fullfile(f.folder, f.name);
-                fileList{end+1} = fullPath;
+                fileList{end+1} = fullPath; %#ok<AGROW>
             end
         end
     else

@@ -53,9 +53,6 @@ function [data, parserName] = importAuto(filepath, varargin)
         varargin
     end
 
-    [~, ~, ext] = fileparts(filepath);
-    ext = lower(ext);
-
     % Extract Verbose flag from varargin (default false — callers opt in)
     verbIdx = find(strcmpi(varargin(1:2:end), 'Verbose'), 1);
     if ~isempty(verbIdx)
@@ -112,8 +109,8 @@ function printSummary(data, parserName, filepath)
 
     % X-axis summary
     if isdatetime(data.time)
-        tMin = datestr(min(data.time), 'yyyy-mm-dd HH:MM');
-        tMax = datestr(max(data.time), 'yyyy-mm-dd HH:MM');
+        tMin = char(datetime(min(data.time), 'Format', 'yyyy-MM-dd HH:mm'));
+        tMax = char(datetime(max(data.time), 'Format', 'yyyy-MM-dd HH:mm'));
         fprintf('  X : (datetime)  %s  to  %s\n', tMin, tMax);
     else
         xRange = [min(data.time), max(data.time)];

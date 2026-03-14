@@ -107,7 +107,7 @@ function data = importLakeShore(filepath, options)
     % ════════════════════════════════════════════════════════════════════════
     %  2. Locate column header row
     % ════════════════════════════════════════════════════════════════════════
-    headerRowIdx = 0;
+    headerRowIdx = 0; %#ok<NASGU>
     if ischar(options.HeaderRows) && strcmpi(options.HeaderRows, 'auto')
         % Auto-detect: scan for first line with comma-separated text that looks
         % like column headers (no pure numbers, contains common keywords)
@@ -402,8 +402,8 @@ function printSummary(data, filepath)
 
     % X-axis summary
     if isdatetime(data.time)
-        tMin = datestr(min(data.time), 'yyyy-mm-dd HH:MM');
-        tMax = datestr(max(data.time), 'yyyy-mm-dd HH:MM');
+        tMin = char(datetime(min(data.time), 'Format', 'yyyy-MM-dd HH:mm'));
+        tMax = char(datetime(max(data.time), 'Format', 'yyyy-MM-dd HH:mm'));
         fprintf('  X : (datetime)  %s  to  %s\n', tMin, tMax);
     else
         xRange = [min(data.time), max(data.time)];

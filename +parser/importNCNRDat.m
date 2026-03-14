@@ -42,7 +42,7 @@ function data = importNCNRDat(filepath, options)
     % Use lower-case filename to check extension (fileparts may not split correctly)
     filepathStr = string(filepath);
 
-    polarization = '';
+    polarization = ''; %#ok<NASGU>
     if endsWith(filepathStr, '.datA', 'IgnoreCase', true)
         polarization = '++';
     elseif endsWith(filepathStr, '.datB', 'IgnoreCase', true)
@@ -67,11 +67,13 @@ function data = importNCNRDat(filepath, options)
             if ~ischar(line)
                 break;
             end
-            lines{end+1} = line;
+            lines{end+1} = line; %#ok<AGROW>
         end
-    finally
+    catch ME
         fclose(fid);
+        rethrow(ME);
     end
+    fclose(fid);
 
     if isempty(lines)
         error('parser:importNCNRDat:emptyFile', ...
@@ -123,7 +125,7 @@ function data = importNCNRDat(filepath, options)
         if ~isempty(dataArray) && numel(tokens) ~= size(dataArray, 2)
             continue;
         end
-        dataArray = [dataArray; tokens];
+        dataArray = [dataArray; tokens]; %#ok<AGROW>
     end
 
     if isempty(dataArray)
@@ -188,4 +190,8 @@ function data = importNCNRDat(filepath, options)
         'labels', labels, ...
         'units', units, ...
         'metadata', metadata);
+
+    if options.Verbose
+        fprintf('importNCNRDat: %d rows, polarization=%s\n', size(valueData,1), polarization);
+    end
 end

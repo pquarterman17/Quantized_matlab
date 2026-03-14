@@ -52,9 +52,11 @@ function data = importNCNRPNR(filepath, options)
 
         % Convert cell array to matrix
         dataMatrix = [dataArray{:}];
-    finally
+    catch ME
         fclose(fid);
+        rethrow(ME);
     end
+    fclose(fid);
 
     if isempty(dataMatrix)
         error('parser:importNCNRPNR:noData', ...
@@ -112,6 +114,10 @@ function data = importNCNRPNR(filepath, options)
         'labels', outLabels, ...
         'units', outUnits, ...
         'metadata', metadata);
+
+    if options.Verbose
+        fprintf('importNCNRPNR: %d rows, variant=%s\n', size(valueData,1), variant);
+    end
 end
 
 
@@ -131,6 +137,6 @@ function cleanLabels = cleanPolarizationLabels(labels)
         label = strrep(label, '--', 'mm');
         label = strrep(label, '+/-', 'pm');  % Alternative notation
         label = strrep(label, '-/+', 'mp');
-        cleanLabels{i} = label;
+        cleanLabels{i} = label; %#ok<AGROW>
     end
 end

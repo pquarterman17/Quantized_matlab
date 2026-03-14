@@ -85,7 +85,7 @@ function idx = resolveColumnShorthand(spec, colNames, shorthandMap, label)
 
     % ── 5. Partial match (shortest wins when ambiguous) ───────────────────
     matches = find(contains(colNames, spec, 'IgnoreCase', true));
-    if numel(matches) == 1
+    if isscalar(matches)
         idx = matches;
         return;
     elseif numel(matches) > 1

@@ -409,8 +409,8 @@ fig.UserData = struct('appData', appData, 'handles', handles);
 
             if isXRD
                 fullPath = fullfile(f.folder, f.name);
-                filePaths{end+1} = fullPath;
-                fileTypes{end+1} = fileType;
+                filePaths{end+1} = fullPath; %#ok<AGROW>
+                fileTypes{end+1} = fileType; %#ok<AGROW>
 
                 switch fileType
                     case 'xrdml',  badge = '[XRDML]';
@@ -418,7 +418,7 @@ fig.UserData = struct('appData', appData, 'handles', handles);
                     case 'bruker', badge = '[Bruker]';
                     otherwise,     badge = '[???]';
                 end
-                listItems{end+1} = sprintf('%s %s', badge, f.name);
+                listItems{end+1} = sprintf('%s %s', badge, f.name); %#ok<AGROW>
             end
         end
     end
@@ -535,7 +535,7 @@ fig.UserData = struct('appData', appData, 'handles', handles);
         for j = 1:numel(selectedItems)
             itemIdx = find(strcmp(allItems, selectedItems{j}), 1);
             if ~isempty(itemIdx)
-                selectedPaths{end+1} = allFilePaths{itemIdx};
+                selectedPaths{end+1} = allFilePaths{itemIdx}; %#ok<AGROW>
             end
         end
 

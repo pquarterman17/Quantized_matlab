@@ -44,11 +44,13 @@ function data = importNCNRRefl(filepath, options)
             if ~ischar(line)
                 break;
             end
-            lines{end+1} = line;
+            lines{end+1} = line; %#ok<AGROW>
         end
-    finally
+    catch ME
         fclose(fid);
+        rethrow(ME);
     end
+    fclose(fid);
 
     if isempty(lines)
         error('parser:importNCNRRefl:emptyFile', ...
@@ -61,7 +63,7 @@ function data = importNCNRRefl(filepath, options)
     name = '';
     polarization = '';
     wavelength = [];
-    wavelength_resolution = [];
+    wavelength_resolution = []; %#ok<NASGU>
     columns = {};
     units = {};
     dataStartIdx = 1;
@@ -87,7 +89,7 @@ function data = importNCNRRefl(filepath, options)
                         case 'wavelength'
                             wavelength = parseJsonArray(valStr);
                         case 'wavelength_resolution'
-                            wavelength_resolution = parseJsonArray(valStr);
+                            wavelength_resolution = parseJsonArray(valStr); %#ok<NASGU>
                         case 'columns'
                             columns = parseJsonStringArray(valStr);
                         case 'units'
@@ -120,7 +122,7 @@ function data = importNCNRRefl(filepath, options)
         end
         tokens = str2double(strsplit(strtrim(line)));
         if ~any(isnan(tokens))
-            dataArray = [dataArray; tokens];
+            dataArray = [dataArray; tokens]; %#ok<AGROW>
         end
     end
 
@@ -147,9 +149,9 @@ function data = importNCNRRefl(filepath, options)
             colUnit = units{j};
         end
 
-        valueLabels{end+1} = colName;
-        valueUnits{end+1} = colUnit;
-        values = [values, dataArray(:, j)];
+        valueLabels{end+1} = colName; %#ok<AGROW>
+        valueUnits{end+1} = colUnit; %#ok<AGROW>
+        values = [values, dataArray(:, j)]; %#ok<AGROW>
     end
 
     % ════════════════════════════════════════════════════════════════
@@ -188,6 +190,10 @@ function data = importNCNRRefl(filepath, options)
         'labels', outLabels, ...
         'units', outUnits, ...
         'metadata', metadata);
+
+    if options.Verbose
+        fprintf('importNCNRRefl: %d rows, name=%s\n', size(values,1), name);
+    end
 end
 
 
@@ -218,7 +224,7 @@ function arr = parseJsonArray(jsonStr)
     for i = 1:numel(parts)
         val = str2double(strtrim(parts{i}));
         if ~isnan(val)
-            arr = [arr, val];
+            arr = [arr, val]; %#ok<AGROW>
         end
     end
     arr = arr(:);  % Column vector
@@ -240,6 +246,6 @@ function strArr = parseJsonStringArray(jsonStr)
         if startsWith(s, '"') && endsWith(s, '"')
             s = s(2:end-1);
         end
-        strArr{i} = s;
+        strArr{i} = s; %#ok<AGROW>
     end
 end

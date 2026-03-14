@@ -214,7 +214,7 @@ function data = importPPMS(filepath, options)
         ySpec = {char(ySpec)};
     end
 
-    if numel(ySpec) == 1 && strcmpi(ySpec{1}, 'all')
+    if isscalar(ySpec) && strcmpi(ySpec{1}, 'all')
         yColIdx = [];
         for c = 1:numCols
             if c == xColIdx, continue; end
