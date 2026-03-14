@@ -39,14 +39,14 @@ function s = default()
     ];
 
     % ── Line geometry ──────────────────────────────────────────────────────
-    s.lineWidth     = 1.5;
-    s.lineWidthThin = 0.75;
-    s.markerSize    = 5;
+    s.lineWidth     = 1.75;
+    s.lineWidthThin = 1.0;
+    s.markerSize    = 6;
 
     % ── Typography ─────────────────────────────────────────────────────────
-    s.fontSize       = 11;
-    s.titleFontSize  = 12;
-    s.legendFontSize = 9;
+    s.fontSize       = 12;
+    s.titleFontSize  = 14;
+    s.legendFontSize = 10;
 
     % ── Figure size (cm) ──────────────────────────────────────────────────
     s.figWidth  = 14;
