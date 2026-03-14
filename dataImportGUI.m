@@ -412,20 +412,26 @@ function varargout = dataImportGUI()
     lbDatasets.Layout.Row = 7; lbDatasets.Layout.Column = [1 2];
 
     % Context menu for dataset list (right-click) — #12 expanded
-    cmDatasets = uicontextmenu(fig);
-    uimenu(cmDatasets, 'Text', 'Remove Selected', ...
-        'MenuSelectedFcn', @(~,~) onRemoveDataset([], []));
-    uimenu(cmDatasets, 'Text', 'Duplicate', ...
-        'MenuSelectedFcn', @(~,~) onDuplicateDataset([], []));
-    uimenu(cmDatasets, 'Text', 'Hide / Show', ...
-        'MenuSelectedFcn', @(~,~) onToggleDatasetVisibility([], []));
-    uimenu(cmDatasets, 'Text', 'Set as Background', ...
-        'MenuSelectedFcn', @(~,~) onSetActiveBG([], []));
-    uimenu(cmDatasets, 'Text', 'Move Up', ...
-        'MenuSelectedFcn', @(~,~) onMoveDatasetUp([], []));
-    uimenu(cmDatasets, 'Text', 'Move Down', ...
-        'MenuSelectedFcn', @(~,~) onMoveDatasetDown([], []));
-    lbDatasets.ContextMenu = cmDatasets;
+    % uicontextmenu on uifigure components requires R2023b+; guard for older versions.
+    try
+        cmDatasets = uicontextmenu(fig);
+        uimenu(cmDatasets, 'Text', 'Remove Selected', ...
+            'MenuSelectedFcn', @(~,~) onRemoveDataset([], []));
+        uimenu(cmDatasets, 'Text', 'Duplicate', ...
+            'MenuSelectedFcn', @(~,~) onDuplicateDataset([], []));
+        uimenu(cmDatasets, 'Text', 'Hide / Show', ...
+            'MenuSelectedFcn', @(~,~) onToggleDatasetVisibility([], []));
+        uimenu(cmDatasets, 'Text', 'Set as Background', ...
+            'MenuSelectedFcn', @(~,~) onSetActiveBG([], []));
+        uimenu(cmDatasets, 'Text', 'Move Up', ...
+            'MenuSelectedFcn', @(~,~) onMoveDatasetUp([], []));
+        uimenu(cmDatasets, 'Text', 'Move Down', ...
+            'MenuSelectedFcn', @(~,~) onMoveDatasetDown([], []));
+        lbDatasets.ContextMenu = cmDatasets;
+    catch
+        % R2022a/R2022b: uicontextmenu not supported on uifigure — skip silently.
+        % Users can still use toolbar buttons for these operations.
+    end
 
     % Left controls panel
     % Title updates to show parser name after each load.
@@ -7559,14 +7565,20 @@ function varargout = dataImportGUI()
             yfmt = ddYFmt.Value;
             if strcmp(yfmt, '__exp0')
                 ytickformat(targetAx, 'auto');
-                targetAx.YAxis(1).ExponentMode = 'manual';
-                targetAx.YAxis(1).Exponent     = 0;
+                % YAxis.ExponentMode requires R2023a+; guard for older versions
+                try
+                    targetAx.YAxis(1).ExponentMode = 'manual';
+                    targetAx.YAxis(1).Exponent     = 0;
+                catch
+                    % R2022 fallback: use ruler property if available
+                    try targetAx.YRuler.Exponent = 0; catch, end %#ok<CTCH>
+                end
             elseif isempty(yfmt)
                 ytickformat(targetAx, 'auto');
-                targetAx.YAxis(1).ExponentMode = 'auto';
+                try targetAx.YAxis(1).ExponentMode = 'auto'; catch, end %#ok<CTCH>
             else
                 ytickformat(targetAx, yfmt);
-                targetAx.YAxis(1).ExponentMode = 'auto';
+                try targetAx.YAxis(1).ExponentMode = 'auto'; catch, end %#ok<CTCH>
             end
 
             if hasY2
@@ -7574,14 +7586,16 @@ function varargout = dataImportGUI()
                 y2fmt = ddY2Fmt.Value;
                 if strcmp(y2fmt, '__exp0')
                     ytickformat(targetAx, 'auto');
-                    targetAx.YAxis(2).ExponentMode = 'manual';
-                    targetAx.YAxis(2).Exponent     = 0;
+                    try
+                        targetAx.YAxis(2).ExponentMode = 'manual';
+                        targetAx.YAxis(2).Exponent     = 0;
+                    catch, end %#ok<CTCH>
                 elseif isempty(y2fmt)
                     ytickformat(targetAx, 'auto');
-                    targetAx.YAxis(2).ExponentMode = 'auto';
+                    try targetAx.YAxis(2).ExponentMode = 'auto'; catch, end %#ok<CTCH>
                 else
                     ytickformat(targetAx, y2fmt);
-                    targetAx.YAxis(2).ExponentMode = 'auto';
+                    try targetAx.YAxis(2).ExponentMode = 'auto'; catch, end %#ok<CTCH>
                 end
                 yyaxis(targetAx, 'left');
             end
