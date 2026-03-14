@@ -74,6 +74,39 @@ function data = importXRDML(filepath, options)
 %   concatenated in ascending appendNumber order.  The countingTime from
 %   the first valid scan is used for the cps normalisation.
 %
+%   2D area-detector data
+%   ─────────────────────
+%   PANalytical Empyrean systems with PIXcel3D / GaliPIX3D detectors produce
+%   multi-scan XRDML files where each <scan> records a strip of M detector
+%   pixels at a different motor position (Omega, Chi, or Phi).  importXRDML
+%   automatically detects this pattern when all scans share the same 2Theta
+%   range and a secondary axis (Omega / Chi / Phi) varies across scans.
+%
+%   When 2D data is detected, these extra fields appear in
+%   data.metadata.parserSpecific:
+%     .is2D    true
+%     .map2D   struct with fields:
+%       .intensity     [N×M]  Intensity matrix (N frames × M detector pixels)
+%       .axis1         [N×1]  Scanned motor positions (e.g. Omega, degrees)
+%       .axis1Name     string 'Omega', 'Chi', or 'Phi'
+%       .axis1Unit     'deg'
+%       .axis2         [M×1]  Detector strip axis (2Theta, degrees)
+%       .axis2Name     '2Theta'
+%       .axis2Unit     'deg'
+%       .intensityUnit 'cps' or 'counts' (matches the Intensity option)
+%       .Qx            [N×M]  Reciprocal-space coordinate (Å⁻¹), present only
+%                             when wavelength metadata is available.
+%                             Qx = (4π/λ)·sin(θ)·sin(ω−θ),  θ = 2θ/2
+%       .Qz            [N×M]  Reciprocal-space coordinate (Å⁻¹), present only
+%                             when wavelength metadata is available.
+%                             Qz = (4π/λ)·sin(θ)·cos(ω−θ)
+%       .QxUnit        'Ang^-1'  (only when Qx is present)
+%       .QzUnit        'Ang^-1'  (only when Qz is present)
+%
+%   The 1D output (data.time, data.values) contains the integrated profile
+%   (row-sum of the intensity matrix) for backward compatibility with
+%   existing code that expects 1D data.
+%
 %   Example
 %   ───────
 %   d = parser.importXRDML('La2NiO4.xrdml', Intensity='cps', Verbose=true);
@@ -200,6 +233,12 @@ function data = importXRDML(filepath, options)
     endTimeStamp      = NaT;
     intensityTag      = '';
 
+    % Per-scan data storage for 2D area-detector detection
+    scanTTRanges = {};   % {[start, end]} per completed scan
+    scanCounts   = {};   % {[1×M] double} raw count vector per completed scan
+    scanSecVals  = [];   % fixed secondary-axis position per scan (NaN if absent)
+    scanSecName  = '';   % secondary axis name established from first valid scan
+
     for si = 1:nScans
         sb = scanBlocks{sortIdx(si)};
 
@@ -270,6 +309,32 @@ function data = importXRDML(filepath, options)
         nPts    = numel(cntVals);
         if nPts < 1; continue; end
 
+        % ── Collect per-scan data for 2D area-detector classification ──────
+        if isempty(scanSecName)
+            % First valid scan: discover which secondary axis is fixed
+            for axN = ["Omega", "Chi", "Phi"]
+                pos2 = rxPositions(dpBlock, char(axN));
+                if ~isempty(pos2) && pos2(1) == pos2(2)
+                    scanSecName = char(axN);
+                    scanSecVals(end+1) = pos2(1);  %#ok<AGROW>
+                    break;
+                end
+            end
+            if isempty(scanSecName)
+                scanSecVals(end+1) = NaN;  %#ok<AGROW>
+            end
+        else
+            % Subsequent scans: read the established secondary axis
+            pos2 = rxPositions(dpBlock, scanSecName);
+            if ~isempty(pos2) && pos2(1) == pos2(2)
+                scanSecVals(end+1) = pos2(1);  %#ok<AGROW>
+            else
+                scanSecVals(end+1) = NaN;      %#ok<AGROW>
+            end
+        end
+        scanTTRanges{end+1} = ttRange;   %#ok<AGROW>
+        scanCounts{end+1}   = cntVals;   %#ok<AGROW>
+
         % Build 2θ vector; trim overlap at range boundaries
         ttVec = linspace(ttRange(1), ttRange(2), nPts);
         if ~isempty(twoTheta_all) && ttVec(1) == twoTheta_all(end)
@@ -280,6 +345,48 @@ function data = importXRDML(filepath, options)
 
         twoTheta_all = [twoTheta_all, ttVec];    %#ok<AGROW>
         counts_all   = [counts_all,   cntVals];   %#ok<AGROW>
+    end
+
+    % ════════════════════════════════════════════════════════════════════════
+    %  4b. 2D area-detector detection and matrix assembly
+    % ════════════════════════════════════════════════════════════════════════
+    nValid       = numel(scanTTRanges);
+    is2D         = false;
+    intensityMap = [];
+    twoThetaVec  = [];
+    secSorted    = [];
+
+    if nValid > 1 && ~isempty(scanSecName)
+        ttStarts    = cellfun(@(r) r(1), scanTTRanges);
+        ttEnds      = cellfun(@(r) r(2), scanTTRanges);
+        ttSame      = all(abs(ttStarts - ttStarts(1)) < 1e-4) && ...
+                      all(abs(ttEnds   - ttEnds(1))   < 1e-4);
+        allSecKnown = all(~isnan(scanSecVals));
+        if allSecKnown
+            secVaries = (max(scanSecVals) - min(scanSecVals)) > 1e-6;
+        else
+            secVaries = false;
+        end
+        is2D = ttSame && secVaries;
+    end
+
+    if is2D
+        [secSorted, secOrder] = sort(scanSecVals);
+        nPtsPerScan  = numel(scanCounts{1});
+        twoThetaVec  = linspace(scanTTRanges{1}(1), scanTTRanges{1}(2), nPtsPerScan)';
+        intensityMap = zeros(nValid, nPtsPerScan);
+        for i = 1:nValid
+            vals = scanCounts{secOrder(i)};
+            n    = min(numel(vals), nPtsPerScan);
+            intensityMap(i, 1:n) = vals(1:n);
+        end
+        if options.Verbose
+            fprintf('  [importXRDML] 2D area-detector: %d %s frames x %d detector pixels\n', ...
+                nValid, scanSecName, nPtsPerScan);
+        end
+        % 1D fallback: override concatenated vectors with integrated profile
+        twoTheta_all = twoThetaVec';
+        counts_all   = sum(intensityMap, 1);
     end
 
     % Warn on mixed counting times
@@ -360,6 +467,45 @@ function data = importXRDML(filepath, options)
     ps.endAngle                = twoTheta_col(end);
     ps.stepSize                = mean(diff(twoTheta_col), 'omitnan');
 
+    % 2D area-detector fields
+    ps.is2D = is2D;
+    if is2D
+        if options.Intensity == "cps" && ~isnan(countingTime) && countingTime > 0
+            mapIntensity = intensityMap / countingTime;
+            mapIntUnit   = 'cps';
+        else
+            mapIntensity = intensityMap;
+            mapIntUnit   = 'counts';
+        end
+        map2D.intensity     = mapIntensity;
+        map2D.axis1         = secSorted(:);
+        map2D.axis1Name     = scanSecName;
+        map2D.axis1Unit     = 'deg';
+        map2D.axis2         = twoThetaVec;
+        map2D.axis2Name     = '2Theta';
+        map2D.axis2Unit     = 'deg';
+        map2D.intensityUnit = mapIntUnit;
+
+        % ── Reciprocal-space conversion (requires wavelength) ─────────────
+        % Standard coplanar geometry:
+        %   Qx = (4π/λ) · sin(θ) · sin(ω − θ)
+        %   Qz = (4π/λ) · sin(θ) · cos(ω − θ)
+        % where θ = 2θ/2 (half detector angle), ω = motor position.
+        % At the symmetric Bragg condition ω = θ: Qx = 0, Qz = (4π/λ)·sin(θ).
+        if ~isnan(wl.kAlpha1) && wl.kAlpha1 > 0
+            lambda = wl.kAlpha1;   % Å
+            [TT_rad, OM_rad] = meshgrid(deg2rad(twoThetaVec), deg2rad(secSorted(:)));
+            theta_rad = TT_rad / 2;
+            k0        = 2 * pi / lambda;
+            map2D.Qx     = 2 * k0 .* sin(theta_rad) .* sin(OM_rad - theta_rad);
+            map2D.Qz     = 2 * k0 .* sin(theta_rad) .* cos(OM_rad - theta_rad);
+            map2D.QxUnit = 'Ang^-1';
+            map2D.QzUnit = 'Ang^-1';
+        end
+
+        ps.map2D = map2D;
+    end
+
     meta = struct();
     meta.source        = char(filepath);
     meta.importDate    = datetime('now');
@@ -372,8 +518,10 @@ function data = importXRDML(filepath, options)
     % ════════════════════════════════════════════════════════════════════════
     %  8. Build unified output struct
     % ════════════════════════════════════════════════════════════════════════
+    labelStr = 'Intensity';
+    if is2D; labelStr = 'Intensity (integrated)'; end
     data = parser.createDataStruct(twoTheta_col, intensity, ...
-        'labels',   {'Intensity'}, ...
+        'labels',   {labelStr}, ...
         'units',    {intensUnit},  ...
         'metadata', meta);
 
@@ -574,5 +722,9 @@ function printSummary(data, filepath)
         fprintf('  End time   : %s\n', char(datetime(ps.endTime,   'Format', 'yyyy-MM-dd HH:mm:ss')));
     end
     fprintf('  Data tag   : <%s>\n', ps.intensityTag);
+    if isfield(ps, 'is2D') && ps.is2D
+        fprintf('  Map size   : %d %s frames x %d detector pixels (2D)\n', ...
+            numel(ps.map2D.axis1), ps.map2D.axis1Name, numel(ps.map2D.axis2));
+    end
     fprintf('%s\n\n', SEP);
 end

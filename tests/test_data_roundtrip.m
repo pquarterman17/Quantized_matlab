@@ -11,6 +11,7 @@
 clear; clc;
 
 ROOT = fileparts(fileparts(mfilename('fullpath')));  % go up from tests/ to project root
+addpath(ROOT);   % ensure +parser and +utilities packages are on path
 XRDML_FILE = fullfile(ROOT, '+test_datasets', 'XRDML', 'La2NiO4_1.xrdml');
 
 % Setup temporary directory for test output files

@@ -19,6 +19,8 @@ thin_film_toolkit_matlab/
 │   ├── test_data_roundtrip.m       # CSV export round-trip tests
 │   ├── test_batch_processing.m     # batchImport / batchConvertXRD integration
 │   ├── test_batch_xrd_converter.m  # XRD converter edge cases
+│   ├── test_xrdml_2d.m             # 2D area-detector parser tests (8 tests)
+│   ├── test_gui_2d.m               # 2D GUI API tests (6 tests)
 │   └── archive_2026-03-10/         # Superseded tests (kept for reference)
 ├── +parser/                # Data import namespace
 │   ├── importAuto.m        # Auto-detect file type and dispatch to correct parser
@@ -51,6 +53,7 @@ thin_film_toolkit_matlab/
 | CSV / TSV / TXT | `importCSV.m` | Generic lab data with auto-detection of delimiter, headers, units |
 | Excel `.xlsx/.xls/.ods` | `importExcel.m` | Spreadsheet data with unit row support |
 | Rigaku SmartLab `.raw` | `importRigaku_raw.m` | Binary XRD file (magic "FI"); warns on multi-range files |
+| PANalytical `.xrdml` | `importXRDML.m` | XML XRD scan; auto-detects 1D vs 2D area-detector data; Q-space conversion |
 
 ## Conventions
 
@@ -66,6 +69,16 @@ All parsers return unified structs with consistent fields:
 - `.labels` — channel names (cell array of strings)
 - `.units` — unit strings (cell array)
 - `.metadata` — instrument params, source file info
+
+#### 2D area-detector extension (`importXRDML` only)
+When a PANalytical XRDML file contains multi-frame area-detector data,
+`data.metadata.parserSpecific` gains:
+- `.is2D` — `true`; also present (as `false`) for 1D files for explicit checking
+- `.map2D.intensity` — [N×M] matrix (N Omega frames × M detector pixels), cps or counts
+- `.map2D.axis1` / `.axis1Name` / `.axis1Unit` — scanned motor positions (e.g. Omega, deg)
+- `.map2D.axis2` / `.axis2Name` / `.axis2Unit` — detector strip (2Theta, deg)
+- `.map2D.Qx`, `.map2D.Qz` — [N×M] reciprocal-space grids (Å⁻¹); present when wavelength available
+- `data.time` / `data.values` — integrated profile `sum(intensity, 1)'` (1D fallback)
 
 ### Dataset struct (GUI internal)
 Each loaded file is stored as a `ds` struct inside `appData.datasets`:
@@ -96,6 +109,26 @@ data = parser.importQDVSM('sample.dat', 'XAxis', 'field', 'YAxis', 'moment');
 ### XRD (Rigaku)
 ```matlab
 data = parser.importRigaku_raw('scan.raw', 'UseCountsPerSec', true);
+```
+
+### XRD 2D reciprocal-space map (PANalytical area detector)
+```matlab
+data = parser.importXRDML('rsm.xrdml', Intensity='cps');
+map  = data.metadata.parserSpecific.map2D;  % only present when is2D==true
+
+% Angle-space heatmap
+imagesc(map.axis2, map.axis1, log10(map.intensity));
+axis xy; colorbar; colormap parula;
+xlabel('2\theta (deg)'); ylabel('\omega (deg)');
+
+% Q-space heatmap (requires wavelength in file)
+if isfield(map, 'Qx')
+    pcolor(map.Qx, map.Qz, log10(map.intensity)); shading flat;
+end
+
+% Extract a rocking curve (V-cut) at the peak 2Theta
+[~, col] = min(abs(map.axis2 - 61.0));
+plot(map.axis1, map.intensity(:, col));
 ```
 
 ### Generic CSV

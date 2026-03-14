@@ -10,6 +10,7 @@
 clear; clc;
 
 ROOT = fileparts(fileparts(mfilename('fullpath')));  % go up from tests/ to project root
+addpath(ROOT);   % ensure +parser and +scripts packages are on path
 
 % Setup temporary directory for test operations
 tmpDir = fullfile(tempdir, 'batch_test_' + string(datetime('now','Format','yyyyMMdd_HHmmss')));

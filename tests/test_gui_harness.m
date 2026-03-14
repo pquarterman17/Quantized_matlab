@@ -15,6 +15,7 @@
 clear; clc;
 
 ROOT = fileparts(fileparts(mfilename('fullpath')));  % go up from tests/ to project root
+addpath(ROOT);   % ensure dataImportGUI and +parser packages are on path
 XRDML_F = fullfile(ROOT, '+test_datasets', 'XRDML', 'La2NiO4_1.xrdml');
 VSM_F   = fullfile(ROOT, '+test_datasets', 'QuantumDesign', 'EDP136_Perp_StrawNew.dat');
 
@@ -25,15 +26,6 @@ cleanupTmp = onCleanup(@() rmdir(tmpDir, 's'));
 
 passed = 0;
 failed = 0;
-
-% ════════════════════════════════════════════════════════════════════════
-%  HELPER: Launch headless GUI
-% ════════════════════════════════════════════════════════════════════════
-function api = launchHeadless()
-    api = dataImportGUI();
-    api.fig.Visible = 'off';
-    drawnow;
-end
 
 % ════════════════════════════════════════════════════════════════════════
 %  1. GUI launches with valid API
@@ -275,7 +267,7 @@ try
     end
 
     fprintf('  Datasets with corrections: %d/%d\n', ...
-        sum(~cellfun(@isempty, {datasets.corrData})), numel(datasets));
+        sum(cellfun(@(d) ~isempty(d.corrData), datasets)), numel(datasets));
     fprintf('  PASS\n');
     passed = passed + 1;
 catch ME
@@ -503,12 +495,20 @@ end
 % ════════════════════════════════════════════════════════════════════════
 %  SUMMARY
 % ════════════════════════════════════════════════════════════════════════
-fprintf('\n' + string(repmat('═', 1, 72)) + '\n');
+fprintf('\n%s\n', repmat(char(9552), 1, 72));
 fprintf('SUMMARY: %d passed, %d failed\n', passed, failed);
 if failed > 0
     fprintf('Status: FAIL\n');
-    exit(1);
 else
     fprintf('Status: ALL PASS\n');
-    exit(0);
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  Local functions  (must appear after all script code)
+% ════════════════════════════════════════════════════════════════════════
+function api = launchHeadless()
+%LAUNCHHEADLESS  Start dataImportGUI with the figure hidden.
+    api = dataImportGUI();
+    api.fig.Visible = 'off';
+    drawnow;
 end

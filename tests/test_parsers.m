@@ -9,6 +9,7 @@
 clear; clc;
 
 ROOT = fileparts(fileparts(mfilename('fullpath')));  % go up from tests/ to project root
+addpath(ROOT);   % ensure +parser packages are on path
 
 % ── Data file paths ──────────────────────────────────────────────────────
 QD_VSM_FILE = fullfile(ROOT, '+test_datasets', 'QuantumDesign', 'EDP136_Perp_StrawNew.dat');
@@ -468,9 +469,11 @@ else
         assert(isfield(d, 'labels'),                   'missing field: labels');
         assert(isfield(d, 'units'),                    'missing field: units');
         assert(isfield(d, 'metadata'),                 'missing field: metadata');
-        assert(~isempty(d.time),                       'Qz vector is empty');
-        assert(strcmpi(d.labels{1}, 'Qz'),             'first label should be Qz');
-        assert(isfield(d.metadata, 'parserSpecific'),  'missing metadata.parserSpecific');
+        assert(~isempty(d.time),                                'Qz vector is empty');
+        assert(~isempty(d.labels),                             'labels must not be empty');
+        % Qz is the x-axis stored in .time; check via metadata not labels
+        assert(strcmpi(d.metadata.xColumnName, 'Qz'),          'xColumnName should be Qz');
+        assert(isfield(d.metadata, 'parserSpecific'),           'missing metadata.parserSpecific');
 
         fprintf('  [.refl] PASS: %d points, instrument=%s\n', ...
             numel(d.time), d.metadata.parserSpecific.instrument_type);

@@ -2,6 +2,7 @@
 clear; clc;
 
 ROOT = fileparts(fileparts(mfilename('fullpath')));  % go up from tests/ to project root
+addpath(ROOT);   % ensure +parser packages are on path
 DAT1 = fullfile(ROOT, '+test_datasets', 'QuantumDesign', 'EDP136_Perp_StrawNew.dat');
 RAW1 = fullfile(ROOT, '+test_datasets', 'rigaku_sample.raw');
 

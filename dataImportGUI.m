@@ -101,6 +101,9 @@ function varargout = dataImportGUI()
 %   api.saveSession(outPath)   — save session .mat (no dialog)
 %   api.loadSession(matPath)   — restore session .mat (no dialog)
 %   api.close()                — close figure
+%   api.is2DActive()           — true when active dataset is a 2D area-detector map
+%   api.setMap2DType(typeStr)  — set '2D plot type' and replot ('Heatmap'|'Contour'|...)
+%   api.extractLineCut2D(x,y,isH) — extract 1D slice from 2D map (isH: H-cut vs V-cut)
 %
 %   Headless usage (e.g. in test_gui_harness.m):
 %     api = dataImportGUI();
@@ -1338,6 +1341,58 @@ function varargout = dataImportGUI()
         'ValueChangedFcn', @onToggleShowBG);
     chkShowBG.Layout.Row = 6; chkShowBG.Layout.Column = [1 2];
 
+    % ── 2D Map controls (col 3, overlaps peakPanel — toggled by is2DDataset) ──
+    map2DPanel = uipanel(analysisGL,'Title','2D Map View','FontSize',13);
+    map2DPanel.Layout.Row = 1; map2DPanel.Layout.Column = 3;
+    map2DPanel.Visible = 'off';   % shown only when a 2D area-detector dataset is active
+
+    map2DGL = uigridlayout(map2DPanel,[5 2], ...
+        'RowHeight',    {24, 24, 24, 22, '1x'}, ...
+        'ColumnWidth',  {95, '1x'}, ...
+        'Padding',      [8 8 8 8], ...
+        'RowSpacing',   5, ...
+        'ColumnSpacing', 5);
+
+    lblMap2DType = uilabel(map2DGL,'Text','Plot type:','FontSize',10,'HorizontalAlignment','right');
+    lblMap2DType.Layout.Row = 1; lblMap2DType.Layout.Column = 1;
+    ddMap2DType = uidropdown(map2DGL, ...
+        'Items',           {'Heatmap','Contour','Filled Contour'}, ...
+        'Value',           'Heatmap', ...
+        'Tooltip',         'Rendering style for the 2D intensity map', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    ddMap2DType.Layout.Row = 1; ddMap2DType.Layout.Column = 2;
+
+    lblMap2DLevels = uilabel(map2DGL,'Text','Contour lvls:','FontSize',10,'HorizontalAlignment','right');
+    lblMap2DLevels.Layout.Row = 2; lblMap2DLevels.Layout.Column = 1;
+    efMap2DContourN = uieditfield(map2DGL,'numeric', ...
+        'Value',   20, ...
+        'Limits',  [2 200], ...
+        'Tooltip', 'Number of contour levels (Contour and Filled Contour modes)', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    efMap2DContourN.Layout.Row = 2; efMap2DContourN.Layout.Column = 2;
+
+    cbMap2DQSpace = uicheckbox(map2DGL, ...
+        'Text',    'Q-space (Qx / Qz)', ...
+        'Value',   false, ...
+        'Enable',  'off', ...
+        'Tooltip', ['Show reciprocal-space map in Qx/Qz coordinates.' newline ...
+                    'Enabled when the file contains wavelength metadata.' newline ...
+                    'Shift+click / Ctrl+click line-cuts use Q-space coordinates.']);
+    cbMap2DQSpace.Layout.Row = 3; cbMap2DQSpace.Layout.Column = [1 2];
+
+    lblMap2DInfo = uilabel(map2DGL,'Text','', ...
+        'FontSize', 9, ...
+        'FontColor', [0.4 0.4 0.4], ...
+        'HorizontalAlignment', 'center', ...
+        'WordWrap', 'on');
+    lblMap2DInfo.Layout.Row = 4; lblMap2DInfo.Layout.Column = [1 2];
+
+    lblMap2DHint = uilabel(map2DGL,'Text','Shift+click: H-cut  |  Ctrl+click: V-cut', ...
+        'FontSize', 8, ...
+        'FontColor', [0.55 0.55 0.55], ...
+        'HorizontalAlignment', 'center');
+    lblMap2DHint.Layout.Row = 5; lblMap2DHint.Layout.Column = [1 2];
+
     % ── Drag-and-drop: register every major surface as a drop target (R2023a+) ──
     % In uifigure the CEF renderer consumes drag events at whichever child
     % component is under the cursor; they do NOT bubble up to the figure.
@@ -1372,8 +1427,8 @@ function varargout = dataImportGUI()
     api.addFiles            = @addFilesDirect;
     api.saveSession         = @saveSessionDirect;
     api.loadSession         = @loadSessionDirect;
-    api.getDatasets         = @() appData.datasets;
-    api.getActiveIdx        = @() appData.activeIdx;
+    api.getDatasets         = @getDatasetsDirect;
+    api.getActiveIdx        = @getActiveIdxDirect;
     api.setActiveIdx        = @setActiveIdxDirect;
     api.setCorrections      = @setCorrections;
     api.applyCorrections    = @() onApplyCorrections([],[]);
@@ -1384,6 +1439,10 @@ function varargout = dataImportGUI()
     api.getPeaks            = @getPeaksDirect;
     api.setDatasetVisible   = @setDatasetVisibleDirect;
     api.close               = @() close(fig);
+    % 2D map API (used by test_gui_2d.m)
+    api.is2DActive          = @is2DActiveDirect;
+    api.setMap2DType        = @setMap2DTypeDirect;
+    api.extractLineCut2D    = @extractLineCut2DDirect;
 
     % ════════════════════════════════════════════════════════════════════
     %  NESTED CALLBACKS  (share appData + all control handles via closure)
@@ -1662,6 +1721,16 @@ function varargout = dataImportGUI()
         end
     end
 
+    function ds = getDatasetsDirect()
+    %GETDATASETSDIRECT  Return live cell array of dataset structs.
+        ds = appData.datasets;
+    end
+
+    function idx = getActiveIdxDirect()
+    %GETACTIVEIDXDIRECT  Return live active dataset index (0 when none loaded).
+        idx = appData.activeIdx;
+    end
+
     function setDatasetVisibleDirect(idx, vis)
     %SETDATASETVISIBLEDDIRECT  Set visibility of dataset at index.
         assert(isnumeric(idx) && idx >= 1 && idx <= numel(appData.datasets), ...
@@ -1669,6 +1738,30 @@ function varargout = dataImportGUI()
         assert(islogical(vis) || isnumeric(vis), 'vis must be logical');
         appData.datasets{idx}.visible = logical(vis);
         onPlot([],[]);
+    end
+
+    function tf = is2DActiveDirect()
+    %IS2DACTIVEDIRECT  True when the active dataset is a 2D area-detector map.
+        tf = appData.activeIdx >= 1 && ~isempty(appData.datasets) && ...
+             is2DDataset(appData.datasets{appData.activeIdx});
+    end
+
+    function setMap2DTypeDirect(typeStr)
+    %SETMAP2DTYPEDIRECT  Set the 2D plot type and trigger a replot.
+    %   typeStr: 'Heatmap' | 'Contour' | 'Filled Contour'
+        validTypes = {'Heatmap', 'Contour', 'Filled Contour'};
+        assert(ismember(typeStr, validTypes), ...
+            'typeStr must be one of: %s', strjoin(validTypes, ', '));
+        ddMap2DType.Value = typeStr;
+        onPlot([],[]);
+        drawnow;
+    end
+
+    function extractLineCut2DDirect(clickX, clickY, isHorizontal)
+    %EXTRACTLINECUT2DDIRECT  Programmatically extract a 1D slice from the 2D map.
+    %   Mirrors the Shift+click / Ctrl+click interaction.
+        extract2DLineCut(clickX, clickY, isHorizontal);
+        drawnow;
     end
 
     function onSelectDataset(~,~)
@@ -2155,6 +2248,19 @@ function varargout = dataImportGUI()
                 lbY.Value = d.labels(rIdx);
             end
             cbLogY.Value = true;
+        elseif is2DDataset(ds)
+            cbLogY.Value = true;  % log intensity is standard for XRD reciprocal-space maps
+            % Update map dimension info label
+            map = ds.data.metadata.parserSpecific.map2D;
+            lblMap2DInfo.Text = sprintf('%d %s positions  \xD7  %d 2\xB0 pixels', ...
+                numel(map.axis1), map.axis1Name, numel(map.axis2));
+            % Enable Q-space toggle only when wavelength was available for conversion
+            if isfield(map, 'Qx')
+                cbMap2DQSpace.Enable = 'on';
+            else
+                cbMap2DQSpace.Enable = 'off';
+                cbMap2DQSpace.Value  = false;
+            end
         else
             cbLogY.Value = false;
         end
@@ -2344,6 +2450,33 @@ function varargout = dataImportGUI()
                 % Peak analysis panel — hidden for generic data (col 3 collapses; axlim expands)
                 peakPanel.Visible          = 'off';
                 analysisGL.ColumnWidth     = {appData.corrPanelWidth, '7x', 0, '3x'};
+        end
+
+        % ── 2D area-detector override (applied after the switch) ─────────
+        % When the active dataset contains a 2D map, hide the peak panel and
+        % corrections (not meaningful for raw intensity maps) and show the
+        % map2D controls instead.
+        is2D_active = appData.activeIdx >= 1 && ~isempty(appData.datasets) && ...
+                      is2DDataset(appData.datasets{appData.activeIdx});
+        if is2D_active
+            peakPanel.Visible  = 'off';
+            map2DPanel.Visible = 'on';
+            analysisGL.ColumnWidth = {appData.corrPanelWidth, appData.axLimPanelWidth, '4x', '3x'};
+            % Disable all corrections — not meaningful for raw 2D maps
+            for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
+                      btnApply, btnReset, btnApplyAll, btnUndo, ...
+                      cbSmooth, efSmoothWin, ddSmoothMethod, ...
+                      efXTrimMin, efXTrimMax, ddNormalize}
+                hh{1}.Enable = 'off';            end
+            btnFitBG.Visible           = 'off';
+            btnPickY.Visible           = 'off';
+            btnYTranslate.Visible      = 'off';
+            btnAutoPeak.Visible        = 'off';
+            btnManualPeak.Visible      = 'off';
+            btnRemovePeakClick.Visible = 'off';
+            analysisPanel.Title = 'Analysis  —  XRD 2D Map';
+        else
+            map2DPanel.Visible = 'off';
         end
     end
 
@@ -6021,6 +6154,12 @@ function varargout = dataImportGUI()
                 yyaxis(targetAx, 'left');
             end
 
+            % ── 2D area-detector map branch ──────────────────────────────
+            if is2DDataset(activeDs)
+                draw2DMap(targetAx, activeDs);
+                return;
+            end
+
             hold(targetAx,'on');
             if hasY2
                 yyaxis(targetAx,'right'); hold(targetAx,'on');
@@ -6917,6 +7056,181 @@ function varargout = dataImportGUI()
         end
     end
 
+    function draw2DMap(targetAx, ds)
+    %DRAW2DMAP  Render a 2D area-detector intensity map into targetAx.
+    %   Uses imagesc (Heatmap) or contour/contourf (Contour / Filled Contour).
+    %   cbLogY is reinterpreted as log-intensity toggle for 2D maps.
+    %   Axis limits from ds.axLims are applied when present.
+        ps  = ds.data.metadata.parserSpecific;
+        map = ps.map2D;
+        I   = map.intensity;
+
+        x2 = map.axis2(:)';  % 2Theta [1×M]
+        x1 = map.axis1(:);   % Omega / Chi / Phi [N×1]
+
+        % Determine whether to render in Q-space (non-uniform Qx/Qz grid)
+        useQSpace = cbMap2DQSpace.Value && isfield(map, 'Qx');
+        if useQSpace
+            Xmat = map.Qx;   % [N×M]  Qx grid
+            Ymat = map.Qz;   % [N×M]  Qz grid
+            xLbl = 'Q_x (\AA^{-1})';
+            yLbl = 'Q_z (\AA^{-1})';
+        else
+            [Xmat, Ymat] = meshgrid(x2, x1);   % uniform angle-space grid
+            xLbl = [map.axis2Name ' (' map.axis2Unit ')'];
+            yLbl = [map.axis1Name ' (' map.axis1Unit ')'];
+        end
+
+        % Log intensity (cbLogY re-purposed as log-I for 2D)
+        if cbLogY.Value
+            I = log10(max(I, 1e-9));
+        end
+
+        % Per-axes colormap — handle custom palettes and the 'lines' special case
+        cmapName = ddColormap.Value;
+        try
+            switch lower(cmapName)
+                case {'lines (matlab default)', 'lines'}
+                    colormap(targetAx, parula(256));   % lines is discrete, not suitable for maps
+                case 'viridis'
+                    colormap(targetAx, generateViridis(256));
+                case 'plasma'
+                    colormap(targetAx, generatePlasma(256));
+                case 'inferno'
+                    colormap(targetAx, generateInferno(256));
+                otherwise
+                    colormap(targetAx, feval(cmapName, 256));
+            end
+        catch
+            colormap(targetAx, parula(256));
+        end
+
+        nLvl = round(efMap2DContourN.Value);
+        switch ddMap2DType.Value
+            case 'Heatmap'
+                if useQSpace
+                    % pcolor requires (N+1)×(M+1) for shading flat, but non-uniform
+                    % grids can be passed directly with shading interp/flat on NxM data
+                    pcolor(targetAx, Xmat, Ymat, I);
+                    shading(targetAx, 'flat');
+                else
+                    imagesc(targetAx, x2, x1, I);
+                    targetAx.YDir = 'normal';
+                end
+            case 'Contour'
+                contour(targetAx, Xmat, Ymat, I, nLvl);
+            otherwise  % 'Filled Contour'
+                contourf(targetAx, Xmat, Ymat, I, nLvl);
+        end
+
+        % Colorbar with intensity unit label
+        if cbLogY.Value
+            cbStr = ['log_{10}(I / ' map.intensityUnit ')'];
+        else
+            cbStr = ['I (' map.intensityUnit ')'];
+        end
+        cbh = colorbar(targetAx);
+        cbh.Label.String      = cbStr;
+        cbh.Label.Interpreter = 'tex';
+
+        xlabel(targetAx, xLbl, 'Interpreter', 'tex');
+        ylabel(targetAx, yLbl, 'Interpreter', 'tex');
+
+        % Title: sample name or filename
+        sName = '';
+        if isfield(ps, 'sampleName') && ~isempty(ps.sampleName)
+            sName = ps.sampleName;
+        end
+        if isempty(sName)
+            [~, fn, fext] = fileparts(ds.filepath);
+            sName = [fn fext];
+        end
+        title(targetAx, sName, 'Interpreter', 'none');
+
+        % Restore saved axis limits if present
+        if isfield(ds, 'axLims')
+            aL  = ds.axLims;
+            xlo = str2num_trim(aL.xMin);  xhi = str2num_trim(aL.xMax);
+            ylo = str2num_trim(aL.yMin);  yhi = str2num_trim(aL.yMax);
+            if ~isnan(xlo) && ~isnan(xhi) && xhi > xlo
+                targetAx.XLim = [xlo, xhi];
+            end
+            if ~isnan(ylo) && ~isnan(yhi) && yhi > ylo
+                targetAx.YLim = [ylo, yhi];
+            end
+        end
+    end
+
+    function extract2DLineCut(clickX, clickY, isHorizontal)
+    %EXTRACT2DLINECUT  Extract a 1D slice from the active 2D intensity map.
+    %   isHorizontal == true  (Shift+click): row cut — fixed Omega → I vs 2Theta
+    %   isHorizontal == false (Ctrl+click):  col cut — fixed 2Theta → I vs Omega
+    %   The extracted profile is added as a new dataset in appData.datasets.
+        if appData.activeIdx < 1 || isempty(appData.datasets), return; end
+        ds = appData.datasets{appData.activeIdx};
+        if ~is2DDataset(ds), return; end
+
+        map = ds.data.metadata.parserSpecific.map2D;
+        [~, fn, fext] = fileparts(ds.filepath);
+
+        % Determine whether the axes are currently displaying Q-space coordinates
+        useQSpace = cbMap2DQSpace.Value && isfield(map, 'Qx');
+
+        if isHorizontal
+            if useQSpace
+                % Shift+click in Q-space: find row whose mean Qz is closest to clickY
+                meanQz = mean(map.Qz, 2);   % [N×1]
+                [~, rowIdx] = min(abs(meanQz - clickY));
+                xVec = map.Qx(rowIdx, :)';
+                xColName = 'Q_x (Ang^-1)';
+                cutLabel = sprintf('H-cut  Qz\x2248%.4g \x212B\x207B\xB9', meanQz(rowIdx));
+            else
+                [~, rowIdx] = min(abs(map.axis1 - clickY));
+                xVec = map.axis2(:);
+                xColName = [map.axis2Name ' (' map.axis2Unit ')'];
+                cutLabel = sprintf('H-cut  %s=%.4g %s', ...
+                    map.axis1Name, map.axis1(rowIdx), map.axis1Unit);
+            end
+            yVec = map.intensity(rowIdx, :)';
+        else
+            if useQSpace
+                % Ctrl+click in Q-space: find col whose mean Qx is closest to clickX
+                meanQx = mean(map.Qx, 1);   % [1×M]
+                [~, colIdx] = min(abs(meanQx - clickX));
+                xVec = map.Qz(:, colIdx);
+                xColName = 'Q_z (Ang^-1)';
+                cutLabel = sprintf('V-cut  Qx\x2248%.4g \x212B\x207B\xB9', meanQx(colIdx));
+            else
+                [~, colIdx] = min(abs(map.axis2 - clickX));
+                xVec = map.axis1(:);
+                xColName = [map.axis1Name ' (' map.axis1Unit ')'];
+                cutLabel = sprintf('V-cut  %s=%.4g %s', ...
+                    map.axis2Name, map.axis2(colIdx), map.axis2Unit);
+            end
+            yVec = map.intensity(:, colIdx);
+        end
+
+        % Minimal metadata for the line-cut
+        meta.source      = ds.filepath;
+        meta.importDate  = datetime('now');
+        meta.parserName  = 'lineCut';
+        meta.xColumnName = xColName;
+        meta.xColumnUnit = '';
+        meta.parserSpecific = struct('is2D', false, ...
+            'originFile', ds.filepath, 'cutLabel', cutLabel);
+        cutData = parser.createDataStruct(xVec, yVec, ...
+            'labels',   {['I (' map.intensityUnit ')']}, ...
+            'units',    {map.intensityUnit}, ...
+            'metadata', meta);
+
+        newDs             = buildDs('[lineCut]', cutData, 'lineCut');
+        newDs.displayName = cutLabel;
+        newDs.legendName  = cutLabel;
+        appData.datasets{end+1} = newDs;
+        rebuildDatasetList(numel(appData.datasets));
+        fprintf('[dataImportGUI] Line-cut added: %s — %s\n', [fn fext], cutLabel);
+    end
+
     function onSmartScale(~,~)
     %ONSMARTSCALE  Auto-detect linear/log and set reasonable axis limits.
     %   Examines the plotted data to choose log scale when values span >2
@@ -7070,6 +7384,19 @@ function varargout = dataImportGUI()
            y0 < ax.YLim(1) || y0 > ax.YLim(2)
             return;
         end
+        % 2D map line-cut (Shift+click = horizontal row, Ctrl+click = vertical col)
+        if ~isempty(appData.datasets) && appData.activeIdx >= 1 && ...
+                is2DDataset(appData.datasets{appData.activeIdx})
+            mod = fig.CurrentModifier;
+            if ismember('shift', mod)
+                extract2DLineCut(x0, y0, true);
+                return;
+            elseif ismember('control', mod)
+                extract2DLineCut(x0, y0, false);
+                return;
+            end
+        end
+
         % Manual double-click detection (two clicks within 350 ms)
         DBLCLICK_SEC = 0.35;
         isDoubleClick = appData.lastClickTic ~= uint64(0) && ...
@@ -8372,9 +8699,22 @@ function badge = getParserBadge(parserName)
             badge = '[NR]';   % Neutron Reflectometry
         case {'importExcel', 'importCSV'}
             badge = '[DAT]';  % Generic data
+        case 'lineCut'
+            badge = '[CUT]';  % 1D line-cut extracted from a 2D map
         otherwise
             badge = '';
     end
+end
+
+
+function tf = is2DDataset(ds)
+%IS2DDATASET  True when ds holds a 2D area-detector XRDML map.
+%   Checks for the is2D flag added by importXRDML Phase 1.1-1.3.
+    tf = isfield(ds, 'data') && ...
+         isfield(ds.data, 'metadata') && ...
+         isfield(ds.data.metadata, 'parserSpecific') && ...
+         isfield(ds.data.metadata.parserSpecific, 'is2D') && ...
+         isequal(ds.data.metadata.parserSpecific.is2D, true);
 end
 
 
