@@ -1551,7 +1551,10 @@ function varargout = dataImportGUI()
 
             supported = {'.dat','.csv','.tsv','.txt', ...
                          '.xlsx','.xls','.xlsm','.xlsb','.ods', ...
-                         '.raw','.xrdml'};
+                         '.raw','.xrdml','.brml', ...
+                         '.refl','.pnr', ...
+                         '.datA','.datB','.datC','.datD', ...
+                         '.data','.datb','.datc','.datd'};
             valid = {};
             for k = 1:numel(fpaths)
                 p = strtrim(char(fpaths{k}));
@@ -3394,11 +3397,11 @@ function varargout = dataImportGUI()
 
     function onRemoveSelectedPeak(~,~)
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
-        pi = appData.selectedPeakIdx;
-        if pi < 1, return; end
+        pki = appData.selectedPeakIdx;
+        if pki < 1, return; end
         cancelInteractions();
         ds = appData.datasets{appData.activeIdx};
-        if pi > numel(ds.peaks), return; end
+        if pki > numel(ds.peaks), return; end
         ds.peaks(pki) = [];
         appData.datasets{appData.activeIdx} = ds;
         appData.selectedPeakIdx = 0;
@@ -3605,26 +3608,26 @@ function varargout = dataImportGUI()
             C(1,:) = {'Peak #', 'Center (deg)', 'd (A)', 'Size (nm)', 'FWHM (deg)', 'Height', 'Area', 'Status'};
             for pki = 1:nPk
                 pk        = ds.peaks(pki);
-                C{pi+1,1} = pi;
-                C{pi+1,2} = pk.center;
+                C{pki+1,1} = pki;
+                C{pki+1,2} = pk.center;
                 canCalc   = ~isnan(wl_A) && ~isnan(pk.center) && pk.center > 0;
                 if canCalc
                     theta_rad  = (pk.center / 2) * DEG2RAD;
-                    C{pi+1,3}  = wl_A / (2 * sin(theta_rad));
+                    C{pki+1,3}  = wl_A / (2 * sin(theta_rad));
                 else
-                    C{pi+1,3} = '';
+                    C{pki+1,3} = '';
                 end
                 if canCalc && ~isnan(pk.fwhm) && pk.fwhm > 0
                     beta_sq = (pk.fwhm * DEG2RAD)^2 - inst_rad^2;
-                    C{pi+1,4} = guiTernary(beta_sq > 0, ...
+                    C{pki+1,4} = guiTernary(beta_sq > 0, ...
                         (K * wl_A * 0.1) / (sqrt(max(beta_sq,0)) * cos(theta_rad)), '');
                 else
-                    C{pi+1,4} = '';
+                    C{pki+1,4} = '';
                 end
-                C{pi+1,5} = guiTernary(isnan(pk.fwhm) || pk.fwhm <= 0, '', pk.fwhm);
-                C{pi+1,6} = pk.height;
-                C{pi+1,7} = guiTernary(isnan(pk.area) || pk.area <= 0, '', pk.area);
-                C{pi+1,8} = pk.status;
+                C{pki+1,5} = guiTernary(isnan(pk.fwhm) || pk.fwhm <= 0, '', pk.fwhm);
+                C{pki+1,6} = pk.height;
+                C{pki+1,7} = guiTernary(isnan(pk.area) || pk.area <= 0, '', pk.area);
+                C{pki+1,8} = pk.status;
             end
 
             try
@@ -8007,7 +8010,7 @@ function varargout = dataImportGUI()
                 if hasCtrl, onUndoCorrections([], []); end
 
             case 'e'
-                if hasCtrl, onExportCSV([], []); end
+                if hasCtrl, onSaveCSV([], []); end
 
             case 'c'
                 if hasCtrl, onCopyToClipboard([], []); end
