@@ -293,7 +293,10 @@ function data = importQDVSM(filepath, options)
     meta.xColumnName = colNames{xColIdx};
     meta.xColumnUnit = colUnits{xColIdx};
 
-    meta.parserSpecific              = headerInfo;   % title, app, instrument, dataTypes, allColumnNames/Units, startupAxisX/Y
+    % Auto-detect scan type from STARTUPAXIS and column layout
+    headerInfo.scanType = detectScanType(headerInfo, colNames);
+
+    meta.parserSpecific              = headerInfo;   % title, app, instrument, dataTypes, allColumnNames/Units, startupAxisX/Y, scanType
     meta.parserSpecific.xColumnIndex = xColIdx;
     meta.parserSpecific.yColumnIndices = yColIdx;
 
@@ -352,6 +355,55 @@ function [name, unit] = parseColumnHeader(raw)
     if ~isempty(tok)
         name = strtrim(tok{1});
         unit = strtrim(tok{2});
+    end
+end
+
+
+function scanType = detectScanType(headerInfo, colNames)
+%DETECTSCANTYPE  Infer scan type from STARTUPAXIS and column names.
+%   Returns one of: 'MvsH', 'MvsT', 'ACsusceptibility', 'MvsTime', 'unknown'
+    scanType = 'unknown';
+
+    % Check STARTUPAXIS X column if available
+    if isfield(headerInfo, 'startupAxisX') && ~isnan(headerInfo.startupAxisX)
+        xIdx = headerInfo.startupAxisX;
+        if xIdx >= 1 && xIdx <= numel(colNames)
+            xName = lower(colNames{xIdx});
+            if contains(xName, 'field')
+                scanType = 'MvsH';
+            elseif contains(xName, 'temperature') || contains(xName, 'temp')
+                scanType = 'MvsT';
+            elseif contains(xName, 'time')
+                scanType = 'MvsTime';
+            elseif contains(xName, 'frequency')
+                scanType = 'ACsusceptibility';
+            end
+            return;
+        end
+    end
+
+    % Fallback: check DATATYPE entries
+    if isfield(headerInfo, 'dataTypes')
+        dtStr = lower(strjoin(headerInfo.dataTypes, ' '));
+        if contains(dtStr, 'ac ')
+            scanType = 'ACsusceptibility';
+            return;
+        end
+    end
+
+    % Fallback: infer from column presence
+    hasField = any(strcmpi(colNames, 'Magnetic Field'));
+    hasTemp  = any(strcmpi(colNames, 'Temperature'));
+    hasACChi = any(contains(colNames, 'AC ', 'IgnoreCase', true));
+
+    if hasACChi
+        scanType = 'ACsusceptibility';
+    elseif hasField && hasTemp
+        scanType = 'MvsH';   % both present, default to field sweep
+    elseif hasField
+        scanType = 'MvsH';
+    elseif hasTemp
+        scanType = 'MvsT';
     end
 end
 
