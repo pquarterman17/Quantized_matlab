@@ -277,7 +277,7 @@ function varargout = dataImportGUI()
                    'AutoResizeChildren','off');
     MIN_FIG_H = 820;   % minimum height so the analysis panel is never clipped
     LAYOUT_DEFAULTS = struct('figW',1080,'figH',1000,'ctrlPanelW',215, ...
-        'corrPanelW',350,'axLimPanelW',220,'toolbarH',130);
+        'corrPanelW',350,'axLimPanelW',220,'toolbarH',90);
     PREFS_FILE = fullfile(fileparts(mfilename('fullpath')),'layoutPrefs.mat');
     fig.SizeChangedFcn = @onFigSizeChanged;
     try
@@ -312,19 +312,20 @@ function varargout = dataImportGUI()
     % Row 1 height: 130px (dataset list only — appearance moved to axLimPanel).
     % Row 2 (preview) gets 50% of flexible space, row 3 (analysis) gets 50%.
     rootGL = uigridlayout(fig,[3 1], ...
-        'RowHeight',    {130,'1x','1x'}, ...
+        'RowHeight',    {90,'1x','1x'}, ...
         'ColumnWidth',  {'1x'}, ...
         'Padding',      [8 8 8 8], ...
         'RowSpacing',   6, ...
         'ColumnSpacing', 0);
 
-    % ── Toolbar row: Add / Remove buttons (top) + search/merge row + dataset listbox ─
-    tbGL = uigridlayout(rootGL,[3 2], ...
-        'RowHeight',    {26,26,'1x'}, ...
-        'ColumnWidth',  {'1x','1x'}, ...
+    % ── Toolbar row: [Add Files | Remove | Filter | Merge] then listbox below ─
+    % Condensed 2-row × 4-column layout to save vertical space for Controls panel.
+    tbGL = uigridlayout(rootGL,[2 4], ...
+        'RowHeight',    {26,'1x'}, ...
+        'ColumnWidth',  {'1.5x','1x','1.5x','1x'}, ...
         'Padding',      [0 0 0 0], ...
         'RowSpacing',   4, ...
-        'ColumnSpacing', 6);
+        'ColumnSpacing', 4);
     tbGL.Layout.Row = 1; tbGL.Layout.Column = 1;  % single-column root grid
 
     btnBrowse = uibutton(tbGL,'Text','Add File(s)...', ...
@@ -341,19 +342,19 @@ function varargout = dataImportGUI()
         'Tooltip','Remove the highlighted dataset from the list (also: right-click or press Delete)');
     btnRemoveDS.Layout.Row = 1; btnRemoveDS.Layout.Column = 2;
 
-    % Row 2: search box + merge button
+    % Row 1 col 3: filter field  |  col 4: merge button
     efDatasetSearch = uieditfield(tbGL,'text','Value','', ...
         'Placeholder','Filter datasets...', ...
         'Tooltip','Filter the dataset list by name (case-insensitive substring match)', ...
         'ValueChangedFcn',@onSearchChanged);
-    efDatasetSearch.Layout.Row = 2; efDatasetSearch.Layout.Column = 1;
+    efDatasetSearch.Layout.Row = 1; efDatasetSearch.Layout.Column = 3;
 
     btnMerge = uibutton(tbGL,'Text','Merge Selected', ...
         'ButtonPushedFcn',@onMergeDatasets, ...
         'BackgroundColor',[0.25 0.45 0.65], ...
         'FontColor',[1 1 1], ...
         'Tooltip','Concatenate 2+ selected datasets into a new merged dataset (sorted by X)');
-    btnMerge.Layout.Row = 2; btnMerge.Layout.Column = 2;
+    btnMerge.Layout.Row = 1; btnMerge.Layout.Column = 4;
 
     lbDatasets = uilistbox(tbGL, ...
         'Items',     {'(no files loaded — click  Add File(s)...  to begin)'}, ...
@@ -361,7 +362,7 @@ function varargout = dataImportGUI()
         'Multiselect','on', ...
         'ValueChangedFcn',@onSelectDataset, ...
         'Tooltip','Loaded datasets — click to make active; Ctrl+click to select multiple; right-click to remove');
-    lbDatasets.Layout.Row = 3; lbDatasets.Layout.Column = [1 2];
+    lbDatasets.Layout.Row = 2; lbDatasets.Layout.Column = [1 4];
 
     % Context menu for dataset list (right-click)
     cmDatasets = uicontextmenu(fig);
@@ -7552,7 +7553,7 @@ function varargout = dataImportGUI()
         if strcmp(appData.panelResizeDir, 'h_row12')
             % Snapshot the current toolbar row height (always a fixed-px number)
             rh = rootGL.RowHeight;
-            appData.panelResizeOrig = guiTernary(isnumeric(rh{1}), rh{1}, 130);
+            appData.panelResizeOrig = guiTernary(isnumeric(rh{1}), rh{1}, 90);
         elseif strcmp(appData.panelResizeDir, 'h_row23')
             % Snapshot the current analysis panel height (px)
             try
@@ -7612,7 +7613,7 @@ function varargout = dataImportGUI()
             % Sign is inverted vs h_row23: dragging the top border down expands row 1.
             delta_y = mp(2) - appData.panelResizeStart(2);
             newH    = round(appData.panelResizeOrig - delta_y);
-            newH    = max(90, min(newH, 400));
+            newH    = max(60, min(newH, 400));
             rootGL.RowHeight = {newH, '3x', '2x'};
 
         elseif strcmp(appData.panelResizeDir, 'h_row23')
@@ -7621,10 +7622,10 @@ function varargout = dataImportGUI()
             figH    = fig.Position(4);
             % Available px after toolbar row + padding + spacings
             %   rootGL: Padding [8 8 8 8] → 16 px;  2 RowSpacing gaps of 6 → 12 px
-            availH  = figH - 16 - 12 - 130;
+            availH  = figH - 16 - 12 - 90;
             newH    = round(appData.panelResizeOrig + delta_y);
             newH    = max(200, min(newH, availH - 100));  % leave ≥ 100 px for preview
-            rootGL.RowHeight = {130, '1x', newH};
+            rootGL.RowHeight = {90, '1x', newH};
 
         elseif strcmp(appData.panelResizeDir, 'v_col12')
             % Mouse moves right → corrections panel gets wider
