@@ -14,8 +14,15 @@ function data = importCSV(filepath, options)
 %   AUTO-DETECTION (when options are not specified):
 %     - Delimiter: tries comma, tab, semicolon, space
 %     - Header row: looks for the first row that is mostly non-numeric
+%     - Units row: a second non-numeric row immediately before data (e.g.
+%       a row of "(°C)","(Oe)","emu") is detected and its values are used
+%       as channel units, overriding any inline "Label (unit)" extraction
+%     - Pre-header metadata (instrument info, date, etc.) is captured and
+%       stored in data.metadata.parserSpecific.headerMetadata
 %     - Time column: uses column 1 by default
-%     - Data columns: all numeric columns except time
+%     - Data columns: all numeric columns except time; fully-empty columns
+%       (e.g. blank separator columns in Excel exports) are automatically
+%       removed; blank column headers are replaced with 'Col{N}'
 %
 %   INPUTS:
 %       filepath - Path to the CSV/TSV file.
@@ -101,9 +108,9 @@ function data = importCSV(filepath, options)
     tokens = splitLines(rawLines, delim);
 
     % ════════════════════════════════════════════════════════════════
-    %  STEP 4: Detect header row and data start
+    %  STEP 4: Detect header row, units row, and data start
     % ════════════════════════════════════════════════════════════════
-    [headerRow, dataStartRow] = detectLayout(tokens, ...
+    [headerRow, dataStartRow, unitsRow] = detectLayout(tokens, ...
         options.HeaderRow, options.DataStartRow);
 
     % ════════════════════════════════════════════════════════════════
@@ -115,6 +122,52 @@ function data = importCSV(filepath, options)
         numCols = numel(tokens{dataStartRow});
         colHeaders = arrayfun(@(k) sprintf('Col%d',k), 1:numCols, ...
                               'UniformOutput', false);
+    end
+
+    % Pad / trim colHeaders to match the actual data row width
+    nDataCols = numel(tokens{dataStartRow});
+    if numel(colHeaders) < nDataCols
+        for k = numel(colHeaders)+1 : nDataCols
+            colHeaders{k} = sprintf('Col%d', k);
+        end
+    elseif numel(colHeaders) > nDataCols
+        colHeaders = colHeaders(1:nDataCols);
+    end
+
+    % Replace blank column headers with 'Col{N}' so output labels are never empty
+    for k = 1:numel(colHeaders)
+        if isempty(strtrim(colHeaders{k}))
+            colHeaders{k} = sprintf('Col%d', k);
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════
+    %  STEP 5b: Extract row-level units from a dedicated units row
+    %  (e.g. a row of "(s)","(°C)","emu" between the header and data)
+    % ════════════════════════════════════════════════════════════════
+    rowUnits = {};   % populated only when a units row was detected
+    if unitsRow > 0
+        uTok = strtrim(tokens{unitsRow});
+        rowUnits = cell(1, numel(colHeaders));
+        for k = 1:numel(colHeaders)
+            if k <= numel(uTok)
+                u = strtrim(uTok{k});
+                % Strip surrounding ( ) or [ ]
+                u = regexprep(u, '^\s*[\(\[](.*?)[\)\]]\s*$', '$1');
+                rowUnits{k} = u;
+            else
+                rowUnits{k} = '';
+            end
+        end
+    end
+
+    % Capture pre-header metadata lines (instrument name, date, operator, etc.)
+    % These are all non-comment rows before the column header row.
+    headerMetadata = {};
+    if headerRow > 1
+        for mi = 1:headerRow-1
+            headerMetadata{end+1} = strjoin(strtrim(tokens{mi}), char(delim)); %#ok<AGROW>
+        end
     end
 
     % ════════════════════════════════════════════════════════════════
@@ -177,7 +230,8 @@ function data = importCSV(filepath, options)
         else
             dataColIdx = allCols;
         end
-        % Further filter: keep only columns that have at least some numeric data
+        % Filter 1: keep only columns that have at least some numeric data.
+        % This removes empty separator columns (all-NaN) common in Excel exports.
         numericFrac = sum(~isnan(rawMatrix(:, dataColIdx)), 1) / numRows;
         dataColIdx = dataColIdx(numericFrac > 0.1);
     else
@@ -213,6 +267,15 @@ function data = importCSV(filepath, options)
                 labels{i} = cleanLabel;
             end
         end
+        % Dedicated units row overrides inline units from header strings
+        if ~isempty(rowUnits)
+            for i = 1:M
+                u = rowUnits{dataColIdx(i)};
+                if ~isempty(u)
+                    units{i} = u;
+                end
+            end
+        end
     end
 
     % ════════════════════════════════════════════════════════════════
@@ -223,6 +286,10 @@ function data = importCSV(filepath, options)
         rawXHeader = colHeaders{timeColIdx};
         [xUnit, xName] = extractUnitsFromHeader(rawXHeader);
         if isempty(xName), xName = rawXHeader; end
+        % Prefer dedicated units row over inline unit in header
+        if ~isempty(rowUnits) && timeColIdx <= numel(rowUnits) && ~isempty(rowUnits{timeColIdx})
+            xUnit = rowUnits{timeColIdx};
+        end
     else
         xName = 'Sample Index';
         xUnit = '';
@@ -245,9 +312,11 @@ function data = importCSV(filepath, options)
 
     meta.parserSpecific.delimiter      = char(delim);
     meta.parserSpecific.headerRow      = headerRow;
+    meta.parserSpecific.unitsRow       = unitsRow;
     meta.parserSpecific.numRawRows     = numel(rawLines);
     meta.parserSpecific.allColumnNames = allColNames;
     meta.parserSpecific.allColumnUnits = allColUnits;
+    meta.parserSpecific.headerMetadata = headerMetadata;  % pre-header text lines
 
     data = parser.createDataStruct(timeVec, valuesMatrix, ...
         'labels', labels, 'units', units, 'metadata', meta);
@@ -317,19 +386,31 @@ end
 
 function tokens = splitLines(rawLines, delim)
 %SPLITLINES Split each raw line by the delimiter.
+%   Uses regexp 'split' so that consecutive delimiters (e.g. ",," in CSV)
+%   produce an empty-string token rather than being silently collapsed.
+%   strsplit collapses consecutive delimiters by default in some MATLAB
+%   versions, which would drop empty columns — so regexp is safer here.
     tokens = cell(numel(rawLines), 1);
+    pat = regexptranslate('escape', char(delim));
     for i = 1:numel(rawLines)
-        tokens{i} = strsplit(rawLines{i}, delim);
+        tokens{i} = regexp(rawLines{i}, pat, 'split');
     end
 end
 
 
-function [headerRow, dataStartRow] = detectLayout(tokens, hdrOpt, dsOpt)
-%DETECTLAYOUT Find header row and first data row.
+function [headerRow, dataStartRow, unitsRow] = detectLayout(tokens, hdrOpt, dsOpt)
+%DETECTLAYOUT Find header row, optional units row, and first data row.
+%
+%   unitsRow is non-zero when a dedicated units row is detected between the
+%   column-header row and the data (e.g. a row of "(s)","(°C)","emu").
+%   Detection requires at least two consecutive non-numeric rows before the
+%   first data row so that a single header like "Field (Oe)" is never
+%   mis-identified as a units row.
     N = numel(tokens);
+    unitsRow = 0;
 
     if hdrOpt >= 0 && dsOpt >= 0
-        % Both specified
+        % Both explicitly specified — trust the caller
         headerRow = hdrOpt;
         dataStartRow = dsOpt;
         return;
@@ -364,14 +445,63 @@ function [headerRow, dataStartRow] = detectLayout(tokens, hdrOpt, dsOpt)
 
     if hdrOpt >= 0
         headerRow = hdrOpt;
+        return;
+    end
+
+    % ── Auto-detect header (and optional units) row ──────────────────
+    % Only attempt units-row detection when there are ≥2 consecutive
+    % non-numeric rows immediately before the first data row, to avoid
+    % misidentifying a header like "Field (Oe)" as a units row.
+    if firstDataIdx >= 3 && ...
+       numericScore(firstDataIdx - 1) < 0.5 && ...
+       numericScore(firstDataIdx - 2) < 0.5 && ...
+       looksLikeUnitsRow(tokens{firstDataIdx - 1}, numel(tokens{firstDataIdx}))
+        % Pattern: ... | header row | units row | data row
+        unitsRow  = firstDataIdx - 1;
+        headerRow = firstDataIdx - 2;
+    elseif firstDataIdx > 1 && numericScore(firstDataIdx - 1) < 0.5
+        % Standard: single non-numeric row immediately before data
+        headerRow = firstDataIdx - 1;
     else
-        % If the row above the first data row is non-numeric, it's the header
-        if firstDataIdx > 1 && numericScore(firstDataIdx - 1) < 0.5
-            headerRow = firstDataIdx - 1;
-        else
-            headerRow = 0;  % no header detected
+        headerRow = 0;  % no header detected
+    end
+end
+
+
+function tf = looksLikeUnitsRow(rowTokens, nDataCols)
+%LOOKSLIKEUNITSROW  Return true if rowTokens looks like a units row.
+%   Heuristic: the row must have a similar column count to the data row,
+%   and ≥60% of entries must either be empty or look like physical unit
+%   strings (short, no spaces, wrapped in brackets, or a recognised unit
+%   abbreviation pattern).
+    n = numel(rowTokens);
+    if n < max(nDataCols * 0.5, 2)
+        tf = false; return;
+    end
+    nUnitLike = 0;
+    nNonEmpty = 0;
+    for i = 1:n
+        t = strtrim(rowTokens{i});
+        if isempty(t)
+            nUnitLike = nUnitLike + 1;  % empty separators are fine in units rows
+            continue;
+        end
+        nNonEmpty = nNonEmpty + 1;
+        % Wrapped in ( ) or [ ] → classic unit annotation
+        if ~isempty(regexp(t, '^[\(\[{].*[\)\]}]$', 'once'))
+            nUnitLike = nUnitLike + 1;
+        % Short unit abbreviation: has non-alpha chars (/, °, digits) + short,
+        % OR is a very short all-alpha token (≤4 chars, e.g. "Oe", "emu", "K").
+        % The ≤4 cap prevents column-name words like "Field" (5) or "Temp" (4+)
+        % from being mistaken for unit abbreviations.
+        elseif isempty(strfind(t, ' ')) && isnan(str2double(t)) && ...
+               (~isempty(regexp(t, '[^a-zA-Z]', 'once')) && numel(t) <= 10 || ...
+                isempty(regexp(t, '[^a-zA-Z]', 'once'))  && numel(t) <= 4)
+            nUnitLike = nUnitLike + 1;
         end
     end
+    % Require at least one non-empty entry and ≥60% unit-like entries overall
+    tf = nNonEmpty > 0 && (nUnitLike / max(n, 1)) >= 0.6;
 end
 
 

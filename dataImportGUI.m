@@ -104,6 +104,9 @@ function varargout = dataImportGUI()
 %   api.is2DActive()           — true when active dataset is a 2D area-detector map
 %   api.setMap2DType(typeStr)  — set '2D plot type' and replot ('Heatmap'|'Contour'|...)
 %   api.extractLineCut2D(x,y,isH) — extract 1D slice from 2D map (isH: H-cut vs V-cut)
+%   api.setQSpace(tf)          — enable/disable Q-space axes on 2D map and replot
+%   api.setContourLevels(n)    — set number of contour levels for Contour plot types
+%   api.setColormap(name)      — set active colormap by name and replot
 %
 %   Headless usage (e.g. in test_gui_harness.m):
 %     api = dataImportGUI();
@@ -260,7 +263,7 @@ function varargout = dataImportGUI()
     appData.fitCurveColor     = [0.85 0.20 0.00];   % default warm red-orange
     appData.kFactor           = 0.9;                % Scherrer shape factor K (0.9 spherical default)
     appData.instBroadening_deg = 0;                 % Instrument broadening FWHM (°); 0 = uncorrected
-    appData.panelResizeDir    = '';   % '' | 'h_row12' | 'h_row23' | 'v_col12' | 'v_col23' | 'v_col34'
+    appData.panelResizeDir    = '';   % '' | 'h_row12' | 'v_col12' | 'v_col23' | 'v_col34'
     appData.panelResizeStart  = [];   % [mousePixX, mousePixY] at resize drag start
     appData.panelResizeOrig   = [];   % panel dimension (px) at resize drag start
     appData.corrPanelWidth    = 350;  % user-resized corrections column width (px)
@@ -311,25 +314,33 @@ function varargout = dataImportGUI()
     YTICKFMT_NAMES = {'Auto', 'Scientific', 'Fixed 4dp', 'Fixed 2dp', 'Integer', 'Exp = 0'};
     YTICKFMT_DATA  = {'',     '%.2e',       '%.4f',      '%.2f',      '%d',      '__exp0'};
 
-    % Root grid  (3 rows × 1 col: toolbar row 1, preview row 2, analysis row 3)
-    % Row 1 height: 130px (dataset list only — appearance moved to axLimPanel).
-    % Row 2 (preview) gets 50% of flexible space, row 3 (analysis) gets 50%.
-    rootGL = uigridlayout(fig,[3 1], ...
-        'RowHeight',    {90,'1x','1x'}, ...
+    % Root grid  (2 rows × 1 col: content row 1, analysis row 2)
+    % Row 1 holds file-list | controls | preview side-by-side (contentGL).
+    % Row 2 (analysis) is resizable via the h_row12 drag border.
+    rootGL = uigridlayout(fig,[2 1], ...
+        'RowHeight',    {'1x','1x'}, ...
         'ColumnWidth',  {'1x'}, ...
         'Padding',      [8 8 8 8], ...
         'RowSpacing',   6, ...
         'ColumnSpacing', 0);
 
-    % ── Toolbar row: [Add Files | Remove | Filter | Merge] then listbox below ─
-    % Condensed 2-row × 4-column layout to save vertical space for Controls panel.
-    tbGL = uigridlayout(rootGL,[2 4], ...
-        'RowHeight',    {26,'1x'}, ...
-        'ColumnWidth',  {'1.5x','1x','1.5x','1x'}, ...
+    % ── Content row: [Files | Controls | Preview] ─────────────────────────
+    % File-list column is narrow; controls column fixed; preview fills remainder.
+    contentGL = uigridlayout(rootGL,[1 3], ...
+        'ColumnWidth',  {170, 215, '1x'}, ...
+        'Padding',      [0 0 0 0], ...
+        'ColumnSpacing', 8);
+    contentGL.Layout.Row = 1; contentGL.Layout.Column = 1;
+
+    % ── File list panel (contentGL col 1) ─────────────────────────────────
+    % Stacked vertically: Add | Remove | Filter | Merge | Listbox
+    tbGL = uigridlayout(contentGL,[5 1], ...
+        'RowHeight',    {26,26,26,26,'1x'}, ...
+        'ColumnWidth',  {'1x'}, ...
         'Padding',      [0 0 0 0], ...
         'RowSpacing',   4, ...
-        'ColumnSpacing', 4);
-    tbGL.Layout.Row = 1; tbGL.Layout.Column = 1;  % single-column root grid
+        'ColumnSpacing', 0);
+    tbGL.Layout.Row = 1; tbGL.Layout.Column = 1;
 
     btnBrowse = uibutton(tbGL,'Text','Add File(s)...', ...
         'ButtonPushedFcn',@onAddFiles, ...
@@ -343,21 +354,20 @@ function varargout = dataImportGUI()
         'BackgroundColor',[0.70 0.18 0.18], ...
         'FontColor',[1 1 1], ...
         'Tooltip','Remove the highlighted dataset from the list (also: right-click or press Delete)');
-    btnRemoveDS.Layout.Row = 1; btnRemoveDS.Layout.Column = 2;
+    btnRemoveDS.Layout.Row = 2; btnRemoveDS.Layout.Column = 1;
 
-    % Row 1 col 3: filter field  |  col 4: merge button
     efDatasetSearch = uieditfield(tbGL,'text','Value','', ...
         'Placeholder','Filter datasets...', ...
         'Tooltip','Filter the dataset list by name (case-insensitive substring match)', ...
         'ValueChangedFcn',@onSearchChanged);
-    efDatasetSearch.Layout.Row = 1; efDatasetSearch.Layout.Column = 3;
+    efDatasetSearch.Layout.Row = 3; efDatasetSearch.Layout.Column = 1;
 
     btnMerge = uibutton(tbGL,'Text','Merge Selected', ...
         'ButtonPushedFcn',@onMergeDatasets, ...
         'BackgroundColor',[0.25 0.45 0.65], ...
         'FontColor',[1 1 1], ...
         'Tooltip','Concatenate 2+ selected datasets into a new merged dataset (sorted by X)');
-    btnMerge.Layout.Row = 1; btnMerge.Layout.Column = 4;
+    btnMerge.Layout.Row = 4; btnMerge.Layout.Column = 1;
 
     lbDatasets = uilistbox(tbGL, ...
         'Items',     {'(no files loaded — click  Add File(s)...  to begin)'}, ...
@@ -365,20 +375,13 @@ function varargout = dataImportGUI()
         'Multiselect','on', ...
         'ValueChangedFcn',@onSelectDataset, ...
         'Tooltip','Loaded datasets — click to make active; Ctrl+click to select multiple; right-click to remove');
-    lbDatasets.Layout.Row = 2; lbDatasets.Layout.Column = [1 4];
+    lbDatasets.Layout.Row = 5; lbDatasets.Layout.Column = 1;
 
     % Context menu for dataset list (right-click)
     cmDatasets = uicontextmenu(fig);
     miRemove = uimenu(cmDatasets, 'Text', 'Remove Selected', ...
         'MenuSelectedFcn', @(~,~) onRemoveDataset([], [])); %#ok<NASGU>
     lbDatasets.ContextMenu = cmDatasets;
-
-    % ── Content: controls panel (left) | preview axes (right) ────────────
-    contentGL = uigridlayout(rootGL,[1 2], ...
-        'ColumnWidth',  {215,'1x'}, ...
-        'Padding',      [0 0 0 0], ...
-        'ColumnSpacing', 8);
-    contentGL.Layout.Row = 2; contentGL.Layout.Column = 1;
 
     % Left controls panel
     % Title updates to show parser name after each load.
@@ -393,10 +396,10 @@ function varargout = dataImportGUI()
     %   8 -  30px  Replot button
     %   9 -   1x   Metadata text area
     ctrlPanel = uipanel(contentGL,'Title','Controls','FontSize',13);
-    ctrlPanel.Layout.Column = 1;
+    ctrlPanel.Layout.Column = 2;
 
     ctrlGL = uigridlayout(ctrlPanel,[10 1], ...
-        'RowHeight', {26,2,'1x',2,'1x',2,34,24,26,24}, ...
+        'RowHeight', {26,2,'1x',2,'1x',2,50,24,26,24}, ...
         'Padding',   [6 6 6 6], ...
         'RowSpacing', 0);
 
@@ -509,7 +512,7 @@ function varargout = dataImportGUI()
 
     % ── Right: preview axes ───────────────────────────────────────────────
     axPanel = uipanel(contentGL,'Title','Preview','FontSize',13);
-    axPanel.Layout.Column = 2;
+    axPanel.Layout.Column = 3;
     axGL = uigridlayout(axPanel,[1 1],'Padding',[2 2 2 2]);
     ax = uiaxes(axGL);
     ax.Box = 'on';
@@ -535,7 +538,7 @@ function varargout = dataImportGUI()
 
     % ── Analysis & Corrections panel (row 3, full width) ─────────────────
     analysisPanel = uipanel(rootGL,'Title','Analysis & Corrections','FontSize',13);
-    analysisPanel.Layout.Row = 3; analysisPanel.Layout.Column = 1;
+    analysisPanel.Layout.Row = 2; analysisPanel.Layout.Column = 1;
 
     analysisGL = uigridlayout(analysisPanel,[1 4], ...
         'ColumnWidth', {350, 220, '7x', '3x'}, ...
@@ -1440,10 +1443,13 @@ function varargout = dataImportGUI()
     api.getPeaks            = @getPeaksDirect;
     api.setDatasetVisible   = @setDatasetVisibleDirect;
     api.close               = @() close(fig);
-    % 2D map API (used by test_gui_2d.m)
+    % 2D map API (used by test_gui_2d.m / test_gui_phase4.m)
     api.is2DActive          = @is2DActiveDirect;
     api.setMap2DType        = @setMap2DTypeDirect;
     api.extractLineCut2D    = @extractLineCut2DDirect;
+    api.setQSpace           = @setQSpaceDirect;
+    api.setContourLevels    = @setContourLevelsDirect;
+    api.setColormap         = @setColormapDirect;
 
     % ════════════════════════════════════════════════════════════════════
     %  NESTED CALLBACKS  (share appData + all control handles via closure)
@@ -1765,6 +1771,28 @@ function varargout = dataImportGUI()
         drawnow;
     end
 
+    function setQSpaceDirect(tf)
+    %SETQSPACEDIRECT  Enable or disable Q-space axes on the 2D map and replot.
+    %   tf: true to enable Q-space (Qx/Qz), false for angular axes.
+        cbMap2DQSpace.Value = logical(tf);
+        onPlot([],[]);
+        drawnow;
+    end
+
+    function setContourLevelsDirect(n)
+    %SETCONTOURLEVELSDIRECT  Set the number of contour levels for Contour/Filled Contour plots.
+    %   n: positive integer (e.g. 20)
+        efMap2DContourN.Value = round(n);
+    end
+
+    function setColormapDirect(name)
+    %SETCOLOURMAPDIRECT  Set the colormap by name and replot.
+    %   name: one of the items in ddColormap (e.g. 'parula', 'viridis', 'jet')
+        ddColormap.Value = name;
+        onPlot([],[]);
+        drawnow;
+    end
+
     function onSelectDataset(~,~)
     %ONSELECTDATASET  Fires when the user clicks a row in lbDatasets.
     %  With Multiselect='on', lbDatasets.Value is a cell array of selected
@@ -1961,6 +1989,8 @@ function varargout = dataImportGUI()
             efLegendName.Enable   = 'off';
             efLegendName.Value    = '';
             cla(ax);
+            ax.XLim = [0 1];  ax.YLim = [0 1];
+            ax.XLimMode = 'auto';  ax.YLimMode = 'auto';
             title(ax,'Load a file to preview data','Interpreter','none');
         else
             appData.activeIdx = min(appData.activeIdx, numel(appData.datasets));
@@ -5916,10 +5946,10 @@ function varargout = dataImportGUI()
         current = struct( ...
             'figW',       fig.Position(3), ...
             'figH',       fig.Position(4), ...
-            'ctrlPanelW', contentGL.ColumnWidth{1}, ...
+            'ctrlPanelW', contentGL.ColumnWidth{2}, ...
             'corrPanelW', appData.corrPanelWidth, ...
             'axLimPanelW', appData.axLimPanelWidth, ...
-            'toolbarH',   rootGL.RowHeight{1} ...
+            'toolbarH',   contentGL.ColumnWidth{1} ...
         );
         layoutSettingsGUI(@applyLayoutSettings, current, LAYOUT_DEFAULTS, PREFS_FILE);
     end
@@ -5931,10 +5961,10 @@ function varargout = dataImportGUI()
         pos(3) = max(s.figW, 400);
         pos(4) = max(s.figH, MIN_FIG_H);
         fig.Position = pos;
-        % Toolbar height
-        rootGL.RowHeight{1} = s.toolbarH;
-        % Controls panel (dataset list sidebar)
-        contentGL.ColumnWidth{1} = s.ctrlPanelW;
+        % File-list column width (narrow sidebar)
+        contentGL.ColumnWidth{1} = s.toolbarH;
+        % Controls panel width
+        contentGL.ColumnWidth{2} = s.ctrlPanelW;
         % Corrections and axes+appearance panel widths
         appData.corrPanelWidth  = s.corrPanelW;
         appData.axLimPanelWidth = s.axLimPanelW;
@@ -6138,9 +6168,13 @@ function varargout = dataImportGUI()
             delete(findall(targetAx, 'Tag', 'GUIZoomBox'));
             delete(targetAx.Children);
             cla(targetAx);
-            % cla() preserves XLimMode/YLimMode, so an explicit drag-zoom would keep
-            % the axes locked at manual limits even after the fields are cleared.
-            % Reset to auto here; explicit limits below will override when populated.
+            % cla() removes plot children but DOES NOT reset XLim/YLim — MATLAB
+            % retains the last auto-scaled range even after clearing.  When switching
+            % data types (e.g. XRD → magnetometry), the stale XRD YLim [0,50000]
+            % would persist, squishing new [-5,5] moment data into a flat line.
+            % Fix: temporarily set [0 1] (forces XLimMode='manual') then release to
+            % 'auto' so the next plot() auto-scales purely to the new data.
+            targetAx.XLim = [0 1];  targetAx.YLim = [0 1];
             targetAx.XLimMode = 'auto';
             targetAx.YLimMode = 'auto';
 
@@ -6149,6 +6183,7 @@ function varargout = dataImportGUI()
             if numel(targetAx.YAxis) > 1
                 yyaxis(targetAx, 'right');
                 cla(targetAx);
+                targetAx.YLim = [0 1];
                 targetAx.YLimMode = 'auto';
                 targetAx.YScale   = 'linear';
                 ylabel(targetAx, '');
@@ -7074,8 +7109,8 @@ function varargout = dataImportGUI()
         if useQSpace
             Xmat = map.Qx;   % [N×M]  Qx grid
             Ymat = map.Qz;   % [N×M]  Qz grid
-            xLbl = 'Q_x (\AA^{-1})';
-            yLbl = 'Q_z (\AA^{-1})';
+            xLbl = 'Q_x (Å^{-1})';
+            yLbl = 'Q_z (Å^{-1})';
         else
             [Xmat, Ymat] = meshgrid(x2, x1);   % uniform angle-space grid
             xLbl = [map.axis2Name ' (' map.axis2Unit ')'];
@@ -7321,7 +7356,7 @@ function varargout = dataImportGUI()
         % -- Panel resize border detection: update cursor and store hover direction --
         dir = detectResizeBorder();
         appData.panelResizeDir = dir;
-        if     strcmp(dir, 'h_row12') || strcmp(dir, 'h_row23'), fig.Pointer = 'top';
+        if     strcmp(dir, 'h_row12'), fig.Pointer = 'top';
         elseif strcmp(dir, 'v_col12') || strcmp(dir, 'v_col23') || strcmp(dir, 'v_col34')
                                                                    fig.Pointer = 'left';
         else,                                                      fig.Pointer = 'arrow';
@@ -7803,8 +7838,7 @@ function varargout = dataImportGUI()
     function dir = detectResizeBorder()
     %DETECTRESIZEBORDER  Check whether fig.CurrentPoint is within SNAP_PX of a
     %  resizable panel border.  Returns:
-    %    'h_row12' — horizontal border between toolbar row (1) and preview row (2)
-    %    'h_row23' — horizontal border between preview row (2) and analysis row (3)
+    %    'h_row12' — horizontal border between content row (1) and analysis row (2)
     %    'v_col12' — vertical border between corrections col (1) and axis-limits col (2)
     %    'v_col23' — vertical border between axis-limits col (2) and peak col (3)  [XRD only]
     %    'v_col34' — vertical border between peak col (3) and save col (4)         [XRD only]
@@ -7815,19 +7849,11 @@ function varargout = dataImportGUI()
             mp   = fig.CurrentPoint;                        % [x y] from figure bottom-left
             aPos = getpixelposition(analysisPanel, true);   % [l b w h] relative to figure
 
-            % h_row12: bottom edge of toolbar row = top edge of contentGL
-            cglPos  = getpixelposition(contentGL, true);
-            borderY = cglPos(2) + cglPos(4);
-            if abs(mp(2) - borderY) <= SNAP_PX && ...
-               mp(1) >= cglPos(1) && mp(1) <= cglPos(1) + cglPos(3)
-                dir = 'h_row12'; return;
-            end
-
-            % h_row23: top edge of the analysis panel
+            % h_row12: top edge of the analysis panel
             borderY = aPos(2) + aPos(4);
             if abs(mp(2) - borderY) <= SNAP_PX && ...
                mp(1) >= aPos(1) && mp(1) <= aPos(1) + aPos(3)
-                dir = 'h_row23'; return;
+                dir = 'h_row12'; return;
             end
 
             % Vertical borders — only test inside the analysis panel's y-band
@@ -7878,17 +7904,13 @@ function varargout = dataImportGUI()
         mp = fig.CurrentPoint;
         appData.panelResizeStart = mp;
         if strcmp(appData.panelResizeDir, 'h_row12')
-            % Snapshot the current toolbar row height (always a fixed-px number)
-            rh = rootGL.RowHeight;
-            appData.panelResizeOrig = guiTernary(isnumeric(rh{1}), rh{1}, 90);
-        elseif strcmp(appData.panelResizeDir, 'h_row23')
             % Snapshot the current analysis panel height (px)
             try
                 aPos = getpixelposition(analysisPanel, true);
                 appData.panelResizeOrig = aPos(4);
             catch
                 rh = rootGL.RowHeight;
-                appData.panelResizeOrig = guiTernary(isnumeric(rh{3}), rh{3}, 400);
+                appData.panelResizeOrig = guiTernary(isnumeric(rh{2}), rh{2}, 400);
             end
         elseif strcmp(appData.panelResizeDir, 'v_col12')
             % Snapshot the current corrections panel width (px)
@@ -7936,23 +7958,15 @@ function varargout = dataImportGUI()
         mp = fig.CurrentPoint;
 
         if strcmp(appData.panelResizeDir, 'h_row12')
-            % Mouse moves down (mp(2) decreases) → toolbar row gets taller.
-            % Sign is inverted vs h_row23: dragging the top border down expands row 1.
-            delta_y = mp(2) - appData.panelResizeStart(2);
-            newH    = round(appData.panelResizeOrig - delta_y);
-            newH    = max(60, min(newH, 400));
-            rootGL.RowHeight = {newH, '3x', '2x'};
-
-        elseif strcmp(appData.panelResizeDir, 'h_row23')
             % Mouse moves up (mp(2) increases) → analysis panel gets taller
             delta_y = mp(2) - appData.panelResizeStart(2);
             figH    = fig.Position(4);
-            % Available px after toolbar row + padding + spacings
-            %   rootGL: Padding [8 8 8 8] → 16 px;  2 RowSpacing gaps of 6 → 12 px
-            availH  = figH - 16 - 12 - 90;
+            % Available px after padding + 1 RowSpacing gap
+            %   rootGL: Padding [8 8 8 8] → 16 px;  1 RowSpacing gap of 6 → 6 px
+            availH  = figH - 16 - 6;
             newH    = round(appData.panelResizeOrig + delta_y);
             newH    = max(200, min(newH, availH - 100));  % leave ≥ 100 px for preview
-            rootGL.RowHeight = {90, '1x', newH};
+            rootGL.RowHeight = {'1x', newH};
 
         elseif strcmp(appData.panelResizeDir, 'v_col12')
             % Mouse moves right → corrections panel gets wider

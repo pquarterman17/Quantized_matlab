@@ -42,7 +42,7 @@ try
         sprintf('expected 2 files found, got %d', numel(results)));
 
     % Both should be error-free
-    errors = cellfun(@(r) r.error, {results.error}, 'UniformOutput', false);
+    errors = {results.error};   % already a cell array of error strings
     assert(all(cellfun(@isempty, errors)), ...
         sprintf('expected 0 errors, got %d', sum(~cellfun(@isempty, errors))));
 
@@ -307,7 +307,7 @@ try
 
     % Create fake .raw without valid magic ("FI" for Rigaku, "RAW1.01" for Bruker)
     fid = fopen(fullfile(tmpDir10, 'fake_rigaku.raw'), 'w');
-    fwrite(fid, 'XX' + char([0 0 0 0 0 0]), 'char');  % Invalid magic
+    fwrite(fid, ['XX', char([0 0 0 0 0 0])], 'char');  % Invalid magic (8 bytes, not "FI" or "RAW1.01")
     fclose(fid);
 
     outputDir10 = fullfile(tmpDir10, 'output');
@@ -462,13 +462,12 @@ end
 % ════════════════════════════════════════════════════════════════════════
 %  SUMMARY
 % ════════════════════════════════════════════════════════════════════════
-fprintf('\n' + string(repmat('═', 1, 72)) + '\n');
+fprintf('\n%s\n', repmat(char(9552), 1, 72));
 fprintf('SUMMARY: %d passed, %d failed\n', passed, failed);
 if failed > 0
     fprintf('Status: FAIL\n');
-    exit(1);
+    error('test_batch_processing:failures', '%d test(s) failed.', failed);
 else
     fprintf('Status: ALL PASS\n');
-    exit(0);
 end
 

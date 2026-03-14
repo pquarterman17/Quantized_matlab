@@ -44,9 +44,9 @@ arguments
     options.IncludeMetadata logical = true
 end
 
-% Validate format and intensity options
-validatestring(options.Format, ["standard", "origin"]);
-validatestring(options.Intensity, ["both", "cps", "counts"]);
+% Validate and normalise format / intensity options (validatestring is case-insensitive)
+options.Format    = validatestring(options.Format,    ["standard", "origin"]);
+options.Intensity = validatestring(options.Intensity, ["both", "cps", "counts"]);
 
 % Check output directory exists (if a directory is specified)
 [outDir, ~, ~] = fileparts(outputPath);
@@ -157,7 +157,12 @@ function [intensityVals, labels, units] = resolveIntensityColumns(data, intensit
 
     originalUnit = data.units{1};
     originalVals = data.values(:, 1);
-    countingTime = getNested(data.metadata, 'countingTime', nan);
+    % countingTime lives in parserSpecific (canonical schema); fall back to nan
+    if isfield(data.metadata, 'parserSpecific')
+        countingTime = getNested(data.metadata.parserSpecific, 'countingTime', nan);
+    else
+        countingTime = nan;
+    end
 
     if strcmp(intensityOpt, "both")
         % Try to provide both cps and counts columns

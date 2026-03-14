@@ -1,36 +1,58 @@
 # Test Suite
 
-All test scripts live here. Run from the project root (or any directory — scripts
-resolve paths from their own location automatically).
+All test scripts live here. Run from the project root.
 
-## Running Tests
+## Quick start
 
 ```matlab
-% From the project root:
-cd G:\Onedrive\Coding\git\thin_film_toolkit_matlab
-setupToolbox          % add packages to path (once per session)
+runAllTests                   % run everything
+runAllTests(Group="parser")   % fast parser checks only (no GUI)
+runAllTests(Group="gui")      % GUI tests only
+```
 
-% Then run any test script:
+## Groups
+
+| Group | Command | Speed | What it covers |
+|-------|---------|-------|----------------|
+| `parser` | `runAllTests(Group="parser")` | Fast | All parsers, importAuto dispatch, edge cases, CSV round-trip |
+| `batch`  | `runAllTests(Group="batch")`  | Fast | batchImport, batchConvertXRD, XRD converter GUI |
+| `xrd2d`  | `runAllTests(Group="xrd2d")`  | Fast | 2D XRDML parser, Q-space, shapes, cuts, session round-trip |
+| `gui`    | `runAllTests(Group="gui")`    | Medium | GUI API: load, correct, peaks, session, 2D map, colormaps |
+| `all`    | `runAllTests`                 | Medium | Everything above, in order |
+
+## Individual suites
+
+You can still run any suite on its own:
+
+```matlab
 run tests/test_parsers
 run tests/test_importAuto
 run tests/test_parsers_edge_cases
-run tests/test_gui_harness
 run tests/test_data_roundtrip
 run tests/test_batch_processing
 run tests/test_batch_xrd_converter
+run tests/test_xrdml_2d
+run tests/test_xrdml_2d_edge
+run tests/test_gui_harness
+run tests/test_gui_2d
+run tests/test_gui_phase4
 ```
 
-## Test Files
+## Test files
 
-| File | Coverage | Speed |
-|------|----------|-------|
-| `test_parsers.m` | Smoke tests for all `+parser` functions (importQDVSM, importPPMS, importCSV, importExcel, importRigaku_raw, importXRDML, importBruker, importMPMS, importLakeShore, importNCNRRefl, importNCNRPNR, importNCNRDat) | Fast |
-| `test_importAuto.m` | `parser.importAuto` extension dispatch and format detection | Fast |
-| `test_parsers_edge_cases.m` | Error handling: empty files, truncated binaries, missing files, inconsistent columns | Fast |
-| `test_gui_harness.m` | GUI programmatic API: load, correct, peak-find, undo, session save/load | Medium (opens GUI) |
-| `test_data_roundtrip.m` | CSV export round-trip: import → writeXRDcsv → re-import → compare | Fast |
-| `test_batch_processing.m` | `batchImport` and `batchConvertXRD` integration tests | Fast |
-| `test_batch_xrd_converter.m` | `xrdConvertGUI` and batch XRD converter edge cases | Fast |
+| File | Group | Coverage |
+|------|-------|----------|
+| `test_parsers.m` | parser | Smoke tests for all `+parser` functions |
+| `test_importAuto.m` | parser | `parser.importAuto` dispatch and format detection |
+| `test_parsers_edge_cases.m` | parser | Error handling: empty files, truncated binaries, missing files |
+| `test_data_roundtrip.m` | parser | CSV export round-trip: import → writeXRDcsv → re-import → compare |
+| `test_batch_processing.m` | batch | `batchImport` and `batchConvertXRD` integration tests |
+| `test_batch_xrd_converter.m` | batch | `xrdConvertGUI` and batch XRD converter edge cases |
+| `test_xrdml_2d.m` | xrd2d | 2D XRDML parser: is2D detection, matrix shape, Q-space, backward compat |
+| `test_xrdml_2d_edge.m` | xrd2d | Edge cases: minimal/large/asymmetric grids, zero BG, boundary cuts, session |
+| `test_gui_harness.m` | gui | GUI programmatic API: load, correct, peak-find, undo, session save/load |
+| `test_gui_2d.m` | gui | GUI 2D map: load, plot types, H-cut, V-cut, multi-cut accumulation |
+| `test_gui_phase4.m` | gui | GUI Phase 4: Q-space toggle, contour levels, colormap, mixed 1D+2D |
 
 ## Archive
 

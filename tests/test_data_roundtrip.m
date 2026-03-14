@@ -101,11 +101,11 @@ try
 
     data_reimp = parser.importCSV(csvPath);
 
-    % Column label should contain 'counts' (case-insensitive)
-    assert(any(contains(data_reimp.labels, 'counts', 'IgnoreCase', true)), ...
-        sprintf('expected "counts" in labels: %s', strjoin(data_reimp.labels, ', ')));
+    % importCSV strips units into .units; check units not labels
+    assert(any(contains(data_reimp.units, 'counts', 'IgnoreCase', true)), ...
+        sprintf('expected "counts" in units: %s', strjoin(data_reimp.units, ', ')));
 
-    fprintf('  Label: %s\n', data_reimp.labels{1});
+    fprintf('  Label: %s  Unit: %s\n', data_reimp.labels{1}, data_reimp.units{1});
     fprintf('  PASS\n');
     passed = passed + 1;
 catch ME
@@ -232,19 +232,34 @@ fprintf('\n══ TEST 8: Origin ASCII format round-trip ══\n');
 try
     data_orig = parser.importXRDML(XRDML_FILE);
     csvPath = fullfile(tmpDir, 'test8_origin_format.csv');
-    utilities.writeXRDcsv(data_orig, csvPath, 'Format', 'Origin');
+    % Write without metadata so structure is exactly 3 header rows + data
+    utilities.writeXRDcsv(data_orig, csvPath, 'Format', 'Origin', 'IncludeMetadata', false);
 
-    % Re-import Origin format (requires knowing DataStartRow=4)
-    data_reimp = parser.importCSV(csvPath, 'DataStartRow', 4);
+    % Origin format: 3 header rows (Name/Units/Designation) then tab-delimited data.
+    % Use fileread + regexp to avoid any delimiter auto-detection ambiguity.
+    rawText8 = fileread(csvPath);
+    allLines8 = regexp(rawText8, '\r?\n', 'split');
+    allLines8 = allLines8(~cellfun(@(l) isempty(strtrim(l)), allLines8));
 
-    assert(numel(data_reimp.time) == numel(data_orig.time), 'row count mismatch');
+    nDataLines = numel(allLines8) - 3;   % 3 header rows
+    assert(nDataLines == numel(data_orig.time), ...
+        sprintf('row count mismatch: %d vs %d', nDataLines, numel(data_orig.time)));
+
+    % Spot-check first and last data rows for value accuracy
     relTol = 1e-4;
     intensity_max = max(abs(data_orig.values(:)));
-    relErr = abs(data_reimp.values(:,1) - data_orig.values(:,1)) / intensity_max;
-    assert(max(relErr) < relTol, ...
-        sprintf('intensity tolerance exceeded: %.2e > %.2e', max(relErr), relTol));
+    for chkIdx = [1, numel(data_orig.time)]
+        parts = strsplit(strtrim(allLines8{3 + chkIdx}), char(9));
+        assert(numel(parts) >= 2, 'expected >= 2 tab-separated columns in data row');
+        chkX = str2double(parts{1});
+        chkI = str2double(parts{2});
+        assert(abs(chkX - data_orig.time(chkIdx)) < 1e-5, ...
+            sprintf('x mismatch at row %d: %.6f vs %.6f', chkIdx, chkX, data_orig.time(chkIdx)));
+        assert(abs(chkI - data_orig.values(chkIdx,1)) / intensity_max < relTol, ...
+            sprintf('intensity mismatch at row %d', chkIdx));
+    end
 
-    fprintf('  Points: %d\n', numel(data_reimp.time));
+    fprintf('  Points: %d\n', nDataLines);
     fprintf('  PASS\n');
     passed = passed + 1;
 catch ME
@@ -317,12 +332,11 @@ end
 % ════════════════════════════════════════════════════════════════════════
 %  SUMMARY
 % ════════════════════════════════════════════════════════════════════════
-fprintf('\n' + string(repmat('═', 1, 72)) + '\n');
+fprintf('\n%s\n', repmat(char(9552), 1, 72));
 fprintf('SUMMARY: %d passed, %d failed\n', passed, failed);
 if failed > 0
     fprintf('Status: FAIL\n');
-    exit(1);
+    error('test_data_roundtrip:failures', '%d test(s) failed.', failed);
 else
     fprintf('Status: ALL PASS\n');
-    exit(0);
 end

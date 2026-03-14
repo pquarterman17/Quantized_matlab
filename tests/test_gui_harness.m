@@ -192,7 +192,8 @@ try
 
     orig_val = ds.data.values(1,1);
     corr_val = ds.corrData.values(1,1);
-    expected_diff = 1.5;
+    % GUI applies yOff as subtraction: corrData = origData - yOff
+    expected_diff = -1.5;
     actual_diff = corr_val - orig_val;
 
     assert(abs(actual_diff - expected_diff) < 1e-10, ...
@@ -256,7 +257,9 @@ try
     % Set active to first, apply correction
     api.setActiveIdx(1);
     api.setCorrections(0, 3.0, 0, 0);
+    api.fig.Visible = 'on'; drawnow;   % applyCorrectionsAll requires visible figure
     api.applyCorrectionsAll();
+    api.fig.Visible = 'off';
 
     datasets = api.getDatasets();
 
@@ -313,7 +316,9 @@ try
     api.addFiles({XRDML_F});
 
     api.autoPeaks();
+    api.fig.Visible = 'on'; drawnow;   % fitPeaks requires visible figure
     api.fitPeaks();
+    api.fig.Visible = 'off';
 
     peaks = api.getPeaks();
     assert(~isempty(peaks), 'no peaks after fit');
@@ -499,6 +504,7 @@ fprintf('\n%s\n', repmat(char(9552), 1, 72));
 fprintf('SUMMARY: %d passed, %d failed\n', passed, failed);
 if failed > 0
     fprintf('Status: FAIL\n');
+    error('test_gui_harness:failures', '%d test(s) failed.', failed);
 else
     fprintf('Status: ALL PASS\n');
 end

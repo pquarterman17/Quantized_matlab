@@ -46,7 +46,9 @@ function results = batchImport(directory, options)
         directory              (1,1) string {mustBeFolder}
         options.Recursive      (1,1) logical = false
         options.Extensions           cell    = {'.dat','.csv','.tsv','.txt', ...
-                                                '.xlsx','.xls','.raw'}
+                                                '.xlsx','.xls','.raw','.xrdml', ...
+                                                '.brml','.refl','.pnr', ...
+                                                '.datA','.datB','.datC','.datD'}
         options.Verbose        (1,1) logical = true
     end
 
