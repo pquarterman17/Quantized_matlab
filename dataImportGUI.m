@@ -284,7 +284,8 @@ function varargout = dataImportGUI()
     MIN_FIG_H = 820;   % minimum height so the analysis panel is never clipped
     LAYOUT_DEFAULTS = struct('figW',1080,'figH',1000,'ctrlPanelW',215, ...
         'corrPanelW',350,'axLimPanelW',220,'fileListW',170);
-    PREFS_FILE = fullfile(fileparts(mfilename('fullpath')),'layoutPrefs.mat');
+    PREFS_FILE   = fullfile(fileparts(mfilename('fullpath')),'layoutPrefs.mat');
+    BUG_LOG_FILE = fullfile(fileparts(mfilename('fullpath')),'gui_bug_log.txt');
     fig.SizeChangedFcn = @onFigSizeChanged;
     try
         fig.DropFcn = @onDropFiles;   % drag-and-drop from Explorer (R2023a+)
@@ -334,12 +335,12 @@ function varargout = dataImportGUI()
 
     % ── File list panel (contentGL col 1) ─────────────────────────────────
     % Stacked vertically: Add | Remove | Filter | Merge | Listbox
-    tbGL = uigridlayout(contentGL,[5 1], ...
-        'RowHeight',    {26,26,26,26,'1x'}, ...
-        'ColumnWidth',  {'1x'}, ...
+    tbGL = uigridlayout(contentGL,[8 2], ...
+        'RowHeight',    {26,26,26,26,26,26,26,'1x'}, ...
+        'ColumnWidth',  {'1x','1x'}, ...
         'Padding',      [0 0 0 0], ...
         'RowSpacing',   4, ...
-        'ColumnSpacing', 0);
+        'ColumnSpacing', 4);
     tbGL.Layout.Row = 1; tbGL.Layout.Column = 1;
 
     btnBrowse = uibutton(tbGL,'Text','Add File(s)...', ...
@@ -347,20 +348,20 @@ function varargout = dataImportGUI()
         'BackgroundColor',[0.18 0.52 0.18], ...
         'FontColor',[1 1 1],'FontWeight','bold', ...
         'Tooltip','Browse for one or more data files — each is added as a new dataset');
-    btnBrowse.Layout.Row = 1; btnBrowse.Layout.Column = 1;
+    btnBrowse.Layout.Row = 1; btnBrowse.Layout.Column = [1 2];
 
     btnRemoveDS = uibutton(tbGL,'Text','Remove Selected', ...
         'ButtonPushedFcn',@onRemoveDataset, ...
         'BackgroundColor',[0.70 0.18 0.18], ...
         'FontColor',[1 1 1], ...
         'Tooltip','Remove the highlighted dataset from the list (also: right-click or press Delete)');
-    btnRemoveDS.Layout.Row = 2; btnRemoveDS.Layout.Column = 1;
+    btnRemoveDS.Layout.Row = 2; btnRemoveDS.Layout.Column = [1 2];
 
     efDatasetSearch = uieditfield(tbGL,'text','Value','', ...
         'Placeholder','Filter datasets...', ...
         'Tooltip','Filter the dataset list by name (case-insensitive substring match)', ...
         'ValueChangedFcn',@onSearchChanged);
-    efDatasetSearch.Layout.Row = 3; efDatasetSearch.Layout.Column = 1;
+    efDatasetSearch.Layout.Row = 3; efDatasetSearch.Layout.Column = [1 2];
 
     btnMerge = uibutton(tbGL,'Text','Merge Selected', ...
         'ButtonPushedFcn',@onMergeDatasets, ...
@@ -369,13 +370,37 @@ function varargout = dataImportGUI()
         'Tooltip','Concatenate 2+ selected datasets into a new merged dataset (sorted by X)');
     btnMerge.Layout.Row = 4; btnMerge.Layout.Column = 1;
 
+    btnDatasetMath = uibutton(tbGL,'Text','Dataset Math...', ...
+        'ButtonPushedFcn',@onDatasetMath, ...
+        'BackgroundColor',[0.45 0.30 0.60], ...
+        'FontColor',[1 1 1], ...
+        'Tooltip','Create derived datasets via expressions: D1/D2, log10(D1), diff(D1), D1-D2, D1*D2');
+    btnDatasetMath.Layout.Row = 4; btnDatasetMath.Layout.Column = 2;
+
+    btnMoveUp = uibutton(tbGL,'Text',[char(9650) ' Up'], ...
+        'ButtonPushedFcn',@onMoveDatasetUp, ...
+        'Tooltip','Move the active dataset up in the list (Ctrl+Up)');
+    btnMoveUp.Layout.Row = 5; btnMoveUp.Layout.Column = 1;
+
+    btnMoveDown = uibutton(tbGL,'Text',[char(9660) ' Down'], ...
+        'ButtonPushedFcn',@onMoveDatasetDown, ...
+        'Tooltip','Move the active dataset down in the list (Ctrl+Down)');
+    btnMoveDown.Layout.Row = 5; btnMoveDown.Layout.Column = 2;
+
+    btnAnimate = uibutton(tbGL,'Text',[char(9654) ' Animate'], ...
+        'ButtonPushedFcn',@onToggleAnimation, ...
+        'BackgroundColor',[0.50 0.35 0.15], ...
+        'FontColor',[1 1 1], ...
+        'Tooltip','Cycle through datasets as animation frames (2 fps). Click again to stop.');
+    btnAnimate.Layout.Row = 6; btnAnimate.Layout.Column = [1 2];
+
     lbDatasets = uilistbox(tbGL, ...
         'Items',     {'(no files loaded — click  Add File(s)...  to begin)'}, ...
         'ItemsData', {0}, ...
         'Multiselect','on', ...
         'ValueChangedFcn',@onSelectDataset, ...
         'Tooltip','Loaded datasets — click to make active; Ctrl+click to select multiple; right-click to remove');
-    lbDatasets.Layout.Row = 5; lbDatasets.Layout.Column = 1;
+    lbDatasets.Layout.Row = 8; lbDatasets.Layout.Column = [1 2];
 
     % Context menu for dataset list (right-click)
     cmDatasets = uicontextmenu(fig);
@@ -399,7 +424,7 @@ function varargout = dataImportGUI()
     ctrlPanel.Layout.Column = 2;
 
     ctrlGL = uigridlayout(ctrlPanel,[10 1], ...
-        'RowHeight', {26,2,'1x',2,'1x',2,50,24,26,24}, ...
+        'RowHeight', {26,2,'1x',2,'1x',2,70,24,26,24}, ...
         'Padding',   [6 6 6 6], ...
         'RowSpacing', 0);
 
@@ -430,16 +455,15 @@ function varargout = dataImportGUI()
     lbY2.Layout.Row = 2; lbY2.Layout.Column = 1;
 
     % Plot-style buttons (row 7) — three uibutton objects in a nested grid.
-    styleGL = uigridlayout(ctrlGL,[2 3], ...
+    styleGL = uigridlayout(ctrlGL,[3 3], ...
         'Padding',[0 0 0 0],'ColumnSpacing',2,'RowSpacing',2, ...
-        'ColumnWidth',{'1x','1x','1x'},'RowHeight',{20,'1x'});
+        'ColumnWidth',{'1x','1x','1x'},'RowHeight',{20,20,'1x'});
     styleGL.Layout.Row = 7;
 
-    % Row 1: Colormap label
+    % Row 1: Colormap label + selector
     lblColormap = uilabel(styleGL,'Text','Colormap:','FontSize',10);
     lblColormap.Layout.Row = 1; lblColormap.Layout.Column = 1;
 
-    % Row 1: Colormap selector
     COLORMAPS = {'lines (MATLAB default)', 'jet', 'turbo', 'hot', 'cool', ...
                  'spring', 'summer', 'autumn', 'winter', 'gray', 'copper', ...
                  'pink', 'bone', 'hsv', 'parula', 'viridis', 'plasma', 'inferno'};
@@ -448,19 +472,30 @@ function varargout = dataImportGUI()
         'ValueChangedFcn', @(~,~) onPlot([],[]));
     ddColormap.Layout.Row = 1; ddColormap.Layout.Column = [2 3];
 
-    % Row 2: Style buttons
+    % Row 2: Theme selector
+    lblTheme = uilabel(styleGL,'Text','Theme:','FontSize',10); %#ok<NASGU>
+    lblTheme.Layout.Row = 2; lblTheme.Layout.Column = 1;
+
+    ddTheme = uidropdown(styleGL, ...
+        'Items',   {'Light', 'Dark'}, ...
+        'Value',   'Light', ...
+        'Tooltip', 'Switch between light and dark GUI themes', ...
+        'ValueChangedFcn', @onThemeChanged);
+    ddTheme.Layout.Row = 2; ddTheme.Layout.Column = [2 3];
+
+    % Row 3: Style buttons
     btnStyleLine = uibutton(styleGL,'Text','Line', ...
         'ButtonPushedFcn',@(~,~) onStylePick('Line'), ...
         'BackgroundColor',[0.20 0.50 0.20],'FontColor',[1 1 1]);
-    btnStyleLine.Layout.Row = 2; btnStyleLine.Layout.Column = 1;
+    btnStyleLine.Layout.Row = 3; btnStyleLine.Layout.Column = 1;
 
     btnStyleScatter = uibutton(styleGL,'Text','Scatter', ...
         'ButtonPushedFcn',@(~,~) onStylePick('Scatter'));
-    btnStyleScatter.Layout.Row = 2; btnStyleScatter.Layout.Column = 2;
+    btnStyleScatter.Layout.Row = 3; btnStyleScatter.Layout.Column = 2;
 
     btnStyleLineMarkers = uibutton(styleGL,'Text','Line+Pts', ...
         'ButtonPushedFcn',@(~,~) onStylePick('Line+Pts'));
-    btnStyleLineMarkers.Layout.Row = 2; btnStyleLineMarkers.Layout.Column = 3;
+    btnStyleLineMarkers.Layout.Row = 3; btnStyleLineMarkers.Layout.Column = 3;
 
     % Row 8: All log-scale checkboxes + Cts/s in one row
     logChkGL = uigridlayout(ctrlGL,[1 4], ...
@@ -1040,8 +1075,8 @@ function varargout = dataImportGUI()
     savePanel = uipanel(analysisGL,'Title','Save / Export','FontSize',13);
     savePanel.Layout.Row = 1; savePanel.Layout.Column = 4;
 
-    saveGL = uigridlayout(savePanel,[13 2], ...
-        'RowHeight',    {26,28,32,32,32,32,32,32,32,32,32,32,28}, ...
+    saveGL = uigridlayout(savePanel,[14 2], ...
+        'RowHeight',    {26,28,32,32,32,32,32,32,32,32,32,32,32,28}, ...
         'ColumnWidth',  {'1x','1x'}, ...
         'Padding',      [6 6 6 6], ...
         'RowSpacing',   4, ...
@@ -1152,13 +1187,21 @@ function varargout = dataImportGUI()
         'Tooltip', 'Open batch XRD file converter (XRDML, Rigaku, Bruker)');
     btnBatchConvertXRD.Layout.Row = 12; btnBatchConvertXRD.Layout.Column = [1 2];
 
-    % Row 13: Layout Settings
+    % Row 13: Export Origin Script
+    btnExportOriginScript = uibutton(saveGL,'Text','Export Origin Script', ...
+        'ButtonPushedFcn', @onExportOriginScript, ...
+        'BackgroundColor', [0.55 0.35 0.10], ...
+        'FontColor', [1 1 1], ...
+        'Tooltip', 'Write a LabTalk (.ogs) script + CSV that Origin can import directly');
+    btnExportOriginScript.Layout.Row = 13; btnExportOriginScript.Layout.Column = [1 2];
+
+    % Row 14: Layout Settings
     btnLayoutSettings = uibutton(saveGL,'Text','Layout Settings...', ...
         'ButtonPushedFcn', @onOpenLayoutSettings, ...
         'BackgroundColor', [0.30 0.30 0.50], ...
         'FontColor', [1 1 1], ...
         'Tooltip', 'Open the Layout Settings window to configure panel sizes and figure dimensions');
-    btnLayoutSettings.Layout.Row = 13; btnLayoutSettings.Layout.Column = [1 2];
+    btnLayoutSettings.Layout.Row = 14; btnLayoutSettings.Layout.Column = [1 2];
 
     % ── Peak Analysis sub-panel (row 2, full width) ───────────────────────
     % Always visible; XRD buttons in corrGL activate it contextually.
@@ -1187,9 +1230,10 @@ function varargout = dataImportGUI()
     peakBtnGL.Layout.Column = 2;
 
     ddFitModel = uidropdown(peakBtnGL, ...
-        'Items',   {'Lorentzian', 'Gaussian', 'Pseudo-Voigt'}, ...
+        'Items',   {'Lorentzian', 'Gaussian', 'Pseudo-Voigt', 'Split Pearson VII'}, ...
         'Value',   'Lorentzian', ...
-        'Tooltip', 'Peak shape model: Lorentzian, Gaussian, or Pseudo-Voigt (η·L + (1-η)·G)');
+        'Tooltip', ['Peak shape model: Lorentzian, Gaussian, Pseudo-Voigt (' char(951) char(183) ...
+                    'L + (1-' char(951) ')' char(183) 'G), or Split Pearson VII (asymmetric)']);
     ddFitModel.Layout.Row = 1;
 
     btnFitPeaks = uibutton(peakBtnGL,'Text','Fit Peaks', ...
@@ -1350,8 +1394,8 @@ function varargout = dataImportGUI()
     map2DPanel.Layout.Row = 1; map2DPanel.Layout.Column = 3;
     map2DPanel.Visible = 'off';   % shown only when a 2D area-detector dataset is active
 
-    map2DGL = uigridlayout(map2DPanel,[5 2], ...
-        'RowHeight',    {24, 24, 24, 22, '1x'}, ...
+    map2DGL = uigridlayout(map2DPanel,[6 2], ...
+        'RowHeight',    {24, 24, 24, 26, 22, '1x'}, ...
         'ColumnWidth',  {95, '1x'}, ...
         'Padding',      [8 8 8 8], ...
         'RowSpacing',   5, ...
@@ -1384,18 +1428,25 @@ function varargout = dataImportGUI()
                     'Shift+click / Ctrl+click line-cuts use Q-space coordinates.']);
     cbMap2DQSpace.Layout.Row = 3; cbMap2DQSpace.Layout.Column = [1 2];
 
+    btnPoleFigure = uibutton(map2DGL,'Text','Pole Figure...', ...
+        'ButtonPushedFcn',@onPoleFigure, ...
+        'BackgroundColor',[0.30 0.45 0.55], ...
+        'FontColor',[1 1 1], ...
+        'Tooltip','Open a polar plot of integrated intensity at a chosen 2θ position');
+    btnPoleFigure.Layout.Row = 4; btnPoleFigure.Layout.Column = [1 2];
+
     lblMap2DInfo = uilabel(map2DGL,'Text','', ...
         'FontSize', 9, ...
         'FontColor', [0.4 0.4 0.4], ...
         'HorizontalAlignment', 'center', ...
         'WordWrap', 'on');
-    lblMap2DInfo.Layout.Row = 4; lblMap2DInfo.Layout.Column = [1 2];
+    lblMap2DInfo.Layout.Row = 5; lblMap2DInfo.Layout.Column = [1 2];
 
     lblMap2DHint = uilabel(map2DGL,'Text','Shift+click: H-cut  |  Ctrl+click: V-cut', ...
         'FontSize', 8, ...
         'FontColor', [0.55 0.55 0.55], ...
         'HorizontalAlignment', 'center');
-    lblMap2DHint.Layout.Row = 5; lblMap2DHint.Layout.Column = [1 2];
+    lblMap2DHint.Layout.Row = 6; lblMap2DHint.Layout.Column = [1 2];
 
     % ── Drag-and-drop: register every major surface as a drop target (R2023a+) ──
     % In uifigure the CEF renderer consumes drag events at whichever child
@@ -1571,6 +1622,7 @@ function varargout = dataImportGUI()
                     catch ME
                         fprintf(2, '\n[dataImportGUI] Import error (%s [%s]): %s\n', ...
                             fnBase, shName, ME.message);
+                        logGUIError('Import error', sprintf('%s [%s]  %s', fnBase, shName, ME.message), ME);
                         uialert(fig, sprintf('%s [%s]\n\n%s', fnBase, shName, ME.message), ...
                             'Import error');
                     end
@@ -1589,6 +1641,7 @@ function varargout = dataImportGUI()
                 for si = 1:numel(ME.stack)
                     fprintf(2, '  at %s  (line %d)\n', ME.stack(si).name, ME.stack(si).line);
                 end
+                logGUIError('Import error', sprintf('%s  %s', [fnBase fExt], ME.message), ME);
                 uialert(fig, sprintf('%s\n\n%s', [fnBase fExt], ME.message), 'Import error');
             end
         end
@@ -1910,6 +1963,98 @@ function varargout = dataImportGUI()
         onPlot([],[]);
     end
 
+    function onDatasetMath(~,~)
+    %ONDATASETMATH  Open expression dialog for derived dataset creation.
+    %  Supports: D1/D2, D1-D2, D1*D2, D1+D2, log10(D1), diff(D1), abs(D1)
+    %  Datasets are referenced by index: D1 = dataset #1, D2 = dataset #2, etc.
+    %  When two datasets have different x-grids, interp1 aligns them.
+        if isempty(appData.datasets)
+            uialert(fig,'Load files first.','No data'); return;
+        end
+        nDS = numel(appData.datasets);
+
+        % Build dataset list for the prompt
+        dsNames = cell(1, nDS);
+        for dmi = 1:nDS
+            [~, fn, ext] = fileparts(appData.datasets{dmi}.filepath);
+            dsNames{dmi} = sprintf('  D%d = %s%s', dmi, fn, ext);
+        end
+        prompt = sprintf(['Enter expression using D1, D2, ... (dataset indices):\n\n' ...
+                          'Available datasets:\n%s\n\n' ...
+                          'Examples:  D1 - D2,  D1 / D2,  log10(D1),  diff(D1)'], ...
+                          strjoin(dsNames, '\n'));
+
+        answer = inputdlg(prompt, 'Dataset Math', [1 60], {'D1 - D2'});
+        if isempty(answer), return; end
+        expr = strtrim(answer{1});
+        if isempty(expr), return; end
+
+        try
+            % Parse referenced dataset indices (D1, D2, ...)
+            refIdxs = unique(str2double(regexp(expr, 'D(\d+)', 'tokens', 'once')));
+            allRefs = regexp(expr, 'D(\d+)', 'tokens');
+            refIdxs = unique(cellfun(@(c) str2double(c{1}), allRefs));
+
+            if any(refIdxs < 1 | refIdxs > nDS)
+                error('Dataset index out of range (1 to %d).', nDS);
+            end
+
+            % Use corrected data if available; get first referenced dataset as base
+            baseIdx = refIdxs(1);
+            baseDs  = appData.datasets{baseIdx};
+            baseD   = guiTernary(~isempty(baseDs.corrData), baseDs.corrData, baseDs.data);
+            xBase   = double(baseD.time);
+
+            % Build variable map: D1 → y-values (first channel), interp to base x-grid
+            vars = struct();
+            for ri = 1:numel(refIdxs)
+                di = refIdxs(ri);
+                dsi = appData.datasets{di};
+                d   = guiTernary(~isempty(dsi.corrData), dsi.corrData, dsi.data);
+                yVec = d.values(:, 1);  % use first y-channel
+                if di ~= baseIdx
+                    % Interpolate to base x-grid
+                    yVec = interp1(double(d.time), yVec, xBase, 'linear', NaN);
+                end
+                vars.(sprintf('D%d', di)) = yVec;
+            end
+
+            % Replace D<N> references with struct field access for safe evaluation
+            safeExpr = expr;
+            for ri = sort(refIdxs, 'descend')  % descend to avoid D1 matching in D10
+                safeExpr = strrep(safeExpr, sprintf('D%d', ri), sprintf('vars.D%d', ri));
+            end
+
+            % Evaluate expression (only allow safe math operations)
+            yResult = eval(safeExpr); %#ok<EVLC>
+
+            if ~isnumeric(yResult) || numel(yResult) ~= numel(xBase)
+                error('Expression did not produce a vector of the correct length.');
+            end
+
+            % Build result data struct
+            resultD        = baseD;
+            resultD.time   = xBase;
+            resultD.values = yResult(:);
+            resultD.labels = {expr};
+            resultD.units  = {''};
+
+            ds = buildDs(baseDs.filepath, resultD, 'math');
+            ds.displayName = ['[math] ' expr];
+            ds.legendName  = expr;
+
+            appData.datasets{end+1} = ds;
+            appData.activeIdx       = numel(appData.datasets);
+
+            rebuildDatasetList(true);
+            updateControlsForActiveDataset();
+            onPlot([],[]);
+        catch ME
+            logGUIError('Dataset Math Error', ME.message, ME);
+            uialert(fig, sprintf('Expression error:\n\n%s', ME.message), 'Dataset Math Error');
+        end
+    end
+
     function onDatasetColorChanged(~,~)
     %ONDATASETCOLORCHANGED  Store colour override on the active dataset and replot.
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
@@ -1998,6 +2143,66 @@ function varargout = dataImportGUI()
             updateControlsForActiveDataset();
             onPlot([],[]);
         end
+    end
+
+    function onToggleAnimation(~,~)
+    %ONTOGGLEANIMATION  Start/stop cycling through datasets as animation frames.
+    %  Uses a MATLAB timer at ~2 fps to step through each dataset in sequence.
+        if isfield(appData, 'animTimer') && ~isempty(appData.animTimer) && isvalid(appData.animTimer)
+            % Stop animation
+            stop(appData.animTimer);
+            delete(appData.animTimer);
+            appData.animTimer = [];
+            btnAnimate.Text = [char(9654) ' Animate'];
+            btnAnimate.BackgroundColor = [0.50 0.35 0.15];
+            return;
+        end
+
+        if numel(appData.datasets) < 2
+            uialert(fig,'Need at least 2 datasets to animate.','Animate'); return;
+        end
+
+        btnAnimate.Text = [char(9724) ' Stop'];
+        btnAnimate.BackgroundColor = [0.70 0.18 0.18];
+
+        appData.animTimer = timer('ExecutionMode', 'fixedRate', ...
+            'Period', 0.5, ...
+            'TimerFcn', @(~,~) animStep());
+        start(appData.animTimer);
+    end
+
+    function animStep()
+    %ANIMSTEP  Advance to the next dataset frame (called by animation timer).
+        if isempty(appData.datasets), return; end
+        nextIdx = appData.activeIdx + 1;
+        if nextIdx > numel(appData.datasets)
+            nextIdx = 1;
+        end
+        appData.activeIdx = nextIdx;
+        rebuildDatasetList(true);
+        updateControlsForActiveDataset();
+        onPlot([],[]);
+        drawnow limitrate;
+    end
+
+    function onMoveDatasetUp(~,~)
+    %ONMOVEDATASETUP  Move the active dataset one position up in the list.
+        if appData.activeIdx <= 1 || numel(appData.datasets) < 2, return; end
+        idx = appData.activeIdx;
+        appData.datasets([idx-1, idx]) = appData.datasets([idx, idx-1]);
+        appData.activeIdx = idx - 1;
+        rebuildDatasetList(true);
+        onPlot([],[]);
+    end
+
+    function onMoveDatasetDown(~,~)
+    %ONMOVEDATASETDOWN  Move the active dataset one position down in the list.
+        if appData.activeIdx < 1 || appData.activeIdx >= numel(appData.datasets), return; end
+        idx = appData.activeIdx;
+        appData.datasets([idx, idx+1]) = appData.datasets([idx+1, idx]);
+        appData.activeIdx = idx + 1;
+        rebuildDatasetList(true);
+        onPlot([],[]);
     end
 
     function saveAxisLimsToActiveDataset()
@@ -2917,7 +3122,8 @@ function varargout = dataImportGUI()
         FIT_MAX_FWHM_FRAC   = 0.5;    % reject fit if FWHM exceeds this × x-span
         FIT_EXPAND_WIN      = 0.025;  % expanded window fraction when < 5 pts in window
 
-        isPV = strcmp(ddFitModel.Value, 'Pseudo-Voigt');
+        isPV   = strcmp(ddFitModel.Value, 'Pseudo-Voigt');
+        isSPVII = strcmp(ddFitModel.Value, 'Split Pearson VII');
         switch ddFitModel.Value
             case 'Gaussian'
                 modelFun = @(p,x) p(1) .* exp(-4.*log(2).*((x-p(2))./p(3)).^2) + p(4);
@@ -2925,14 +3131,17 @@ function varargout = dataImportGUI()
                 % p = [H, x0, fwhm, bg, eta]  eta in [0,1] (Lorentzian fraction)
                 modelFun = @(p,x) p(1) .* (p(5) ./ (1 + 4.*((x-p(2))./p(3)).^2) + ...
                                   (1-p(5)) .* exp(-4.*log(2).*((x-p(2))./p(3)).^2)) + p(4);
+            case 'Split Pearson VII'
+                % p = [H, center, wL, wR, mL, mR, bg]
+                modelFun = @(p,x) utilities.splitPearsonVII(x, p);
             otherwise  % 'Lorentzian' (default)
                 modelFun = @(p,x) p(1) ./ (1 + 4.*((x - p(2))./p(3)).^2) + p(4);
         end
         opts = optimset('Display','off','MaxIter',8000,'TolX',1e-10,'TolFun',1e-14);
 
         nFailed = 0;
-        for pi = 1:numel(ds.peaks)
-            pk = ds.peaks(pi);
+        for pki = 1:numel(ds.peaks)
+            pk = ds.peaks(pki);
 
             % ── Determine fit window ──────────────────────────────────────
             if ~isempty(pk.xRange) && numel(pk.xRange) == 2
@@ -2972,24 +3181,39 @@ function varargout = dataImportGUI()
                 fw0 = max(diff([min(xFit), max(xFit)]) * FIT_INIT_WIDTH_FRAC, dx*2);
             end
 
-            p0 = [H0, x0_0, fw0, bg0];
-            if isPV, p0(end+1) = 0.5; end  %#ok<AGROW> % initial eta guess: 50% Lorentzian
+            if isSPVII
+                % Split Pearson VII: p = [H, center, wL, wR, mL, mR, bg]
+                hw0 = fw0 / 2;
+                p0 = [H0, x0_0, hw0, hw0, 1.5, 1.5, bg0];
+            else
+                p0 = [H0, x0_0, fw0, bg0];
+                if isPV, p0(end+1) = 0.5; end  %#ok<AGROW> % initial eta guess: 50% Lorentzian
+            end
             objFun = @(p) sum((modelFun(p, xFit) - yFit).^2);
             try
                 pFit = fminsearch(objFun, p0, opts);
-                fwhmFit = abs(pFit(3));
-                etaFit  = guiTernary(isPV, max(0, min(1, pFit(5))), NaN);
+                if isSPVII
+                    fwhmFit = abs(pFit(3)) + abs(pFit(4));  % wL + wR
+                    etaFit  = NaN;
+                else
+                    fwhmFit = abs(pFit(3));
+                    etaFit  = guiTernary(isPV, max(0, min(1, pFit(5))), NaN);
+                end
                 % Accept only if center is inside fit window and fwhm is sane
                 if pFit(2) >= xLo && pFit(2) <= xHi && ...
                    fwhmFit > 0     && fwhmFit < xSpan * FIT_MAX_FWHM_FRAC
-                    ds.peaks(pi).center = pFit(2);
-                    ds.peaks(pi).fwhm   = fwhmFit;
-                    ds.peaks(pi).height = pFit(1);
-                    ds.peaks(pi).bg     = pFit(4);
-                    ds.peaks(pi).eta    = etaFit;
-                    ds.peaks(pi).status = 'fitted';
-                    ds.peaks(pi).model  = ddFitModel.Value;
-                    % Compute area analytically
+                    ds.peaks(pki).center = pFit(2);
+                    ds.peaks(pki).fwhm   = fwhmFit;
+                    ds.peaks(pki).height = pFit(1);
+                    ds.peaks(pki).bg     = guiTernary(isSPVII, pFit(7), pFit(4));
+                    ds.peaks(pki).eta    = etaFit;
+                    ds.peaks(pki).status = 'fitted';
+                    ds.peaks(pki).model  = ddFitModel.Value;
+                    if isSPVII
+                        ds.peaks(pki).asymmetry = abs(pFit(3)) / abs(pFit(4));  % wL/wR ratio
+                        ds.peaks(pki).fitParams = pFit;  % store full [H,c,wL,wR,mL,mR,bg]
+                    end
+                    % Compute area analytically (or numerically for Split Pearson VII)
                     switch ddFitModel.Value
                         case 'Gaussian'
                             fittedArea = pFit(1) * fwhmFit * sqrt(pi / log(2)) / 2;
@@ -2998,10 +3222,15 @@ function varargout = dataImportGUI()
                             A_L = pi / 2;
                             A_G = sqrt(pi) / (2 * sqrt(log(2)));
                             fittedArea = pFit(1) * fwhmFit * (etaFit * A_L + (1-etaFit) * A_G);
+                        case 'Split Pearson VII'
+                            % No closed-form integral — use numerical integration
+                            xDense = linspace(xLo, xHi, 500)';
+                            yDense = utilities.splitPearsonVII(xDense, pFit) - pFit(7);
+                            fittedArea = trapz(xDense, yDense);
                         otherwise  % Lorentzian
                             fittedArea = pFit(1) * fwhmFit * pi / 2;
                     end
-                    ds.peaks(pi).area = fittedArea;
+                    ds.peaks(pki).area = fittedArea;
                 else
                     nFailed = nFailed + 1;
                 end
@@ -3170,7 +3399,7 @@ function varargout = dataImportGUI()
         cancelInteractions();
         ds = appData.datasets{appData.activeIdx};
         if pi > numel(ds.peaks), return; end
-        ds.peaks(pi) = [];
+        ds.peaks(pki) = [];
         appData.datasets{appData.activeIdx} = ds;
         appData.selectedPeakIdx = 0;
         refreshPeakTable();
@@ -3297,6 +3526,7 @@ function varargout = dataImportGUI()
             uialert(fig, sprintf('Saved:\n%s', fp), 'Peak Summary Exported');
         catch ME
             if fid >= 0, fclose(fid); end
+            logGUIError('Save error', ME.message, ME);
             uialert(fig, ME.message, 'Save error');
         end
     end
@@ -3373,8 +3603,8 @@ function varargout = dataImportGUI()
             DEG2RAD  = pi / 180;
             C   = cell(nPk + 1, 8);
             C(1,:) = {'Peak #', 'Center (deg)', 'd (A)', 'Size (nm)', 'FWHM (deg)', 'Height', 'Area', 'Status'};
-            for pi = 1:nPk
-                pk        = ds.peaks(pi);
+            for pki = 1:nPk
+                pk        = ds.peaks(pki);
                 C{pi+1,1} = pi;
                 C{pi+1,2} = pk.center;
                 canCalc   = ~isnan(wl_A) && ~isnan(pk.center) && pk.center > 0;
@@ -4477,6 +4707,101 @@ function varargout = dataImportGUI()
         end
     end
 
+    function onThemeChanged(~,~)
+    %ONTHEMECHANGED  Apply light or dark theme to the entire GUI.
+        isDark = strcmp(ddTheme.Value, 'Dark');
+        if isDark
+            th = styles.dark();
+        else
+            th = styles.default();
+        end
+
+        if isDark
+            bgC  = th.bgColor;
+            fgC  = th.fgColor;
+            panC = th.panelBgColor;
+            btnC = th.buttonBgColor;
+            btnF = th.buttonFgColor;
+            lstC = th.listBgColor;
+            lstF = th.listFgColor;
+            edtC = th.editBgColor;
+            edtF = th.editFgColor;
+            axBg = th.axesBgColor;
+            axFg = th.axesFgColor;
+        else
+            bgC  = [0.94 0.94 0.94];
+            fgC  = [0 0 0];
+            panC = [0.94 0.94 0.94];
+            btnC = [0.94 0.94 0.94];
+            btnF = [0 0 0];
+            lstC = [1 1 1];
+            lstF = [0 0 0];
+            edtC = [1 1 1];
+            edtF = [0 0 0];
+            axBg = [1 1 1];
+            axFg = [0.15 0.15 0.15];
+        end
+
+        % Apply to figure
+        fig.Color = bgC;
+
+        % Apply to axes
+        ax.Color     = axBg;
+        ax.XColor    = axFg;
+        ax.YColor    = axFg;
+        ax.GridColor = guiTernary(isDark, th.gridColor, [0.15 0.15 0.15]);
+
+        % Apply to all panels and their children recursively
+        applyThemeToChildren(fig, panC, fgC, btnC, btnF, lstC, lstF, edtC, edtF);
+
+        if appData.activeIdx > 0 && ~isempty(appData.datasets)
+            onPlot([],[]);
+        end
+    end
+
+    function applyThemeToChildren(parent, panC, fgC, btnC, btnF, lstC, lstF, edtC, edtF)
+    %APPLYTHEMETOCHILDREN  Recursively set theme colours on UI components.
+        children = parent.Children;
+        for ci = 1:numel(children)
+            c = children(ci);
+            cType = class(c);
+            try
+                switch cType
+                    case {'matlab.ui.container.Panel', 'matlab.ui.container.GridLayout'}
+                        if isprop(c, 'BackgroundColor')
+                            c.BackgroundColor = panC;
+                        end
+                    case 'matlab.ui.control.Button'
+                        % Don't override buttons with custom colors (colored buttons)
+                        if all(abs(c.BackgroundColor - [0.94 0.94 0.94]) < 0.05) || ...
+                           all(abs(c.BackgroundColor - [0.25 0.25 0.28]) < 0.05)
+                            c.BackgroundColor = btnC;
+                            c.FontColor = btnF;
+                        end
+                    case 'matlab.ui.control.ListBox'
+                        c.BackgroundColor = lstC;
+                        c.FontColor       = lstF;
+                    case {'matlab.ui.control.EditField', 'matlab.ui.control.NumericEditField'}
+                        c.BackgroundColor = edtC;
+                        c.FontColor       = edtF;
+                    case 'matlab.ui.control.Label'
+                        c.FontColor = fgC;
+                    case 'matlab.ui.control.DropDown'
+                        c.BackgroundColor = edtC;
+                        c.FontColor       = edtF;
+                    case 'matlab.ui.control.CheckBox'
+                        c.FontColor = fgC;
+                end
+            catch
+                % Skip unsupported property assignments
+            end
+            % Recurse into containers
+            if isprop(c, 'Children') && ~isempty(c.Children)
+                applyThemeToChildren(c, panC, fgC, btnC, btnF, lstC, lstF, edtC, edtF);
+            end
+        end
+    end
+
     % ── Corrections callbacks ─────────────────────────────────────────────
 
     function onApplyCorrectionsAll(~,~)
@@ -4763,9 +5088,9 @@ function varargout = dataImportGUI()
         if isfield(ds, 'parserName') && isNeutronParser(ds.parserName)
             activeBase = neutronBaseName(ds.filepath);
             normVal    = ddNormalize.Value;
-            for pi = 1:numel(appData.datasets)
-                if pi == appData.activeIdx, continue; end
-                pds = appData.datasets{pi};
+            for pki = 1:numel(appData.datasets)
+                if pki == appData.activeIdx, continue; end
+                pds = appData.datasets{pki};
                 if ~isfield(pds, 'parserName') || ~isNeutronParser(pds.parserName)
                     continue;
                 end
@@ -4825,7 +5150,7 @@ function varargout = dataImportGUI()
                 pds.xTrimMin   = xTrimMin;
                 pds.xTrimMax   = xTrimMax;
                 pds.normMethod = normVal;
-                appData.datasets{pi} = pds;
+                appData.datasets{pki} = pds;
             end
         end
 
@@ -4956,6 +5281,7 @@ function varargout = dataImportGUI()
         try
             bgData = parser.importAuto(fullPath);
         catch ME
+            logGUIError('Background Load Error', ME.message, ME);
             uialert(fig, ME.message, 'Background Load Error');
             return;
         end
@@ -5478,6 +5804,7 @@ function varargout = dataImportGUI()
             for si = 1:numel(ME.stack)
                 fprintf(2, '  at %s  (line %d)\n', ME.stack(si).name, ME.stack(si).line);
             end
+            logGUIError('Save error', ME.message, ME);
             uialert(fig, ME.message, 'Save error');
         end
     end
@@ -5839,6 +6166,7 @@ function varargout = dataImportGUI()
             uialert(fig, sprintf('Copied %d dataset(s) to clipboard.\nPaste into Origin or Excel.', ...
                 numel(sel)), 'Copied');
         catch ME
+            logGUIError('Clipboard error', ME.message, ME);
             uialert(fig, ME.message, 'Clipboard error');
         end
     end
@@ -5945,6 +6273,32 @@ function varargout = dataImportGUI()
         end
     end
 
+    function onExportOriginScript(~,~)
+    %ONEXPORTORIGINSCRIPT  Export active dataset as LabTalk script + CSV.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig,'Load a file first.','No data'); return;
+        end
+        ds  = appData.datasets{appData.activeIdx};
+        src = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
+        [fp, fn, ~] = fileparts(ds.filepath);
+
+        defaultPath = fullfile(fp, [fn, '.ogs']);
+        [outFile, outDir] = uiputfile({'*.ogs','LabTalk Script (*.ogs)'}, ...
+            'Save Origin Script', defaultPath);
+        if isequal(outFile, 0), return; end
+
+        scriptPath = fullfile(outDir, outFile);
+        try
+            utilities.exportOriginScript(src, scriptPath, ...
+                'LogY', cbLogY.Value, ...
+                'LogX', cbLogX.Value);
+            uialert(fig, sprintf('Origin script saved:\n%s\n\nRun in Origin: run.file("%s")', ...
+                scriptPath, outFile), 'Export Complete');
+        catch ME
+            uialert(fig, sprintf('Export failed:\n%s', ME.message), 'Export Error');
+        end
+    end
+
     function onBatchConvertXRD(~,~)
     %ONBATCHCONVERTXRD  Launch the standalone XRD batch converter GUI.
         xrdConvertGUI();
@@ -6008,6 +6362,7 @@ function varargout = dataImportGUI()
             for si = 1:numel(ME.stack)
                 fprintf(2, '  at %s  (line %d)\n', ME.stack(si).name, ME.stack(si).line);
             end
+            logGUIError('Export error', ME.message, ME);
             uialert(fig, ME.message, 'Export error');
         end
     end
@@ -6884,8 +7239,8 @@ function varargout = dataImportGUI()
 
                     % ── (1) Lorentzian fit overlays ───────────────────────
                     if appData.showFitCurves
-                        for pi = 1:numel(dsPk.peaks)
-                            pk       = dsPk.peaks(pi);
+                        for pki = 1:numel(dsPk.peaks)
+                            pk       = dsPk.peaks(pki);
                             hasBg    = isfield(pk,'bg') && ~isempty(pk.bg) && ~isnan(pk.bg);
                             isFitted = strcmp(pk.status,'fitted') && ~isnan(pk.fwhm) && pk.fwhm > 0;
                             if ~isFitted || ~hasBg, continue; end
@@ -6908,6 +7263,8 @@ function varargout = dataImportGUI()
                                 L   = 1 ./ (1 + 4.*u.^2);
                                 G   = exp(-4.*log(2).*u.^2);
                                 yFitPlot = pk.height .* (eta.*L + (1-eta).*G) + pk.bg;
+                            elseif strcmp(pkModel, 'Split Pearson VII') && isfield(pk,'fitParams') && numel(pk.fitParams) == 7
+                                yFitPlot = utilities.splitPearsonVII(xFitPlot(:), pk.fitParams)';
                             else   % Lorentzian (default)
                                 yFitPlot = pk.height ./ (1 + 4.*u.^2) + pk.bg;
                             end
@@ -6917,7 +7274,7 @@ function varargout = dataImportGUI()
                                 yFitPlot = yFitPlot + pkYOff;
                             end
 
-                            isSel = (pi == appData.selectedPeakIdx);
+                            isSel = (pki == appData.selectedPeakIdx);
                             plot(targetAx, xFitPlot, yFitPlot, '-', ...
                                 'Color',            fitColor, ...
                                 'LineWidth',        guiTernary(isSel, 2.5, 1.5), ...
@@ -6928,9 +7285,9 @@ function varargout = dataImportGUI()
                     end
 
                     % ── (2) Vertical markers, labels and FWHM bars ────────
-                    for pi = 1:numel(dsPk.peaks)
-                        pk        = dsPk.peaks(pi);
-                        isSel     = (pi == appData.selectedPeakIdx);
+                    for pki = 1:numel(dsPk.peaks)
+                        pk        = dsPk.peaks(pki);
+                        isSel     = (pki == appData.selectedPeakIdx);
                         lineColor = guiTernary(isSel, [1.0 0.50 0.00], [0.55 0.15 0.75]);
                         lineWidth = guiTernary(isSel, 2.5, 1.5);
 
@@ -7097,8 +7454,54 @@ function varargout = dataImportGUI()
             for si = 1:numel(ME.stack)
                 fprintf(2, '  at %s  (line %d)\n', ME.stack(si).name, ME.stack(si).line);
             end
+            logGUIError('Plot error', ME.message, ME);
             uialert(fig, ME.message, 'Plot error');
         end
+    end
+
+    function onPoleFigure(~,~)
+    %ONPOLEFIGURE  Generate a polar plot of intensity vs scan angle at a chosen 2θ.
+    %  For 2D area-detector data: extracts a column (fixed 2θ) and plots
+    %  intensity vs omega/chi/phi as a polar projection.
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        ds = appData.datasets{appData.activeIdx};
+        if ~is2DDataset(ds)
+            uialert(fig,'Active dataset is not a 2D area-detector scan.','Pole Figure'); return;
+        end
+
+        map = ds.data.metadata.parserSpecific.map2D;
+        I   = map.intensity;   % [N × M]
+        x2  = map.axis2(:)';  % 2Theta [1×M]
+        x1  = map.axis1(:);   % Omega/Chi [N×1]
+
+        % Ask user for the 2θ position to extract
+        [~, peakCol] = max(sum(I, 1));  % default: column with highest total intensity
+        answer = inputdlg( ...
+            sprintf('Enter 2%s position to extract (range: %.2f to %.2f):', ...
+                    char(952), x2(1), x2(end)), ...
+            'Pole Figure', [1 50], {sprintf('%.3f', x2(peakCol))});
+        if isempty(answer), return; end
+        target2th = str2double(answer{1});
+        if isnan(target2th), return; end
+
+        % Find nearest column
+        [~, col] = min(abs(x2 - target2th));
+        intensitySlice = I(:, col);
+
+        % Create polar figure
+        poleFig = figure('Name', sprintf('Pole Figure — 2%s = %.3f%s', ...
+            char(952), x2(col), char(176)), ...
+            'NumberTitle', 'off');
+        pax = polaraxes(poleFig);
+
+        % Convert omega/chi to radians for polar plot
+        thetaRad = deg2rad(x1);
+        polarplot(pax, thetaRad, intensitySlice, '-', 'LineWidth', 1.5);
+        title(pax, sprintf('Intensity at 2%s = %.3f%s', char(952), x2(col), char(176)));
+        pax.ThetaZeroLocation = 'top';
+        pax.ThetaDir = 'clockwise';
+
+        figure(poleFig);
     end
 
     function draw2DMap(targetAx, ds)
@@ -7388,8 +7791,42 @@ function varargout = dataImportGUI()
             set(appData.cursorText, 'Visible', 'off');
             return;
         end
+        cursorStr = sprintf('x = %.5g\ny = %.5g', x, y);
+
+        % ── Peak identification on hover ────────────────────────────────
+        % If the active dataset has fitted peaks, show info for the nearest
+        % peak when the cursor is within 2× its FWHM.
+        ds = appData.datasets{appData.activeIdx};
+        if ~isempty(ds.peaks)
+            bestDist = Inf;
+            bestPk   = [];
+            for pki = 1:numel(ds.peaks)
+                pk = ds.peaks(pki);
+                if isnan(pk.center), continue; end
+                fwhmThr = guiTernary(~isnan(pk.fwhm) && pk.fwhm > 0, pk.fwhm * 2, Inf);
+                dist = abs(x - pk.center);
+                if dist < fwhmThr && dist < bestDist
+                    bestDist = dist;
+                    bestPk   = pk;
+                end
+            end
+            if ~isempty(bestPk)
+                pkInfo = sprintf('\n── Peak ──\ncenter = %.4f', bestPk.center);
+                if ~isnan(bestPk.fwhm) && bestPk.fwhm > 0
+                    pkInfo = [pkInfo, sprintf('\nFWHM = %.4f', bestPk.fwhm)];
+                end
+                % d-spacing if wavelength is available
+                wl = extractWavelength_A(ds);
+                if ~isnan(wl) && wl > 0 && bestPk.center > 0
+                    dSpacing = wl / (2 * sind(bestPk.center / 2));
+                    pkInfo = [pkInfo, sprintf('\nd = %.4f %s', dSpacing, char(197))];
+                end
+                cursorStr = [cursorStr, pkInfo];
+            end
+        end
+
         set(appData.cursorText, ...
-            'String',  sprintf('x = %.5g\ny = %.5g', x, y), ...
+            'String',  cursorStr, ...
             'Visible', 'on');
     end
 
@@ -7544,12 +7981,63 @@ function varargout = dataImportGUI()
     end
 
     function onFigureKeyPress(~, e)
-    %ONFIGUREKEYPRES  Handle keyboard shortcuts (Delete key for removing datasets).
-        if strcmp(e.Key, 'delete')
-            % Delete key: remove selected datasets if listbox has focus/selection
-            if ~isempty(lbDatasets.Value) && ~isempty(appData.datasets)
-                onRemoveDataset([], []);
-            end
+    %ONFIGUREKEYPRES  Handle keyboard shortcuts.
+    %  Delete      — remove selected dataset(s)
+    %  Ctrl+S      — save session
+    %  Ctrl+Z      — undo corrections
+    %  Ctrl+E      — export CSV
+    %  Ctrl+C      — copy plot to clipboard
+    %  Left/Right  — switch active dataset
+    %  Space       — toggle dataset visibility
+    %  Ctrl+Up     — move dataset up
+    %  Ctrl+Down   — move dataset down
+        hasMod  = ~isempty(e.Modifier);
+        hasCtrl = hasMod && any(strcmp(e.Modifier, 'control'));
+
+        switch e.Key
+            case 'delete'
+                if ~isempty(lbDatasets.Value) && ~isempty(appData.datasets)
+                    onRemoveDataset([], []);
+                end
+
+            case 's'
+                if hasCtrl, onSaveSession([], []); end
+
+            case 'z'
+                if hasCtrl, onUndoCorrections([], []); end
+
+            case 'e'
+                if hasCtrl, onExportCSV([], []); end
+
+            case 'c'
+                if hasCtrl, onCopyToClipboard([], []); end
+
+            case 'leftarrow'
+                if ~hasCtrl && appData.activeIdx > 1
+                    appData.activeIdx = appData.activeIdx - 1;
+                    rebuildDatasetList(true);
+                    updateControlsForActiveDataset();
+                    onPlot([],[]);
+                end
+
+            case 'rightarrow'
+                if ~hasCtrl && appData.activeIdx < numel(appData.datasets)
+                    appData.activeIdx = appData.activeIdx + 1;
+                    rebuildDatasetList(true);
+                    updateControlsForActiveDataset();
+                    onPlot([],[]);
+                end
+
+            case 'space'
+                if ~isempty(appData.datasets) && appData.activeIdx > 0
+                    onToggleDatasetVisibility([], []);
+                end
+
+            case 'uparrow'
+                if hasCtrl, onMoveDatasetUp([], []); end
+
+            case 'downarrow'
+                if hasCtrl, onMoveDatasetDown([], []); end
         end
     end
 
@@ -7663,6 +8151,7 @@ function varargout = dataImportGUI()
             uialert(fig, sprintf('Saved:\n%s', outPath), 'Figure Saved');
         catch ME
             delete(tmpFig);
+            logGUIError('Save error (exportgraphics)', ME.message, ME);
             uialert(fig, sprintf('exportgraphics failed:\n%s', ME.message), 'Save error');
         end
     end
@@ -7742,6 +8231,7 @@ function varargout = dataImportGUI()
                           '-v7.3');
             uialert(fig, sprintf('Session saved:\n%s', outPath), 'Session Saved');
         catch ME
+            logGUIError('Session Save Error', ME.message, ME);
             uialert(fig, sprintf('Save failed:\n%s', ME.message), 'Session Save Error');
         end
     end
@@ -7759,6 +8249,7 @@ function varargout = dataImportGUI()
         try
             S = load(matPath, '-mat');
         catch ME
+            logGUIError('Load Error', ME.message, ME);
             uialert(fig, sprintf('Could not load file:\n%s', ME.message), 'Load Error');
             return;
         end
@@ -8156,6 +8647,43 @@ function varargout = dataImportGUI()
 
         rebuildDatasetList(true);
         onPlot([], []);
+    end
+
+    function logGUIError(title, msg, ME)
+    %LOGGUI ERROR  Append an error entry to gui_bug_log.txt next to this file.
+    %   Called alongside every uialert that surfaces a caught exception so that
+    %   errors can be reviewed and triaged in a future code session.
+    %   ME may be [] if no MException is available.
+        try
+            fid = fopen(BUG_LOG_FILE, 'a');
+            if fid == -1, return; end
+            stamp = char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss'));
+            fprintf(fid, '
+%s
+', repmat('=', 1, 68));
+            fprintf(fid, '[%s]  %s
+', stamp, title);
+            fprintf(fid, 'Message: %s
+', msg);
+            if ~isempty(ME)
+                if ~isempty(ME.identifier)
+                    fprintf(fid, 'Identifier: %s
+', ME.identifier);
+                end
+                if ~isempty(ME.stack)
+                    fprintf(fid, 'Stack:
+');
+                    for si = 1:numel(ME.stack)
+                        fprintf(fid, '  %s  (line %d)
+', ...
+                            ME.stack(si).name, ME.stack(si).line);
+                    end
+                end
+            end
+            fclose(fid);
+        catch
+            % Never let logging crash the GUI
+        end
     end
 
     function toggleY2Appearance(active)
