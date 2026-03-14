@@ -336,8 +336,8 @@ function varargout = dataImportGUI()
 
     % ── File list panel (contentGL col 1) ─────────────────────────────────
     % Stacked vertically: Add | Remove | Filter | Merge | Listbox
-    tbGL = uigridlayout(contentGL,[8 2], ...
-        'RowHeight',    {26,26,26,26,26,26,26,'1x'}, ...
+    tbGL = uigridlayout(contentGL,[7 2], ...
+        'RowHeight',    {26,26,26,26,26,26,'1x'}, ...
         'ColumnWidth',  {'1x','1x'}, ...
         'Padding',      [0 0 0 0], ...
         'RowSpacing',   4, ...
@@ -409,33 +409,41 @@ function varargout = dataImportGUI()
         'Multiselect','on', ...
         'ValueChangedFcn',@onSelectDataset, ...
         'Tooltip','Loaded datasets — click to make active; Ctrl+click to select multiple; right-click to remove');
-    lbDatasets.Layout.Row = 8; lbDatasets.Layout.Column = [1 2];
+    lbDatasets.Layout.Row = 7; lbDatasets.Layout.Column = [1 2];
 
-    % Context menu for dataset list (right-click)
+    % Context menu for dataset list (right-click) — #12 expanded
     cmDatasets = uicontextmenu(fig);
-    miRemove = uimenu(cmDatasets, 'Text', 'Remove Selected', ...
-        'MenuSelectedFcn', @(~,~) onRemoveDataset([], [])); %#ok<NASGU>
+    uimenu(cmDatasets, 'Text', 'Remove Selected', ...
+        'MenuSelectedFcn', @(~,~) onRemoveDataset([], []));
+    uimenu(cmDatasets, 'Text', 'Duplicate', ...
+        'MenuSelectedFcn', @(~,~) onDuplicateDataset([], []));
+    uimenu(cmDatasets, 'Text', 'Hide / Show', ...
+        'MenuSelectedFcn', @(~,~) onToggleDatasetVisibility([], []));
+    uimenu(cmDatasets, 'Text', 'Set as Background', ...
+        'MenuSelectedFcn', @(~,~) onSetActiveBG([], []));
+    uimenu(cmDatasets, 'Text', 'Move Up', ...
+        'MenuSelectedFcn', @(~,~) onMoveDatasetUp([], []));
+    uimenu(cmDatasets, 'Text', 'Move Down', ...
+        'MenuSelectedFcn', @(~,~) onMoveDatasetDown([], []));
     lbDatasets.ContextMenu = cmDatasets;
 
     % Left controls panel
     % Title updates to show parser name after each load.
-    % Row layout (9 rows):
+    % Row layout (7 rows):
     %   1 -  26px  X dropdown
-    %   2 -   4px  spacer
-    %   3 -  88px  Y listbox (multi-select)
-    %   4 -   4px  spacer
-    %   5 -  36px  Plot-style toggle buttons (Line | Scatter | Line+Pts)
-    %   6 -  26px  Log-scale checkboxes
-    %   7 -   6px  spacer
-    %   8 -  30px  Refresh button
-    %   9 -   1x   Metadata text area
+    %   2 -  '1x'  Y listbox (multi-select)
+    %   3 -  '1x'  Right Y-axis selector
+    %   4 -  70px  Plot-style / colormap / theme buttons
+    %   5 -  24px  Log-scale checkboxes
+    %   6 -  26px  Waterfall + Refresh
+    %   7 -  24px  Annotation mode
     ctrlPanel = uipanel(contentGL,'Title','Controls','FontSize',13);
     ctrlPanel.Layout.Column = 2;
 
-    ctrlGL = uigridlayout(ctrlPanel,[10 1], ...
-        'RowHeight', {26,2,'1x',2,'1x',2,70,24,26,24}, ...
+    ctrlGL = uigridlayout(ctrlPanel,[7 1], ...
+        'RowHeight', {26,'1x','1x',70,24,26,24}, ...
         'Padding',   [6 6 6 6], ...
-        'RowSpacing', 0);
+        'RowSpacing', 4);
 
     ddX = uidropdown(ctrlGL,'Items',{'(load file first)'}, ...
         'ValueChangedFcn',@onAxisChanged, ...
@@ -445,13 +453,13 @@ function varargout = dataImportGUI()
     lbY = uilistbox(ctrlGL,'Items',{'(load file first)'},'Multiselect','on', ...
         'ValueChangedFcn',@onAxisChanged, ...
         'Tooltip','Y axis channel(s) — Ctrl+click to select multiple');
-    lbY.Layout.Row = 3;
+    lbY.Layout.Row = 2;
 
     % Row 5: Right Y-axis channel selector
     y2GL = uigridlayout(ctrlGL,[2 1], ...
         'Padding',[0 0 0 0],'RowSpacing',2,'ColumnSpacing',4, ...
         'RowHeight',{20,'1x'},'ColumnWidth',{'1x'});
-    y2GL.Layout.Row = 5;
+    y2GL.Layout.Row = 3;
 
     lblY2 = uilabel(y2GL,'Text','Right Y-axis:', ...
         'FontSize',12,'FontColor',[0.75 0.75 0.75]);
@@ -464,10 +472,10 @@ function varargout = dataImportGUI()
     lbY2.Layout.Row = 2; lbY2.Layout.Column = 1;
 
     % Plot-style buttons (row 7) — three uibutton objects in a nested grid.
-    styleGL = uigridlayout(ctrlGL,[3 3], ...
+    styleGL = uigridlayout(ctrlGL,[3 4], ...
         'Padding',[0 0 0 0],'ColumnSpacing',2,'RowSpacing',2, ...
-        'ColumnWidth',{'1x','1x','1x'},'RowHeight',{20,20,'1x'});
-    styleGL.Layout.Row = 7;
+        'ColumnWidth',{'1x','1x','1x','1x'},'RowHeight',{20,20,'1x'});
+    styleGL.Layout.Row = 4;
 
     % Row 1: Colormap label + selector
     lblColormap = uilabel(styleGL,'Text','Colormap:','FontSize',10);
@@ -479,7 +487,7 @@ function varargout = dataImportGUI()
     ddColormap = uidropdown(styleGL, 'Items', COLORMAPS, 'Value', COLORMAPS{1}, ...
         'Tooltip', 'Color palette for multi-dataset plots', ...
         'ValueChangedFcn', @(~,~) onPlot([],[]));
-    ddColormap.Layout.Row = 1; ddColormap.Layout.Column = [2 3];
+    ddColormap.Layout.Row = 1; ddColormap.Layout.Column = [2 4];
 
     % Row 2: Theme selector
     lblTheme = uilabel(styleGL,'Text','Theme:','FontSize',10); %#ok<NASGU>
@@ -490,7 +498,7 @@ function varargout = dataImportGUI()
         'Value',   'Light', ...
         'Tooltip', 'Switch between light and dark GUI themes', ...
         'ValueChangedFcn', @onThemeChanged);
-    ddTheme.Layout.Row = 2; ddTheme.Layout.Column = [2 3];
+    ddTheme.Layout.Row = 2; ddTheme.Layout.Column = [2 4];
 
     % Row 3: Style buttons
     btnStyleLine = uibutton(styleGL,'Text','Line', ...
@@ -506,10 +514,16 @@ function varargout = dataImportGUI()
         'ButtonPushedFcn',@(~,~) onStylePick('Line+Pts'));
     btnStyleLineMarkers.Layout.Row = 3; btnStyleLineMarkers.Layout.Column = 3;
 
+    btnStyleErrorBand = uibutton(styleGL,'Text','Err Band', ...
+        'ButtonPushedFcn',@(~,~) onStylePick('ErrorBand'), ...
+        'FontSize', 9, ...
+        'Tooltip','Plot with shaded error bands (auto-detects error columns)');
+    btnStyleErrorBand.Layout.Row = 3; btnStyleErrorBand.Layout.Column = 4;
+
     % Row 8: All log-scale checkboxes + Cts/s in one row
     logChkGL = uigridlayout(ctrlGL,[1 4], ...
         'Padding',[0 0 0 0],'ColumnWidth',{'1x','1x','1x','1x'},'ColumnSpacing',2);
-    logChkGL.Layout.Row = 8;
+    logChkGL.Layout.Row = 5;
     cbLogX = uicheckbox(logChkGL,'Text','Log X','ValueChangedFcn',@onAxisChanged);
     cbLogX.Layout.Column = 1;
     cbLogY = uicheckbox(logChkGL,'Text','Log Y','ValueChangedFcn',@onAxisChanged);
@@ -528,7 +542,7 @@ function varargout = dataImportGUI()
     % Row 9: Waterfall toggle + spacing + Replot button
     wfGL = uigridlayout(ctrlGL,[1 3], ...
         'Padding',[0 0 0 0],'ColumnSpacing',4,'ColumnWidth',{'1x',50,55});
-    wfGL.Layout.Row = 9;
+    wfGL.Layout.Row = 6;
 
     cbWaterfall = uicheckbox(wfGL, ...
         'Text',    'Waterfall', ...
@@ -553,7 +567,7 @@ function varargout = dataImportGUI()
         'Value',   false, ...
         'Tooltip', 'Click on the plot to add text annotations. Right-click to delete.', ...
         'ValueChangedFcn', @onAnnotationModeChanged);
-    cbAnnotationMode.Layout.Row = 10;
+    cbAnnotationMode.Layout.Row = 7;
 
     % ── Right: preview axes ───────────────────────────────────────────────
     axPanel = uipanel(contentGL,'Title','Preview','FontSize',13);
@@ -612,15 +626,15 @@ function varargout = dataImportGUI()
     corrPanel = uipanel(analysisGL,'Title','Corrections','FontSize',13);
     corrPanel.Layout.Row = 1; corrPanel.Layout.Column = 1;
 
-    corrGL = uigridlayout(corrPanel,[16 4], ...
-        'RowHeight',    {24,24,24,24,24,24,24,24,28,28,24,20,24,24,0,0}, ...
+    corrGL = uigridlayout(corrPanel,[20 4], ...
+        'RowHeight',    {24,24,24,24,24,24,24,24,28,28,24,20,24,24,0,0,24,24,24,24}, ...
         'ColumnWidth',  {70,'1x',88,'1x'}, ...
         'Padding',      [6 6 6 6], ...
         'RowSpacing',   4, ...
         'ColumnSpacing', 4);
 
     % Row 1: Correction style selector
-    lblCorrStyle = uibutton(corrGL,'Text','Style:','Enable','off','FontSize',10);
+    lblCorrStyle = uilabel(corrGL,'Text','Style:','FontSize',10,'HorizontalAlignment','right');
     lblCorrStyle.Layout.Row = 1; lblCorrStyle.Layout.Column = 1;
 
     ddCorrStyle = uidropdown(corrGL, ...
@@ -633,7 +647,7 @@ function varargout = dataImportGUI()
     ddCorrStyle.Layout.Row = 1; ddCorrStyle.Layout.Column = [2 4];
 
     % Row 2: X Offset | BG Slope
-    lblXOff = uibutton(corrGL,'Text','X Offset:','Enable','off');
+    lblXOff = uilabel(corrGL,'Text','X Offset:','HorizontalAlignment','right');
     lblXOff.Layout.Row = 2; lblXOff.Layout.Column = 1;
 
     efXOffset = uieditfield(corrGL,'numeric','Value',0, ...
@@ -642,7 +656,7 @@ function varargout = dataImportGUI()
         'ValueChangedFcn',@(~,~) markCorrectionsDirty());
     efXOffset.Layout.Row = 2; efXOffset.Layout.Column = 2;
 
-    lblBGSlope = uibutton(corrGL,'Text','BG Slope:','Enable','off');
+    lblBGSlope = uilabel(corrGL,'Text','BG Slope:','HorizontalAlignment','right');
     lblBGSlope.Layout.Row = 2; lblBGSlope.Layout.Column = 3;
 
     efBGSlope = uieditfield(corrGL,'numeric','Value',0, ...
@@ -652,7 +666,7 @@ function varargout = dataImportGUI()
     efBGSlope.Layout.Row = 2; efBGSlope.Layout.Column = 4;
 
     % Row 3: Y Offset | BG Intercept
-    lblYOff = uibutton(corrGL,'Text','Y Offset:','Enable','off');
+    lblYOff = uilabel(corrGL,'Text','Y Offset:','HorizontalAlignment','right');
     lblYOff.Layout.Row = 3; lblYOff.Layout.Column = 1;
 
     efYOffset = uieditfield(corrGL,'numeric','Value',0, ...
@@ -661,7 +675,7 @@ function varargout = dataImportGUI()
         'ValueChangedFcn',@(~,~) markCorrectionsDirty());
     efYOffset.Layout.Row = 3; efYOffset.Layout.Column = 2;
 
-    lblBGInt = uibutton(corrGL,'Text','BG Intercept:','Enable','off');
+    lblBGInt = uilabel(corrGL,'Text','BG Intercept:','HorizontalAlignment','right');
     lblBGInt.Layout.Row = 3; lblBGInt.Layout.Column = 3;
 
     efBGIntercept = uieditfield(corrGL,'numeric','Value',0, ...
@@ -738,7 +752,7 @@ function varargout = dataImportGUI()
     btnManualPeak.Layout.Row = 5; btnManualPeak.Layout.Column = 4;
 
     % Row 6: BG polynomial order selector (cols 1-3) + Remove Peak for XRD (col 4)
-    lblBGOrder = uibutton(corrGL,'Text','BG Order:','Enable','off','FontSize',10);
+    lblBGOrder = uilabel(corrGL,'Text','BG Order:','FontSize',10,'HorizontalAlignment','right');
     lblBGOrder.Layout.Row = 6; lblBGOrder.Layout.Column = 1;
 
     ddBGOrder = uidropdown(corrGL, ...
@@ -755,7 +769,7 @@ function varargout = dataImportGUI()
     btnRemovePeakClick.Layout.Row = 6; btnRemovePeakClick.Layout.Column = 4;
 
     % Row 7: Background dataset file picker
-    lblBGFile = uibutton(corrGL,'Text','BG File:','Enable','off');
+    lblBGFile = uilabel(corrGL,'Text','BG File:','HorizontalAlignment','right');
     lblBGFile.Layout.Row = 7; lblBGFile.Layout.Column = 1;
 
     efBGFile = uieditfield(corrGL,'text','Value','', ...
@@ -824,12 +838,12 @@ function varargout = dataImportGUI()
     btnToggleVis.Layout.Row = 11; btnToggleVis.Layout.Column = [1 2];
 
     % Row 12: Region statistics readout (populated when BG box is drawn)
-    lblRegionStats = uibutton(corrGL,'Text','', 'Enable','off', 'FontSize',9, ...
+    lblRegionStats = uilabel(corrGL,'Text','', 'FontSize',9, ...
         'FontColor',[0.3 0.3 0.6]);
     lblRegionStats.Layout.Row = 12; lblRegionStats.Layout.Column = [1 4];
 
     % Row 13: Normalization control
-    lblNormalize = uibutton(corrGL,'Text','Normalize:','Enable','off');
+    lblNormalize = uilabel(corrGL,'Text','Normalize:','HorizontalAlignment','right');
     lblNormalize.Layout.Row = 13; lblNormalize.Layout.Column = 1;
 
     ddNormalize = uidropdown(corrGL, ...
@@ -840,7 +854,7 @@ function varargout = dataImportGUI()
     ddNormalize.Layout.Row = 13; ddNormalize.Layout.Column = [2 4];
 
     % Row 14: Data trim / crop
-    lblXTrim = uibutton(corrGL,'Text','Trim X:','Enable','off');
+    lblXTrim = uilabel(corrGL,'Text','Trim X:','HorizontalAlignment','right');
     lblXTrim.Layout.Row = 14; lblXTrim.Layout.Column = 1;
 
     efXTrimMin = uieditfield(corrGL,'text','Value','', ...
@@ -854,7 +868,7 @@ function varargout = dataImportGUI()
     efXTrimMax.Layout.Row = 14; efXTrimMax.Layout.Column = [3 4];
 
     % Row 15: Neutron spin asymmetry calculation (neutron data only)
-    lblAsymmetry = uibutton(corrGL,'Text','Spin Asymmetry:','Enable','off');
+    lblAsymmetry = uilabel(corrGL,'Text','Spin Asymmetry:','HorizontalAlignment','right');
     lblAsymmetry.Layout.Row = 15; lblAsymmetry.Layout.Column = 1;
 
     cbCalculateAsymmetry = uicheckbox(corrGL,'Text','Calculate & Plot', ...
@@ -864,7 +878,7 @@ function varargout = dataImportGUI()
     cbCalculateAsymmetry.Layout.Row = 15; cbCalculateAsymmetry.Layout.Column = [2 4];
 
     % Row 16: Asymmetry formula selector (hidden by default)
-    lblAsymFormula = uibutton(corrGL,'Text','Formula:','Enable','off');
+    lblAsymFormula = uilabel(corrGL,'Text','Formula:','HorizontalAlignment','right');
     lblAsymFormula.Layout.Row = 16; lblAsymFormula.Layout.Column = 1;
 
     ddAsymFormula = uidropdown(corrGL, ...
@@ -873,6 +887,42 @@ function varargout = dataImportGUI()
         'Tooltip', 'Asymmetry formula: Linear uses reflectivity ratio, Log uses reflectivity ratio logarithm');
     ddAsymFormula.Layout.Row = 16; ddAsymFormula.Layout.Column = [2 4];
 
+    % Row 17: BG interpolation method (#21)
+    lblBGInterp = uilabel(corrGL,'Text','BG Interp:','HorizontalAlignment','right'); %#ok<NASGU>
+    lblBGInterp.Layout.Row = 17; lblBGInterp.Layout.Column = 1;
+
+    ddBGInterp = uidropdown(corrGL, ...
+        'Items',   {'linear', 'pchip', 'spline', 'nearest'}, ...
+        'Value',   'linear', ...
+        'Tooltip', 'Interpolation method for background subtraction: linear (default), pchip (smooth), spline (smoother), nearest (step)', ...
+        'ValueChangedFcn', @(~,~) markCorrectionsDirty());
+    ddBGInterp.Layout.Row = 17; ddBGInterp.Layout.Column = [2 4];
+
+    % Row 18: Baseline estimation button (#5)
+    btnEstimateBaseline = uibutton(corrGL,'Text','Estimate Baseline (SNIP)', ...
+        'ButtonPushedFcn', @onEstimateBaseline, ...
+        'Tooltip', 'Estimate and subtract baseline using the SNIP peak-clipping algorithm (ideal for XRD data)', ...
+        'FontSize', 9);
+    btnEstimateBaseline.Layout.Row = 18; btnEstimateBaseline.Layout.Column = [1 4];
+
+    % Row 19: Derivative computation (#3)
+    lblDerivative = uilabel(corrGL,'Text','Derivative:','HorizontalAlignment','right'); %#ok<NASGU>
+    lblDerivative.Layout.Row = 19; lblDerivative.Layout.Column = 1;
+
+    ddDerivative = uidropdown(corrGL, ...
+        'Items',   {'None', 'dY/dX', 'd²Y/dX²'}, ...
+        'Value',   'None', ...
+        'Tooltip', 'Compute derivative after smoothing: dY/dX (gradient) or d²Y/dX² (second derivative). Essential for phase transition detection.', ...
+        'ValueChangedFcn', @(~,~) markCorrectionsDirty());
+    ddDerivative.Layout.Row = 19; ddDerivative.Layout.Column = [2 4];
+
+    % Row 20: Live preview toggle (#2)
+    cbLivePreview = uicheckbox(corrGL, ...
+        'Text',    'Live preview corrections', ...
+        'Value',   true, ...
+        'Tooltip', 'Automatically apply and redraw when correction parameters change (uncheck for large datasets)');
+    cbLivePreview.Layout.Row = 20; cbLivePreview.Layout.Column = [1 4];
+
     % ── Axes & Appearance sub-panel (middle column) ──────────────────────
     % Combined panel: rows 1-5 axis limits, rows 6-11 appearance controls.
     % All limit fields are text-type: blank = auto-scale, any number = manual.
@@ -880,23 +930,23 @@ function varargout = dataImportGUI()
     axLimPanel = uipanel(analysisGL,'Title','Axes & Appearance','FontSize',13);
     axLimPanel.Layout.Row = 1; axLimPanel.Layout.Column = 2;
 
-    axLimGL = uigridlayout(axLimPanel,[11 4], ...
-        'RowHeight',    {22,26,26,0,28, 22,22,22,22,22,22}, ...
+    axLimGL = uigridlayout(axLimPanel,[13 4], ...
+        'RowHeight',    {22,26,26,0,28, 22,22,22,22,22,22, 22,22}, ...
         'ColumnWidth',  {40,'1x','1x','1x'}, ...
         'Padding',      [6 6 6 6], ...
         'RowSpacing',   4, ...
         'ColumnSpacing', 4);
 
     % Row 1: column header labels (Min | Max | Step)
-    lblAxHdrMin  = uibutton(axLimGL,'Text','Min', 'Enable','off','FontSize',9);
+    lblAxHdrMin  = uilabel(axLimGL,'Text','Min', 'FontSize',9,'HorizontalAlignment','center');
     lblAxHdrMin.Layout.Row  = 1; lblAxHdrMin.Layout.Column  = 2;
-    lblAxHdrMax  = uibutton(axLimGL,'Text','Max', 'Enable','off','FontSize',9);
+    lblAxHdrMax  = uilabel(axLimGL,'Text','Max', 'FontSize',9,'HorizontalAlignment','center');
     lblAxHdrMax.Layout.Row  = 1; lblAxHdrMax.Layout.Column  = 3;
-    lblAxHdrStep = uibutton(axLimGL,'Text','Step','Enable','off','FontSize',9);
+    lblAxHdrStep = uilabel(axLimGL,'Text','Step','FontSize',9,'HorizontalAlignment','center');
     lblAxHdrStep.Layout.Row = 1; lblAxHdrStep.Layout.Column = 4;
 
     % Row 2: X axis
-    lblXLim = uibutton(axLimGL,'Text','X:','Enable','off');
+    lblXLim = uilabel(axLimGL,'Text','X:','HorizontalAlignment','right');
     lblXLim.Layout.Row = 2; lblXLim.Layout.Column = 1;
 
     AXLIM_BG = [0.17 0.17 0.17];   % dark field background matching GUI theme
@@ -925,7 +975,7 @@ function varargout = dataImportGUI()
     efXStep.Layout.Row = 2; efXStep.Layout.Column = 4;
 
     % Row 3: Y axis
-    lblYLim = uibutton(axLimGL,'Text','Y:','Enable','off');
+    lblYLim = uilabel(axLimGL,'Text','Y:','HorizontalAlignment','right');
     lblYLim.Layout.Row = 3; lblYLim.Layout.Column = 1;
 
     efYMin = uieditfield(axLimGL,'text','Value','', ...
@@ -950,7 +1000,7 @@ function varargout = dataImportGUI()
     efYStep.Layout.Row = 3; efYStep.Layout.Column = 4;
 
     % Row 4: right Y-axis limits — hidden (RowHeight=0) until Y2 channel is selected
-    lblY2Lim = uibutton(axLimGL,'Text','Y2:','Enable','off');
+    lblY2Lim = uilabel(axLimGL,'Text','Y2:','HorizontalAlignment','right');
     lblY2Lim.Layout.Row = 4; lblY2Lim.Layout.Column = 1;
 
     efY2Min = uieditfield(axLimGL,'text','Value','', ...
@@ -987,7 +1037,7 @@ function varargout = dataImportGUI()
 
     % ── Appearance controls (rows 6-11) ────────────────────────────────
     % Row 6: Color (L spans 2-3 normally; R in col 4 when Y2 active)
-    lblApColor = uibutton(axLimGL,'Text','Color:','Enable','off','FontSize',10);
+    lblApColor = uilabel(axLimGL,'Text','Color:','FontSize',10,'HorizontalAlignment','right');
     lblApColor.Layout.Row = 6; lblApColor.Layout.Column = 1;
 
     ddDatasetColor = uidropdown(axLimGL, ...
@@ -1010,7 +1060,7 @@ function varargout = dataImportGUI()
     ddDatasetColorR.Layout.Row = 6; ddDatasetColorR.Layout.Column = 4;
 
     % Row 7: Legend name
-    lblApLegend = uibutton(axLimGL,'Text','Legend:','Enable','off','FontSize',10);
+    lblApLegend = uilabel(axLimGL,'Text','Legend:','FontSize',10,'HorizontalAlignment','right');
     lblApLegend.Layout.Row = 7; lblApLegend.Layout.Column = 1;
 
     efLegendName = uieditfield(axLimGL,'text','Value','', ...
@@ -1029,7 +1079,7 @@ function varargout = dataImportGUI()
     efLegendNameR.Layout.Row = 7; efLegendNameR.Layout.Column = 4;
 
     % Row 8: X label (spans all value columns — only one X axis)
-    lblApXLabel = uibutton(axLimGL,'Text','X Label:','Enable','off','FontSize',10);
+    lblApXLabel = uilabel(axLimGL,'Text','X Label:','FontSize',10,'HorizontalAlignment','right');
     lblApXLabel.Layout.Row = 8; lblApXLabel.Layout.Column = 1;
 
     efCustomXLabel = uieditfield(axLimGL,'text','Value','', ...
@@ -1039,7 +1089,7 @@ function varargout = dataImportGUI()
     efCustomXLabel.Layout.Row = 8; efCustomXLabel.Layout.Column = [2 4];
 
     % Row 9: Y label (left and right independently)
-    lblApYLabel = uibutton(axLimGL,'Text','Y Label:','Enable','off','FontSize',10);
+    lblApYLabel = uilabel(axLimGL,'Text','Y Label:','FontSize',10,'HorizontalAlignment','right');
     lblApYLabel.Layout.Row = 9; lblApYLabel.Layout.Column = 1;
 
     efCustomYLabel = uieditfield(axLimGL,'text','Value','', ...
@@ -1056,7 +1106,7 @@ function varargout = dataImportGUI()
     efCustomY2Label.Layout.Row = 9; efCustomY2Label.Layout.Column = 4;
 
     % Row 10: Title (spans all value columns)
-    lblApTitle = uibutton(axLimGL,'Text','Title:','Enable','off','FontSize',10);
+    lblApTitle = uilabel(axLimGL,'Text','Title:','FontSize',10,'HorizontalAlignment','right');
     lblApTitle.Layout.Row = 10; lblApTitle.Layout.Column = 1;
 
     efCustomTitle = uieditfield(axLimGL,'text','Value','', ...
@@ -1068,7 +1118,7 @@ function varargout = dataImportGUI()
     % Row 11: Tick-label notation — X and Y1 always visible; R (Y2) hidden until active.
     % A nested 1×6 grid packs [X: dd | Y: dd | R: dd] into the three value columns.
     % Cols 5-6 (the R label + dropdown) start at width 0 and are revealed with Y2.
-    lblApFmt = uibutton(axLimGL,'Text','Format:','Enable','off','FontSize',10);
+    lblApFmt = uilabel(axLimGL,'Text','Format:','FontSize',10,'HorizontalAlignment','right');
     lblApFmt.Layout.Row = 11; lblApFmt.Layout.Column = 1;
 
     fmtGL = uigridlayout(axLimGL, [1 6], ...
@@ -1097,12 +1147,55 @@ function varargout = dataImportGUI()
         'ValueChangedFcn', @(~,~) onPlot([],[]));
     ddY2Fmt.Layout.Column = 6;
 
+    % Row 12: Legend toggle (#1) + Reference lines (#11)
+    cbShowLegend = uicheckbox(axLimGL, ...
+        'Text',    'Legend', ...
+        'Value',   true, ...
+        'Tooltip', 'Show/hide the plot legend', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    cbShowLegend.Layout.Row = 12; cbShowLegend.Layout.Column = 1;
+
+    btnAddHLine = uibutton(axLimGL,'Text','+ H Line', ...
+        'ButtonPushedFcn', @onAddHRefLine, ...
+        'FontSize', 9, ...
+        'Tooltip', 'Add a horizontal reference line at a specified Y value');
+    btnAddHLine.Layout.Row = 12; btnAddHLine.Layout.Column = 2;
+
+    btnAddVLine = uibutton(axLimGL,'Text','+ V Line', ...
+        'ButtonPushedFcn', @onAddVRefLine, ...
+        'FontSize', 9, ...
+        'Tooltip', 'Add a vertical reference line at a specified X value');
+    btnAddVLine.Layout.Row = 12; btnAddVLine.Layout.Column = 3;
+
+    btnClearRefLines = uibutton(axLimGL,'Text','Clear', ...
+        'ButtonPushedFcn', @onClearRefLines, ...
+        'FontSize', 9, ...
+        'Tooltip', 'Remove all reference lines');
+    btnClearRefLines.Layout.Row = 12; btnClearRefLines.Layout.Column = 4;
+
+    % Row 13: Figure dimensions for export (#7)
+    lblFigDims = uilabel(axLimGL,'Text','Fig size:','FontSize',9,'HorizontalAlignment','right'); %#ok<NASGU>
+    lblFigDims.Layout.Row = 13; lblFigDims.Layout.Column = 1;
+
+    efFigWidth = uieditfield(axLimGL,'numeric','Value',7, ...
+        'Limits',[1 30], ...
+        'Tooltip','Export figure width (inches)');
+    efFigWidth.Layout.Row = 13; efFigWidth.Layout.Column = 2;
+
+    lblFigX = uilabel(axLimGL,'Text',char(215),'FontSize',10,'HorizontalAlignment','center'); %#ok<NASGU>
+    lblFigX.Layout.Row = 13; lblFigX.Layout.Column = 3;
+
+    efFigHeight = uieditfield(axLimGL,'numeric','Value',5, ...
+        'Limits',[1 30], ...
+        'Tooltip','Export figure height (inches)');
+    efFigHeight.Layout.Row = 13; efFigHeight.Layout.Column = 4;
+
     % ── Save / Export sub-panel (right column) ─────────────────────────────
     savePanel = uipanel(analysisGL,'Title','Save / Export','FontSize',13);
     savePanel.Layout.Row = 1; savePanel.Layout.Column = 4;
 
-    saveGL = uigridlayout(savePanel,[19 2], ...
-        'RowHeight',    {14,26,28,32,32,32,32,14,32,32,32,14,32,14,32,32,14,32,28}, ...
+    saveGL = uigridlayout(savePanel,[22 2], ...
+        'RowHeight',    {14,26,28,32,32,32,32,14,32,32,32,14,32,14,32,32,14,32,32,32,32,28}, ...
         'ColumnWidth',  {'1x','1x'}, ...
         'Padding',      [6 6 6 6], ...
         'RowSpacing',   4, ...
@@ -1174,7 +1267,7 @@ function varargout = dataImportGUI()
 
     % Row 8: Publication figure save — format selector + save button
     ddFigFormat = uidropdown(saveGL, ...
-        'Items',   {'PNG (300 dpi)', 'PDF (vector)', 'SVG (vector)', 'TIFF (300 dpi)'}, ...
+        'Items',   {'PNG (300 dpi)', 'PDF (vector)', 'SVG (vector)', 'TIFF (300 dpi)', 'MATLAB .fig'}, ...
         'Value',   'PNG (300 dpi)', ...
         'Tooltip', 'Output file format for publication-quality figure save');
     ddFigFormat.Layout.Row = 11; ddFigFormat.Layout.Column = 1;
@@ -1243,7 +1336,31 @@ function varargout = dataImportGUI()
         'Tooltip', 'Open batch XRD file converter (XRDML, Rigaku, Bruker)');
     btnBatchConvertXRD.Layout.Row = 18; btnBatchConvertXRD.Layout.Column = [1 2];
 
-    % Row 13: Export Origin Script
+    % Row 19: Resample Dataset (#15)
+    btnResample = uibutton(saveGL,'Text','Resample Dataset...', ...
+        'ButtonPushedFcn', @onResampleDataset, ...
+        'BackgroundColor', [0.28 0.28 0.28], ...
+        'FontColor', [1 1 1], ...
+        'Tooltip', 'Resample the active dataset to a uniform x-grid (linear interpolation)');
+    btnResample.Layout.Row = 19; btnResample.Layout.Column = [1 2];
+
+    % Row 20: Column Calculator (#16)
+    btnColumnCalc = uibutton(saveGL,'Text','Column Calculator...', ...
+        'ButtonPushedFcn', @onColumnCalculator, ...
+        'BackgroundColor', [0.28 0.28 0.28], ...
+        'FontColor', [1 1 1], ...
+        'Tooltip', 'Create a new Y column from expressions using existing columns (e.g. C1./C2)');
+    btnColumnCalc.Layout.Row = 20; btnColumnCalc.Layout.Column = [1 2];
+
+    % Row 21: Inset Plot (#18)
+    btnInset = uibutton(saveGL,'Text','Create Inset Plot...', ...
+        'ButtonPushedFcn', @onCreateInset, ...
+        'BackgroundColor', [0.28 0.28 0.28], ...
+        'FontColor', [1 1 1], ...
+        'Tooltip', 'Create an inset axes showing a zoomed region of the current plot');
+    btnInset.Layout.Row = 21; btnInset.Layout.Column = [1 2];
+
+    % Export Origin Script
     btnExportOriginScript = uibutton(saveGL,'Text','Export Origin Script', ...
         'ButtonPushedFcn', @onExportOriginScript, ...
         'BackgroundColor', [0.12 0.38 0.38], ...
@@ -1251,13 +1368,13 @@ function varargout = dataImportGUI()
         'Tooltip', 'Write a LabTalk (.ogs) script + CSV that Origin can import directly');
     btnExportOriginScript.Layout.Row = 16; btnExportOriginScript.Layout.Column = [1 2];
 
-    % Row 14: Layout Settings
+    % Layout Settings (last row)
     btnLayoutSettings = uibutton(saveGL,'Text','Layout Settings...', ...
         'ButtonPushedFcn', @onOpenLayoutSettings, ...
         'BackgroundColor', [0.28 0.28 0.28], ...
         'FontColor', [1 1 1], ...
         'Tooltip', 'Open the Layout Settings window to configure panel sizes and figure dimensions');
-    btnLayoutSettings.Layout.Row = 19; btnLayoutSettings.Layout.Column = [1 2];
+    btnLayoutSettings.Layout.Row = 22; btnLayoutSettings.Layout.Column = [1 2];
 
     % ── Peak Analysis sub-panel (row 2, full width) ───────────────────────
     % Always visible; XRD buttons in corrGL activate it contextually.
@@ -1279,8 +1396,8 @@ function varargout = dataImportGUI()
         'Tooltip','Detected peaks — select a row to highlight it on the plot');
     peakTable.Layout.Column = 1;
 
-    peakBtnGL = uigridlayout(peakGL,[14 1], ...
-        'RowHeight',    {20,24,24,24,24,24,20,24,24,24,24,24,24,'1x'}, ...
+    peakBtnGL = uigridlayout(peakGL,[15 1], ...
+        'RowHeight',    {20,24,24,24,24,24,24,20,24,24,24,24,24,24,'1x'}, ...
         'Padding',      [0 0 0 0], ...
         'RowSpacing',   4);
     peakBtnGL.Layout.Column = 2;
@@ -1326,17 +1443,23 @@ function varargout = dataImportGUI()
         'Tooltip','Export peak data from all datasets to an Excel file (.xlsx)');
     btnExportPeakXLSX.Layout.Row = 7;
 
+    btnCopyPeaksClip = uibutton(peakBtnGL,'Text','Copy Peaks to Clipboard', ...
+        'ButtonPushedFcn', @onCopyPeaksToClipboard, ...
+        'BackgroundColor', [0.25 0.28 0.35], 'FontColor', [1 1 1], ...
+        'Tooltip', 'Copy peak table as tab-delimited text to clipboard');
+    btnCopyPeaksClip.Layout.Row = 8;
+
     chkShowFit = uicheckbox(peakBtnGL, ...
         'Text',              'Show fit curves', ...
         'Value',             true, ...
         'Tooltip',           'Overlay fit curves on the plot', ...
         'ValueChangedFcn',   @onToggleFitCurves);
-    chkShowFit.Layout.Row = 8;
+    chkShowFit.Layout.Row = 9;
 
     btnFitColor = uibutton(peakBtnGL, 'Text', 'Fit curve color...', ...
         'Tooltip',           'Pick the color used for fit curve overlays', ...
         'ButtonPushedFcn',   @onPickFitColor);
-    btnFitColor.Layout.Row = 9;
+    btnFitColor.Layout.Row = 10;
     btnFitColor.BackgroundColor = appData.fitCurveColor;
 
     btnWHPlot = uibutton(peakBtnGL, 'Text', 'W-H Plot', ...
@@ -1345,13 +1468,13 @@ function varargout = dataImportGUI()
         'Tooltip', ['Williamson-Hall strain analysis: plot ' char(946) char(183) ...
                     'cos' char(952) ' vs 4' char(183) 'sin' char(952) ...
                     '.  Needs ' char(8805) '3 fitted peaks.']);
-    btnWHPlot.Layout.Row = 10;
+    btnWHPlot.Layout.Row = 11;
 
     btnFFTThickness = uibutton(peakBtnGL, 'Text', 'FFT Thickness', ...
         'ButtonPushedFcn', @onFFTThickness, ...
         'BackgroundColor', [0.55 0.30 0.15], 'FontColor', [1 1 1], ...
         'Tooltip', 'Compute film thickness from Laue / Kiessig fringe periodicity via FFT');
-    btnFFTThickness.Layout.Row = 11;
+    btnFFTThickness.Layout.Row = 12;
 
     btnReflFFT = uibutton(peakBtnGL, 'Text', 'Reflectivity FFT', ...
         'ButtonPushedFcn', @onReflectivityFFT, ...
@@ -1359,13 +1482,13 @@ function varargout = dataImportGUI()
         'Tooltip', ['Compute film thickness from Kiessig fringes via FFT.' newline ...
                     'For neutron/XRR data (Q-space). Also works for XRD in 2' char(952) ...
                     '-space if wavelength is set.']);
-    btnReflFFT.Layout.Row = 12;
+    btnReflFFT.Layout.Row = 13;
 
     btnRefineLattice = uibutton(peakBtnGL, 'Text', 'Refine Lattice...', ...
         'ButtonPushedFcn', @onRefineLattice, ...
         'BackgroundColor', [0.15 0.50 0.30], 'FontColor', [1 1 1], ...
         'Tooltip', 'Refine lattice parameters from fitted peak positions + hkl Miller indices');
-    btnRefineLattice.Layout.Row = 13;
+    btnRefineLattice.Layout.Row = 14;
 
     % Row 14: Min sep / wavelength / source / K factor / instrument broadening (shared sub-grid)
     % X-ray source lookup table: {display name, wavelength_A}
@@ -1383,7 +1506,7 @@ function varargout = dataImportGUI()
     minSepGL = uigridlayout(peakBtnGL, [6 2], ...
         'RowHeight', {'1x','1x','1x','1x','1x','1x'}, 'ColumnWidth', {64, '1x'}, ...
         'Padding', [0 0 0 0], 'ColumnSpacing', 4, 'RowSpacing', 2);
-    minSepGL.Layout.Row = 14;
+    minSepGL.Layout.Row = 15;
     lblMinSep = uilabel(minSepGL, 'Text', 'Min sep:', 'FontSize', 9, ...
         'HorizontalAlignment', 'right', ...
         'Tooltip', 'Minimum peak separation in degrees');
@@ -1642,10 +1765,20 @@ function varargout = dataImportGUI()
         if isempty(fpaths), return; end
         appData.lastDir = fileparts(fpaths{1});
 
+        % Progress indicator for file loading (#6)
+        fig.Pointer = 'watch';
+        nTotal = numel(fpaths);
+
         nLoaded = 0;
         for fi = 1:numel(fpaths)
             fp = fpaths{fi};
             [~, fnBase, fExt] = fileparts(fp);
+            if nTotal > 1
+                setStatus(sprintf('Loading file %d of %d: %s%s...', fi, nTotal, fnBase, fExt));
+            else
+                setStatus(sprintf('Loading %s%s...', fnBase, fExt));
+            end
+            drawnow limitrate;
 
             % ── Excel: offer sheet selection when file has multiple sheets ──
             excelExts = {'.xlsx','.xls','.xlsm','.xlsb','.ods'};
@@ -1705,6 +1838,7 @@ function varargout = dataImportGUI()
             end
         end
 
+        fig.Pointer = 'arrow';
         if nLoaded == 0, return; end
 
         % Make the last successfully loaded file the active dataset
@@ -1736,6 +1870,12 @@ function varargout = dataImportGUI()
     %SAVESESSIONDIRECT  Save session to .mat file (no dialog).
         if nargin < 1 || isempty(outPath)
             error('outPath required');
+        end
+
+        % Guard against accidental overwrite (#22)
+        if isfile(outPath)
+            warning('dataImportGUI:sessionOverwrite', ...
+                'Overwriting existing session file: %s', outPath);
         end
 
         % Save datasets with all their state
@@ -1932,6 +2072,15 @@ function varargout = dataImportGUI()
         end
         appData.activeIdx = val;
         updateControlsForActiveDataset();
+
+        % Update listbox tooltip with dataset metadata (#19)
+        ds = appData.datasets{val};
+        nPts = numel(ds.data.time);
+        pName = guiTernary(isfield(ds,'parserName'), ds.parserName, 'unknown');
+        hasCorrStr = guiTernary(~isempty(ds.corrData), 'corrected', 'raw');
+        lbDatasets.Tooltip = sprintf('%s\nParser: %s  |  %d points  |  %s', ...
+            ds.filepath, pName, nPts, hasCorrStr);
+
         onPlot([],[]);
     end
 
@@ -2086,7 +2235,18 @@ function varargout = dataImportGUI()
                 safeExpr = strrep(safeExpr, sprintf('D%d', ri), sprintf('vars.D%d', ri));
             end
 
-            % Evaluate expression (only allow safe math operations)
+            % Validate expression against whitelist (#23)
+            stripped = regexprep(safeExpr, 'vars\.D\d+', '');  % remove dataset refs
+            stripped = regexprep(stripped, '[\d.eE+\-*/^().,\s]', '');  % remove numbers/operators
+            allowedFuncs = {'log10','log','abs','diff','sqrt','exp','sin','cos','tan','real','imag','cumsum','cumtrapz','gradient'};
+            for afi = 1:numel(allowedFuncs)
+                stripped = strrep(stripped, allowedFuncs{afi}, '');
+            end
+            if ~isempty(strtrim(stripped))
+                error('Expression contains disallowed tokens: "%s". Only math operators, numbers, and functions (log10, abs, diff, sqrt, exp, sin, cos, gradient) are permitted.', strtrim(stripped));
+            end
+
+            % Evaluate expression
             yResult = eval(safeExpr); %#ok<EVLC>
 
             if ~isnumeric(yResult) || numel(yResult) ~= numel(xBase)
@@ -2631,9 +2791,10 @@ function varargout = dataImportGUI()
                           btnFitColor, btnWHPlot, btnFFTThickness, btnRefineLattice, btnReflFFT}
                     hh{1}.Visible = 'on'; %#ok<FXSET>
                 end
-                % Hide asymmetry rows (save 48px); restore BG rows
+                % Hide asymmetry rows (save 48px); restore BG and baseline rows
                 corrGL.RowHeight{7}  = 24; corrGL.RowHeight{8}  = 24;
                 corrGL.RowHeight{15} = 0;  corrGL.RowHeight{16} = 0;
+                corrGL.RowHeight{17} = 24; corrGL.RowHeight{18} = 24;
 
             case 'importQDVSM'
                 % Re-enable controls for non-neutron case
@@ -2663,9 +2824,10 @@ function varargout = dataImportGUI()
                 % Peak analysis panel — hidden for VSM (col 3 collapses; axlim expands)
                 peakPanel.Visible          = 'off';
                 analysisGL.ColumnWidth     = {appData.corrPanelWidth, '7x', 0, '3x'};
-                % Hide asymmetry rows (save 48px); restore BG rows
+                % Hide asymmetry rows (save 48px); restore BG and baseline rows
                 corrGL.RowHeight{7}  = 24; corrGL.RowHeight{8}  = 24;
                 corrGL.RowHeight{15} = 0;  corrGL.RowHeight{16} = 0;
+                corrGL.RowHeight{17} = 24; corrGL.RowHeight{18} = 24;
 
             case 'importPPMS'
                 % Re-enable controls for non-neutron case
@@ -2693,9 +2855,10 @@ function varargout = dataImportGUI()
                 % Peak analysis panel — hidden for PPMS (col 3 collapses; axlim expands)
                 peakPanel.Visible          = 'off';
                 analysisGL.ColumnWidth     = {appData.corrPanelWidth, '7x', 0, '3x'};
-                % Hide asymmetry rows (save 48px); restore BG rows
+                % Hide asymmetry rows (save 48px); restore BG and baseline rows
                 corrGL.RowHeight{7}  = 24; corrGL.RowHeight{8}  = 24;
                 corrGL.RowHeight{15} = 0;  corrGL.RowHeight{16} = 0;
+                corrGL.RowHeight{17} = 24; corrGL.RowHeight{18} = 24;
 
             case {'importNCNRDat', 'importNCNRRefl', 'importNCNRPNR'}
                 analysisPanel.Title = 'Analysis & Corrections  —  Neutron Reflectometry';
@@ -2732,9 +2895,10 @@ function varargout = dataImportGUI()
                     hh{1}.Visible = 'off'; %#ok<FXSET>
                 end
                 btnReflFFT.Visible = 'on';
-                % Hide BG file rows (not applicable); show asymmetry rows
+                % Hide BG file rows and BG interp/baseline (not applicable); show asymmetry rows
                 corrGL.RowHeight{7}  = 0;  corrGL.RowHeight{8}  = 0;
                 corrGL.RowHeight{15} = 24; corrGL.RowHeight{16} = 24;
+                corrGL.RowHeight{17} = 0;  corrGL.RowHeight{18} = 0;
                 % Show neutron-specific analysis controls
                 lblAsymmetry.Enable        = 'on';
                 cbCalculateAsymmetry.Enable = 'on';
@@ -2742,9 +2906,10 @@ function varargout = dataImportGUI()
                 ddAsymFormula.Enable       = 'on';
 
             otherwise  % importCSV, importExcel, unknown — generic labels
-                % Hide asymmetry rows (save 48px); restore BG rows
+                % Hide asymmetry rows (save 48px); restore BG and baseline rows
                 corrGL.RowHeight{7}  = 24; corrGL.RowHeight{8}  = 24;
                 corrGL.RowHeight{15} = 0;  corrGL.RowHeight{16} = 0;
+                corrGL.RowHeight{17} = 24; corrGL.RowHeight{18} = 24;
                 % Re-enable controls for non-neutron case
                 for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
                           btnApply, btnReset, btnApplyAll, btnUndo, ...
@@ -4784,9 +4949,9 @@ function varargout = dataImportGUI()
 
     function onStylePick(styleName)
         appData.style = styleName;
-        allBtns   = {btnStyleLine, btnStyleScatter, btnStyleLineMarkers};
-        allStyles = {'Line', 'Scatter', 'Line+Pts'};
-        for i = 1:3
+        allBtns   = {btnStyleLine, btnStyleScatter, btnStyleLineMarkers, btnStyleErrorBand};
+        allStyles = {'Line', 'Scatter', 'Line+Pts', 'ErrorBand'};
+        for i = 1:numel(allBtns)
             if strcmp(allStyles{i}, styleName)
                 allBtns{i}.BackgroundColor = [0.20 0.50 0.20];
                 allBtns{i}.FontColor       = [1 1 1];
@@ -4990,8 +5155,9 @@ function varargout = dataImportGUI()
                 if ~isdatetime(bgDs.time) && ~isdatetime(corrData.time)
                     bgX = double(bgDs.time);
                     bgY = bgDs.values(:, 1);
+                    bgMethod = ddBGInterp.Value;
                     bgInterp = interp1(bgX, bgY, double(corrData.time), ...
-                                       'linear', 0);
+                                       bgMethod, 0);
                     for k = 1:size(corrData.values, 2)
                         corrData.values(:, k) = corrData.values(:, k) - bgInterp;
                     end
@@ -5074,7 +5240,20 @@ function varargout = dataImportGUI()
         undoState.xTrimMin       = ds.xTrimMin;
         undoState.xTrimMax       = ds.xTrimMax;
         undoState.normMethod     = ds.normMethod;
-        ds.undoState = undoState;
+        if isfield(undoState, 'derivativeMode')
+            undoState.derivativeMode = ds.derivativeMode;
+        else
+            undoState.derivativeMode = 'None';
+        end
+        % Multi-level undo stack (#13): push onto stack, cap at 5
+        if ~isfield(ds, 'undoStack') || ~iscell(ds.undoStack)
+            ds.undoStack = {};
+        end
+        ds.undoStack{end+1} = undoState;
+        if numel(ds.undoStack) > 5
+            ds.undoStack = ds.undoStack(end-4:end);
+        end
+        ds.undoState = undoState;  % keep single-state for backward compat
 
         % Build corrected data struct (value-copy, then override time/values)
         corrData = d;
@@ -5136,8 +5315,9 @@ function varargout = dataImportGUI()
             if ~isdatetime(bgDs.time) && ~isdatetime(corrData.time)
                 bgX = double(bgDs.time);
                 bgY = bgDs.values(:, 1);
+                bgMethod = ddBGInterp.Value;
                 bgInterp = interp1(bgX, bgY, double(corrData.time), ...
-                                   'linear', 0);   % 0 outside BG range
+                                   bgMethod, 0);   % 0 outside BG range
                 for k = 1:size(corrData.values, 2)
                     corrData.values(:, k) = corrData.values(:, k) - bgInterp;
                 end
@@ -5152,7 +5332,7 @@ function varargout = dataImportGUI()
         end
 
         % ════════════════════════════════════════════════════════════════
-        %  Normalization (LAST step)
+        %  Normalization
         % ════════════════════════════════════════════════════════════════
         switch ddNormalize.Value
             case 'Range [0,1]'
@@ -5168,6 +5348,21 @@ function varargout = dataImportGUI()
                 end
         end
 
+        % ════════════════════════════════════════════════════════════════
+        %  Derivative computation (#3) — LAST step after normalization
+        % ════════════════════════════════════════════════════════════════
+        derivMode = ddDerivative.Value;
+        if ~strcmp(derivMode, 'None') && ~isdatetime(corrData.time)
+            xVec = double(corrData.time);
+            for k = 1:size(corrData.values, 2)
+                if strcmp(derivMode, 'dY/dX')
+                    corrData.values(:, k) = gradient(corrData.values(:, k), xVec);
+                else  % d²Y/dX²
+                    corrData.values(:, k) = gradient(gradient(corrData.values(:, k), xVec), xVec);
+                end
+            end
+        end
+
         ds.corrData      = corrData;
         ds.xOff          = xOff;
         ds.yOff          = yOff;
@@ -5179,7 +5374,8 @@ function varargout = dataImportGUI()
         ds.smoothMethod  = ddSmoothMethod.Value;
         ds.xTrimMin      = xTrimMin;
         ds.xTrimMax      = xTrimMax;
-        ds.normMethod    = ddNormalize.Value;
+        ds.normMethod      = ddNormalize.Value;
+        ds.derivativeMode  = ddDerivative.Value;
         appData.datasets{appData.activeIdx} = ds;
 
         % ════════════════════════════════════════════════════════════════
@@ -5269,7 +5465,12 @@ function varargout = dataImportGUI()
 
     function markCorrectionsDirty()
     %MARKCORRECTIONSDIRTY  Visually indicate that correction fields have
-    %  changed and the plot may be stale (resets when Apply is pressed).
+    %  changed and the plot may be stale.  If live-preview is enabled (#2),
+    %  immediately apply corrections and redraw instead.
+        if cbLivePreview.Value
+            onApplyCorrections([], []);
+            return;
+        end
         if isvalid(btnApply)
             btnApply.Text      = 'Apply  *';
             btnApply.FontColor = [1 0.85 0.2];
@@ -5343,7 +5544,8 @@ function varargout = dataImportGUI()
     end
 
     function onUndoCorrections(~,~)
-    %ONUNDOCORRECTIONS  Restore the previous correction state (one-level undo).
+    %ONUNDOCORRECTIONS  Restore the previous correction state from the undo stack.
+    %  Supports multi-level undo (up to 5 levels, #13).
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig,'Load a file first.','No data');
             return;
@@ -5351,13 +5553,21 @@ function varargout = dataImportGUI()
 
         ds = appData.datasets{appData.activeIdx};
 
-        % Check if an undo state exists
-        if ~isfield(ds, 'undoState') || isempty(ds.undoState)
+        % Pop from multi-level stack if available, else fall back to single undoState
+        hasStack = isfield(ds, 'undoStack') && iscell(ds.undoStack) && ~isempty(ds.undoStack);
+        hasSingle = isfield(ds, 'undoState') && isstruct(ds.undoState) && ~isempty(fieldnames(ds.undoState));
+        if ~hasStack && ~hasSingle
             uialert(fig, 'No previous correction state to restore.', 'Undo unavailable');
             return;
         end
 
-        undoState = ds.undoState;
+        if hasStack
+            undoState = ds.undoStack{end};
+            ds.undoStack(end) = [];  % pop
+        else
+            undoState = ds.undoState;
+            ds.undoState = struct();
+        end
 
         % Restore all correction state from the saved undo state
         ds.corrData      = undoState.corrData;
@@ -5368,21 +5578,11 @@ function varargout = dataImportGUI()
         ds.smoothEnabled = undoState.smoothEnabled;
         ds.smoothWindow  = undoState.smoothWindow;
         ds.smoothMethod  = undoState.smoothMethod;
-        if isfield(undoState, 'xTrimMin')
-            ds.xTrimMin = undoState.xTrimMin;
-        end
-        if isfield(undoState, 'xTrimMax')
-            ds.xTrimMax = undoState.xTrimMax;
-        end
-        if isfield(undoState, 'normMethod')
-            ds.normMethod = undoState.normMethod;
-        end
-        if isfield(undoState, 'bgPoly')
-            ds.bgPoly = undoState.bgPoly;
-        end
-
-        % Clear the undo state after restoring (one-level undo)
-        ds.undoState = struct();
+        if isfield(undoState, 'xTrimMin'), ds.xTrimMin = undoState.xTrimMin; end
+        if isfield(undoState, 'xTrimMax'), ds.xTrimMax = undoState.xTrimMax; end
+        if isfield(undoState, 'normMethod'), ds.normMethod = undoState.normMethod; end
+        if isfield(undoState, 'bgPoly'), ds.bgPoly = undoState.bgPoly; end
+        if isfield(undoState, 'derivativeMode'), ds.derivativeMode = undoState.derivativeMode; end
 
         % Update appData
         appData.datasets{appData.activeIdx} = ds;
@@ -5398,6 +5598,9 @@ function varargout = dataImportGUI()
         efXTrimMin.Value     = nan2str(ds.xTrimMin);
         efXTrimMax.Value     = nan2str(ds.xTrimMax);
         ddNormalize.Value    = ds.normMethod;
+        if isfield(ds, 'derivativeMode')
+            ddDerivative.Value = ds.derivativeMode;
+        end
 
         % Refresh the plot
         onPlot([],[]);
@@ -6210,6 +6413,11 @@ function varargout = dataImportGUI()
             return;
         end
 
+        % Output directory picker (#8): choose folder or use source-adjacent
+        outDir = uigetdir(guiTernary(isempty(appData.lastDir), pwd, appData.lastDir), ...
+            'Choose output folder (Cancel = save next to source files)');
+        if isequal(outDir, 0), outDir = ''; end  % empty = source-adjacent
+
         setStatus('Exporting CSV files...');
         fig.Pointer = 'watch';
         drawnow;
@@ -6228,6 +6436,7 @@ function varargout = dataImportGUI()
                 bn = neutronBaseName(ds.filepath);
                 if any(strcmp(neutronDone, bn)), continue; end
                 [fpath, ~, ~] = fileparts(ds.filepath);
+                if ~isempty(outDir), fpath = outDir; end
                 outFile = fullfile(fpath, [bn, '_neutron.csv']);
                 try
                     saveConsolidatedNeutronCSV(ds, outFile, fmt);
@@ -6245,6 +6454,7 @@ function varargout = dataImportGUI()
             suffix       = guiTernary(hasCorrected, '_corrected.csv', '_export.csv');
 
             [fpath, fname, ~] = fileparts(ds.filepath);
+            if ~isempty(outDir), fpath = outDir; end
             outFile = fullfile(fpath, [fname, suffix]);
 
             try
@@ -6672,6 +6882,7 @@ function varargout = dataImportGUI()
             delete(findall(targetAx, 'Tag', 'GUIPeakAnnotation'));
             delete(findall(targetAx, 'Tag', 'GUISNIPBackground'));
             delete(findall(targetAx, 'Tag', 'GUIZoomBox'));
+            delete(findall(targetAx, 'Tag', 'GUIRefLine'));
             delete(targetAx.Children);
             cla(targetAx);
             % cla() removes plot children but DOES NOT reset XLim/YLim — MATLAB
@@ -6979,10 +7190,36 @@ function varargout = dataImportGUI()
                         if isfield(ds,'legendName') && ~isempty(ds.legendName)
                             dispName = ds.legendName;
                         end
-                        plot(targetAx, xVecPrimary(good), yPrimary(good), lsPrimary{:}, ...
-                            'Color',       baseColor, ...
-                            'HitTest',     'off', ...
-                            'DisplayName', dispName);
+                        % Auto-detect error column for this y-channel (#4, #17)
+                        errIdx = findErrorColumn(primaryD.labels, ySel{k});
+                        if ~isempty(errIdx) && ~waterfallOn
+                            yErr = primaryD.values(:, errIdx);
+                            if ctFactor > 0, yErr = yErr / ctFactor; end
+                            yErrGood = yErr(good);
+
+                            if strcmp(appData.style, 'ErrorBand')
+                                % Shaded error band (#17)
+                                xFill = [xVecPrimary(good); flipud(xVecPrimary(good))];
+                                yFill = [yPrimary(good) + yErrGood; flipud(yPrimary(good) - yErrGood)];
+                                fill(targetAx, xFill, yFill, baseColor, ...
+                                    'FaceAlpha', 0.2, 'EdgeColor', 'none', ...
+                                    'HitTest', 'off', 'HandleVisibility', 'off');
+                                plot(targetAx, xVecPrimary(good), yPrimary(good), lsPrimary{:}, ...
+                                    'Color', baseColor, 'HitTest', 'off', ...
+                                    'DisplayName', dispName);
+                            else
+                                % Standard error bars via errorbar()
+                                errorbar(targetAx, xVecPrimary(good), yPrimary(good), yErrGood, ...
+                                    'Color', baseColor, 'LineWidth', 1.0, ...
+                                    'CapSize', 3, 'HitTest', 'off', ...
+                                    'DisplayName', dispName);
+                            end
+                        else
+                            plot(targetAx, xVecPrimary(good), yPrimary(good), lsPrimary{:}, ...
+                                'Color',       baseColor, ...
+                                'HitTest',     'off', ...
+                                'DisplayName', dispName);
+                        end
                     end
                 end
 
@@ -7178,8 +7415,8 @@ function varargout = dataImportGUI()
                 yyaxis(targetAx, 'left');
             end
 
-            % Legend: on when multi-channel, multi-dataset, raw overlay, or Y2 shown
-            if nY > 1 || nDS > 1 || anyRawShown || hasY2
+            % Legend: controlled by cbShowLegend checkbox (#1)
+            if cbShowLegend.Value && (nY > 1 || nDS > 1 || anyRawShown || hasY2)
                 legend(targetAx,'Location','best','Interpreter','none');
             else
                 legend(targetAx,'off');
@@ -7530,6 +7767,29 @@ function varargout = dataImportGUI()
                             'HitTest',          'off', ...
                             'Tag',              'GUIUserAnnotation', ...
                             'HandleVisibility', 'off');
+                    end
+                    hold(targetAx, 'off');
+                end
+            end
+
+            % ── Reference lines (#11) ────────────────────────────────────────
+            if appData.activeIdx >= 1 && ~isempty(appData.datasets)
+                dsRef = appData.datasets{appData.activeIdx};
+                if isfield(dsRef, 'refLines') && ~isempty(dsRef.refLines)
+                    hold(targetAx, 'on');
+                    for ri = 1:numel(dsRef.refLines)
+                        rl = dsRef.refLines{ri};
+                        if strcmp(rl.orientation, 'horizontal')
+                            yline(targetAx, rl.value, rl.style, ...
+                                'Color', rl.color, 'LineWidth', 1.2, ...
+                                'HitTest', 'off', 'HandleVisibility', 'off', ...
+                                'Tag', 'GUIRefLine');
+                        else
+                            xline(targetAx, rl.value, rl.style, ...
+                                'Color', rl.color, 'LineWidth', 1.2, ...
+                                'HitTest', 'off', 'HandleVisibility', 'off', ...
+                                'Tag', 'GUIRefLine');
+                        end
                     end
                     hold(targetAx, 'off');
                 end
@@ -8264,6 +8524,7 @@ function varargout = dataImportGUI()
 
         % Map dropdown choice to file extension and exportgraphics options
         fmtStr = ddFigFormat.Value;
+        isFigFormat = strcmp(fmtStr, 'MATLAB .fig');
         switch fmtStr
             case 'PNG (300 dpi)'
                 ext      = '.png';
@@ -8281,6 +8542,10 @@ function varargout = dataImportGUI()
                 ext      = '.tif';
                 fmtFilter = {'*.tif','TIFF image (*.tif)'};
                 egOpts   = {'ContentType','image','Resolution',300};
+            case 'MATLAB .fig'
+                ext      = '.fig';
+                fmtFilter = {'*.fig','MATLAB figure (*.fig)'};
+                egOpts   = {};
             otherwise
                 ext      = '.png';
                 fmtFilter = {'*.png','PNG image (*.png)'};
@@ -8296,23 +8561,31 @@ function varargout = dataImportGUI()
         if isequal(fname, 0), return; end
         outPath = fullfile(fpath, fname);
 
+        % Use custom figure dimensions from efFigWidth/efFigHeight (#7)
+        figW = efFigWidth.Value;
+        figH = efFigHeight.Value;
+
         % Render into a hidden figure
         tmpFig = figure('Visible','off','Name','SaveFig','NumberTitle','off', ...
                         'MenuBar','none','ToolBar','none', ...
-                        'Units','inches','Position',[0 0 7 5]);
+                        'Units','inches','Position',[0 0 figW figH]);
         tmpAx = axes(tmpFig);
         box(tmpAx,'on');
         grid(tmpAx,'on');
         drawToAxes(tmpAx);
         styleAxesForExport(tmpAx);
         try
-            exportgraphics(tmpFig, outPath, egOpts{:});
+            if isFigFormat
+                savefig(tmpFig, outPath);  % #20: MATLAB .fig format
+            else
+                exportgraphics(tmpFig, outPath, egOpts{:});
+            end
             delete(tmpFig);
             uialert(fig, sprintf('Saved:\n%s', outPath), 'Figure Saved');
         catch ME
             delete(tmpFig);
             logGUIError('Save error (exportgraphics)', ME.message, ME);
-            uialert(fig, sprintf('exportgraphics failed:\n%s', ME.message), 'Save error');
+            uialert(fig, sprintf('Export failed:\n%s', ME.message), 'Save error');
         end
     end
 
@@ -8380,6 +8653,7 @@ function varargout = dataImportGUI()
         savedY2Sel     = ensureCell(lbY2.Value);
         savedLogX      = cbLogX.Value;
         savedLogY      = cbLogY.Value;
+        savedBGInterp  = ddBGInterp.Value;
 
         setStatus('Saving session...');
         fig.Pointer = 'watch';
@@ -8391,6 +8665,7 @@ function varargout = dataImportGUI()
                           'savedColormap', 'savedXSel', ...
                           'savedYSel', 'savedY2Sel', ...
                           'savedLogX', 'savedLogY', ...
+                          'savedBGInterp', ...
                           '-v7.3');
             fig.Pointer = 'arrow';
             setStatus(sprintf('Session saved: %s', fname));
@@ -8454,10 +8729,27 @@ function varargout = dataImportGUI()
                  'Data should load correctly; re-import files to attach version metadata.'], nLegacy);
         end
 
-        % Backward-compat: ensure snipBackground field exists for old sessions
+        % Backward-compat: ensure all expected fields exist for old sessions (#14)
+        sessionDefaults = struct( ...
+            'snipBackground', struct('x', [], 'bg', []), ...
+            'derivativeMode', 'None', ...
+            'refLines', {{}}, ...
+            'undoStack', {{}}, ...
+            'normMethod', 'None', ...
+            'xTrimMin', NaN, ...
+            'xTrimMax', NaN, ...
+            'legendName', '', ...
+            'legendNameR', '', ...
+            'color', [], ...
+            'colorR', [], ...
+            'annotations', {{}}, ...
+            'visible', true);
+        fnames = fieldnames(sessionDefaults);
         for di = 1:numel(appData.datasets)
-            if ~isfield(appData.datasets{di}, 'snipBackground')
-                appData.datasets{di}.snipBackground = struct('x', [], 'bg', []);
+            for fi = 1:numel(fnames)
+                if ~isfield(appData.datasets{di}, fnames{fi})
+                    appData.datasets{di}.(fnames{fi}) = sessionDefaults.(fnames{fi});
+                end
             end
         end
 
@@ -8472,6 +8764,9 @@ function varargout = dataImportGUI()
         end
         if isfield(S,'savedLogX'), cbLogX.Value = S.savedLogX; end
         if isfield(S,'savedLogY'), cbLogY.Value = S.savedLogY; end
+        if isfield(S,'savedBGInterp') && ismember(S.savedBGInterp, ddBGInterp.Items)
+            ddBGInterp.Value = S.savedBGInterp;
+        end
 
         % Restore plot style button appearance
         onStylePick(appData.style);
@@ -8876,6 +9171,272 @@ function varargout = dataImportGUI()
     end
 
     % Return api struct only when caller requests it (suppress command-window dump)
+    % ════════════════════════════════════════════════════════════════════
+    %  NEW FEATURE CALLBACKS (added 2026-03-14)
+    % ════════════════════════════════════════════════════════════════════
+
+    function onDuplicateDataset(~,~)
+    %ONDUPLICATEDATASET  Deep-copy the active dataset for side-by-side comparison (#9).
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig,'Load a file first.','No data'); return;
+        end
+        ds = appData.datasets{appData.activeIdx};
+        dsCopy = ds;
+        dsCopy.corrData = [];  % start fresh corrections on the copy
+        dsCopy.undoState = struct();
+        dsCopy.undoStack = {};
+        [~, fn, fext] = fileparts(ds.filepath);
+        dsCopy.displayName = [fn fext ' (copy)'];
+        dsCopy.legendName  = [fn fext ' (copy)'];
+        appData.datasets{end+1} = dsCopy;
+        appData.activeIdx = numel(appData.datasets);
+        rebuildDatasetList(true);
+        updateControlsForActiveDataset();
+        onPlot([],[]);
+    end
+
+    function onAddHRefLine(~,~)
+    %ONADDHREFLINE  Add a horizontal reference line at a user-specified Y value (#11).
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        answer = inputdlg('Y value for horizontal line:', 'H Reference Line', [1 40], {'0'});
+        if isempty(answer), return; end
+        val = str2double(answer{1});
+        if isnan(val), uialert(fig, 'Invalid number.', 'Error'); return; end
+        ds = appData.datasets{appData.activeIdx};
+        if ~isfield(ds, 'refLines'), ds.refLines = {}; end
+        ds.refLines{end+1} = struct('orientation','horizontal','value',val, ...
+            'color',[0.5 0.5 0.5],'style','--');
+        appData.datasets{appData.activeIdx} = ds;
+        onPlot([],[]);
+    end
+
+    function onAddVRefLine(~,~)
+    %ONADDVREFLINE  Add a vertical reference line at a user-specified X value (#11).
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        answer = inputdlg('X value for vertical line:', 'V Reference Line', [1 40], {'0'});
+        if isempty(answer), return; end
+        val = str2double(answer{1});
+        if isnan(val), uialert(fig, 'Invalid number.', 'Error'); return; end
+        ds = appData.datasets{appData.activeIdx};
+        if ~isfield(ds, 'refLines'), ds.refLines = {}; end
+        ds.refLines{end+1} = struct('orientation','vertical','value',val, ...
+            'color',[0.5 0.5 0.5],'style','--');
+        appData.datasets{appData.activeIdx} = ds;
+        onPlot([],[]);
+    end
+
+    function onClearRefLines(~,~)
+    %ONCLEARREFLINES  Remove all reference lines from the active dataset (#11).
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        ds = appData.datasets{appData.activeIdx};
+        ds.refLines = {};
+        appData.datasets{appData.activeIdx} = ds;
+        onPlot([],[]);
+    end
+
+    function onCopyPeaksToClipboard(~,~)
+    %ONCOPYPEAKSTOCLIPBOARD  Copy peak table as tab-delimited text to clipboard (#10).
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig,'Load a file first.','No data'); return;
+        end
+        ds = appData.datasets{appData.activeIdx};
+        if isempty(ds.peaks)
+            uialert(fig,'No peaks to copy.','No peaks'); return;
+        end
+        hdr = {'#','Center','d(A)','Size(nm)','FWHM','Height','Area','eta','Status'};
+        lines = {strjoin(hdr, char(9))};
+        for pi = 1:numel(ds.peaks)
+            pk = ds.peaks(pi);
+            dStr  = guiTernary(isfield(pk,'dSpacing') && ~isnan(pk.dSpacing), sprintf('%.4f',pk.dSpacing), '');
+            szStr = guiTernary(isfield(pk,'crystSize') && ~isnan(pk.crystSize), sprintf('%.1f',pk.crystSize), '');
+            areaStr = guiTernary(isfield(pk,'area') && ~isnan(pk.area), sprintf('%.4g',pk.area), '');
+            etaStr  = guiTernary(isfield(pk,'eta') && ~isnan(pk.eta), sprintf('%.3f',pk.eta), '');
+            row = sprintf('%d\t%.4f\t%s\t%s\t%.4f\t%.4g\t%s\t%s\t%s', ...
+                pi, pk.center, dStr, szStr, pk.fwhm, pk.height, areaStr, etaStr, pk.status);
+            lines{end+1} = row; %#ok<AGROW>
+        end
+        clipboard('copy', strjoin(lines, newline));
+        setStatus(sprintf('Copied %d peak(s) to clipboard.', numel(ds.peaks)));
+    end
+
+    function onEstimateBaseline(~,~)
+    %ONESTIMATEBASELINE  Estimate and subtract baseline via SNIP algorithm (#5).
+    %  Uses utilities.estimateBackground (peak-clipping) to compute a baseline,
+    %  then subtracts it from all Y channels. The baseline is stored as a new
+    %  dataset for visual comparison. Works best on XRD data with sharp peaks.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig,'Load a file first.','No data'); return;
+        end
+        ds = appData.datasets{appData.activeIdx};
+        d = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
+        if isdatetime(d.time)
+            uialert(fig,'Baseline estimation requires numeric x-axes.','Error'); return;
+        end
+        % Ask for max window parameter
+        answer = inputdlg({'Max window (x-axis units):', 'Smooth passes:'}, ...
+            'SNIP Baseline Estimation', [1 40], {'2.0', '3'});
+        if isempty(answer), return; end
+        maxWin = str2double(answer{1});
+        smoothP = round(str2double(answer{2}));
+        if isnan(maxWin) || isnan(smoothP) || maxWin <= 0
+            uialert(fig,'Invalid parameters.','Error'); return;
+        end
+        xVec = double(d.time);
+        bgAll = zeros(size(d.values));
+        for k = 1:size(d.values, 2)
+            bgAll(:, k) = utilities.estimateBackground(xVec, d.values(:, k), ...
+                'MaxWindowDeg', maxWin, 'SmoothPasses', smoothP);
+        end
+        % Subtract baseline and store as corrected data
+        if isempty(ds.corrData)
+            ds.corrData = d;
+        end
+        ds.corrData.values = d.values - bgAll;
+        appData.datasets{appData.activeIdx} = ds;
+        % Also add the baseline as a separate dataset for visual comparison
+        bgData = d;
+        bgData.values = bgAll;
+        bgData.labels = cellfun(@(lbl) ['BG: ' lbl], d.labels, 'UniformOutput', false);
+        dsNew = buildDs(ds.filepath, bgData, 'baseline');
+        [~, fn, fext] = fileparts(ds.filepath);
+        dsNew.displayName = [fn fext ' (baseline)'];
+        dsNew.legendName  = [fn fext ' (baseline)'];
+        appData.datasets{end+1} = dsNew;
+        rebuildDatasetList(true);
+        onPlot([],[]);
+        setStatus(sprintf('Baseline subtracted (SNIP, window=%.1f).', maxWin));
+    end
+
+    function onResampleDataset(~,~)
+    %ONRESAMPLEDATASET  Resample active dataset to a uniform x-grid (#15).
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig,'Load a file first.','No data'); return;
+        end
+        ds = appData.datasets{appData.activeIdx};
+        d = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
+        if isdatetime(d.time)
+            uialert(fig,'Cannot resample datetime x-axes.','Error'); return;
+        end
+        xVec = double(d.time);
+        xLo = min(xVec); xHi = max(xVec);
+        nPts = numel(xVec);
+        answer = inputdlg({'X min:', 'X max:', 'Number of points:'}, ...
+            'Resample Dataset', [1 40], {num2str(xLo), num2str(xHi), num2str(nPts)});
+        if isempty(answer), return; end
+        newXMin = str2double(answer{1}); newXMax = str2double(answer{2});
+        newN    = round(str2double(answer{3}));
+        if isnan(newXMin) || isnan(newXMax) || isnan(newN) || newN < 2
+            uialert(fig,'Invalid parameters.','Error'); return;
+        end
+        newX = linspace(newXMin, newXMax, newN)';
+        newVals = zeros(newN, size(d.values, 2));
+        for k = 1:size(d.values, 2)
+            newVals(:, k) = interp1(xVec, d.values(:, k), newX, 'pchip', NaN);
+        end
+        resD = d;
+        resD.time   = newX;
+        resD.values = newVals;
+        dsNew = buildDs(ds.filepath, resD, 'resampled');
+        [~, fn, fext] = fileparts(ds.filepath);
+        dsNew.displayName = [fn fext ' (resampled)'];
+        dsNew.legendName  = [fn fext ' (resampled)'];
+        appData.datasets{end+1} = dsNew;
+        appData.activeIdx = numel(appData.datasets);
+        rebuildDatasetList(true);
+        updateControlsForActiveDataset();
+        onPlot([],[]);
+    end
+
+    function onColumnCalculator(~,~)
+    %ONCOLUMNCALCULATOR  Per-dataset column math dialog (#16).
+    %  Creates a new Y column from an expression using existing column names.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig,'Load a file first.','No data'); return;
+        end
+        ds = appData.datasets{appData.activeIdx};
+        d = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
+        colInfo = cell(1, numel(d.labels));
+        for ci = 1:numel(d.labels)
+            colInfo{ci} = sprintf('  C%d = %s', ci, d.labels{ci});
+        end
+        prompt = sprintf(['Create a new column from existing columns.\n\n' ...
+                          'Available columns:\n%s\n\n' ...
+                          'Use C1, C2, ... or col("Name").\n' ...
+                          'Examples: C1./C2,  log10(C1),  C1*1e3'], ...
+                          strjoin(colInfo, '\n'));
+        answer = inputdlg({prompt, 'New column name:'}, ...
+            'Column Calculator', [1 60; 1 40], {'C1 ./ C2', 'Derived'});
+        if isempty(answer), return; end
+        expr = strtrim(answer{1});
+        colName = strtrim(answer{2});
+        if isempty(expr) || isempty(colName), return; end
+        try
+            % Build column variables
+            colVars = struct();
+            for ci = 1:numel(d.labels)
+                colVars.(sprintf('C%d', ci)) = d.values(:, ci);
+            end
+            % Replace C<N> references
+            safeExpr = expr;
+            for ci = sort(1:numel(d.labels), 'descend')
+                safeExpr = strrep(safeExpr, sprintf('C%d', ci), sprintf('colVars.C%d', ci));
+            end
+            yResult = eval(safeExpr); %#ok<EVLC>
+            if ~isnumeric(yResult) || numel(yResult) ~= size(d.values, 1)
+                error('Result must be a vector with %d elements.', size(d.values, 1));
+            end
+            % Append new column
+            d.values = [d.values, yResult(:)];
+            d.labels{end+1} = colName;
+            d.units{end+1}  = '';
+            if ~isempty(ds.corrData)
+                ds.corrData = d;
+            else
+                ds.data = d;
+            end
+            appData.datasets{appData.activeIdx} = ds;
+            updateControlsForActiveDataset();
+            onPlot([],[]);
+            setStatus(sprintf('Added column "%s".', colName));
+        catch ME
+            uialert(fig, sprintf('Expression error:\n%s', ME.message), 'Column Calculator Error');
+        end
+    end
+
+    function onCreateInset(~,~)
+    %ONCREATEINSET  Create an inset axes showing a zoomed region (#18).
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig,'Load a file first.','No data'); return;
+        end
+        answer = inputdlg({'X min:', 'X max:', 'Y min:', 'Y max:'}, ...
+            'Inset Region', [1 40], ...
+            {num2str(ax.XLim(1)), num2str(ax.XLim(2)), ...
+             num2str(ax.YLim(1)), num2str(ax.YLim(2))});
+        if isempty(answer), return; end
+        xLo = str2double(answer{1}); xHi = str2double(answer{2});
+        yLo = str2double(answer{3}); yHi = str2double(answer{4});
+        if any(isnan([xLo xHi yLo yHi])), return; end
+
+        % Create inset axes in top-right corner of the main axes
+        axPos = getpixelposition(ax, true);
+        insetW = axPos(3) * 0.35;
+        insetH = axPos(4) * 0.35;
+        insetPos = [axPos(1)+axPos(3)-insetW-20, axPos(2)+axPos(4)-insetH-20, insetW, insetH];
+        if isfield(appData, 'insetAx') && ~isempty(appData.insetAx) && isvalid(appData.insetAx)
+            delete(appData.insetAx);
+        end
+        insetAx = axes(fig, 'Units', 'pixels', 'Position', insetPos);
+        box(insetAx, 'on'); grid(insetAx, 'on');
+        insetAx.FontSize = 8;
+        drawToAxes(insetAx);
+        insetAx.XLim = [xLo xHi];
+        insetAx.YLim = [yLo yHi];
+        legend(insetAx, 'off');
+        title(insetAx, '');
+        xlabel(insetAx, ''); ylabel(insetAx, '');
+        appData.insetAx = insetAx;
+    end
+
     if nargout > 0
         varargout{1} = api;
     end
@@ -8886,6 +9447,31 @@ end  % dataImportGUI
 % ════════════════════════════════════════════════════════════════════════
 %  Module-level helpers  (stateless — no access to GUI handles)
 % ════════════════════════════════════════════════════════════════════════
+
+function idx = findErrorColumn(labels, yLabel)
+%FINDERRORCOLUMN  Find an error/uncertainty column matching a given y-channel label.
+%  Heuristic: look for labels containing 'err', 'std', 'sigma', or 'd<Label>'.
+%  Returns the column index or [] if none found.
+    idx = [];
+    candidates = { ...
+        ['d' yLabel], ...        % e.g., 'dMoment' for 'Moment'
+        [yLabel ' err'], ...     % e.g., 'Moment err'
+        [yLabel ' Err'], ...
+        ['M. Std. Err.'], ...    % QD VSM standard error
+        [yLabel ' std'], ...
+        [yLabel ' sigma'] };
+    for ci = 1:numel(candidates)
+        ii = find(strcmpi(labels, candidates{ci}), 1);
+        if ~isempty(ii), idx = ii; return; end
+    end
+    % Fallback: any label containing 'err' or 'std' (case-insensitive)
+    for li = 1:numel(labels)
+        lbl = lower(labels{li});
+        if (contains(lbl, 'err') || contains(lbl, 'std')) && ~strcmpi(labels{li}, yLabel)
+            idx = li; return;
+        end
+    end
+end
 
 function merged = deduplicatePeaks(peaks, minSep)
 %DEDUPLICATEPEAKS  Remove peaks within minSep of each other.
@@ -8950,6 +9536,8 @@ function ds = buildDs(fp, data, parserName)
     ds.filmThickness  = [];   % struct with FFT-derived film thickness (set by FFT Thickness)
     ds.williamsonHall = [];   % struct with W-H analysis results (set by W-H Plot)
     ds.snipBackground = struct('x', [], 'bg', []);  % SNIP-estimated background (set by Auto Peak)
+    ds.derivativeMode = 'None';   % 'None', 'dY/dX', 'd²Y/dX²' — applied in corrections pipeline
+    ds.refLines       = {};       % Cell array of structs: {orientation, value, color, style}
 end
 
 
