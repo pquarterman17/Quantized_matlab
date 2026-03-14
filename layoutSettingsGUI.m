@@ -20,7 +20,7 @@ function layoutSettingsGUI(applyFn, currentSettings, defaultSettings, prefsFile)
 %   .ctrlPanelW - Dataset controls panel width (px, left sidebar)
 %   .corrPanelW - Corrections panel width (px)
 %   .axLimPanelW- Axes & Appearance panel width (px)
-%   .toolbarH   - Toolbar / dataset-list area height (px, row 1 of rootGL)
+%   .fileListW  - File-list panel width (px, col 1 of contentGL; the file browser sidebar)
 %
 % ════════════════════════════════════════════════════════════════════════
 
@@ -111,13 +111,13 @@ spCtrlW = uispinner(tbGL, 'Value', currentSettings.ctrlPanelW, ...
     'Tooltip', 'Width of the left-side Controls panel containing the dataset list');
 spCtrlW.Layout.Row = 1; spCtrlW.Layout.Column = [2 4];
 
-uilabel(tbGL, 'Text', 'Toolbar area height:', 'FontSize', 10);
+uilabel(tbGL, 'Text', 'File-list panel width:', 'FontSize', 10);
 uilabel(tbGL, 'Text', '', 'FontSize', 9);
 uilabel(tbGL, 'Text', '', 'FontSize', 9);
-spToolbarH = uispinner(tbGL, 'Value', currentSettings.toolbarH, ...
+spFileListW = uispinner(tbGL, 'Value', currentSettings.fileListW, ...
     'Limits', [80 300], 'Step', 5, ...
-    'Tooltip', 'Height of the top toolbar area (dataset list + buttons, row 1 of root grid)');
-spToolbarH.Layout.Row = 2; spToolbarH.Layout.Column = 4;
+    'Tooltip', 'Width of the file-list sidebar (dataset browser, col 1 of the top row)');
+spFileListW.Layout.Row = 2; spFileListW.Layout.Column = 4;
 
 % ── Row 4: status label ───────────────────────────────────────────────
 lblStatus = uilabel(mainGL, 'Text', '', 'FontSize', 9, ...
@@ -166,7 +166,7 @@ btnClose.Layout.Row = 1; btnClose.Layout.Column = 4;
         s.ctrlPanelW = spCtrlW.Value;
         s.corrPanelW = spCorrW.Value;
         s.axLimPanelW = spAxLimW.Value;
-        s.toolbarH   = spToolbarH.Value;
+        s.fileListW   = spFileListW.Value;
     end
 
     function onApply(~,~)
@@ -200,7 +200,7 @@ btnClose.Layout.Row = 1; btnClose.Layout.Column = 4;
         spCtrlW.Value     = defaultSettings.ctrlPanelW;
         spCorrW.Value     = defaultSettings.corrPanelW;
         spAxLimW.Value    = defaultSettings.axLimPanelW;
-        spToolbarH.Value  = defaultSettings.toolbarH;
+        spFileListW.Value  = defaultSettings.fileListW;
         lblStatus.Text    = 'Reset to factory defaults (click Apply to use).';
         lblStatus.FontColor = [0.45 0.35 0.0];
     end

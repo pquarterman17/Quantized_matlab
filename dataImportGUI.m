@@ -283,7 +283,7 @@ function varargout = dataImportGUI()
                    'AutoResizeChildren','off');
     MIN_FIG_H = 820;   % minimum height so the analysis panel is never clipped
     LAYOUT_DEFAULTS = struct('figW',1080,'figH',1000,'ctrlPanelW',215, ...
-        'corrPanelW',350,'axLimPanelW',220,'toolbarH',90);
+        'corrPanelW',350,'axLimPanelW',220,'fileListW',170);
     PREFS_FILE = fullfile(fileparts(mfilename('fullpath')),'layoutPrefs.mat');
     fig.SizeChangedFcn = @onFigSizeChanged;
     try
@@ -1404,15 +1404,15 @@ function varargout = dataImportGUI()
     % dropped anywhere in the window is caught.
     dropSurfaces = {ctrlPanel, axPanel, ax, analysisPanel, ...
                     corrPanel, axLimPanel, savePanel, peakPanel, lbDatasets};
-    for dsi = 1:numel(dropSurfaces)
+    for surf_i = 1:numel(dropSurfaces)
         try
-            dropSurfaces{dsi}.AllowDrop = true;   % R2024a+: must opt-in before DropFcn fires
-            dropSurfaces{dsi}.DropFcn   = @onDropFiles;
+            dropSurfaces{surf_i}.AllowDrop = true;   % R2024a+: must opt-in before DropFcn fires
+            dropSurfaces{surf_i}.DropFcn   = @onDropFiles;
         catch
             % Component does not support AllowDrop/DropFcn on this MATLAB version — skip
         end
     end
-    clear dsi dropSurfaces;
+    clear surf_i dropSurfaces;
 
     % ── Load persistent layout prefs (if saved) ──────────────────────────
     if isfile(PREFS_FILE)
@@ -2321,7 +2321,8 @@ function varargout = dataImportGUI()
                           btnApply, btnReset, btnApplyAll, btnUndo, ...
                           cbSmooth, efSmoothWin, ddSmoothMethod, ...
                           efXTrimMin, efXTrimMax, ddNormalize}
-                    hh{1}.Enable = 'on';                end
+                    hh{1}.Enable = 'on'; %#ok<FXSET>
+                end
                 analysisPanel.Title   = 'Analysis & Corrections  —  XRD';
                 lblXOff.Text          = '2θ Offset (°):';
                 efXOffset.Tooltip     = '2θ-offset: 2θ_corrected = 2θ − this value  (0 = no shift)';
@@ -2347,7 +2348,8 @@ function varargout = dataImportGUI()
                 for hh = {ddFitModel, btnFitPeaks, btnFitAllPeaks, btnClearPeaks, ...
                           btnRemovePeak, btnSavePeaks, btnExportPeakXLSX, chkShowFit, ...
                           btnFitColor, btnWHPlot, btnFFTThickness, btnRefineLattice, btnReflFFT}
-                    hh{1}.Visible = 'on';                end
+                    hh{1}.Visible = 'on'; %#ok<FXSET>
+                end
                 % Hide asymmetry rows (save 48px); restore BG rows
                 corrGL.RowHeight{7}  = 24; corrGL.RowHeight{8}  = 24;
                 corrGL.RowHeight{15} = 0;  corrGL.RowHeight{16} = 0;
@@ -2358,7 +2360,8 @@ function varargout = dataImportGUI()
                           btnApply, btnReset, btnApplyAll, btnUndo, ...
                           cbSmooth, efSmoothWin, ddSmoothMethod, ...
                           efXTrimMin, efXTrimMax, ddNormalize}
-                    hh{1}.Enable = 'on';                end
+                    hh{1}.Enable = 'on'; %#ok<FXSET>
+                end
                 analysisPanel.Title   = 'Analysis & Corrections  —  VSM';
                 lblXOff.Text          = 'Field Offset:';
                 efXOffset.Tooltip     = 'Field offset: H_corrected = H − this value  (0 = no shift)';
@@ -2389,7 +2392,8 @@ function varargout = dataImportGUI()
                           btnApply, btnReset, btnApplyAll, btnUndo, ...
                           cbSmooth, efSmoothWin, ddSmoothMethod, ...
                           efXTrimMin, efXTrimMax, ddNormalize}
-                    hh{1}.Enable = 'on';                end
+                    hh{1}.Enable = 'on'; %#ok<FXSET>
+                end
                 analysisPanel.Title   = 'Analysis & Corrections  —  PPMS';
                 lblXOff.Text          = 'X Offset:';
                 efXOffset.Tooltip     = 'X-offset: x_corrected = x − this value  (0 = no shift)';
@@ -2421,10 +2425,12 @@ function varargout = dataImportGUI()
                 % Enable useful corrections (offsets, trim, normalize, apply/reset)
                 for hh = {efXOffset, efYOffset, btnApply, btnReset, btnApplyAll, btnUndo, ...
                           efXTrimMin, efXTrimMax, ddNormalize}
-                    hh{1}.Enable = 'on';                end
+                    hh{1}.Enable = 'on'; %#ok<FXSET>
+                end
                 % Keep BG slope/intercept and smoothing disabled (not meaningful for neutron)
                 for hh = {efBGSlope, efBGIntercept, cbSmooth, efSmoothWin, ddSmoothMethod}
-                    hh{1}.Enable = 'off';                end
+                    hh{1}.Enable = 'off'; %#ok<FXSET>
+                end
                 lblBGSlope.Text = 'BG Slope:';
                 lblBGInt.Text   = 'BG Intercept:';
                 btnFitBG.Visible           = 'off';
@@ -2442,7 +2448,8 @@ function varargout = dataImportGUI()
                 for hh = {ddFitModel, btnFitPeaks, btnFitAllPeaks, btnClearPeaks, ...
                           btnRemovePeak, btnSavePeaks, btnExportPeakXLSX, chkShowFit, ...
                           btnFitColor, btnWHPlot, btnFFTThickness, btnRefineLattice}
-                    hh{1}.Visible = 'off';                end
+                    hh{1}.Visible = 'off'; %#ok<FXSET>
+                end
                 btnReflFFT.Visible = 'on';
                 % Hide BG file rows (not applicable); show asymmetry rows
                 corrGL.RowHeight{7}  = 0;  corrGL.RowHeight{8}  = 0;
@@ -2462,7 +2469,8 @@ function varargout = dataImportGUI()
                           btnApply, btnReset, btnApplyAll, btnUndo, ...
                           cbSmooth, efSmoothWin, ddSmoothMethod, ...
                           efXTrimMin, efXTrimMax, ddNormalize}
-                    hh{1}.Enable = 'on';                end
+                    hh{1}.Enable = 'on'; %#ok<FXSET>
+                end
                 analysisPanel.Title   = 'Analysis & Corrections';
                 lblXOff.Text          = 'X Offset:';
                 efXOffset.Tooltip     = 'X-offset: x_corrected = x − this value  (0 = no shift)';
@@ -2498,7 +2506,8 @@ function varargout = dataImportGUI()
                       btnApply, btnReset, btnApplyAll, btnUndo, ...
                       cbSmooth, efSmoothWin, ddSmoothMethod, ...
                       efXTrimMin, efXTrimMax, ddNormalize}
-                hh{1}.Enable = 'off';            end
+                hh{1}.Enable = 'off'; %#ok<FXSET>
+            end
             btnFitBG.Visible           = 'off';
             btnPickY.Visible           = 'off';
             btnYTranslate.Visible      = 'off';
@@ -3260,8 +3269,8 @@ function varargout = dataImportGUI()
             K         = appData.kFactor;
             inst_rad  = appData.instBroadening_deg * (pi / 180);
             DEG2RAD   = pi / 180;
-            for pi = 1:numel(ds.peaks)
-                pk      = ds.peaks(pi);
+            for pki = 1:numel(ds.peaks)
+                pk      = ds.peaks(pki);
                 fwhmStr = guiTernary(isnan(pk.fwhm) || pk.fwhm <= 0, '', sprintf('%.6f', pk.fwhm));
                 areaStr = guiTernary(isnan(pk.area) || pk.area <= 0, '', sprintf('%.6g', pk.area));
                 canCalc = ~isnan(wl_A) && ~isnan(pk.center) && pk.center > 0;
@@ -3282,7 +3291,7 @@ function varargout = dataImportGUI()
                     sizeStr = '';
                 end
                 fprintf(fid, '%d,%.6f,%s,%s,%s,%.6g,%s,%s\n', ...
-                    pi, pk.center, dStr, sizeStr, fwhmStr, pk.height, areaStr, pk.status);
+                    pki, pk.center, dStr, sizeStr, fwhmStr, pk.height, areaStr, pk.status);
             end
             fclose(fid);
             uialert(fig, sprintf('Saved:\n%s', fp), 'Peak Summary Exported');
@@ -4326,15 +4335,15 @@ function varargout = dataImportGUI()
         inst_rad = appData.instBroadening_deg * DEG2RAD;
 
         validIdx = [];
-        for pi = 1:numel(ds.peaks)
-            pk = ds.peaks(pi);
+        for pki = 1:numel(ds.peaks)
+            pk = ds.peaks(pki);
             isFitted = strcmp(pk.status,'fitted') || strcmp(pk.status,'fitted(global)');
             hasFWHM  = ~isnan(pk.fwhm) && pk.fwhm > 0;
             if isFitted && hasFWHM
                 beta_meas = pk.fwhm * DEG2RAD;
                 beta_sq   = beta_meas^2 - inst_rad^2;
                 if beta_sq > 0
-                    validIdx(end+1) = pi; %#ok<AGROW>
+                    validIdx(end+1) = pki; %#ok<AGROW>
                 end
             end
         end
@@ -5069,7 +5078,7 @@ function varargout = dataImportGUI()
             return;  % User cancelled
         end
 
-        text = strtrim(answer{1});
+        annotText = strtrim(answer{1});
 
         % Add annotation to current dataset
         ds = appData.datasets{appData.activeIdx};
@@ -5078,7 +5087,7 @@ function varargout = dataImportGUI()
         end
 
         % Create annotation struct
-        annot = struct('x', x, 'y', y, 'text', text);
+        annot = struct('x', x, 'y', y, 'text', annotText);
         ds.annotations{end+1} = annot;
 
         appData.datasets{appData.activeIdx} = ds;
@@ -5949,7 +5958,7 @@ function varargout = dataImportGUI()
             'ctrlPanelW', contentGL.ColumnWidth{2}, ...
             'corrPanelW', appData.corrPanelWidth, ...
             'axLimPanelW', appData.axLimPanelWidth, ...
-            'toolbarH',   contentGL.ColumnWidth{1} ...
+            'fileListW',   contentGL.ColumnWidth{1} ...
         );
         layoutSettingsGUI(@applyLayoutSettings, current, LAYOUT_DEFAULTS, PREFS_FILE);
     end
@@ -5962,7 +5971,7 @@ function varargout = dataImportGUI()
         pos(4) = max(s.figH, MIN_FIG_H);
         fig.Position = pos;
         % File-list column width (narrow sidebar)
-        contentGL.ColumnWidth{1} = s.toolbarH;
+        contentGL.ColumnWidth{1} = s.fileListW;
         % Controls panel width
         contentGL.ColumnWidth{2} = s.ctrlPanelW;
         % Corrections and axes+appearance panel widths
