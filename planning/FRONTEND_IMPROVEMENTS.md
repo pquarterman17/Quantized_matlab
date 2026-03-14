@@ -128,7 +128,7 @@ btnCopyClip.Tooltip    = 'Copy the current plot to the clipboard as an image  [C
 
 ---
 
-### M5 — Correction style dropdown tooltip is misleading
+### M5 — Correction style dropdown tooltip is misleading **FIXED**
 **Problem:** `ddCorrStyle` tooltip says `"Choose correction labels"` but selecting a style
 actually changes which controls are visible and which analysis features are enabled
 (peak tools, neutron spin asymmetry, XRD-specific panels).
@@ -165,7 +165,7 @@ btnApply.FontColor = [1 1 1];
 
 ---
 
-### M7 — Peak table columns clip values at narrow widths
+### M7 — Peak table columns clip values at narrow widths **FIXED**
 **Problem:** `peakTable` column widths `{28, 80, 62, 62, 65, 65, 65, 38, 55}` (line 1218)
 clip d-spacing and Size values with many decimal places. The `#` column at 28px is
 oversized for 1–2 digit row numbers.
@@ -211,7 +211,7 @@ end
 
 ---
 
-### L3 — Axis limit placeholder text fails WCAG contrast
+### L3 — Axis limit placeholder text fails WCAG contrast **FIXED**
 **Problem:** Axis limit edit fields use `BackgroundColor=[0.17 0.17 0.17]`. MATLAB's
 default placeholder text renders at ~[0.5 0.5 0.5], giving a contrast ratio of ~2.6:1
 (WCAG AA minimum for normal text is 4.5:1).
@@ -222,7 +222,7 @@ slightly.
 
 ---
 
-### L4 — Default 170px file list clips long filenames
+### L4 — Default file list width clips long filenames **FIXED**
 **Problem:** Scientific filenames like `LaFeO3_300K_MvsH_sweep2.dat` are heavily
 truncated in the 170px list column.
 **Fix:** Raise default `contentGL.ColumnWidth{1}` from `170` to `200`. Also update
@@ -231,7 +231,7 @@ truncated in the 170px list column.
 
 ---
 
-### L6 — "Replot" button name implies plot can be stale
+### L6 — "Replot" button name implies plot can be stale **FIXED**
 **Problem:** Most value-changed callbacks already call `onPlot`. The "Replot" button
 (line 537) suggests manual refresh is sometimes required, which may confuse users.
 **Fix:** Rename to `"Refresh"` and add tooltip: `"Force a full redraw of the current plot"`.
