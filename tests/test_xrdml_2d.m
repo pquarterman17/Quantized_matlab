@@ -11,6 +11,7 @@
 clear; clc;
 
 ROOT     = fileparts(fileparts(mfilename('fullpath')));
+addpath(ROOT);
 FILE_1D  = fullfile(ROOT, '+test_datasets', 'XRDML', 'La2NiO4_1.xrdml');
 FILE_2D  = fullfile(ROOT, '+test_datasets', 'XRDML', 'synthetic_rsm.xrdml');
 GEN_DIR  = fullfile(ROOT, '+test_datasets', 'XRDML');

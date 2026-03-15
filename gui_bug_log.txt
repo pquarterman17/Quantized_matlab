@@ -13,3 +13,129 @@ Stack:
   run  (line 112)
   runSuite  (line 122)
   runAllTests  (line 80)
+
+====================================================================
+[2026-03-14 21:42:11]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 35)
+  guiImport  (line 9732)
+  dataImportGUI/loadFilePaths  (line 1903)
+  dataImportGUI/addFilesDirect  (line 1942)
+  test_gui_harness  (line 484)
+  run  (line 112)
+  runSuite  (line 124)
+  runAllTests  (line 82)
+
+====================================================================
+[2026-03-14 21:44:54]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 35)
+  guiImport  (line 9732)
+  dataImportGUI/loadFilePaths  (line 1903)
+  dataImportGUI/addFilesDirect  (line 1942)
+  test_gui_harness  (line 484)
+  run  (line 112)
+  runSuite  (line 124)
+  runAllTests  (line 82)
+
+====================================================================
+[2026-03-14 21:50:45]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 35)
+  guiImport  (line 9764)
+  dataImportGUI/loadFilePaths  (line 1918)
+  dataImportGUI/addFilesDirect  (line 1957)
+  test_gui_harness  (line 484)
+  run  (line 112)
+  runSuite  (line 124)
+  runAllTests  (line 82)
+
+====================================================================
+[2026-03-14 21:55:45]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 35)
+  guiImport  (line 9794)
+  dataImportGUI/loadFilePaths  (line 1931)
+  dataImportGUI/addFilesDirect  (line 1970)
+  test_gui_harness  (line 484)
+  run  (line 112)
+  runSuite  (line 124)
+  runAllTests  (line 82)
+
+====================================================================
+[2026-03-14 22:03:23]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 35)
+  guiImport  (line 9794)
+  dataImportGUI/loadFilePaths  (line 1931)
+  dataImportGUI/addFilesDirect  (line 1970)
+  test_gui_harness  (line 484)
+  run  (line 112)
+  runSuite  (line 124)
+  runAllTests  (line 82)
+
+====================================================================
+[2026-03-14 22:11:43]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 35)
+  guiImport  (line 9806)
+  dataImportGUI/loadFilePaths  (line 1926)
+  dataImportGUI/addFilesDirect  (line 1965)
+  test_gui_harness  (line 484)
+  run  (line 112)
+  runSuite  (line 124)
+  runAllTests  (line 82)
+
+====================================================================
+[2026-03-14 22:24:25]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 35)
+  guiImport  (line 10062)
+  dataImportGUI/loadFilePaths  (line 2010)
+  dataImportGUI/addFilesDirect  (line 2049)
+  test_gui_harness  (line 484)
+  run  (line 112)
+  runSuite  (line 124)
+  runAllTests  (line 82)
+
+====================================================================
+[2026-03-14 22:27:02]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 35)
+  guiImport  (line 10067)
+  dataImportGUI/loadFilePaths  (line 2010)
+  dataImportGUI/addFilesDirect  (line 2049)
+  test_gui_harness  (line 484)
+  run  (line 112)
+  runSuite  (line 124)
+  runAllTests  (line 82)
+
+====================================================================
+[2026-03-14 22:44:46]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 35)
+  guiImport  (line 10067)
+  dataImportGUI/loadFilePaths  (line 2010)
+  dataImportGUI/addFilesDirect  (line 2049)
+  test_gui_harness  (line 484)
+  run  (line 112)
+  runSuite  (line 124)
+  runAllTests  (line 82)
