@@ -14,6 +14,7 @@ function runAllTests(options)
 %       batch    — batch import and XRD converter integration tests
 %       xrd2d    — 2D area-detector XRDML parser and edge-case tests
 %       gui      — headless GUI API tests (opens/closes figures)
+%       sims     — SIMS depth profile parser tests
 %       all      — all of the above, in order
 %
 %   Examples:
@@ -28,7 +29,7 @@ arguments
 end
 
 options.Group = validatestring(options.Group, ...
-    ["all", "parser", "batch", "xrd2d", "gui"]);
+    ["all", "parser", "batch", "xrd2d", "gui", "sims"]);
 
 % Build absolute paths to test scripts so `run` works regardless of CWD.
 ROOT  = fileparts(mfilename('fullpath'));
@@ -47,6 +48,7 @@ SUITES = {
     T('test_gui_harness'),         'gui',    'GUI API: load, correct, peaks, session'
     T('test_gui_2d'),              'gui',    'GUI API: 2D map load, plot types, cuts'
     T('test_gui_phase4'),          'gui',    'GUI API: Q-space, colormap, mixed datasets'
+    T('test_sims_parser'),         'sims',   'SIMS depth profile parser'
 };
 
 % Filter by group

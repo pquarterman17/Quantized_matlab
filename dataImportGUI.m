@@ -644,7 +644,7 @@ function varargout = dataImportGUI()
     lblCorrStyle.Layout.Row = 1; lblCorrStyle.Layout.Column = 1;
 
     ddCorrStyle = uidropdown(corrGL, ...
-        'Items',           {'Auto (from file)', 'Generic', 'Magnetometry', 'PPMS', 'XRD — 2\theta + BG', 'Neutron NR'}, ...
+        'Items',           {'Auto (from file)', 'Generic', 'Magnetometry', 'PPMS', 'XRD — 2\theta + BG', 'Neutron NR', 'SIMS Depth Profile'}, ...
         'Value',           'Auto (from file)', ...
         'Tooltip',         ['Controls which correction tools and analysis features are shown. '...
             '"Auto" detects from the file type. "XRD" enables peak detection. '...
@@ -2726,6 +2726,8 @@ function varargout = dataImportGUI()
                 lbY.Value = d.labels(rIdx);
             end
             cbLogY.Value = true;
+        elseif isfield(ds, 'parserName') && strcmp(ds.parserName, 'importSIMS')
+            cbLogY.Value = true;  % SIMS concentrations span many decades
         elseif is2DDataset(ds)
             cbLogY.Value = true;  % log intensity is standard for XRD reciprocal-space maps
             % Update map dimension info label
@@ -2911,6 +2913,40 @@ function varargout = dataImportGUI()
                 lblAsymFormula.Enable      = 'on';
                 ddAsymFormula.Enable       = 'on';
 
+            case 'importSIMS'
+                % SIMS depth profiles: enable smoothing, trim, normalize;
+                % disable BG slope/intercept (not meaningful for depth profiles)
+                analysisPanel.Title   = 'Analysis & Corrections  —  SIMS Depth Profile';
+                lblXOff.Text          = 'Depth Offset (nm):';
+                efXOffset.Tooltip     = 'Depth offset: depth_corrected = depth − this value  (0 = no shift)';
+                lblYOff.Text          = 'Conc. Floor:';
+                efYOffset.Tooltip     = 'Concentration floor subtracted from all values  (0 = no shift)';
+                lblBGSlope.Text       = 'BG Slope:';
+                lblBGInt.Text         = 'BG Intercept:';
+                % Enable useful corrections
+                for hh = {efXOffset, efYOffset, btnApply, btnReset, btnApplyAll, btnUndo, ...
+                          cbSmooth, efSmoothWin, ddSmoothMethod, ...
+                          efXTrimMin, efXTrimMax, ddNormalize}
+                    hh{1}.Enable = 'on'; %#ok<FXSET>
+                end
+                % Disable BG slope/intercept (not meaningful for depth profiles)
+                for hh = {efBGSlope, efBGIntercept}
+                    hh{1}.Enable = 'off'; %#ok<FXSET>
+                end
+                btnFitBG.Visible           = 'off';
+                btnPickY.Visible           = 'off';
+                btnYTranslate.Visible      = 'off';
+                btnAutoPeak.Visible        = 'off';
+                btnManualPeak.Visible      = 'off';
+                btnRemovePeakClick.Visible = 'off';
+                % Peak analysis panel — hidden for SIMS
+                peakPanel.Visible          = 'off';
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '7x', 0, '3x'};
+                % Hide asymmetry rows; show BG file rows (for blank subtraction) + baseline
+                corrGL.RowHeight{7}  = 24; corrGL.RowHeight{8}  = 24;
+                corrGL.RowHeight{15} = 0;  corrGL.RowHeight{16} = 0;
+                corrGL.RowHeight{17} = 24; corrGL.RowHeight{18} = 24;
+
             otherwise  % importCSV, importExcel, unknown — generic labels
                 % Hide asymmetry rows (save 48px); restore BG and baseline rows
                 corrGL.RowHeight{7}  = 24; corrGL.RowHeight{8}  = 24;
@@ -2985,6 +3021,8 @@ function varargout = dataImportGUI()
                 pName = 'importRigaku_raw';
             case 'Neutron NR'
                 pName = 'importNCNRDat';
+            case 'SIMS Depth Profile'
+                pName = 'importSIMS';
             case 'Generic'
                 pName = 'importCSV';
             otherwise  % 'Auto (from file)'
@@ -2997,6 +3035,28 @@ function varargout = dataImportGUI()
     end
 
     function onCorrStyleChanged(~,~)
+        % Reimport with SIMS parser when user switches to 'SIMS Depth Profile'
+        % and the active dataset was originally parsed by importCSV
+        if strcmp(ddCorrStyle.Value, 'SIMS Depth Profile') && ...
+                appData.activeIdx >= 1 && ~isempty(appData.datasets)
+            ds = appData.datasets{appData.activeIdx};
+            if isfield(ds, 'parserName') && strcmp(ds.parserName, 'importCSV')
+                try
+                    newData = parser.importSIMS(ds.filepath);
+                    ds.data       = newData;
+                    ds.corrData   = [];
+                    ds.parserName = 'importSIMS';
+                    appData.datasets{appData.activeIdx} = ds;
+                    rebuildDatasetList();
+                    updateControlsForActiveDataset();
+                    onPlot([],[]);
+                    return;  % updateControls already calls applyParserAnalysisConfig
+                catch ME
+                    warning('dataImportGUI:simsReimport', ...
+                        'SIMS reimport failed: %s', ME.message);
+                end
+            end
+        end
         applyParserAnalysisConfig(resolvedCorrStyle());
     end
 
@@ -9580,6 +9640,9 @@ function [data, parserName] = guiImport(fp)
         case 'importCSV'
             data = parser.importCSV(fp);
 
+        case 'importSIMS'
+            data = parser.importSIMS(fp);
+
         case 'importNCNRRefl'
             data = parser.importNCNRRefl(fp);
 
@@ -10005,6 +10068,7 @@ function lbl = guiParserLabel(parserName)
         case 'importLakeShore', lbl = 'Lake Shore Magnetometer';
         case {'importNCNRDat', 'importNCNRRefl'}, lbl = 'NCNR Neutron Reflectometry';
         case 'importNCNRPNR', lbl = 'NCNR Polarized Neutron Reflectometry';
+        case 'importSIMS',    lbl = 'SIMS Depth Profile';
         otherwise,            lbl = parserName;
     end
 end
@@ -10019,6 +10083,8 @@ function badge = getParserBadge(parserName)
             badge = '[MAG]';  % Magnetometry
         case {'importNCNRDat', 'importNCNRRefl', 'importNCNRPNR'}
             badge = '[NR]';   % Neutron Reflectometry
+        case 'importSIMS'
+            badge = '[SIMS]';
         case {'importExcel', 'importCSV'}
             badge = '[DAT]';  % Generic data
         case 'lineCut'

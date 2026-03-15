@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Scientific data analysis toolbox for processing and visualizing magnetometry and generic lab data from laboratory instruments. Supports Quantum Design PPMS/VSM/DynaCool/MPMS, Rigaku XRD, PANalytical XRDML, Bruker XRD, Lake Shore VSM, NCNR neutron reflectometry, and generic CSV/Excel/TSV data.
+Scientific data analysis toolbox for processing and visualizing magnetometry and generic lab data from laboratory instruments. Supports Quantum Design PPMS/VSM/DynaCool/MPMS, Rigaku XRD, PANalytical XRDML, Bruker XRD, Lake Shore VSM, NCNR neutron reflectometry, SIMS depth profiles, and generic CSV/Excel/TSV data.
 
 ## Repository Structure
 
@@ -24,6 +24,7 @@ thin_film_toolkit_matlab/
 │   ├── test_xrdml_2d_edge.m        # Edge cases: missing wavelength, malformed XML, single-frame files
 │   ├── test_gui_2d.m               # 2D GUI API tests (6 tests)
 │   ├── test_gui_phase4.m           # Phase-4 GUI feature tests (annotations, Y2, waterfall, session)
+│   ├── test_sims_parser.m          # SIMS depth profile parser tests (synthetic data)
 │   └── archive_2026-03-10/         # Superseded tests (kept for reference)
 ├── +parser/                # Data import namespace
 │   ├── importAuto.m        # Auto-detect file type and dispatch to correct parser
@@ -40,6 +41,7 @@ thin_film_toolkit_matlab/
 │   ├── importNCNRRefl.m    # NCNR polarized neutron reflectometry .refl files (R vs Q + errors)
 │   ├── importNCNRPNR.m     # NCNR polarized neutron reflectometry .pnr files; cross-section resolved
 │   ├── importNCNRDat.m     # refl1d fit output .datA/.datB/.datC/.datD; theory + data overlay
+│   ├── importSIMS.m        # SIMS depth profile CSV; paired or shared-depth columns; grid merging
 │   └── createDataStruct.m  # Validates and assembles the unified data struct
 ├── +plotting/              # Plot helper functions
 │   ├── formatAxes.m        # Apply theme to an axes object (fonts, grid, labels)
@@ -76,6 +78,7 @@ thin_film_toolkit_matlab/
 | NCNR reflectometry `.refl` | `importNCNRRefl.m` | Polarized neutron reflectometry from NCNR; R vs Q with error bars |
 | NCNR PNR `.pnr` | `importNCNRPNR.m` | Polarized neutron reflectometry; cross-section resolved (R+, R−) |
 | NCNR fit output `.datA/.datB` | `importNCNRDat.m` | refl1d fit output; theory + data overlay; also handles `.datC/.datD` |
+| SIMS depth profile `.csv` | `importSIMS.m` | Paired or shared-depth column layout; per-element grid merging via interpolation |
 
 ## Conventions
 
@@ -183,6 +186,20 @@ data = parser.importXRDML('scan.xrdml');
 utilities.writeXRDcsv(data, 'scan.csv', Format='origin', Intensity='cps');
 ```
 
+### SIMS Depth Profile
+```matlab
+data = parser.importSIMS('sims_profile.csv');
+% data.time = depth grid (nm), data.values = [NxM] concentration matrix
+% data.labels = element names, data.units = concentration units
+
+% Access original per-element depth vectors (before grid merging)
+origD = data.metadata.parserSpecific.originalDepths;
+origC = data.metadata.parserSpecific.originalConcentrations;
+
+% Or use the GUI: load a CSV, switch ddCorrStyle to "SIMS Depth Profile"
+dataImportGUI
+```
+
 ### Neutron reflectometry (NCNR)
 ```matlab
 % Import polarized neutron data
@@ -226,6 +243,7 @@ runAllTests                     % all 11 suites (~2 min including GUI tests)
 runAllTests(Group="parser")     % fast parser smoke tests only (no GUI, ~5 s)
 runAllTests(Group="xrd2d")      % 2D area-detector parser + edge cases
 runAllTests(Group="gui")        % headless GUI API tests
+runAllTests(Group="sims")       % SIMS depth profile parser tests
 runAllTests(Group="batch")      % batchImport / batchConvertXRD integration
 ```
 
@@ -238,6 +256,7 @@ run tests/test_xrdml_2d           % 2D XRDML parser (8 tests)
 run tests/test_xrdml_2d_edge      % edge cases: missing wavelength, malformed XML
 run tests/test_gui_harness        % GUI API (requires display)
 run tests/test_gui_phase4         % phase-4 GUI features (annotations, Y2, session)
+run tests/test_sims_parser        % SIMS depth profile parser (synthetic data)
 ```
 
 ## Key Design Decisions
