@@ -13,13 +13,19 @@
 %   Generated edge-case files go to a temporary directory and are auto-cleaned.
 %   The pre-existing synthetic_rsm.xrdml in +test_datasets is used for 5.6–5.8.
 %
-%   Run from the project root:
-%       run tests/test_xrdml_2d_edge
+%   Run standalone:  cd tests; run test_xrdml_2d_edge
+%   Run from root:   run tests/test_xrdml_2d_edge
 
 clear; clc;
 
-ROOT    = fileparts(fileparts(mfilename('fullpath')));
-addpath(ROOT);
+% Ensure toolbox is on the path
+thisDir = fileparts(mfilename('fullpath'));
+rootDir = fileparts(thisDir);
+if ~contains(path, rootDir)
+    addpath(rootDir);
+end
+
+ROOT = rootDir;
 GEN_DIR = fullfile(ROOT, '+test_datasets', 'XRDML');
 FILE_2D = fullfile(GEN_DIR, 'synthetic_rsm.xrdml');  % 5×10 reference file
 

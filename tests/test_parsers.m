@@ -1,15 +1,20 @@
 %TEST_PARSERS  Quick smoke-test for all +parser functions.
 %
-%   Run from the project root:
-%       cd G:\Onedrive\Coding\git\thin_film_toolkit_matlab
-%       test_parsers
+%   Run standalone:  cd tests; run test_parsers
+%   Run from root:   run tests/test_parsers
 %
 %   Each section prints PASS / FAIL and a brief summary.
 
 clear; clc;
 
-ROOT = fileparts(fileparts(mfilename('fullpath')));  % go up from tests/ to project root
-addpath(ROOT);   % ensure +parser packages are on path
+% Ensure toolbox is on the path
+thisDir = fileparts(mfilename('fullpath'));
+rootDir = fileparts(thisDir);
+if ~contains(path, rootDir)
+    addpath(rootDir);
+end
+
+ROOT = rootDir;
 
 % ── Data file paths ──────────────────────────────────────────────────────
 QD_VSM_FILE = fullfile(ROOT, '+test_datasets', 'QuantumDesign', 'EDP136_Perp_StrawNew.dat');

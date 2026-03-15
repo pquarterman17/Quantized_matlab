@@ -11,7 +11,8 @@ thin_film_toolkit_matlab/
 ├── setupToolbox.m          # Entry point — adds toolbox root to MATLAB path
 ├── dataImportGUI.m         # Interactive uifigure GUI: browse, preview, correct, peaks, export
 ├── xrdConvertGUI.m         # Standalone batch XRD file converter GUI
-├── runAllTests.m           # Master test runner; groups: parser/batch/xrd2d/gui/all
+├── emViewerGUI.m           # Standalone electron microscopy image viewer (TIFF/RAW/DM3/DM4)
+├── runAllTests.m           # Master test runner; groups: parser/batch/xrd2d/gui/em/emgui/all
 ├── tests/                  # All test scripts (run via: run tests/test_parsers)
 │   ├── test_parsers.m              # Smoke tests for all +parser functions
 │   ├── test_importAuto.m           # Smoke tests for parser.importAuto dispatch
@@ -25,6 +26,9 @@ thin_film_toolkit_matlab/
 │   ├── test_gui_2d.m               # 2D GUI API tests (6 tests)
 │   ├── test_gui_phase4.m           # Phase-4 GUI feature tests (annotations, Y2, waterfall, session)
 │   ├── test_sims_parser.m          # SIMS depth profile parser tests (synthetic data)
+│   ├── test_em_parsers.m           # EM image parser tests: importTIFF + importRawImage + importDM3 (synthetic)
+│   ├── test_imaging_utils.m        # Unit tests for all +imaging functions
+│   ├── test_em_gui_harness.m       # Headless emViewerGUI API tests (12 tests)
 │   └── archive_2026-03-10/         # Superseded tests (kept for reference)
 ├── +parser/                # Data import namespace
 │   ├── importAuto.m        # Auto-detect file type and dispatch to correct parser
@@ -42,7 +46,19 @@ thin_film_toolkit_matlab/
 │   ├── importNCNRPNR.m     # NCNR polarized neutron reflectometry .pnr files; cross-section resolved
 │   ├── importNCNRDat.m     # refl1d fit output .datA/.datB/.datC/.datD; theory + data overlay
 │   ├── importSIMS.m        # SIMS depth profile CSV; paired or shared-depth columns; grid merging
+│   ├── importTIFF.m        # TIFF images (8/16/32-bit, grayscale/RGB, multi-page stacks, FEI metadata)
+│   ├── importRawImage.m    # Headerless binary images; requires user-specified Width/Height/BitDepth
+│   ├── importDM3.m         # Gatan DigitalMicrograph DM3/DM4; recursive tag tree; calibration + metadata
 │   └── createDataStruct.m  # Validates and assembles the unified data struct
+├── +imaging/               # EM image processing utilities (no toolbox required)
+│   ├── adjustContrast.m    # Window/level linear stretch; clamps to [Low, High]
+│   ├── applyGaussian.m     # 2D Gaussian filter via conv2 with manual kernel
+│   ├── applyMedian.m       # 2D median filter (vectorised sort; window 3-7)
+│   ├── computeFFT.m        # FFT magnitude/phase display; fft2 + fftshift + log scaling
+│   ├── lineProfile.m       # Intensity along a line via interp2; optional pixel calibration
+│   ├── measureDistance.m   # Calibrated point-to-point Euclidean distance
+│   ├── addScaleBar.m       # Scale bar rectangle + label overlay on axes
+│   └── generateThumbnail.m # Downsample via block-averaging or bilinear interp2
 ├── +plotting/              # Plot helper functions
 │   ├── formatAxes.m        # Apply theme to an axes object (fonts, grid, labels)
 │   ├── lineColors.m        # Return N colours from the active theme palette
@@ -79,6 +95,9 @@ thin_film_toolkit_matlab/
 | NCNR PNR `.pnr` | `importNCNRPNR.m` | Polarized neutron reflectometry; cross-section resolved (R+, R−) |
 | NCNR fit output `.datA/.datB` | `importNCNRDat.m` | refl1d fit output; theory + data overlay; also handles `.datC/.datD` |
 | SIMS depth profile `.csv` | `importSIMS.m` | Paired or shared-depth column layout; per-element grid merging via interpolation |
+| TIFF image `.tif` / `.tiff` | `importTIFF.m` | 8/16/32-bit grayscale or RGB; multi-page stacks; FEI/Thermo Fisher tag 34682 metadata |
+| RAW image `.raw` (headerless) | `importRawImage.m` | Headerless binary; requires explicit Width, Height, BitDepth — not auto-dispatchable |
+| Gatan DM3/DM4 `.dm3` / `.dm4` | `importDM3.m` | Gatan DigitalMicrograph v3/v4 recursive tagged binary; pixel calibration; ImageTags metadata |
 
 ## Conventions
 
@@ -237,14 +256,52 @@ smI    = utilities.smoothData(data.values, 'Window', 9); % Gaussian smooth
 dataImportGUI   % browse, preview, apply corrections, find/fit peaks, export CSV
 ```
 
+### EM Image Viewer
+```matlab
+% Launch the GUI interactively
+emViewerGUI
+
+% Programmatic usage (e.g. in scripts or tests)
+api = emViewerGUI();
+api.loadImages({'sem_image.tif'});
+api.autoContrast();
+api.getLineProfile(10, 10, 200, 200);
+api.close();
+
+% Import EM image data directly from the command line
+data = parser.importTIFF('sem_image.tif');
+img = data.metadata.parserSpecific.imageData;
+imagesc(img.pixels); colormap gray; axis equal tight;
+
+% Gatan DigitalMicrograph DM3 or DM4 (auto-dispatched by importAuto)
+data = parser.importDM3('hrstem_image.dm3');
+img = data.metadata.parserSpecific.imageData;
+imagesc(img.pixels); colormap gray; axis image;
+if img.calibrated
+    title(sprintf('Pixel size: %.4g %s', img.pixelSize, img.pixelUnit));
+end
+
+% Headerless RAW — dimensions must be specified explicitly
+data = parser.importRawImage('raw_image.raw', 'Width', 1024, 'Height', 768, 'BitDepth', 16);
+
+% Imaging utilities
+adjusted = imaging.adjustContrast(img.pixels, 100, 3000);
+smoothed = imaging.applyGaussian(img.pixels, Sigma=2);
+[mag, phase] = imaging.computeFFT(img.pixels);
+[dist, intensity] = imaging.lineProfile(img.pixels, 1, 1, 100, 100, PixelSize=2.4, PixelUnit='nm');
+thumb = imaging.generateThumbnail(img.pixels, MaxSize=256);
+```
+
 ### Running the test suite
 ```matlab
-runAllTests                     % all 11 suites (~2 min including GUI tests)
+runAllTests                     % all suites (~2 min including GUI tests)
 runAllTests(Group="parser")     % fast parser smoke tests only (no GUI, ~5 s)
 runAllTests(Group="xrd2d")      % 2D area-detector parser + edge cases
-runAllTests(Group="gui")        % headless GUI API tests
+runAllTests(Group="gui")        % headless dataImportGUI API tests
 runAllTests(Group="sims")       % SIMS depth profile parser tests
 runAllTests(Group="batch")      % batchImport / batchConvertXRD integration
+runAllTests(Group="em")         % EM image parsers + imaging utilities (no GUI, fast)
+runAllTests(Group="emgui")      % headless emViewerGUI API tests (requires display)
 ```
 
 Individual suites can still be run directly:
@@ -257,6 +314,9 @@ run tests/test_xrdml_2d_edge      % edge cases: missing wavelength, malformed XM
 run tests/test_gui_harness        % GUI API (requires display)
 run tests/test_gui_phase4         % phase-4 GUI features (annotations, Y2, session)
 run tests/test_sims_parser        % SIMS depth profile parser (synthetic data)
+run tests/test_em_parsers         % EM image parsers: importTIFF + importRawImage + importDM3
+run tests/test_imaging_utils      % imaging utilities: contrast, filter, FFT, profile
+run tests/test_em_gui_harness     % EM Viewer GUI API (requires display)
 ```
 
 ## Key Design Decisions

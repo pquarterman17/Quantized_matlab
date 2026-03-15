@@ -1,14 +1,21 @@
 function test_batch_xrd_converter()
 % ════════════════════════════════════════════════════════════════════════
 % Test batch XRD converter for bugs, edge cases, and redundancies.
+%
+%   Run standalone:  cd tests; run test_batch_xrd_converter
+%   Run from root:   run tests/test_batch_xrd_converter
 % ════════════════════════════════════════════════════════════════════════
 
 fprintf('╔════════════════════════════════════════════════════════════════╗\n');
 fprintf('║  BATCH XRD CONVERTER TEST SUITE                                ║\n');
 fprintf('╚════════════════════════════════════════════════════════════════╝\n\n');
 
-% Resolve project root from this file's location (works wherever CWD is)
-ROOT      = fileparts(fileparts(mfilename('fullpath')));
+% Ensure toolbox is on the path
+thisDir = fileparts(mfilename('fullpath'));
+ROOT    = fileparts(thisDir);
+if ~contains(path, ROOT)
+    addpath(ROOT);
+end
 XRDML_FILE = fullfile(ROOT, '+test_datasets', 'XRDML', 'La2NiO4_1.xrdml');
 XRDML_DIR  = fullfile(ROOT, '+test_datasets', 'XRDML');
 

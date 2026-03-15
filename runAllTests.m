@@ -6,7 +6,8 @@ function runAllTests(options)
 %       runAllTests(Group="parser")
 %
 %   Name-Value Options:
-%       Group    "all" (default) | "parser" | "batch" | "gui" | "xrd2d"
+%       Group    "all" (default) | "parser" | "batch" | "gui" | "xrd2d" |
+%                "sims" | "em" | "emgui"
 %                Run only the specified group of test suites.
 %
 %   Groups:
@@ -15,12 +16,16 @@ function runAllTests(options)
 %       xrd2d    — 2D area-detector XRDML parser and edge-case tests
 %       gui      — headless GUI API tests (opens/closes figures)
 %       sims     — SIMS depth profile parser tests
+%       em       — EM image parsers: importTIFF, importRawImage (synthetic data)
+%       emgui    — headless emViewerGUI API tests (opens/closes figures, slower)
 %       all      — all of the above, in order
 %
 %   Examples:
 %       runAllTests                   % full suite
 %       runAllTests(Group="parser")   % fast parser checks only
 %       runAllTests(Group="gui")      % GUI tests only
+%       runAllTests(Group="em")       % EM image parser tests
+%       runAllTests(Group="emgui")    % EM Viewer GUI API tests
 %
 %   Throws an error if any suite fails so CI/scripts can detect failures.
 
@@ -29,7 +34,7 @@ arguments
 end
 
 options.Group = validatestring(options.Group, ...
-    ["all", "parser", "batch", "xrd2d", "gui", "sims"]);
+    ["all", "parser", "batch", "xrd2d", "gui", "sims", "em", "emgui"]);
 
 % Build absolute paths to test scripts so `run` works regardless of CWD.
 ROOT  = fileparts(mfilename('fullpath'));
@@ -49,6 +54,12 @@ SUITES = {
     T('test_gui_2d'),              'gui',    'GUI API: 2D map load, plot types, cuts'
     T('test_gui_phase4'),          'gui',    'GUI API: Q-space, colormap, mixed datasets'
     T('test_sims_parser'),         'sims',   'SIMS depth profile parser'
+    T('test_em_parsers'),          'em',     'EM image parsers: importTIFF + importRawImage'
+    T('test_imaging_utils'),       'em',     'Imaging utilities: contrast, filter, FFT, profile, scale bar, thumbnail'
+    T('test_em_gui_harness'),      'emgui',  'EM Viewer GUI API: load, contrast, filter, FFT, profile, export'
+    T('test_real_dm3'),             'em',     'Real DM3/TIFF files from +test_datasets/Microscopy'
+    T('test_csv_mixed_format'),    'parser', 'CSV mixed/awkward format handling'
+    T('test_new_features'),        'parser', 'Features 4-16: utilities and parser changes'
 };
 
 % Filter by group

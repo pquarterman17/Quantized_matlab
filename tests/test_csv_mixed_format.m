@@ -1,8 +1,7 @@
 %TEST_CSV_MIXED_FORMAT  Tests for importCSV handling of mixed/awkward formats.
 %
-%   Run from the project root:
-%       cd G:\Onedrive\Coding\git\thin_film_toolkit_matlab
-%       tests/test_csv_mixed_format
+%   Run standalone:  cd tests; run test_csv_mixed_format
+%   Run from root:   run tests/test_csv_mixed_format
 %
 %   Covers:
 %     - Empty separator columns between data columns
@@ -15,8 +14,14 @@
 
 clear; clc;
 
-ROOT = fileparts(fileparts(mfilename('fullpath')));
-addpath(ROOT);
+% Ensure toolbox is on the path
+thisDir = fileparts(mfilename('fullpath'));
+rootDir = fileparts(thisDir);
+if ~contains(path, rootDir)
+    addpath(rootDir);
+end
+
+ROOT = rootDir;
 
 passed = 0;
 failed = 0;

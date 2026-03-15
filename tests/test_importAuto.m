@@ -1,8 +1,18 @@
 %TEST_IMPORTAUTO  Quick manual test of parser.importAuto dispatch.
+%
+%   Run standalone:  cd tests; run test_importAuto
+%   Run from root:   run tests/test_importAuto
+
 clear; clc;
 
-ROOT = fileparts(fileparts(mfilename('fullpath')));  % go up from tests/ to project root
-addpath(ROOT);   % ensure +parser packages are on path
+% Ensure toolbox is on the path
+thisDir = fileparts(mfilename('fullpath'));
+rootDir = fileparts(thisDir);
+if ~contains(path, rootDir)
+    addpath(rootDir);
+end
+
+ROOT = rootDir;
 DAT1 = fullfile(ROOT, '+test_datasets', 'QuantumDesign', 'EDP136_Perp_StrawNew.dat');
 RAW1 = fullfile(ROOT, '+test_datasets', 'rigaku_sample.raw');
 

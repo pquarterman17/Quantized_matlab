@@ -7,15 +7,21 @@
 %   - Session save/load
 %   - Multi-dataset operations
 %
-%   Run from the project root:
-%       test_gui_harness
+%   Run standalone:  cd tests; run test_gui_harness
+%   Run from root:   run tests/test_gui_harness
 %
 %   Each test prints PASS / FAIL. Cleanup is automatic via onCleanup.
 
 clear; clc;
 
-ROOT = fileparts(fileparts(mfilename('fullpath')));  % go up from tests/ to project root
-addpath(ROOT);   % ensure dataImportGUI and +parser packages are on path
+% Ensure toolbox is on the path
+thisDir = fileparts(mfilename('fullpath'));
+rootDir = fileparts(thisDir);
+if ~contains(path, rootDir)
+    addpath(rootDir);
+end
+
+ROOT = rootDir;
 XRDML_F = fullfile(ROOT, '+test_datasets', 'XRDML', 'La2NiO4_1.xrdml');
 VSM_F   = fullfile(ROOT, '+test_datasets', 'QuantumDesign', 'EDP136_Perp_StrawNew.dat');
 

@@ -4,14 +4,19 @@
 %   fallback, cps normalisation, and backward compatibility with the
 %   existing La2NiO4 1D scan file.
 %
-%   Run from the project root:
-%       cd G:\Onedrive\Coding\git\thin_film_toolkit_matlab
-%       run tests/test_xrdml_2d
+%   Run standalone:  cd tests; run test_xrdml_2d
+%   Run from root:   run tests/test_xrdml_2d
 
 clear; clc;
 
-ROOT     = fileparts(fileparts(mfilename('fullpath')));
-addpath(ROOT);
+% Ensure toolbox is on the path
+thisDir = fileparts(mfilename('fullpath'));
+rootDir = fileparts(thisDir);
+if ~contains(path, rootDir)
+    addpath(rootDir);
+end
+
+ROOT = rootDir;
 FILE_1D  = fullfile(ROOT, '+test_datasets', 'XRDML', 'La2NiO4_1.xrdml');
 FILE_2D  = fullfile(ROOT, '+test_datasets', 'XRDML', 'synthetic_rsm.xrdml');
 GEN_DIR  = fullfile(ROOT, '+test_datasets', 'XRDML');

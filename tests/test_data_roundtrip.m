@@ -3,15 +3,21 @@
 %   Tests that data exported to CSV via writeXRDcsv.m can be re-imported with importCSV.m
 %   and recovers the original data (within tolerance).
 %
-%   Run from the project root:
-%       test_data_roundtrip
+%   Run standalone:  cd tests; run test_data_roundtrip
+%   Run from root:   run tests/test_data_roundtrip
 %
 %   Each test prints PASS / FAIL and details. Cleanup is automatic via onCleanup.
 
 clear; clc;
 
-ROOT = fileparts(fileparts(mfilename('fullpath')));  % go up from tests/ to project root
-addpath(ROOT);   % ensure +parser and +utilities packages are on path
+% Ensure toolbox is on the path
+thisDir = fileparts(mfilename('fullpath'));
+rootDir = fileparts(thisDir);
+if ~contains(path, rootDir)
+    addpath(rootDir);
+end
+
+ROOT = rootDir;
 XRDML_FILE = fullfile(ROOT, '+test_datasets', 'XRDML', 'La2NiO4_1.xrdml');
 
 % Setup temporary directory for test output files

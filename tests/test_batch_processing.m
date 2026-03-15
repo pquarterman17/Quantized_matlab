@@ -2,15 +2,21 @@
 %
 %   Tests batch file operations with mixed file types, recursion, error handling.
 %
-%   Run from the project root:
-%       test_batch_processing
+%   Run standalone:  cd tests; run test_batch_processing
+%   Run from root:   run tests/test_batch_processing
 %
 %   Each test prints PASS / FAIL and summary. Cleanup is automatic via onCleanup.
 
 clear; clc;
 
-ROOT = fileparts(fileparts(mfilename('fullpath')));  % go up from tests/ to project root
-addpath(ROOT);   % ensure +parser and +scripts packages are on path
+% Ensure toolbox is on the path
+thisDir = fileparts(mfilename('fullpath'));
+rootDir = fileparts(thisDir);
+if ~contains(path, rootDir)
+    addpath(rootDir);
+end
+
+ROOT = rootDir;
 
 % Setup temporary directory for test operations
 tmpDir = fullfile(tempdir, 'batch_test_' + string(datetime('now','Format','yyyyMMdd_HHmmss')));

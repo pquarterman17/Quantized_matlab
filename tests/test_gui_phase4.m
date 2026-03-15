@@ -14,13 +14,19 @@
 %     4.8  Colormap: switch colormap + replot without error
 %     4.9  Mixed 1D + 2D datasets: is2DActive toggles correctly when switching
 %
-%   Run from the project root:
-%       run tests/test_gui_phase4
+%   Run standalone:  cd tests; run test_gui_phase4
+%   Run from root:   run tests/test_gui_phase4
 
 clear; clc;
 
-ROOT    = fileparts(fileparts(mfilename('fullpath')));
-addpath(ROOT);
+% Ensure toolbox is on the path
+thisDir = fileparts(mfilename('fullpath'));
+rootDir = fileparts(thisDir);
+if ~contains(path, rootDir)
+    addpath(rootDir);
+end
+
+ROOT = rootDir;
 GEN_DIR = fullfile(ROOT, '+test_datasets', 'XRDML');
 FILE_2D = fullfile(GEN_DIR, 'synthetic_rsm.xrdml');   % 5 Omega × 10 2Theta
 FILE_1D = fullfile(GEN_DIR, 'La2NiO4_1.xrdml');

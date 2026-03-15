@@ -1,13 +1,19 @@
 %TEST_PARSERS_EDGE_CASES  Edge-case and error-handling tests for +parser functions.
 %
-%   Run from the project root:
-%       cd G:\Onedrive\Coding\git\thin_film_toolkit_matlab
-%       test_parsers_edge_cases
+%   Run standalone:  cd tests; run test_parsers_edge_cases
+%   Run from root:   run tests/test_parsers_edge_cases
 %
 %   Tests edge cases like empty files, truncated data, inconsistent columns, etc.
 %   Each test expects either a specific error or a graceful fallback.
 
 clear; clc;
+
+% Ensure toolbox is on the path
+thisDir = fileparts(mfilename('fullpath'));
+rootDir = fileparts(thisDir);
+if ~contains(path, rootDir)
+    addpath(rootDir);
+end
 
 passed = 0;
 failed = 0;

@@ -1,17 +1,19 @@
 %TEST_NEW_FEATURES  Tests for features 4-16 implemented in the proposed features batch.
 %
-%   Run from the project root:
-%       cd G:\Onedrive\Coding\git\thin_film_toolkit_matlab
-%       run tests/test_new_features
+%   Run standalone:  cd tests; run test_new_features
+%   Run from root:   run tests/test_new_features
 %
 %   Tests standalone utility functions and parser changes.
 %   GUI tests require headless mode and are in a separate section.
 
 clear; clc;
 
-% Add project root to path
-projRoot = fileparts(fileparts(mfilename('fullpath')));
-addpath(projRoot);
+% Ensure toolbox is on the path
+thisDir = fileparts(mfilename('fullpath'));
+rootDir = fileparts(thisDir);
+if ~contains(path, rootDir)
+    addpath(rootDir);
+end
 
 passed = 0;
 failed = 0;
@@ -154,7 +156,7 @@ end
 fprintf('\n══ TEST 5: importQDVSM — scan type detection (real file) ══\n');
 try
     % Find a real QD VSM file
-    testFiles = dir(fullfile(projRoot, '+test_datasets', 'QuantumDesign', '*.dat'));
+    testFiles = dir(fullfile(rootDir, '+test_datasets', 'QuantumDesign', '*.dat'));
 
     if isempty(testFiles)
         fprintf('  SKIP: No QD test files found\n');

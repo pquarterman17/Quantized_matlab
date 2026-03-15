@@ -4,11 +4,19 @@
 %   cleaning, depth grid merging, metadata capture, edge cases, and unit
 %   detection. All test data is generated via fprintf to temporary files.
 %
-%   Run via:
-%       run tests/test_sims_parser
+%   Run standalone:  cd tests; run test_sims_parser
+%   Run from root:   run tests/test_sims_parser
 %       runAllTests(Group="sims")
 
 clear; clc;
+
+% Ensure toolbox is on the path
+thisDir = fileparts(mfilename('fullpath'));
+rootDir = fileparts(thisDir);
+if ~contains(path, rootDir)
+    addpath(rootDir);
+end
+
 fprintf('\n═══ test_sims_parser ═══\n');
 
 nPass = 0;
