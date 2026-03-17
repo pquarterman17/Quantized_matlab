@@ -607,6 +607,124 @@ else
 end
 
 % ════════════════════════════════════════════════════════════════════
+%  PLANE SPACINGS
+% ════════════════════════════════════════════════════════════════════
+
+fprintf('\n--- calc.crystal.planeSpacings ---\n');
+
+% Primitive cubic: (100) should be present
+r = calc.crystal.planeSpacings(5.431, Centering='P', MaxHKL=3);
+hklStrs = arrayfun(@(i) sprintf('%d%d%d', r.hkl(i,1), r.hkl(i,2), r.hkl(i,3)), ...
+    1:r.nReflections, 'UniformOutput', false);
+if any(strcmp(hklStrs, '100'))
+    fprintf('  PASS: P centering includes (100)\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: P centering missing (100)\n'); failed = failed + 1;
+end
+
+% FCC (F centering): (100) should be absent, (111) present
+r = calc.crystal.planeSpacings(5.431, Centering='F', MaxHKL=3);
+hklStrs = arrayfun(@(i) sprintf('%d%d%d', r.hkl(i,1), r.hkl(i,2), r.hkl(i,3)), ...
+    1:r.nReflections, 'UniformOutput', false);
+if ~any(strcmp(hklStrs, '100'))
+    fprintf('  PASS: F centering excludes (100)\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: F centering should exclude (100)\n'); failed = failed + 1;
+end
+if any(strcmp(hklStrs, '111'))
+    fprintf('  PASS: F centering includes (111)\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: F centering missing (111)\n'); failed = failed + 1;
+end
+
+% FCC (220) should be present (all even)
+if any(strcmp(hklStrs, '220'))
+    fprintf('  PASS: F centering includes (220)\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: F centering missing (220)\n'); failed = failed + 1;
+end
+
+% BCC (I centering): (100) absent (h+k+l=1 odd), (110) present (h+k+l=2 even)
+r = calc.crystal.planeSpacings(2.867, Centering='I', MaxHKL=3);
+hklStrs = arrayfun(@(i) sprintf('%d%d%d', r.hkl(i,1), r.hkl(i,2), r.hkl(i,3)), ...
+    1:r.nReflections, 'UniformOutput', false);
+if ~any(strcmp(hklStrs, '100'))
+    fprintf('  PASS: I centering excludes (100)\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: I centering should exclude (100)\n'); failed = failed + 1;
+end
+if any(strcmp(hklStrs, '110'))
+    fprintf('  PASS: I centering includes (110)\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: I centering missing (110)\n'); failed = failed + 1;
+end
+
+% d-spacing value check: cubic (100) d = a
+r = calc.crystal.planeSpacings(3.905, Centering='P', MaxHKL=1);
+idx100 = find(r.hkl(:,1)==1 & r.hkl(:,2)==0 & r.hkl(:,3)==0, 1);
+if ~isempty(idx100) && abs(r.d(idx100) - 3.905) < 1e-4
+    fprintf('  PASS: d(100) = a = 3.905\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: d(100) != a\n'); failed = failed + 1;
+end
+
+% 2theta check: known Cu Ka reflection for Si (111) FCC
+% d(111) = 5.431/sqrt(3) ~ 3.1356, 2theta ~ 28.44 deg
+r = calc.crystal.planeSpacings(5.431, Centering='F', MaxHKL=3, Lambda=1.5406);
+idx111 = find(r.hkl(:,1)==1 & r.hkl(:,2)==1 & r.hkl(:,3)==1, 1);
+if ~isempty(idx111) && abs(r.twoTheta(idx111) - 28.44) < 0.1
+    fprintf('  PASS: Si(111) 2theta ~ 28.44\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: Si(111) 2theta\n'); failed = failed + 1;
+end
+
+% Sorted descending by d
+r = calc.crystal.planeSpacings(5.431, Centering='P', MaxHKL=3);
+if all(diff(r.d) <= 0)
+    fprintf('  PASS: d-spacings sorted descending\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: d-spacings not sorted\n'); failed = failed + 1;
+end
+
+% Multiplicity check: cubic (100) family should have 6 members
+r = calc.crystal.planeSpacings(5.431, Centering='P', MaxHKL=1);
+idx100 = find(r.hkl(:,1)==1 & r.hkl(:,2)==0 & r.hkl(:,3)==0, 1);
+if ~isempty(idx100) && r.multiplicity(idx100) == 6
+    fprintf('  PASS: (100) multiplicity = 6\n'); passed = passed + 1;
+else
+    if ~isempty(idx100)
+        fprintf('  FAIL: (100) multiplicity = %d (expected 6)\n', r.multiplicity(idx100));
+    else
+        fprintf('  FAIL: (100) not found\n');
+    end
+    failed = failed + 1;
+end
+
+% System field populated
+if ischar(r.system) && ~isempty(r.system)
+    fprintf('  PASS: system field populated\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: system field empty\n'); failed = failed + 1;
+end
+
+% R centering (obverse): h-k+l = 3n allowed
+r = calc.crystal.planeSpacings(4.758, c=12.991, gamma=120, Centering='R', MaxHKL=2);
+hklStrs = arrayfun(@(i) sprintf('%d%d%d', r.hkl(i,1), r.hkl(i,2), r.hkl(i,3)), ...
+    1:r.nReflections, 'UniformOutput', false);
+% (1,0,2): h-k+l = 1-0+2 = 3 -> allowed
+if any(strcmp(hklStrs, '102'))
+    fprintf('  PASS: R centering includes (102)\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: R centering missing (102)\n'); failed = failed + 1;
+end
+% (1,0,0): h-k+l = 1 -> not divisible by 3 -> absent
+if ~any(strcmp(hklStrs, '100'))
+    fprintf('  PASS: R centering excludes (100)\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: R centering should exclude (100)\n'); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════
 %  SUMMARY
 % ════════════════════════════════════════════════════════════════════
 

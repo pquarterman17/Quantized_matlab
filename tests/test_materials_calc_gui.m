@@ -147,7 +147,7 @@ fprintf('\n--- Semiconductor Tab ---\n');
 % Intrinsic carrier concentration: Si
 api.selectTab('semiconductor');
 txt = api.calcIntrinsic('Si');
-if contains(txt, 'ni')
+if contains(txt, 'n<sub>i</sub>') || contains(txt, 'ni')
     fprintf('  PASS: intrinsic calc runs for Si\n'); passed = passed + 1;
 else
     fprintf('  FAIL: intrinsic calc for Si (got: %s)\n', txt); failed = failed + 1;
@@ -162,7 +162,7 @@ end
 
 % GaAs
 txt2 = api.calcIntrinsic('GaAs');
-if contains(txt2, 'ni')
+if contains(txt2, 'n<sub>i</sub>') || contains(txt2, 'ni')
     fprintf('  PASS: intrinsic calc runs for GaAs\n'); passed = passed + 1;
 else
     fprintf('  FAIL: intrinsic calc for GaAs (got: %s)\n', txt2); failed = failed + 1;
@@ -219,6 +219,50 @@ if contains(detailStr, 'Hydrogen')
     fprintf('  PASS: H shows Hydrogen\n'); passed = passed + 1;
 else
     fprintf('  FAIL: H detail missing\n'); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════
+%  PLANE SPACING TABLE
+% ════════════════════════════════════════════════════════════════════
+
+fprintf('\n--- Plane Spacing Table ---\n');
+
+api.selectTab('crystal');
+
+% FCC Si: should have reflections
+tbl = api.calcPlaneSpacings(5.431, 'F');
+if ~isempty(tbl) && size(tbl, 1) > 0
+    fprintf('  PASS: plane spacings returns data (%d rows)\n', size(tbl, 1)); passed = passed + 1;
+else
+    fprintf('  FAIL: plane spacings empty\n'); failed = failed + 1;
+end
+
+% Check (111) present in FCC results
+found111 = false;
+for ri = 1:size(tbl, 1)
+    if tbl{ri,1} == 1 && tbl{ri,2} == 1 && tbl{ri,3} == 1
+        found111 = true;
+        break;
+    end
+end
+if found111
+    fprintf('  PASS: (111) found in FCC table\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: (111) missing from FCC table\n'); failed = failed + 1;
+end
+
+% Check (100) absent in FCC
+found100 = false;
+for ri = 1:size(tbl, 1)
+    if tbl{ri,1} == 1 && tbl{ri,2} == 0 && tbl{ri,3} == 0
+        found100 = true;
+        break;
+    end
+end
+if ~found100
+    fprintf('  PASS: (100) correctly absent in FCC\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: (100) should be absent in FCC\n'); failed = failed + 1;
 end
 
 % ════════════════════════════════════════════════════════════════════

@@ -92,8 +92,10 @@ if nargout > 0
     api.getDResult     = appData.api.getDResult;
     api.calcIntrinsic  = appData.api.calcIntrinsic;
     api.getNiResult    = appData.api.getNiResult;
-    api.selectElement  = appData.api.selectElement;
-    api.getElementDetail = appData.api.getElementDetail;
+    api.selectElement      = appData.api.selectElement;
+    api.getElementDetail   = appData.api.getElementDetail;
+    api.calcPlaneSpacings  = appData.api.calcPlaneSpacings;
+    api.getMismatchResult   = appData.api.getMismatchResult;
     varargout{1}       = api;
 end
 
@@ -171,7 +173,8 @@ end
         btnCopyLatex.Layout.Row = 3; btnCopyLatex.Layout.Column = 4;
 
         % Row 4: Conversion detail label
-        lblDetail = uilabel(gl, 'Text', '', 'FontSize', 11);
+        lblDetail = uilabel(gl, 'Text', '', 'FontSize', 11, ...
+            'Interpreter', 'html');
         lblDetail.Layout.Row = 4; lblDetail.Layout.Column = [1 4];
 
         % Row 5: Separator
@@ -285,7 +288,7 @@ end
         scroll.Layout.Row = 1; scroll.Layout.Column = 1;
 
         gl = uigridlayout(scroll);
-        gl.RowHeight   = {110, 90, 100, 110};
+        gl.RowHeight   = {110, 90, 100, 110, 260};
         gl.ColumnWidth = {'1x'};
         gl.Padding     = [4 4 4 4];
         gl.RowSpacing  = 8;
@@ -338,7 +341,8 @@ end
         uilabel(gD,'Text','\gamma:','HorizontalAlignment','right');
         efDga = uieditfield(gD,'numeric','Value',90);
         efDga.Layout.Row=3; efDga.Layout.Column=2;
-        lblDResult = uilabel(gD,'Text','','FontSize',11);
+        lblDResult = uilabel(gD,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblDResult.Layout.Row=3; lblDResult.Layout.Column=[3 8];
         btnDCalc = uibutton(gD,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -364,8 +368,8 @@ end
                 r = calc.crystal.dSpacing(efDa.Value, efDh.Value, efDk.Value, efDl.Value, ...
                     b=efDb.Value, c=efDc.Value, ...
                     alpha=efDal.Value, beta=efDbe.Value, gamma=efDga.Value);
-                desc = sprintf('d(%d%d%d) = %.5g Å  [%s]', ...
-                    efDh.Value, efDk.Value, efDl.Value, r.d, r.system);
+                desc = sprintf('d<sub>%d%d%d</sub> = %.5g %s  [%s]', ...
+                    efDh.Value, efDk.Value, efDl.Value, r.d, char(197), r.system);
                 lblDResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
@@ -399,14 +403,16 @@ end
             'ButtonPushedFcn',@(~,~) doDTo2Theta());
         btnDTo2T.Layout.Row=1; btnDTo2T.Layout.Column=6;
 
-        lbl2TResult = uilabel(g2T,'Text','','FontSize',11);
+        lbl2TResult = uilabel(g2T,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lbl2TResult.Layout.Row=2; lbl2TResult.Layout.Column=[1 6];
 
         function do2ThetaToD()
             try
                 r = calc.crystal.dFromTwoTheta(ef2TVal.Value, ef2TLam.Value);
-                desc = sprintf('2\x3b8=%.4g\xb0 \x2192 d=%.5g \xc5  (\x3bb=%.4f \xc5)', ...
-                    ef2TVal.Value, r.d, ef2TLam.Value);
+                desc = sprintf('2%s = %.4g%s %s d = %.5g %s  (%s = %.4f %s)', ...
+                    char(952), ef2TVal.Value, char(176), char(8594), ...
+                    r.d, char(197), char(955), ef2TLam.Value, char(197));
                 lbl2TResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
@@ -418,8 +424,9 @@ end
         function doDTo2Theta()
             try
                 r = calc.crystal.twoThetaFromD(ef2TVal.Value, ef2TLam.Value);
-                desc = sprintf('d=%.4g \xc5 \x2192 2\x3b8=%.5g\xb0  (\x3bb=%.4f \xc5)', ...
-                    ef2TVal.Value, r.twoTheta, ef2TLam.Value);
+                desc = sprintf('d = %.4g %s %s 2%s = %.5g%s  (%s = %.4f %s)', ...
+                    ef2TVal.Value, char(197), char(8594), ...
+                    char(952), r.twoTheta, char(176), char(955), ef2TLam.Value, char(197));
                 lbl2TResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
@@ -450,9 +457,11 @@ end
             'ValueChangedFcn',@(~,~) fillMMSubstrate());
         ddMMSub.Layout.Row=1; ddMMSub.Layout.Column=[5 6];
 
-        lblMMResult = uilabel(gMM,'Text','','FontSize',11);
+        lblMMResult = uilabel(gMM,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblMMResult.Layout.Row=2; lblMMResult.Layout.Column=[1 4];
-        lblMMCtResult = uilabel(gMM,'Text','','FontSize',11);
+        lblMMCtResult = uilabel(gMM,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblMMCtResult.Layout.Row=3; lblMMCtResult.Layout.Column=[1 4];
 
         btnMMCalc = uibutton(gMM,'push','Text','Calculate', ...
@@ -472,15 +481,15 @@ end
         function doMismatch()
             try
                 rMM = calc.crystal.latticeMismatch(efMMFilm.Value, efMMSub.Value);
-                desc = sprintf('f = %.4g%%  (%s)', rMM.mismatchPct, rMM.description);
+                desc = sprintf('<i>f</i> = %.4g%%  (%s)', rMM.mismatchPct, rMM.description);
                 lblMMResult.Text = desc;
                 addHistory(desc, rMM.latex);
 
                 rCT = calc.crystal.criticalThickness(efMMFilm.Value, efMMSub.Value);
                 if isinf(rCT.hc)
-                    descCT = 'h_c = Inf (lattice matched)';
+                    descCT = ['h<sub>c</sub> = ' char(8734) ' (lattice matched)'];
                 else
-                    descCT = sprintf('h_c = %.4g \xc5 = %.4g nm', rCT.hc, rCT.hcNm);
+                    descCT = sprintf('h<sub>c</sub> = %.4g %s = %.4g nm', rCT.hc, char(197), rCT.hcNm);
                 end
                 lblMMCtResult.Text = descCT;
             catch ME
@@ -516,9 +525,11 @@ end
         efVCM = uieditfield(gVC,'numeric','Value',183.84);
         efVCM.Layout.Row=2; efVCM.Layout.Column=4;
 
-        lblVCResult = uilabel(gVC,'Text','','FontSize',11);
+        lblVCResult = uilabel(gVC,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblVCResult.Layout.Row=3; lblVCResult.Layout.Column=[1 6];
-        lblVCDens = uilabel(gVC,'Text','','FontSize',11);
+        lblVCDens = uilabel(gVC,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblVCDens.Layout.Row=4; lblVCDens.Layout.Column=[1 6];
 
         btnVCCalc = uibutton(gVC,'push','Text','Calculate', ...
@@ -530,15 +541,114 @@ end
             try
                 rV = calc.crystal.unitCellVolume(efVCa.Value, ...
                     b=efVCb.Value, c=efVCc.Value);
-                lblVCResult.Text = sprintf('V = %.5g \xc5\xb3  [%s]', rV.volume, rV.system);
-                rD = calc.crystal.densityFromMolar(rV.volume, efVCZ.Value, efVCM.Value);
-                lblVCDens.Text = sprintf('\x3c1 = %.4g g/cm\xb3', rD.density);
+                lblVCResult.Text = sprintf('V = %.5g %s<sup>3</sup>  [%s]', rV.volume, char(197), rV.system);
+                rD = calc.crystal.densityFromMolar(efVCM.Value, efVCa.Value, efVCZ.Value, ...
+                    b=efVCb.Value, c=efVCc.Value);
+                lblVCDens.Text = sprintf('%s = %.4g g/cm<sup>3</sup>', char(961), rD.density);
                 desc = sprintf('V=%.4g Å³, ρ=%.4g g/cm³', rV.volume, rD.density);
                 addHistory(desc, rV.latex);
             catch ME
                 lblVCResult.Text = ['Error: ' ME.message];
                 setStatus(ME.message);
             end
+        end
+
+        % ── Card 5: Plane Spacing Table ──────────────────────────────
+        pPS = uipanel(gl, 'Title', 'Plane Spacing Table', 'FontWeight', 'bold');
+        pPS.Layout.Row = 5; pPS.Layout.Column = 1;
+
+        gPS = uigridlayout(pPS);
+        gPS.RowHeight   = {24, '1x', 24};
+        gPS.ColumnWidth = {70, '1x', 70, 60, 70, '1x', 80, 80};
+        gPS.Padding     = [6 4 6 4];
+        gPS.RowSpacing  = 4;
+
+        uilabel(gPS, 'Text', 'Centering:', 'HorizontalAlignment', 'right');
+        ddPSCent = uidropdown(gPS, 'Items', {'P','F','I','A','B','C','R'}, ...
+            'Value', 'P');
+        ddPSCent.Layout.Row = 1; ddPSCent.Layout.Column = 2;
+
+        uilabel(gPS, 'Text', 'Max hkl:', 'HorizontalAlignment', 'right');
+        efPSMax = uieditfield(gPS, 'numeric', 'Value', 5, ...
+            'Limits', [1 10], 'RoundFractionalValues', 'on');
+        efPSMax.Layout.Row = 1; efPSMax.Layout.Column = 4;
+
+        uilabel(gPS, 'Text', [char(955) ' (' char(197) '):'], ...
+            'HorizontalAlignment', 'right');
+        efPSLam = uieditfield(gPS, 'numeric', 'Value', 1.5406);
+        efPSLam.Layout.Row = 1; efPSLam.Layout.Column = 6;
+
+        btnPSCalc = uibutton(gPS, 'push', 'Text', 'Generate', ...
+            'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
+            'ButtonPushedFcn', @(~,~) doPlaneSpacings());
+        btnPSCalc.Layout.Row = 1; btnPSCalc.Layout.Column = 7;
+
+        btnPSCopy = uibutton(gPS, 'push', 'Text', 'Copy Table', ...
+            'BackgroundColor', BTN_EXPORT, 'FontColor', BTN_FG, ...
+            'ButtonPushedFcn', @(~,~) doCopyPlaneTable());
+        btnPSCopy.Layout.Row = 1; btnPSCopy.Layout.Column = 8;
+
+        % Results table
+        tblPS = uitable(gPS, 'ColumnName', {'h','k','l', ...
+            ['d (' char(197) ')'], ['2' char(952) ' (' char(176) ')'], 'Mult'}, ...
+            'ColumnWidth', {35, 35, 35, 80, 80, 45}, ...
+            'RowName', 'numbered', 'FontSize', 10);
+        tblPS.Layout.Row = 2; tblPS.Layout.Column = [1 8];
+
+        lblPSStatus = uilabel(gPS, 'Text', '', 'FontSize', 10, ...
+            'FontColor', [0.4 0.4 0.4]);
+        lblPSStatus.Layout.Row = 3; lblPSStatus.Layout.Column = [1 8];
+
+        psTableData = {};  % stored for clipboard copy
+
+        function doPlaneSpacings()
+            try
+                r = calc.crystal.planeSpacings(efDa.Value, ...
+                    b=efDb.Value, c=efDc.Value, ...
+                    alpha=efDal.Value, beta=efDbe.Value, gamma=efDga.Value, ...
+                    MaxHKL=efPSMax.Value, Lambda=efPSLam.Value, ...
+                    Centering=ddPSCent.Value);
+
+                n = r.nReflections;
+                tableData = cell(n, 6);
+                for ri = 1:n
+                    tableData{ri,1} = r.hkl(ri,1);
+                    tableData{ri,2} = r.hkl(ri,2);
+                    tableData{ri,3} = r.hkl(ri,3);
+                    tableData{ri,4} = round(r.d(ri), 4);
+                    if isnan(r.twoTheta(ri))
+                        tableData{ri,5} = '-';
+                    else
+                        tableData{ri,5} = round(r.twoTheta(ri), 3);
+                    end
+                    tableData{ri,6} = r.multiplicity(ri);
+                end
+                tblPS.Data = tableData;
+                psTableData = tableData;
+                lblPSStatus.Text = sprintf('%d reflections  [%s, %s centering]', ...
+                    n, r.system, r.centering);
+                addHistory(sprintf('Plane spacings: %d reflections (%s)', n, r.system), '');
+            catch ME
+                lblPSStatus.Text = ['Error: ' ME.message];
+                setStatus(['Plane spacings error: ' ME.message]);
+            end
+        end
+
+        function doCopyPlaneTable()
+            if isempty(psTableData), return; end
+            lines = {sprintf('h\tk\tl\td(Å)\t2θ(°)\tMult')};
+            for ri = 1:size(psTableData, 1)
+                if isnumeric(psTableData{ri,5})
+                    ttStr = sprintf('%.3f', psTableData{ri,5});
+                else
+                    ttStr = '-';
+                end
+                lines{end+1} = sprintf('%d\t%d\t%d\t%.4f\t%s\t%d', ...
+                    psTableData{ri,1}, psTableData{ri,2}, psTableData{ri,3}, ...
+                    psTableData{ri,4}, ttStr, psTableData{ri,6}); %#ok<AGROW>
+            end
+            clipboard('copy', strjoin(lines, newline));
+            setStatus('Plane spacing table copied to clipboard.');
         end
 
         % API hooks
@@ -553,6 +663,14 @@ end
         end
         appData.api.getDResult = @() lblDResult.Text;
         appData.api.getMismatchResult = @() lblMMResult.Text;
+        appData.api.calcPlaneSpacings = @(aVal, cent) apiPlaneSpacings(aVal, cent);
+        function tbl = apiPlaneSpacings(aVal, cent)
+            efDa.Value = aVal; efDb.Value = aVal; efDc.Value = aVal;
+            efDal.Value = 90; efDbe.Value = 90; efDga.Value = 90;
+            ddPSCent.Value = cent;
+            doPlaneSpacings();
+            tbl = psTableData;
+        end
     end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -593,7 +711,8 @@ end
         efRsTh = uieditfield(gRS,'numeric','Value',10);
         efRsTh.Layout.Row=1; efRsTh.Layout.Column=4;
 
-        lblRsResult = uilabel(gRS,'Text','','FontSize',11);
+        lblRsResult = uilabel(gRS,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblRsResult.Layout.Row=2; lblRsResult.Layout.Column=[1 4];
 
         btnRsToRho = uibutton(gRS,'push','Text','R_s \rightarrow \rho', ...
@@ -605,7 +724,8 @@ end
         efRhoVal = uieditfield(gRS,'numeric','Value',1e-4);
         efRhoVal.Layout.Row=3; efRhoVal.Layout.Column=2;
 
-        lblRhoResult = uilabel(gRS,'Text','','FontSize',11);
+        lblRhoResult = uilabel(gRS,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblRhoResult.Layout.Row=3; lblRhoResult.Layout.Column=[3 4];
 
         btnRhoToRs = uibutton(gRS,'push','Text','\rho \rightarrow R_s', ...
@@ -617,8 +737,8 @@ end
             try
                 % resistivity(Rs [Ohm/sq], t [cm])
                 r = calc.electrical.resistivity(efRsVal.Value, efRsTh.Value*1e-7);
-                desc = sprintf('\x3c1 = %.4g \x3a9\xb7cm  (R_s=%.4g \x3a9/sq, t=%.4g nm)', ...
-                    r.rho, efRsVal.Value, efRsTh.Value);
+                desc = sprintf('%s = %.4g %s%scm  (R<sub>s</sub> = %.4g %s/sq, t = %.4g nm)', ...
+                    char(961), r.rho, char(937), char(183), efRsVal.Value, char(937), efRsTh.Value);
                 lblRsResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
@@ -631,7 +751,7 @@ end
             try
                 % sheetResistance(rho [Ohm·cm], t [cm])
                 r = calc.electrical.sheetResistance(efRhoVal.Value, efRsTh.Value*1e-7);
-                desc = sprintf('R_s = %.4g \x3a9/sq', r.Rs);
+                desc = sprintf('R<sub>s</sub> = %.4g %s/sq', r.Rs, char(937));
                 lblRhoResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
@@ -657,15 +777,16 @@ end
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
             'ButtonPushedFcn',@(~,~) doConductivity());
         btnCondCalc.Layout.Row=1; btnCondCalc.Layout.Column=3;
-        lblCondResult = uilabel(gCond,'Text','','FontSize',11);
+        lblCondResult = uilabel(gCond,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblCondResult.Layout.Row=2; lblCondResult.Layout.Column=[1 3];
 
         function doConductivity()
             try
                 % conductivity(rho [Ohm·cm]) → sigma [S/cm]
                 r = calc.electrical.conductivity(efCondRho.Value);
-                desc = sprintf('\x3c3 = %.4g S/cm  (\x3c1=%.4g \x3a9\xb7cm)', ...
-                    r.sigma, efCondRho.Value);
+                desc = sprintf('%s = %.4g S/cm  (%s = %.4g %s%scm)', ...
+                    char(963), r.sigma, char(961), efCondRho.Value, char(937), char(183));
                 lblCondResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
@@ -694,14 +815,15 @@ end
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
             'ButtonPushedFcn',@(~,~) doMobility());
         btnMobCalc.Layout.Row=1; btnMobCalc.Layout.Column=5;
-        lblMobResult = uilabel(gMob,'Text','','FontSize',11);
+        lblMobResult = uilabel(gMob,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblMobResult.Layout.Row=2; lblMobResult.Layout.Column=[1 5];
 
         function doMobility()
             try
                 % mobility(rho [Ohm·cm], n [cm^-3]) → mu [cm²/V·s]
                 r = calc.electrical.mobility(efMobRho.Value, efMobN.Value);
-                desc = sprintf('\x3bc = %.4g cm\xb2/(V\xb7s)', r.mu);
+                desc = sprintf('%s = %.4g cm<sup>2</sup>/(V%ss)', char(956), r.mu, char(183));
                 lblMobResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
@@ -730,14 +852,15 @@ end
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
             'ButtonPushedFcn',@(~,~) doCurrentDensity());
         btnJDCalc.Layout.Row=1; btnJDCalc.Layout.Column=5;
-        lblJDResult = uilabel(gJD,'Text','','FontSize',11);
+        lblJDResult = uilabel(gJD,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblJDResult.Layout.Row=2; lblJDResult.Layout.Column=[1 5];
 
         function doCurrentDensity()
             try
                 % currentDensity(I [A], area [cm²]) → J [A/cm²]
                 r = calc.electrical.currentDensity(efJDI.Value, efJDA.Value);
-                desc = sprintf('J = %.4g A/cm\xb2 = %.4g mA/cm\xb2', r.J, r.J*1e3);
+                desc = sprintf('J = %.4g A/cm<sup>2</sup> = %.4g mA/cm<sup>2</sup>', r.J, r.J*1e3);
                 lblJDResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
@@ -799,9 +922,11 @@ end
         efNiMh = uieditfield(gNi,'numeric','Value',0.81);
         efNiMh.Layout.Row=2; efNiMh.Layout.Column=6;
 
-        lblNiResult = uilabel(gNi,'Text','','FontSize',11);
+        lblNiResult = uilabel(gNi,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblNiResult.Layout.Row=3; lblNiResult.Layout.Column=[1 6];
-        lblNiNcNv = uilabel(gNi,'Text','','FontSize',11);
+        lblNiNcNv = uilabel(gNi,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblNiNcNv.Layout.Row=4; lblNiNcNv.Layout.Column=[1 6];
 
         btnNiCalc = uibutton(gNi,'push','Text','Calculate', ...
@@ -827,9 +952,9 @@ end
                 r = calc.semiconductor.intrinsicCarrierConc( ...
                     Eg=efNiEg.Value, meStar=efNiMe.Value, mhStar=efNiMh.Value, ...
                     T=efNiT.Value);
-                desc = sprintf('ni = %.4g cm\x207b\xb3  (T=%g K)', r.ni, r.T);
+                desc = sprintf('n<sub>i</sub> = %.4g cm<sup>-3</sup>  (T = %g K)', r.ni, r.T);
                 lblNiResult.Text = desc;
-                lblNiNcNv.Text = sprintf('Nc = %.3g cm\x207b\xb3,  Nv = %.3g cm\x207b\xb3', r.Nc, r.Nv);
+                lblNiNcNv.Text = sprintf('N<sub>c</sub> = %.3g cm<sup>-3</sup>,  N<sub>v</sub> = %.3g cm<sup>-3</sup>', r.Nc, r.Nv);
                 addHistory(desc, r.latex);
             catch ME
                 lblNiResult.Text = ['Error: ' ME.message];
@@ -857,9 +982,11 @@ end
         efDopNi = uieditfield(gDop,'numeric','Value',1.5e10);
         efDopNi.Layout.Row=1; efDopNi.Layout.Column=6;
 
-        lblDopResult = uilabel(gDop,'Text','','FontSize',11);
+        lblDopResult = uilabel(gDop,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblDopResult.Layout.Row=2; lblDopResult.Layout.Column=[1 6];
-        lblDopType = uilabel(gDop,'Text','','FontSize',11);
+        lblDopType = uilabel(gDop,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblDopType.Layout.Row=3; lblDopType.Layout.Column=[1 6];
 
         btnDopCalc = uibutton(gDop,'push','Text','Calculate', ...
@@ -873,7 +1000,7 @@ end
                 if niVal <= 0, niVal = 1e-10; end
                 r = calc.semiconductor.carrierConcentration( ...
                     efDopNd.Value, max(efDopNa.Value,0), niVal);
-                desc = sprintf('n = %.3g cm\x207b\xb3,  p = %.3g cm\x207b\xb3  [%s-type]', ...
+                desc = sprintf('n = %.3g cm<sup>-3</sup>,  p = %.3g cm<sup>-3</sup>  [%s-type]', ...
                     r.n, r.p, r.type);
                 lblDopResult.Text = desc;
                 lblDopType.Text = sprintf('Type: %s', r.type);
@@ -911,9 +1038,11 @@ end
         efDepNd = uieditfield(gDep,'numeric','Value',1e17);
         efDepNd.Layout.Row=2; efDepNd.Layout.Column=6;
 
-        lblDepResult = uilabel(gDep,'Text','','FontSize',11);
+        lblDepResult = uilabel(gDep,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblDepResult.Layout.Row=3; lblDepResult.Layout.Column=[1 6];
-        lblDepXnXp = uilabel(gDep,'Text','','FontSize',11);
+        lblDepXnXp = uilabel(gDep,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblDepXnXp.Layout.Row=4; lblDepXnXp.Layout.Column=[1 6];
 
         btnDepCalc = uibutton(gDep,'push','Text','Calculate', ...
@@ -940,9 +1069,9 @@ end
                     Vbi=efDepVbi.Value, ...
                     Na=efDepNa.Value, ...
                     Nd=efDepNd.Value);
-                desc = sprintf('W = %.4g nm  (Vbi=%.3g V)', r.W, efDepVbi.Value);
+                desc = sprintf('W = %.4g nm  (V<sub>bi</sub> = %.3g V)', r.W, efDepVbi.Value);
                 lblDepResult.Text = desc;
-                lblDepXnXp.Text = sprintf('xn = %.4g nm,  xp = %.4g nm', r.xn, r.xp);
+                lblDepXnXp.Text = sprintf('x<sub>n</sub> = %.4g nm,  x<sub>p</sub> = %.4g nm', r.xn, r.xp);
                 addHistory(desc, r.latex);
             catch ME
                 lblDepResult.Text = ['Error: ' ME.message];
@@ -972,18 +1101,20 @@ end
             'ButtonPushedFcn',@(~,~) doTransport());
         btnTransCalc.Layout.Row=1; btnTransCalc.Layout.Column=5;
 
-        lblTransD = uilabel(gTrans,'Text','','FontSize',11);
+        lblTransD = uilabel(gTrans,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblTransD.Layout.Row=2; lblTransD.Layout.Column=[1 5];
-        lblTransL = uilabel(gTrans,'Text','','FontSize',11);
+        lblTransL = uilabel(gTrans,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblTransL.Layout.Row=3; lblTransL.Layout.Column=[1 5];
 
         function doTransport()
             try
                 rD = calc.semiconductor.diffusionCoeff(efTransMu.Value);
                 rL = calc.semiconductor.diffusionLength(rD.D, efTransTau.Value);
-                lblTransD.Text = sprintf('D = %.4g cm\xb2/s', rD.D);
-                desc = sprintf('L = %.4g \x3bcm  (D=%.4g cm\xb2/s, \x3c4=%.3g s)', ...
-                    rL.Lum, rD.D, efTransTau.Value);
+                lblTransD.Text = sprintf('D = %.4g cm<sup>2</sup>/s', rD.D);
+                desc = sprintf('L = %.4g %sm  (D = %.4g cm<sup>2</sup>/s, %s = %.3g s)', ...
+                    rL.Lum, char(956), rD.D, char(964), efTransTau.Value);
                 lblTransL.Text = desc;
                 addHistory(desc, rL.latex);
             catch ME
@@ -1046,13 +1177,14 @@ end
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
             'ButtonPushedFcn',@(~,~) doDepositionRate());
         btnDRCalc.Layout.Row=1; btnDRCalc.Layout.Column=5;
-        lblDRResult = uilabel(gDR,'Text','','FontSize',11);
+        lblDRResult = uilabel(gDR,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblDRResult.Layout.Row=2; lblDRResult.Layout.Column=[1 5];
 
         function doDepositionRate()
             try
                 r = calc.thinFilm.depositionRate(efDRThick.Value, efDRTime.Value);
-                desc = sprintf('Rate = %.4g \xc5/s = %.4g nm/min', r.rate, r.rateNmPerMin);
+                desc = sprintf('Rate = %.4g %s/s = %.4g nm/min', r.rate, char(197), r.rateNmPerMin);
                 lblDRResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
@@ -1078,7 +1210,8 @@ end
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
             'ButtonPushedFcn',@(~,~) doKiessig());
         btnKTCalc.Layout.Row=1; btnKTCalc.Layout.Column=3;
-        lblKTResult = uilabel(gKT,'Text','','FontSize',11);
+        lblKTResult = uilabel(gKT,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblKTResult.Layout.Row=2; lblKTResult.Layout.Column=[1 3];
 
         function doKiessig()
@@ -1086,7 +1219,7 @@ end
                 r = calc.thinFilm.kiessigThickness(efKTdQ.Value);
                 % .thicknessNm confirmed from module
                 tNm = r.thicknessNm;
-                desc = sprintf('t = %.4g nm  (\x394Q=%.4g \xc5\x207b\xb9)', tNm, efKTdQ.Value);
+                desc = sprintf('t = %.4g nm  (%sQ = %.4g %s<sup>-1</sup>)', tNm, char(916), efKTdQ.Value, char(197));
                 lblKTResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
@@ -1122,7 +1255,8 @@ end
         efSSR = uieditfield(gSS,'numeric','Value',10);
         efSSR.Layout.Row=2; efSSR.Layout.Column=4;
 
-        lblSSResult = uilabel(gSS,'Text','','FontSize',11);
+        lblSSResult = uilabel(gSS,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblSSResult.Layout.Row=3; lblSSResult.Layout.Column=[1 6];
         btnSSCalc = uibutton(gSS,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -1138,7 +1272,7 @@ end
                 else
                     stype = 'compressive';
                 end
-                desc = sprintf('\x3c3 = %.4g MPa  (%s)', r.stressMPa, stype);
+                desc = sprintf('%s = %.4g MPa  (%s)', char(963), r.stressMPa, stype);
                 lblSSResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
@@ -1178,9 +1312,11 @@ end
         efTMNu = uieditfield(gTM,'numeric','Value',0.28);
         efTMNu.Layout.Row=2; efTMNu.Layout.Column=6;
 
-        lblTMStrain = uilabel(gTM,'Text','','FontSize',11);
+        lblTMStrain = uilabel(gTM,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblTMStrain.Layout.Row=3; lblTMStrain.Layout.Column=[1 4];
-        lblTMStress = uilabel(gTM,'Text','','FontSize',11);
+        lblTMStress = uilabel(gTM,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblTMStress.Layout.Row=4; lblTMStress.Layout.Column=[1 4];
 
         btnTMCalc = uibutton(gTM,'push','Text','Calculate', ...
@@ -1201,9 +1337,9 @@ end
             try
                 r = calc.thinFilm.thermalMismatchStrain(efTMAlF.Value, efTMAlS.Value, ...
                     efTMdT.Value, E=efTME.Value*1e9, nu=efTMNu.Value);
-                lblTMStrain.Text = sprintf('\x3b5 = %.4g  (%s)', r.strain, r.description);
+                lblTMStrain.Text = sprintf('%s = %.4g  (%s)', char(949), r.strain, r.description);
                 if ~isnan(r.stressMPa)
-                    lblTMStress.Text = sprintf('\x3c3 = %.4g MPa', r.stressMPa);
+                    lblTMStress.Text = sprintf('%s = %.4g MPa', char(963), r.stressMPa);
                 else
                     lblTMStress.Text = '';
                 end
@@ -1237,7 +1373,8 @@ end
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
             'ButtonPushedFcn',@(~,~) doIonDose());
         btnIDCalc.Layout.Row=1; btnIDCalc.Layout.Column=7;
-        lblIDResult = uilabel(gID,'Text','','FontSize',11);
+        lblIDResult = uilabel(gID,'Text','','FontSize',11, ...
+            'Interpreter','html');
         lblIDResult.Layout.Row=2; lblIDResult.Layout.Column=[1 7];
 
         function doIonDose()
@@ -1245,7 +1382,7 @@ end
                 % doseFromCurrent(current [A], time [s], area [cm²])
                 r = calc.thinFilm.doseFromCurrent(efIDCurr.Value, efIDTime.Value, ...
                     efIDArea.Value);
-                desc = sprintf('Dose = %.4g ions/cm\xb2', r.dose);
+                desc = sprintf('Dose = %.4g ions/cm<sup>2</sup>', r.dose);
                 lblIDResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME

@@ -7,6 +7,7 @@
 | 1. Foundation | **COMPLETE** | 3 files (`constants.m`, `unitConvert.m`, `elementData.m`) | 85 pass |
 | 2. Core modules | **COMPLETE** | 38 files across 6 packages (`+crystal/`, `+electrical/`, `+semiconductor/`, `+thinFilm/`, `+magnetic/`, `+substrates/`) | 67 pass |
 | 3. GUI | **COMPLETE** | 1 file (`materialsCalcGUI.m`, ~1460 lines) + 1 test file | 21 pass |
+| 3b. Plane Spacings + Rich Text | Not started | 1 new calc function + GUI updates | — |
 | 4. X-ray/Neutron | Not started | — | — |
 | 5. Extensions | Not started | — | — |
 
@@ -255,8 +256,23 @@ unit expressions. The output unit field is also free-text. As the user types
 |                                                                   |
 |  d = 2.3456 Ang                                                   |
 |  ────────────────────────────────────                              |
-|  ── 2theta from d-spacing ──────────────────────────               |
-|  d (Ang): [____]   lambda (Ang): [1.5406__]                       |
+|  ── Plane Spacing Table ─────────────────────────────              |
+|                                                                   |
+|  Centering: [P_______v]  Max hkl: [5__]  λ (Å): [1.5406_]       |
+|  [Generate Table]                                                  |
+|                                                                   |
+|  ┌─────┬──────────┬──────────┬──────┐                             |
+|  │ hkl │  d (Å)   │  2θ (°)  │ mult │                             |
+|  ├─────┼──────────┼──────────┼──────┤                             |
+|  │ 100 │  3.9050  │  23.12   │   6  │                             |
+|  │ 110 │  2.7613  │  32.42   │  12  │                             |
+|  │ 111 │  2.2539  │  39.95   │   8  │                             |
+|  │ ... │  ...     │  ...     │  ... │                             |
+|  └─────┴──────────┴──────────┴──────┘                             |
+|  [Copy Table]  [Export CSV]                                        |
+|  ────────────────────────────────────                              |
+|  ── 2θ ↔ d-spacing ─────────────────────────────                  |
+|  d (Å): [____]   λ (Å): [1.5406__]                               |
 |  ...                                                              |
 +-------------------------------------------------------------------+
 ```
@@ -447,6 +463,48 @@ own variable names and formatting conventions.
 | `criticalThickness(aFilm, aSub, nu)` | Film/substrate lattice params, Poisson ratio | Matthews-Blakeslee critical thickness (Ang) |
 | `strainFromPoisson(epsInPlane, nu)` | In-plane strain, Poisson ratio | Out-of-plane strain `eps_perp = -2*nu/(1-nu) * eps_par` |
 | `tetragonalDistortion(aRelaxed, cMeasured, cRelaxed)` | Relaxed a, measured c, relaxed c (Ang) | c/a ratio, tetragonal distortion (%) |
+| `planeSpacings(a, opts)` | Lattice params + MaxHKL + Lambda + Centering | Sorted table of allowed (hkl) reflections with d, 2θ |
+
+**Crystal plane spacing enumeration detail:**
+
+- `planeSpacings` enumerates all unique (hkl) planes up to `MaxHKL` (default 5),
+  computes d-spacing for each via `dSpacing`, filters by systematic absence
+  rules based on the Bravais lattice centering, and optionally computes 2θ
+  if a wavelength `Lambda` is provided.
+- **Inputs (name-value):**
+  - `a`, `b`, `c`, `alpha`, `beta`, `gamma` — lattice parameters (same defaults
+    as `dSpacing`: cubic if only `a` given)
+  - `MaxHKL` — maximum absolute value for h, k, l (default 5)
+  - `Lambda` — X-ray wavelength in Angstroms (default Cu Kα = 1.5406); set to
+    `NaN` to omit 2θ column
+  - `Centering` — Bravais lattice centering: `'P'` (primitive, default),
+    `'F'` (face-centered), `'I'` (body-centered), `'A'`/`'B'`/`'C'`
+    (base-centered), `'R'` (rhombohedral obverse)
+  - `MinD` — minimum d-spacing to include (Ang, default 0); useful for
+    excluding physically irrelevant high-angle reflections
+- **Systematic absence rules (by centering):**
+  - `P` — no systematic absences (all hkl allowed)
+  - `F` — allowed only when h,k,l all odd or all even
+  - `I` — allowed only when h+k+l is even
+  - `A` — allowed only when k+l is even
+  - `B` — allowed only when h+l is even
+  - `C` — allowed only when h+k is even
+  - `R` (obverse, IUCr standard) — allowed only when h-k+l = 3n
+- **Output:** struct with fields:
+  - `.hkl` — [N×3] matrix of Miller indices
+  - `.d` — [N×1] d-spacings (Ang), sorted descending
+  - `.twoTheta` — [N×1] 2θ values (deg); NaN column if Lambda not given
+  - `.multiplicity` — [N×1] number of symmetry-equivalent planes
+  - `.centering` — char, the centering used
+  - `.system` — char, inferred crystal system
+  - `.lambda` — wavelength used (Ang)
+  - `.nReflections` — scalar, number of unique reflections
+- **Uniqueness:** Equivalent reflections (e.g., (100) and (010) in cubic)
+  produce the same d-spacing. The function keeps only the lowest
+  lexicographic representative of each unique-d group and reports
+  multiplicity. This avoids duplicate rows in the output table.
+- **Sorting:** Rows sorted by descending d-spacing (ascending 2θ), matching
+  the conventional powder diffraction listing order.
 
 **Epitaxy / strain functions detail:**
 
@@ -1418,6 +1476,48 @@ the most frequently used calculations.
    property dropdown, search, detail panel).
 - [x] Add history log + copy-as-LaTeX on result displays.
 - [x] Create `tests/test_materials_calc_gui.m` — 21 headless API tests. All passing.
+
+### Phase 3b: Crystal Plane Spacing + Rich Text Rendering (4 steps)
+
+**Purpose:** Add crystal plane spacing enumeration to the Crystal tab and
+upgrade result display to handle Greek letters, subscripts, and math
+notation across all tabs.
+
+- [ ] Create `+calc/+crystal/planeSpacings.m` — enumerate allowed (hkl)
+   reflections with systematic absence rules (P/F/I/A/B/C/R centering),
+   compute d-spacings and 2θ, sort by descending d, report multiplicity.
+   Uses `dSpacing` internally.
+- [ ] Add "Plane Spacing Table" card to Crystal tab in `materialsCalcGUI.m` —
+   centering dropdown, max hkl spinner, wavelength field, uitable for
+   results, Copy Table and Export CSV buttons.
+- [ ] Implement rich text rendering for result labels across all tabs.
+   MATLAB `uilabel` supports a subset of HTML via the `Interpreter`
+   property (`'html'`). Use `<sub>`, `<sup>`, and Unicode Greek letters
+   (α β γ ε θ λ μ ρ σ Ω Å) in result strings. Examples:
+   - `d<sub>001</sub> = 3.905 Å` instead of `d_001 = 3.905 Ang`
+   - `ε<sub>⊥</sub> = -0.0023` instead of `eps_perp = -0.0023`
+   - `2θ = 46.47°` instead of `2theta = 46.47 deg`
+   - `ρ = 1.72 × 10<sup>-6</sup> Ω·cm` instead of `rho = 1.72e-6 Ohm*cm`
+   - `n<sub>i</sub> = 8.88 × 10<sup>9</sup> cm<sup>-3</sup>`
+   Convention: calculation functions continue returning `.latex` for
+   clipboard copy; the GUI adds a `.displayHTML` or formats on-the-fly
+   when populating `uilabel.Text` with `Interpreter='html'`.
+- [ ] Add tests for `planeSpacings` in `tests/test_calc_modules.m` — verify
+   FCC Si absences (e.g., (100) absent, (111) present), BCC Fe absences
+   (e.g., (100) absent, (110) present), correct d-values, correct 2θ
+   for known reflections.
+
+**Rich text rendering detail:**
+
+MATLAB `uilabel` with `Interpreter='html'` accepts:
+- `<b>`, `<i>`, `<sub>`, `<sup>`, `<br>`, `<font color="...">`, `<span style="...">`
+- Unicode characters directly in strings (no HTML entity encoding needed
+  for Greek: just `'θ'`, `'λ'`, `'ε'`, etc.)
+- **Does NOT support:** MathJax, LaTeX, `<table>`, `<img>`, CSS classes
+- **Approach:** Build an `htmlFormat()` helper (nested function in the GUI)
+  that converts a result struct's plain-text fields into HTML. Each tab's
+  result label uses `Interpreter='html'`. The `.latex` field on result
+  structs remains unchanged (used for clipboard "Copy as LaTeX" feature).
 
 ### Phase 4: X-ray/Neutron integration (4 steps)
 
