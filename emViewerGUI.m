@@ -411,7 +411,7 @@ function varargout = emViewerGUI()
     toolsPanel.Layout.Column = 3;
 
     toolsGL = uigridlayout(toolsPanel, [12 1], ...
-        'RowHeight', {14, 198, 14, 90, 14, 230, 14, 540, 14, 108, 14, '1x'}, ...
+        'RowHeight', {14, 198, 14, 90, 14, 252, 14, 540, 14, 108, 14, '1x'}, ...
         'ColumnWidth', {'1x'}, ...
         'Padding', [4 4 4 4], ...
         'RowSpacing', 1);
@@ -559,8 +559,8 @@ function varargout = emViewerGUI()
     %   Row 6: Export Profile button
     %   Row 7: Clear All button
     %   Row 8: (padding)
-    measureInnerGL = uigridlayout(pnlMeasure, [11 2], ...
-        'RowHeight',   {18, 20, 2, 20, 20, 20, 20, 20, 2, 20, 20}, ...
+    measureInnerGL = uigridlayout(pnlMeasure, [12 2], ...
+        'RowHeight',   {18, 20, 2, 20, 20, 20, 20, 20, 2, 20, 20, 20}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding',     [3 2 3 2], ...
         'RowSpacing',  2, ...
@@ -665,6 +665,15 @@ function varargout = emViewerGUI()
         'Enable',          'off', ...
         'Tooltip',         'Manage saved ROIs with properties table and CSV export');
     btnROIManager.Layout.Row = 11; btnROIManager.Layout.Column = [1 2];
+
+    % Row 12: Calibrate from Scale Bar
+    btnCalibrateBar = uibutton(measureInnerGL, 'Text', 'Calibrate Bar...', ...
+        'ButtonPushedFcn', @onCalibrateBar, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor',       BTN_FG, ...
+        'Enable',          'off', ...
+        'Tooltip', 'Draw along a scale bar in the image to calibrate pixel size; auto-detect available');
+    btnCalibrateBar.Layout.Row = 12; btnCalibrateBar.Layout.Column = [1 2];
 
     % ROI Manager state
     appData.roiList = {};   % cell array of ROI structs: {name, xMin, xMax, yMin, yMax, stats}
@@ -1520,6 +1529,7 @@ function varargout = emViewerGUI()
         btnExportMeasure.Enable = 'on';
         btnDiffRings.Enable     = 'on';
         btnROIManager.Enable    = 'on';
+        btnCalibrateBar.Enable  = 'on';
 
         % Enable annotation controls
         btnPlaceAnnot.Enable  = 'on';
@@ -1606,6 +1616,7 @@ function varargout = emViewerGUI()
         btnExportMeasure.Enable  = 'off';
         btnDiffRings.Enable      = 'off';
         btnROIManager.Enable     = 'off';
+        btnCalibrateBar.Enable   = 'off';
         if ~isempty(hColorbar) && isvalid(hColorbar)
             delete(hColorbar);
             hColorbar = [];
@@ -3038,7 +3049,11 @@ function varargout = emViewerGUI()
 
         if size(appData.captureClicks, 1) == 1
             % First click recorded — wait for second
-            setStatus('Click second point on the image... (Escape to cancel)');
+            if strcmp(appData.captureMode, 'scalebar')
+                setStatus('Click other end of scale bar... (Escape to cancel)');
+            else
+                setStatus('Click second point on the image... (Escape to cancel)');
+            end
 
         elseif size(appData.captureClicks, 1) >= 2
             % Both clicks collected — execute the measurement
@@ -3057,6 +3072,8 @@ function varargout = emViewerGUI()
                     executeMeasureProfile(x1, y1, x2, y2);
                 case 'distance'
                     executeMeasureDistance(x1, y1, x2, y2);
+                case 'scalebar'
+                    executeScaleBarCalibration(x1, y1, x2, y2);
             end
         end
     end
@@ -3512,6 +3529,7 @@ function varargout = emViewerGUI()
         btnExportMeasure.Enable  = state;
         btnDiffRings.Enable      = state;
         btnROIManager.Enable     = state;
+        btnCalibrateBar.Enable   = state;
         btnPlaceAnnot.Enable   = state;
         btnClearAnnot.Enable   = state;
         btnAnnotColor.Enable   = state;
@@ -3651,6 +3669,8 @@ function varargout = emViewerGUI()
                 setStatus('Click first point for line profile... (Escape to cancel)');
             case 'distance'
                 setStatus('Click first point for distance... (Escape to cancel)');
+            case 'scalebar'
+                setStatus('Click one end of the scale bar... (Escape to cancel)');
         end
     end
 
@@ -4601,23 +4621,266 @@ function varargout = emViewerGUI()
             newUnit = 'px';
         end
 
-        % Update the stored imageData
-        appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.pixelSize  = newSize;
+        applyCalibration(newSize, newUnit);
+        setStatus(sprintf('Pixel size set to %.4g %s/px', newSize, newUnit));
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onCalibrateBar — Calibrate pixel size from scale bar
+    % ════════════════════════════════════════════════════════════════════
+    function onCalibrateBar(~, ~)
+        if appData.activeIdx < 1 || isempty(appData.displayImg)
+            return;
+        end
+
+        % Offer choice: manual draw or auto-detect
+        sel = uiconfirm(fig, ...
+            ['Choose calibration method:' newline newline ...
+             'DRAW — Click both ends of the scale bar, then enter the distance.' newline ...
+             'AUTO-DETECT — Scan the image for a scale bar and suggest calibration.'], ...
+            'Calibrate from Scale Bar', ...
+            'Options', {'Draw on Bar', 'Auto-Detect', 'Cancel'}, ...
+            'DefaultOption', 1, 'CancelOption', 3, ...
+            'Icon', 'question');
+
+        switch sel
+            case 'Draw on Bar'
+                startTwoClickCapture('scalebar');
+            case 'Auto-Detect'
+                autoDetectScaleBar();
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: executeScaleBarCalibration — After two clicks on scale bar
+    % ════════════════════════════════════════════════════════════════════
+    function executeScaleBarCalibration(x1, y1, x2, y2)
+        % Draw overlay line where user clicked
+        hLine = line(ax, [x1 x2], [y1 y2], ...
+            'Color', [0 1 1], 'LineWidth', 2, 'LineStyle', '--', ...
+            'HandleVisibility', 'off');
+
+        % Compute pixel distance
+        pxDist = sqrt((x2 - x1)^2 + (y2 - y1)^2);
+
+        % Clean up click markers
+        for ci = 1:numel(appData.overlays.clickMarkers)
+            h = appData.overlays.clickMarkers{ci};
+            if isvalid(h), delete(h); end
+        end
+        appData.overlays.clickMarkers = {};
+
+        % Prompt for real distance
+        answer = inputdlg( ...
+            {sprintf('Pixel length of drawn line: %.1f px\n\nScale bar distance:'), ...
+             'Unit (nm, \x00B5m, mm, etc.):'}, ...
+            'Enter Scale Bar Value', [1 40], {'', 'nm'});
+
+        % Remove overlay line
+        if isvalid(hLine), delete(hLine); end
+
+        if isempty(answer), return; end
+
+        realDist = str2double(answer{1});
+        realUnit = strtrim(answer{2});
+
+        if isnan(realDist) || realDist <= 0
+            uialert(fig, 'Distance must be a positive number.', ...
+                'Invalid Input', 'Icon', 'error');
+            return;
+        end
+        if isempty(realUnit), realUnit = 'px'; end
+
+        % Compute pixel size = realDist / pxDist
+        newPixelSize = realDist / pxDist;
+
+        applyCalibration(newPixelSize, realUnit);
+        setStatus(sprintf('Calibrated: %.4g %s/px (from %.1f px = %g %s)', ...
+            newPixelSize, realUnit, pxDist, realDist, realUnit));
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: autoDetectScaleBar — Find scale bar in image automatically
+    % ════════════════════════════════════════════════════════════════════
+    function autoDetectScaleBar()
+        fig.Pointer = 'watch'; drawnow;
+
+        try
+            px = double(appData.filteredPixels);
+            [H, W] = size(px);
+
+            % SEM/TEM scale bars are typically in the bottom 15% of the image,
+            % often as a bright or dark horizontal bar on a data bar / info strip
+            stripH = max(10, round(H * 0.15));
+            strip = px(H - stripH + 1 : H, :);
+
+            % Binarize the strip: look for the darkest or brightest regions
+            % Many SEM images have a dark info bar at bottom with white scale bar
+            stripMin = min(strip(:));
+            stripMax = max(strip(:));
+            stripRange = stripMax - stripMin;
+
+            if stripRange < 1
+                fig.Pointer = 'arrow';
+                uialert(fig, 'Could not detect a scale bar (bottom strip is uniform).', ...
+                    'Auto-Detect Failed', 'Icon', 'warning');
+                return;
+            end
+
+            % Try both bright-on-dark and dark-on-bright
+            stripNorm = (strip - stripMin) / stripRange;
+
+            % Detect horizontal runs in each row
+            bestBarLen = 0;
+            bestBarRow = 0;
+            bestBarX1  = 0;
+            bestBarX2  = 0;
+            bestIsWhite = true;
+
+            for tryWhite = [true, false]
+                if tryWhite
+                    bw = stripNorm > 0.85;   % bright bar
+                else
+                    bw = stripNorm < 0.15;   % dark bar
+                end
+
+                % Find the longest horizontal run in each row
+                for ri = 1:size(bw, 1)
+                    row = bw(ri, :);
+                    % Find runs of 1s
+                    d = diff([0, row, 0]);
+                    starts = find(d == 1);
+                    ends   = find(d == -1) - 1;
+
+                    for si = 1:numel(starts)
+                        runLen = ends(si) - starts(si) + 1;
+                        % Scale bars are typically 5-50% of image width,
+                        % and at least 20 px, and narrow (1-10 px tall)
+                        if runLen > bestBarLen && runLen >= 20 && ...
+                                runLen >= W * 0.03 && runLen <= W * 0.60
+                            % Verify it's a thin bar: check rows above/below
+                            barHeight = 1;
+                            for rr = ri+1:size(bw, 1)
+                                midRun = round((starts(si) + ends(si)) / 2);
+                                sampCols = max(1, starts(si)+2) : min(W, ends(si)-2);
+                                if numel(sampCols) < 3, break; end
+                                if mean(bw(rr, sampCols)) > 0.7
+                                    barHeight = barHeight + 1;
+                                else
+                                    break;
+                                end
+                            end
+                            % Scale bars are thin: 1-15 px tall
+                            if barHeight >= 1 && barHeight <= 15
+                                bestBarLen  = runLen;
+                                bestBarRow  = ri;
+                                bestBarX1   = starts(si);
+                                bestBarX2   = ends(si);
+                                bestIsWhite = tryWhite;
+                            end
+                        end
+                    end
+                end
+            end
+
+            if bestBarLen == 0
+                fig.Pointer = 'arrow';
+                uialert(fig, ...
+                    ['Could not detect a scale bar in the bottom 15% of the image.' newline ...
+                     'Use "Draw on Bar" instead.'], ...
+                    'Auto-Detect Failed', 'Icon', 'warning');
+                return;
+            end
+
+            % Convert strip-local coords to image coords
+            barY = H - stripH + bestBarRow;
+            barX1 = bestBarX1;
+            barX2 = bestBarX2;
+
+            % Try to guess the scale bar value from common SEM/TEM values
+            % by looking at the ratio of bar length to image width
+            guessValues = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
+            guessUnits  = {'nm', 'nm', 'nm', 'nm', 'nm', 'nm', 'nm', 'nm', 'nm', 'nm', 'nm', 'nm'; ...
+                           'um', 'um', 'um', 'um', 'um', 'um', 'um', 'um', 'um', 'um', 'um', 'um'};
+            % We can't truly know the value without OCR — just present the
+            % pixel length and let the user type the real distance
+
+            fig.Pointer = 'arrow';
+
+            % Draw overlay showing detected bar
+            barColor = [0 1 1];
+            hBarLine = line(ax, [barX1 barX2], [barY barY], ...
+                'Color', barColor, 'LineWidth', 3, 'LineStyle', '-', ...
+                'HandleVisibility', 'off');
+            hBarEnd1 = line(ax, [barX1 barX1], [barY-8 barY+8], ...
+                'Color', barColor, 'LineWidth', 2, ...
+                'HandleVisibility', 'off');
+            hBarEnd2 = line(ax, [barX2 barX2], [barY-8 barY+8], ...
+                'Color', barColor, 'LineWidth', 2, ...
+                'HandleVisibility', 'off');
+            hBarLabel = text(ax, (barX1 + barX2)/2, barY - 12, ...
+                sprintf('%.0f px detected', bestBarLen), ...
+                'Color', barColor, 'FontSize', 11, 'FontWeight', 'bold', ...
+                'HorizontalAlignment', 'center', ...
+                'BackgroundColor', [0.1 0.1 0.1 0.7], ...
+                'HandleVisibility', 'off');
+
+            drawnow;
+
+            % Ask user to confirm and enter real distance
+            answer = inputdlg( ...
+                {sprintf(['Detected scale bar: %.0f px long\n' ...
+                 '(cyan overlay on image)\n\n' ...
+                 'Enter the real distance this bar represents:'], bestBarLen), ...
+                 'Unit (nm, \x00B5m, mm, etc.):'}, ...
+                'Confirm Scale Bar', [1 44], {'', 'nm'});
+
+            % Clean up overlay
+            if isvalid(hBarLine),  delete(hBarLine);  end
+            if isvalid(hBarEnd1),  delete(hBarEnd1);  end
+            if isvalid(hBarEnd2),  delete(hBarEnd2);  end
+            if isvalid(hBarLabel), delete(hBarLabel); end
+
+            if isempty(answer), return; end
+
+            realDist = str2double(answer{1});
+            realUnit = strtrim(answer{2});
+
+            if isnan(realDist) || realDist <= 0
+                uialert(fig, 'Distance must be a positive number.', ...
+                    'Invalid Input', 'Icon', 'error');
+                return;
+            end
+            if isempty(realUnit), realUnit = 'px'; end
+
+            newPixelSize = realDist / bestBarLen;
+            applyCalibration(newPixelSize, realUnit);
+            setStatus(sprintf('Calibrated: %.4g %s/px (auto-detected %0.f px = %g %s)', ...
+                newPixelSize, realUnit, bestBarLen, realDist, realUnit));
+
+        catch ME
+            fig.Pointer = 'arrow';
+            uialert(fig, sprintf('Auto-detect failed:\n%s', ME.message), ...
+                'Error', 'Icon', 'error');
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: applyCalibration — Set pixel size and refresh UI
+    % ════════════════════════════════════════════════════════════════════
+    function applyCalibration(newPixelSize, newUnit)
+        appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.pixelSize  = newPixelSize;
         appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.pixelUnit  = newUnit;
         appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.calibrated = true;
 
-        % Refresh UI elements that depend on calibration
         updateStatusBar();
         updateMetadataPanel();
 
-        % Enable and show scale bar
         cbScaleBar.Enable       = 'on';
         btnScaleBarColor.Enable = 'on';
         spnScaleBarFont.Enable  = 'on';
         cbScaleBar.Value        = true;
         rebuildScaleBar();
-
-        setStatus(sprintf('Pixel size set to %.4g %s/px', newSize, newUnit));
     end
 
     % ════════════════════════════════════════════════════════════════════
