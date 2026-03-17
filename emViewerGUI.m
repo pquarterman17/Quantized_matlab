@@ -2012,8 +2012,8 @@ function varargout = emViewerGUI()
         % Update CData without recreating imagesc (preserves zoom/pan state)
         appData.imgHandle.CData = dispImg;
 
-        % Update histogram contrast lines
-        updateHistogramLines(lo, hi);
+        % Update histogram contrast lines (single codepath avoids duplicates)
+        refreshHistogramMarkers();
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2675,9 +2675,9 @@ function varargout = emViewerGUI()
         histAx.Box = 'on';
         histAx.Toolbar.Visible = 'off';
 
-        % Draw Low/High contrast lines
+        % Draw Low/High contrast marker lines
         if ~isempty(appData.filteredPixels)
-            updateHistogramLines(sldLow.Value, sldHigh.Value);
+            refreshHistogramMarkers();
         end
     end
 
@@ -3816,7 +3816,8 @@ function varargout = emViewerGUI()
         % Log measurement
         appData.measurementLog{end+1} = struct( ...
             'type', 'distance', 'value', dVal, 'unit', dUnit, ...
-            'details', sprintf('(%.0f,%.0f)-(%.0f,%.0f)', x1, y1, x2, y2));
+            'details', sprintf('(%.0f,%.0f)-(%.0f,%.0f)', x1, y1, x2, y2), ...
+            'timestamp', datestr(now, 'yyyy-mm-dd HH:MM:SS'));
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4429,7 +4430,8 @@ function varargout = emViewerGUI()
             % Log measurement
             appData.measurementLog{end+1} = struct( ...
                 'type', 'angle', 'value', angleDeg, 'unit', 'deg', ...
-                'details', sprintf('vertex=(%.0f,%.0f)', pts(1,1), pts(1,2)));
+                'details', sprintf('vertex=(%.0f,%.0f)', pts(1,1), pts(1,2)), ...
+                'timestamp', datestr(now, 'yyyy-mm-dd HH:MM:SS'));
         end
     end
 
@@ -4511,6 +4513,12 @@ function varargout = emViewerGUI()
             finishCapture();
             setStatus(sprintf('Polyline: %.2f %s (%d segments)', ...
                 totalDist, unitStr, nSegs));
+
+            % Log measurement
+            appData.measurementLog{end+1} = struct( ...
+                'type', 'polyline', 'value', totalDist, 'unit', unitStr, ...
+                'details', sprintf('%d segments', nSegs), ...
+                'timestamp', datestr(now, 'yyyy-mm-dd HH:MM:SS'));
             return;
         end
 
@@ -5657,11 +5665,13 @@ function varargout = emViewerGUI()
         imagesc(result); colormap(gray(256)); axis image; colorbar;
         title(sprintf('%s — %s', names{idxA}, op), 'Interpreter', 'none');
 
-        % Offer to replace active image
-        undoPush();
-        appData.rawPixels = result;
-        appData.filteredPixels = result;
-        refreshDisplay();
+        % Only replace active image if one is loaded
+        if appData.activeIdx >= 1 && ~isempty(appData.imgHandle) && isvalid(appData.imgHandle)
+            undoPush();
+            appData.rawPixels = result;
+            appData.filteredPixels = result;
+            refreshDisplay();
+        end
         setStatus(sprintf('Image math: %s (A=%d, B=%d)', op, idxA, idxB));
     end
 
@@ -5801,7 +5811,9 @@ function varargout = emViewerGUI()
             if isfield(s, 'gamma'), appData.gamma = s.gamma; sldGamma.Value = s.gamma; end
             if isfield(s, 'roiList'), appData.roiList = s.roiList; end
             if isfield(s, 'measureLog'), appData.measurementLog = s.measureLog; end
-            if isfield(s, 'colormap'), ddColormap.Value = s.colormap; end
+            if isfield(s, 'colormap') && ismember(s.colormap, ddColormap.Items)
+                ddColormap.Value = s.colormap;
+            end
             if isfield(s, 'prefs')
                 flds = fieldnames(s.prefs);
                 for fi2 = 1:numel(flds)
@@ -5812,8 +5824,12 @@ function varargout = emViewerGUI()
             if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
                 displayImage();
                 if isfield(s, 'contrastLow') && isfield(s, 'contrastHigh')
-                    sldLow.Value = s.contrastLow;
-                    sldHigh.Value = s.contrastHigh;
+                    lo2 = max(sldLow.Limits(1), min(sldLow.Limits(2), s.contrastLow));
+                    hi2 = max(sldHigh.Limits(1), min(sldHigh.Limits(2), s.contrastHigh));
+                    if lo2 < hi2
+                        sldLow.Value  = lo2;
+                        sldHigh.Value = hi2;
+                    end
                     refreshDisplay();
                 end
             end
@@ -5999,22 +6015,14 @@ function varargout = emViewerGUI()
             current = eroded;
         end
 
-        % Find local maxima in distance map (seeds)
-        seeds = false(size(dist));
-        padD = padarray(dist, [1 1], 0);
-        for dr = -1:1
-            for dc = -1:1
-                if dr == 0 && dc == 0, continue; end
-                seeds = seeds & (dist >= padD((2:end-1)+dr, (2:end-1)+dc));
-            end
-        end
-        % Actually: initialize seeds as true, then AND
+        % Find local maxima in distance map (seeds):
+        % a pixel is a seed if it is strictly greater than all 8 neighbours.
         seeds = true(size(dist));
         padD = padarray(dist, [1 1], 0);
         for dr = -1:1
             for dc = -1:1
                 if dr == 0 && dc == 0, continue; end
-                seeds = seeds & (dist >= padD((2:end-1)+dr, (2:end-1)+dc));
+                seeds = seeds & (dist > padD((2:end-1)+dr, (2:end-1)+dc));
             end
         end
         seeds = seeds & (dist > 1);   % must be interior points
@@ -6095,10 +6103,16 @@ function varargout = emViewerGUI()
         if isequal(fn, 0), return; end
 
         fid = fopen(fullfile(fp, fn), 'w');
+        if fid == -1
+            uialert(fig, sprintf('Cannot write to:\n%s', fn), 'Export Error', 'Icon', 'error');
+            return;
+        end
         fprintf(fid, 'Type,Value,Unit,Details\n');
         for mi = 1:numel(appData.measurementLog)
             m = appData.measurementLog{mi};
-            fprintf(fid, '%s,%.6g,%s,%s\n', m.type, m.value, m.unit, m.details);
+            % Quote the Details field in case it contains commas
+            details = strrep(m.details, '"', '""');
+            fprintf(fid, '%s,%.6g,%s,"%s"\n', m.type, m.value, m.unit, details);
         end
         fclose(fid);
         setStatus(sprintf('Exported %d measurements to %s', numel(appData.measurementLog), fn));
