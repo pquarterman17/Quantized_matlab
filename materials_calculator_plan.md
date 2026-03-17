@@ -1,5 +1,19 @@
 # Materials Calculator & Unit Converter — Architecture Plan
 
+## Progress Summary
+
+| Phase | Status | Files | Tests |
+|-------|--------|-------|-------|
+| 1. Foundation | **COMPLETE** | 3 files (`constants.m`, `unitConvert.m`, `elementData.m`) | 85 pass |
+| 2. Core modules | **COMPLETE** | 38 files across 6 packages (`+crystal/`, `+electrical/`, `+semiconductor/`, `+thinFilm/`, `+magnetic/`, `+substrates/`) | 67 pass |
+| 3. GUI | **COMPLETE** | 1 file (`materialsCalcGUI.m`, ~1460 lines) + 1 test file | 21 pass |
+| 4. X-ray/Neutron | Not started | — | — |
+| 5. Extensions | Not started | — | — |
+
+**Total: 43 `.m` files implemented, 173 tests passing (85 + 67 + 21).**
+
+---
+
 ## Codebase Context (for new sessions)
 
 This section provides everything needed to pick up implementation without
@@ -1358,58 +1372,52 @@ stretch goal — document as unsupported initially.
 
 Each step leaves the system fully working. Steps are ordered by dependency.
 
-### Phase 1: Foundation (4 steps)
+### Phase 1: Foundation (4 steps) — COMPLETE
 
 **Purpose:** Build the unit conversion engine and element database that
 everything else depends on.
 
-1. Create `+calc/constants.m` — physical constants struct.
-2. Create `+calc/unitConvert.m` — unit parser + conversion engine.
-   - Base unit registry (length, mass, time, current, temperature, amount,
-     energy, pressure, magnetic field, magnetic moment, angle, frequency).
-   - SI prefix table with disambiguation logic.
-   - Tokenizer for compound expressions.
-   - Dimension vector arithmetic.
-   - Equivalence bridges (eV<->nm, eV<->cm^-1, eV<->THz, K<->C<->F, Oe<->T).
-3. Create `+calc/elementData.m` — periodic table database (118 elements,
-   all properties).
-4. Create `tests/test_calc_units.m` — comprehensive unit conversion tests.
-   Verify: `calc.unitConvert(1, 'mA/cm^2', 'A/m^2')` returns 10.
+- [x] Create `+calc/constants.m` — physical constants struct (CODATA 2018, 14 constants, persistent cache).
+- [x] Create `+calc/unitConvert.m` — unit parser + conversion engine.
+   - Base unit registry, SI prefix disambiguation, compound expression tokenizer,
+     dimension vector arithmetic, equivalence bridges (eV↔nm, Oe↔T, K↔C↔F).
+- [x] Create `+calc/elementData.m` — periodic table database (118 elements, 18 properties).
+- [x] Create `tests/test_calc_units.m` — 85 tests. All passing.
 
-### Phase 2: Core calculation modules (7 steps)
+### Phase 2: Core calculation modules (7 steps) — COMPLETE
 
 **Purpose:** Build the pure-computation backends for each domain. All
 functions are usable from the command line independent of the GUI.
 
-5. Create `+calc/+crystal/` — dSpacing, twoThetaFromD, dFromTwoTheta,
+- [x] Create `+calc/+crystal/` — 10 functions: dSpacing, twoThetaFromD, dFromTwoTheta,
    atomicDensity, unitCellVolume, densityFromMolar, latticeMismatch,
    criticalThickness, strainFromPoisson, tetragonalDistortion.
-6. Create `+calc/+electrical/` — resistivity, conductivity, mobility,
+- [x] Create `+calc/+electrical/` — 5 functions: resistivity, conductivity, mobility,
    currentDensity, sheetResistance.
-7. Create `+calc/+semiconductor/` — all 13 functions + material presets.
-8. Create `+calc/+thinFilm/` — depositionRate, kiessigThickness, stoneyStress,
+- [x] Create `+calc/+semiconductor/` — 14 files: 13 functions + materialPresets.
+- [x] Create `+calc/+thinFilm/` — 7 functions: depositionRate, kiessigThickness, stoneyStress,
    doseFromCurrent, thermalMismatchStrain, multilayerThermalConductivity,
    diffusionLength_thermal.
-9. Create `+calc/+magnetic/` — momentPerAtom, magnetization,
+- [x] Create `+calc/+magnetic/` — 4 functions: momentPerAtom, magnetization,
    bohrMagnetonConvert, demagFactor.
-10. Create `+calc/+substrates/` — getSubstrate, listSubstrates with 14
-    presets (including dielectric constants).
-11. Create `tests/test_calc_modules.m` — tests for all Phase 2 modules.
+- [x] Create `+calc/+substrates/` — getSubstrate, listSubstrates with 14 presets.
+- [x] Create `tests/test_calc_modules.m` — 67 tests. All passing.
 
-### Phase 3: GUI (6 steps)
+### Phase 3: GUI (6 steps) — COMPLETE
 
 **Purpose:** Build the standalone materials calculator with 6 tabs covering
 the most frequently used calculations.
 
-12. Create `materialsCalcGUI.m` — figure, root grid, tab group, status bar,
-    API struct.
-13. Build Unit Converter tab (free-text parser, swap, presets, live update).
-14. Build Crystal, Electrical, Semiconductor, Thin Film tabs (calculation
-    cards with Calculate buttons).
-15. Build Periodic Table tab (element grid, property/color dropdowns,
-    highlight search, detail bar).
-16. Add history log + copy-as-LaTeX on result displays.
-17. Create `tests/test_materials_calc_gui.m` — headless API tests.
+- [x] Create `materialsCalcGUI.m` — uifigure (720×560), uitabgroup, status bar,
+   API struct with headless test hooks, history log, closure-based state.
+- [x] Build Unit Converter tab (free-text parser, swap, 8 presets, live update,
+   copy result/LaTeX).
+- [x] Build Crystal, Electrical, Semiconductor, Thin Film tabs (scrollable cards
+   with Calculate buttons, substrate/material preset dropdowns).
+- [x] Build Periodic Table tab (18×10 element grid, color-coded by category,
+   property dropdown, search, detail panel).
+- [x] Add history log + copy-as-LaTeX on result displays.
+- [x] Create `tests/test_materials_calc_gui.m` — 21 headless API tests. All passing.
 
 ### Phase 4: X-ray/Neutron integration (4 steps)
 
@@ -1417,42 +1425,42 @@ the most frequently used calculations.
 into dataImportGUI (where the data lives) rather than the standalone
 calculator.
 
-18. Create `+calc/+xrayNeutron/` — braggLaw, qToTwoTheta, twoThetaToQ,
-    neutronSLD, xraySLD, parseFormula, molecularWeight,
-    weightToAtomicPercent, atomicToWeightPercent, balanceReaction,
-    coDepositionRatio.
-19. Add SLD calculator and Q-to-2theta converter as sub-dialog or panel in
-    dataImportGUI.
-20. Create `tests/test_calc_xrayneutron.m`.
-21. Update `CLAUDE.md` and `runAllTests.m` with all new modules and test
-    groups.
+- [ ] Create `+calc/+xrayNeutron/` — braggLaw, qToTwoTheta, twoThetaToQ,
+   neutronSLD, xraySLD, parseFormula, molecularWeight,
+   weightToAtomicPercent, atomicToWeightPercent, balanceReaction,
+   coDepositionRatio.
+- [ ] Add SLD calculator and Q-to-2theta converter as sub-dialog or panel in
+   dataImportGUI.
+- [ ] Create `tests/test_calc_xrayneutron.m`.
+- [ ] Update `CLAUDE.md` and `runAllTests.m` with all new modules and test
+   groups.
 
 ### Phase 5: Extensions (5 steps)
 
 **Purpose:** Add niche-but-valuable features once the core tool is stable
 and tested.
 
-22. Create `+calc/+superconductor/` — londonDepth, coherenceLength,
-    glParameter, criticalFields, depairingCurrent + material presets
-    (Nb, NbN, YBCO, MgB2, Al, Pb, In, Sn). Add Superconductor tab to
-    materialsCalcGUI.
-    *Why: Superconducting thin films are a significant research area. The
-    module is small (5 functions + presets) but the calculations are tedious
-    to do by hand.*
-23. Create `+calc/importCIF.m` — CIF file parser (tag-value pairs, loop
-    blocks, uncertainty stripping, multi-block).
-24. Create `+calc/crystalCache.m` — local crystal structure database
-    (add/import/search/list/remove/rebuild). Create `data/` and `data/cif/`
-    folders (gitignored).
-    *Why: Once you start exporting CIFs from ICSD, having a searchable local
-    cache that auto-fills Crystal tab inputs saves significant time vs.
-    manually entering lattice parameters.*
-25. Add Favorites tab to materialsCalcGUI — pin/unpin toggle on calculation
-    cards, Favorites tab renders pinned cards.
-    *Why: With 7+ tabs (after Superconductor), navigating to frequently-used
-    calculations gets tedious. Pinning the 3-4 you use daily to one tab
-    eliminates tab-switching.*
-26. Create `tests/test_cif_parser.m` and `tests/test_superconductor.m`.
+- [ ] Create `+calc/+superconductor/` — londonDepth, coherenceLength,
+   glParameter, criticalFields, depairingCurrent + material presets
+   (Nb, NbN, YBCO, MgB2, Al, Pb, In, Sn). Add Superconductor tab to
+   materialsCalcGUI.
+   *Why: Superconducting thin films are a significant research area. The
+   module is small (5 functions + presets) but the calculations are tedious
+   to do by hand.*
+- [ ] Create `+calc/importCIF.m` — CIF file parser (tag-value pairs, loop
+   blocks, uncertainty stripping, multi-block).
+- [ ] Create `+calc/crystalCache.m` — local crystal structure database
+   (add/import/search/list/remove/rebuild). Create `data/` and `data/cif/`
+   folders (gitignored).
+   *Why: Once you start exporting CIFs from ICSD, having a searchable local
+   cache that auto-fills Crystal tab inputs saves significant time vs.
+   manually entering lattice parameters.*
+- [ ] Add Favorites tab to materialsCalcGUI — pin/unpin toggle on calculation
+   cards, Favorites tab renders pinned cards.
+   *Why: With 7+ tabs (after Superconductor), navigating to frequently-used
+   calculations gets tedious. Pinning the 3-4 you use daily to one tab
+   eliminates tab-switching.*
+- [ ] Create `tests/test_cif_parser.m` and `tests/test_superconductor.m`.
 
 ---
 
