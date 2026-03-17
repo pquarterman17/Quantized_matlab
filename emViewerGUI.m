@@ -97,7 +97,7 @@ function varargout = emViewerGUI()
         'measurements', {{}}, ...   % cell array of measurement structs (for draggable endpoints)
         'textAnnotations', {{}});  % cell array of text annotation structs
     appData.lastProfile   = struct('dist', [], 'intensity', [], 'unit', 'px');
-    appData.captureMode   = '';     % '' | 'profile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation'
+    appData.captureMode   = '';     % '' | 'profile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'roistats'
     appData.captureClicks = [];     % [Nx2] accumulated click coords (x y per row)
     appData.lastDir       = '';     % last browsed directory for file open dialog
 
@@ -109,6 +109,62 @@ function varargout = emViewerGUI()
 
     % Annotation defaults
     appData.annotationColor = [1 1 1];    % white
+
+    % Undo stack (cap at 5 entries)
+    appData.undoStack     = {};    % cell array of {rawPixels, filteredPixels} snapshots
+    appData.undoStackMax  = 5;
+
+    % Stack navigator state (multi-frame TIFF)
+    appData.stackFrames   = {};    % cell array of 2D matrices (one per frame)
+    appData.stackIdx      = 0;     % current frame index (0 = not a stack)
+
+    % Recent files
+    appData.recentFiles   = {};    % cell array of file paths (most recent first)
+
+    % Gamma
+    appData.gamma         = 1.0;   % gamma correction exponent
+
+    % Preferences (persisted to .emviewer_prefs.mat)
+    appData.prefs = struct( ...
+        'defaultColormap', 'gray', ...
+        'autoContrastLow', 2, ...        % percentile
+        'autoContrastHigh', 98, ...      % percentile
+        'exportDPI', 300, ...
+        'pixelInspectorSize', 7);        % NxN neighborhood
+
+    % Measurement log for export
+    appData.measurementLog = {};   % cell array of structs: {type, value, unit, ...}
+
+    % Session state
+    appData.sessionFile = '';
+
+    % Load recent files from persistent storage
+    recentFilePath = fullfile(fileparts(mfilename('fullpath')), '.emviewer_recent.mat');
+    try
+        if isfile(recentFilePath)
+            tmp = load(recentFilePath, 'recentFiles');
+            if isfield(tmp, 'recentFiles')
+                appData.recentFiles = tmp.recentFiles;
+            end
+        end
+    catch
+        % Ignore errors loading recent files
+    end
+
+    % Load persisted preferences
+    prefsFilePath = fullfile(fileparts(mfilename('fullpath')), '.emviewer_prefs.mat');
+    try
+        if isfile(prefsFilePath)
+            tmp = load(prefsFilePath, 'prefs');
+            if isfield(tmp, 'prefs')
+                flds = fieldnames(tmp.prefs);
+                for fi = 1:numel(flds)
+                    appData.prefs.(flds{fi}) = tmp.prefs.(flds{fi});
+                end
+            end
+        end
+    catch
+    end
 
     % ════════════════════════════════════════════════════════════════════
     %  SEMANTIC BUTTON COLOUR PALETTE
@@ -128,6 +184,13 @@ function varargout = emViewerGUI()
                    'AutoResizeChildren', 'off');
     fig.CloseRequestFcn = @onFigureClose;
 
+    % Drag-and-drop file loading (requires MATLAB R2022b+)
+    try
+        fig.DropFcn = @onFileDrop;
+    catch
+        % DropFcn not supported on older MATLAB versions — ignore
+    end
+
     % ════════════════════════════════════════════════════════════════════
     %  ROOT GRID: 3 rows x 1 col
     %    Row 1 (30px):  Toolbar
@@ -145,8 +208,8 @@ function varargout = emViewerGUI()
     %  ROW 1: TOOLBAR
     %  [Open Files...] [Remove] | gap | [Fit] [1:1] | filename label
     % ════════════════════════════════════════════════════════════════════
-    toolbarGL = uigridlayout(rootGL, [1 9], ...
-        'ColumnWidth', {90, 65, 14, 40, 40, 14, 65, 14, '1x'}, ...
+    toolbarGL = uigridlayout(rootGL, [1 13], ...
+        'ColumnWidth', {90, 65, 65, 14, 40, 40, 14, 65, 40, 14, 30, 14, '1x'}, ...
         'RowHeight',   {'1x'}, ...
         'Padding',     [4 2 4 2], ...
         'ColumnSpacing', 4);
@@ -161,38 +224,45 @@ function varargout = emViewerGUI()
         'Tooltip', 'Browse for TIFF or RAW image files to load');
     btnOpen.Layout.Row = 1; btnOpen.Layout.Column = 1;
 
+    ddRecent = uidropdown(toolbarGL, ...
+        'Items', {'(recent files)'}, ...
+        'Value', '(recent files)', ...
+        'ValueChangedFcn', @onRecentFileSelected, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Tooltip', 'Open a recently loaded file');
+    ddRecent.Layout.Row = 1; ddRecent.Layout.Column = 2;
+
     btnRemove = uibutton(toolbarGL, 'Text', 'Remove', ...
         'ButtonPushedFcn', @onRemoveImage, ...
         'BackgroundColor', BTN_DANGER, ...
         'FontColor', BTN_FG, ...
         'Tooltip', 'Remove the selected image(s) from the list');
-    btnRemove.Layout.Row = 1; btnRemove.Layout.Column = 2;
+    btnRemove.Layout.Row = 1; btnRemove.Layout.Column = 3;
 
-    % Separator gap (column 3 is empty space)
     lblSep = uilabel(toolbarGL, 'Text', '|', ...
         'FontColor', [0.5 0.5 0.5], ...
         'HorizontalAlignment', 'center');
-    lblSep.Layout.Row = 1; lblSep.Layout.Column = 3; %#ok<NASGU>
+    lblSep.Layout.Row = 1; lblSep.Layout.Column = 4; %#ok<NASGU>
 
     btnZoomFit = uibutton(toolbarGL, 'Text', 'Fit', ...
         'ButtonPushedFcn', @onZoomFit, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Tooltip', 'Zoom to fit the entire image in the axes');
-    btnZoomFit.Layout.Row = 1; btnZoomFit.Layout.Column = 4;
+    btnZoomFit.Layout.Row = 1; btnZoomFit.Layout.Column = 5;
 
     btnZoomActual = uibutton(toolbarGL, 'Text', '1:1', ...
         'ButtonPushedFcn', @onZoomActual, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Tooltip', 'Zoom to actual pixels (100% — one image pixel = one screen pixel)');
-    btnZoomActual.Layout.Row = 1; btnZoomActual.Layout.Column = 5;
+    btnZoomActual.Layout.Row = 1; btnZoomActual.Layout.Column = 6;
 
-    % Separator gap (column 6 is empty space)
     lblSep2 = uilabel(toolbarGL, 'Text', '|', ...
         'FontColor', [0.5 0.5 0.5], ...
         'HorizontalAlignment', 'center');
-    lblSep2.Layout.Row = 1; lblSep2.Layout.Column = 6; %#ok<NASGU>
+    lblSep2.Layout.Row = 1; lblSep2.Layout.Column = 7; %#ok<NASGU>
 
     btnCompare = uibutton(toolbarGL, 'state', 'Text', 'Compare', ...
         'ValueChangedFcn', @onCompareToggle, ...
@@ -200,18 +270,38 @@ function varargout = emViewerGUI()
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Side-by-side comparison (Tab to switch active panel, arrows to scroll)');
-    btnCompare.Layout.Row = 1; btnCompare.Layout.Column = 7;
+    btnCompare.Layout.Row = 1; btnCompare.Layout.Column = 8;
+
+    btnGrid = uibutton(toolbarGL, 'Text', 'Grid', ...
+        'ButtonPushedFcn', @onThumbnailGrid, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Show thumbnail grid of all loaded images');
+    btnGrid.Layout.Row = 1; btnGrid.Layout.Column = 9;
 
     lblSep3 = uilabel(toolbarGL, 'Text', '|', ...
         'FontColor', [0.5 0.5 0.5], ...
         'HorizontalAlignment', 'center');
-    lblSep3.Layout.Row = 1; lblSep3.Layout.Column = 8; %#ok<NASGU>
+    lblSep3.Layout.Row = 1; lblSep3.Layout.Column = 10; %#ok<NASGU>
+
+    btnPrefs = uibutton(toolbarGL, 'Text', char(9881), ...
+        'ButtonPushedFcn', @onPreferences, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Tooltip', 'Preferences — default colormap, percentiles, export settings');
+    btnPrefs.Layout.Row = 1; btnPrefs.Layout.Column = 11;
+
+    lblSep4 = uilabel(toolbarGL, 'Text', '|', ...
+        'FontColor', [0.5 0.5 0.5], ...
+        'HorizontalAlignment', 'center');
+    lblSep4.Layout.Row = 1; lblSep4.Layout.Column = 12; %#ok<NASGU>
 
     lblFilename = uilabel(toolbarGL, 'Text', '(no image loaded)', ...
         'FontSize', 11, ...
         'FontColor', [0.85 0.85 0.85], ...
         'HorizontalAlignment', 'left');
-    lblFilename.Layout.Row = 1; lblFilename.Layout.Column = 9;
+    lblFilename.Layout.Row = 1; lblFilename.Layout.Column = 13;
 
     % ════════════════════════════════════════════════════════════════════
     %  ROW 2: MAIN CONTENT — 3 columns
@@ -247,9 +337,13 @@ function varargout = emViewerGUI()
     axPanel.Layout.Row = 1;
     axPanel.Layout.Column = 2;
 
-    axGL = uigridlayout(axPanel, [1 1], 'Padding', [2 2 2 2]);
+    axGL = uigridlayout(axPanel, [2 1], ...
+        'RowHeight', {'1x', 0}, ...
+        'Padding', [2 2 2 2], ...
+        'RowSpacing', 2);
 
     ax = uiaxes(axGL);
+    ax.Layout.Row = 1;
     ax.Box = 'on';
     ax.XTick = [];
     ax.YTick = [];
@@ -259,10 +353,50 @@ function varargout = emViewerGUI()
     colormap(ax, gray(256));
     ax.Toolbar.Visible = 'off';
 
+    % Stack navigator controls (row 2 of axGL, hidden until a stack is loaded)
+    stackGL = uigridlayout(axGL, [1 5], ...
+        'ColumnWidth', {40, 40, '1x', 40, 80}, ...
+        'RowHeight', {24}, ...
+        'Padding', [4 0 4 0], ...
+        'ColumnSpacing', 4);
+    stackGL.Layout.Row = 2;
+
+    btnStackPrev = uibutton(stackGL, 'Text', '<', ...
+        'ButtonPushedFcn', @(~,~) onStackNav(-1), ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Previous frame');
+    btnStackPrev.Layout.Column = 1;
+
+    btnStackNext = uibutton(stackGL, 'Text', '>', ...
+        'ButtonPushedFcn', @(~,~) onStackNav(1), ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Next frame');
+    btnStackNext.Layout.Column = 2;
+
+    sldStackFrame = uislider(stackGL, ...
+        'Value', 1, 'Limits', [1 2], ...
+        'ValueChangedFcn', @onStackSlider, ...
+        'Tooltip', 'Scroll through frames');
+    sldStackFrame.Layout.Column = 3;
+    sldStackFrame.MajorTicks = [];
+    sldStackFrame.MinorTicks = [];
+
+    btnStackMIP = uibutton(stackGL, 'Text', 'MIP', ...
+        'ButtonPushedFcn', @onStackMIP, ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Maximum Intensity Projection across all frames');
+    btnStackMIP.Layout.Column = 4;
+
+    lblStackFrame = uilabel(stackGL, 'Text', '1 / 1', ...
+        'FontSize', 10, 'HorizontalAlignment', 'center', ...
+        'FontColor', [0.7 0.7 0.7]);
+    lblStackFrame.Layout.Column = 5;
+
     % Comparison mode axes (created/destroyed dynamically)
     compareGL = [];   % uigridlayout replacing axGL when in compare mode
     axL       = [];   % left uiaxes
     axR       = [];   % right uiaxes
+    compareLinkedZoom = true;  % whether to sync zoom between compare panels
 
     % Mouse hover tracking via figure-level motion callback
     fig.WindowButtonMotionFcn = @onMouseMotion;
@@ -277,7 +411,7 @@ function varargout = emViewerGUI()
     toolsPanel.Layout.Column = 3;
 
     toolsGL = uigridlayout(toolsPanel, [12 1], ...
-        'RowHeight', {14, 140, 14, 90, 14, 140, 14, 160, 14, 108, 14, '1x'}, ...
+        'RowHeight', {14, 198, 14, 90, 14, 230, 14, 540, 14, 108, 14, '1x'}, ...
         'ColumnWidth', {'1x'}, ...
         'Padding', [4 4 4 4], ...
         'RowSpacing', 1);
@@ -292,8 +426,8 @@ function varargout = emViewerGUI()
     pnlContrast.Layout.Row = 2;
 
     % Inner grid: Low label+slider, High label+slider, two buttons, colormap
-    contrastInnerGL = uigridlayout(pnlContrast, [7 2], ...
-        'RowHeight',   {12, 20, 12, 20, 2, 20, 20}, ...
+    contrastInnerGL = uigridlayout(pnlContrast, [11 2], ...
+        'RowHeight',   {12, 20, 12, 20, 2, 20, 20, 18, 12, 20, 18}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding',     [3 2 3 2], ...
         'RowSpacing',  1, ...
@@ -346,6 +480,41 @@ function varargout = emViewerGUI()
         'Tooltip', 'Select colormap for image display');
     ddColormap.Layout.Row = 7; ddColormap.Layout.Column = [1 2];
 
+    cbColorbar = uicheckbox(contrastInnerGL, ...
+        'Text',    'Show Colorbar', ...
+        'Value',   false, ...
+        'Enable',  'off', ...
+        'ValueChangedFcn', @onColorbarToggle, ...
+        'Tooltip', 'Show/hide a colorbar next to the image');
+    cbColorbar.Layout.Row = 8; cbColorbar.Layout.Column = [1 2];
+
+    hColorbar = [];   % handle to colorbar object (created/deleted dynamically)
+
+    % Row 9-10: Gamma slider
+    lblGamma = uilabel(contrastInnerGL, 'Text', 'Gamma: 1.00', ...
+        'FontSize', 8, 'HorizontalAlignment', 'left');
+    lblGamma.Layout.Row = 9; lblGamma.Layout.Column = [1 2];
+
+    sldGamma = uislider(contrastInnerGL, ...
+        'Value', 1, 'Limits', [0.1 5.0], ...
+        'ValueChangedFcn', @onGammaChanged, ...
+        'Tooltip', 'Non-linear intensity mapping (1.0 = linear, <1 = brighten darks, >1 = darken)');
+    sldGamma.Layout.Row = 10; sldGamma.Layout.Column = [1 2];
+    sldGamma.MajorTicks = [0.1 1.0 2.0 3.0 5.0];
+    sldGamma.MinorTicks = [];
+
+    % Row 11: Minimap toggle
+    cbMinimap = uicheckbox(contrastInnerGL, ...
+        'Text',    'Show Minimap', ...
+        'Value',   false, ...
+        'Enable',  'off', ...
+        'ValueChangedFcn', @onMinimapToggle, ...
+        'Tooltip', 'Show overview inset with zoomed viewport rectangle');
+    cbMinimap.Layout.Row = 11; cbMinimap.Layout.Column = [1 2];
+
+    hMinimap     = [];   % handle to minimap axes (created/deleted dynamically)
+    hMinimapRect = [];   % handle to viewport rectangle on minimap
+
     % ── Section 2: Histogram ──────────────────────────────────────────────
     lblHistogramHeader = uilabel(toolsGL, 'Text', 'Histogram', ...
         'FontWeight', 'bold', 'FontSize', 11, ...
@@ -390,8 +559,8 @@ function varargout = emViewerGUI()
     %   Row 6: Export Profile button
     %   Row 7: Clear All button
     %   Row 8: (padding)
-    measureInnerGL = uigridlayout(pnlMeasure, [7 2], ...
-        'RowHeight',   {18, 20, 2, 20, 20, 20, 20}, ...
+    measureInnerGL = uigridlayout(pnlMeasure, [11 2], ...
+        'RowHeight',   {18, 20, 2, 20, 20, 20, 20, 20, 2, 20, 20}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding',     [3 2 3 2], ...
         'RowSpacing',  2, ...
@@ -443,7 +612,23 @@ function varargout = emViewerGUI()
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
         'Tooltip',         'Save the last line profile to a CSV file');
-    btnExportProfile.Layout.Row = 6; btnExportProfile.Layout.Column = [1 2];
+    btnExportProfile.Layout.Row = 7; btnExportProfile.Layout.Column = [1 2];
+
+    btnAngle = uibutton(measureInnerGL, 'Text', 'Angle', ...
+        'ButtonPushedFcn', @onAngleMeasure, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor',       BTN_FG, ...
+        'Enable',          'off', ...
+        'Tooltip',         'Click 3 points (vertex, ray1, ray2) to measure angle (Esc to cancel)');
+    btnAngle.Layout.Row = 6; btnAngle.Layout.Column = 1;
+
+    btnPolyline = uibutton(measureInnerGL, 'Text', 'Polyline', ...
+        'ButtonPushedFcn', @onPolylineMeasure, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor',       BTN_FG, ...
+        'Enable',          'off', ...
+        'Tooltip',         'Click points to measure total path length; double-click to finish (Esc to cancel)');
+    btnPolyline.Layout.Row = 6; btnPolyline.Layout.Column = 2;
 
     btnClearOverlays = uibutton(measureInnerGL, 'Text', 'Clear All', ...
         'ButtonPushedFcn', @onClearOverlays, ...
@@ -451,7 +636,38 @@ function varargout = emViewerGUI()
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
         'Tooltip',         'Remove all measurement overlays from the image');
-    btnClearOverlays.Layout.Row = 7; btnClearOverlays.Layout.Column = [1 2];
+    btnClearOverlays.Layout.Row = 8; btnClearOverlays.Layout.Column = [1 2];
+
+    % Row 9 = separator gap
+
+    % Row 10: Export Measurements / Diff Rings
+    btnExportMeasure = uibutton(measureInnerGL, 'Text', 'Export Table', ...
+        'ButtonPushedFcn', @onExportMeasurements, ...
+        'BackgroundColor', BTN_EXPORT, ...
+        'FontColor',       BTN_FG, ...
+        'Enable',          'off', ...
+        'Tooltip',         'Export all measurements (distances, angles, ROI stats) to CSV');
+    btnExportMeasure.Layout.Row = 10; btnExportMeasure.Layout.Column = 1;
+
+    btnDiffRings = uibutton(measureInnerGL, 'Text', 'Diff Rings...', ...
+        'ButtonPushedFcn', @onDiffRings, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor',       BTN_FG, ...
+        'Enable',          'off', ...
+        'Tooltip',         'Overlay calibrated diffraction rings (d-spacing)');
+    btnDiffRings.Layout.Row = 10; btnDiffRings.Layout.Column = 2;
+
+    % Row 11: ROI Manager
+    btnROIManager = uibutton(measureInnerGL, 'Text', 'ROI Manager...', ...
+        'ButtonPushedFcn', @onROIManager, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor',       BTN_FG, ...
+        'Enable',          'off', ...
+        'Tooltip',         'Manage saved ROIs with properties table and CSV export');
+    btnROIManager.Layout.Row = 11; btnROIManager.Layout.Column = [1 2];
+
+    % ROI Manager state
+    appData.roiList = {};   % cell array of ROI structs: {name, xMin, xMax, yMin, yMax, stats}
 
     % ── Section 4: Processing ────────────────────────────────────────────
     lblProcessHeader = uilabel(toolsGL, 'Text', 'Processing', ...
@@ -462,20 +678,55 @@ function varargout = emViewerGUI()
     pnlProcess = uipanel(toolsGL, 'BorderType', 'line');
     pnlProcess.Layout.Row = 8;
 
-    processInnerGL = uigridlayout(pnlProcess, [7 2], ...
-        'RowHeight',   {20, 20, 20, 2, 20, 20, 20}, ...
+    processInnerGL = uigridlayout(pnlProcess, [23 2], ...
+        'RowHeight',   {20, 20, 20, 20, 2, 20, 20, 2, 20, 20, 20, 2, 20, 20, 20, 20, 20, 2, 20, 20, 20, 20, 20}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding',     [3 2 3 2], ...
         'RowSpacing',  2, ...
         'ColumnSpacing', 3);
 
+    % Row 1: Rotate CW / Rotate CCW
+    btnRotCW = uibutton(processInnerGL, 'Text', 'Rot 90 CW', ...
+        'ButtonPushedFcn', @(~,~) onRotateFlip('rot90cw'), ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Rotate image 90° clockwise');
+    btnRotCW.Layout.Row = 1; btnRotCW.Layout.Column = 1;
+
+    btnRotCCW = uibutton(processInnerGL, 'Text', 'Rot 90 CCW', ...
+        'ButtonPushedFcn', @(~,~) onRotateFlip('rot90ccw'), ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Rotate image 90° counter-clockwise');
+    btnRotCCW.Layout.Row = 1; btnRotCCW.Layout.Column = 2;
+
+    % Row 2: Flip H / Flip V
+    btnFlipH = uibutton(processInnerGL, 'Text', 'Flip H', ...
+        'ButtonPushedFcn', @(~,~) onRotateFlip('fliph'), ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Flip image horizontally (left-right mirror)');
+    btnFlipH.Layout.Row = 2; btnFlipH.Layout.Column = 1;
+
+    btnFlipV = uibutton(processInnerGL, 'Text', 'Flip V', ...
+        'ButtonPushedFcn', @(~,~) onRotateFlip('flipv'), ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Flip image vertically (top-bottom mirror)');
+    btnFlipV.Layout.Row = 2; btnFlipV.Layout.Column = 2;
+
+    % Row 3: Gaussian / Median
     btnGaussian = uibutton(processInnerGL, 'Text', 'Gaussian...', ...
         'ButtonPushedFcn', @onGaussianFilter, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Apply Gaussian blur — prompts for sigma value');
-    btnGaussian.Layout.Row = 1; btnGaussian.Layout.Column = 1;
+    btnGaussian.Layout.Row = 3; btnGaussian.Layout.Column = 1;
 
     btnMedian = uibutton(processInnerGL, 'Text', 'Median...', ...
         'ButtonPushedFcn', @onMedianFilter, ...
@@ -483,33 +734,52 @@ function varargout = emViewerGUI()
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Apply median filter — prompts for window size (3/5/7)');
-    btnMedian.Layout.Row = 1; btnMedian.Layout.Column = 2;
+    btnMedian.Layout.Row = 3; btnMedian.Layout.Column = 2;
 
+    % Row 4: Show FFT / CLAHE
     btnShowFFT = uibutton(processInnerGL, 'Text', 'Show FFT', ...
         'ButtonPushedFcn', @onShowFFT, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Display 2D FFT magnitude in a new figure window');
-    btnShowFFT.Layout.Row = 2; btnShowFFT.Layout.Column = [1 2];
+    btnShowFFT.Layout.Row = 4; btnShowFFT.Layout.Column = 1;
 
+    btnCLAHE = uibutton(processInnerGL, 'Text', 'CLAHE...', ...
+        'ButtonPushedFcn', @onCLAHE, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Contrast-Limited Adaptive Histogram Equalization — prompts for tile size and clip limit');
+    btnCLAHE.Layout.Row = 4; btnCLAHE.Layout.Column = 2;
+
+    % Row 5 = separator gap
+
+    % Row 6: Undo Filters + ROI Stats
     btnUndoFilters = uibutton(processInnerGL, 'Text', 'Undo Filters', ...
         'ButtonPushedFcn', @onUndoFilters, ...
         'BackgroundColor', BTN_DANGER, ...
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Revert to the original unfiltered image');
-    btnUndoFilters.Layout.Row = 3; btnUndoFilters.Layout.Column = [1 2];
+    btnUndoFilters.Layout.Row = 6; btnUndoFilters.Layout.Column = 1;
 
-    % Row 4 = separator gap
+    btnROIStats = uibutton(processInnerGL, 'Text', 'ROI Stats', ...
+        'ButtonPushedFcn', @onROIStats, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Draw a rectangle to compute region statistics (mean, std, min, max)');
+    btnROIStats.Layout.Row = 6; btnROIStats.Layout.Column = 2;
 
+    % Row 7: Zoom Box / Reset Zoom
     btnZoomBox = uibutton(processInnerGL, 'Text', 'Zoom Box', ...
         'ButtonPushedFcn', @onZoomBox, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Draw a rectangle to zoom into a region (Esc to cancel)');
-    btnZoomBox.Layout.Row = 5; btnZoomBox.Layout.Column = 1;
+    btnZoomBox.Layout.Row = 7; btnZoomBox.Layout.Column = 1;
 
     btnResetZoom = uibutton(processInnerGL, 'Text', 'Reset Zoom', ...
         'ButtonPushedFcn', @onResetZoom, ...
@@ -517,15 +787,18 @@ function varargout = emViewerGUI()
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Reset zoom to show the full image');
-    btnResetZoom.Layout.Row = 5; btnResetZoom.Layout.Column = 2;
+    btnResetZoom.Layout.Row = 7; btnResetZoom.Layout.Column = 2;
 
+    % Row 8 = separator gap
+
+    % Row 9: Crop / Save Crop
     btnCropImage = uibutton(processInnerGL, 'Text', 'Crop', ...
         'ButtonPushedFcn', @onCropImage, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Draw a rectangle to crop the image (destructive — use Undo Filters to revert)');
-    btnCropImage.Layout.Row = 6; btnCropImage.Layout.Column = 1;
+    btnCropImage.Layout.Row = 9; btnCropImage.Layout.Column = 1;
 
     btnSaveCrop = uibutton(processInnerGL, 'Text', 'Save Crop...', ...
         'ButtonPushedFcn', @onSaveCrop, ...
@@ -533,15 +806,161 @@ function varargout = emViewerGUI()
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Save a cropped region to file (draw box, then save)');
-    btnSaveCrop.Layout.Row = 6; btnSaveCrop.Layout.Column = 2;
+    btnSaveCrop.Layout.Row = 9; btnSaveCrop.Layout.Column = 2;
 
+    % Row 10: Save Image
     btnSaveImage = uibutton(processInnerGL, 'Text', 'Save Image...', ...
         'ButtonPushedFcn', @onSaveImage, ...
         'BackgroundColor', BTN_EXPORT, ...
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Save current processed image to PNG or TIFF');
-    btnSaveImage.Layout.Row = 7; btnSaveImage.Layout.Column = [1 2];
+    btnSaveImage.Layout.Row = 10; btnSaveImage.Layout.Column = [1 2];
+
+    % Row 11: Set Pixel Size
+    btnSetPixelSize = uibutton(processInnerGL, 'Text', 'Set Pixel Size...', ...
+        'ButtonPushedFcn', @onSetPixelSize, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Manually set or override pixel size calibration (nm/px, µm/px, etc.)');
+    btnSetPixelSize.Layout.Row = 11; btnSetPixelSize.Layout.Column = [1 2];
+
+    % Row 12 = separator gap
+
+    % Row 13: FFT Mask / Particles
+    btnFFTMask = uibutton(processInnerGL, 'Text', 'FFT Mask...', ...
+        'ButtonPushedFcn', @onFFTMask, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Draw masks on FFT to remove periodic noise; apply inverse FFT');
+    btnFFTMask.Layout.Row = 13; btnFFTMask.Layout.Column = 1;
+
+    btnParticles = uibutton(processInnerGL, 'Text', 'Particles...', ...
+        'ButtonPushedFcn', @onParticleCount, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Threshold + count particles; show size distribution');
+    btnParticles.Layout.Row = 13; btnParticles.Layout.Column = 2;
+
+    % Row 14: Align Stack / Color Overlay
+    btnAlignStack = uibutton(processInnerGL, 'Text', 'Align Stack', ...
+        'ButtonPushedFcn', @onAlignStack, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Cross-correlation drift correction for loaded image stack');
+    btnAlignStack.Layout.Row = 14; btnAlignStack.Layout.Column = 1;
+
+    btnColorOverlay = uibutton(processInnerGL, 'Text', 'Overlay...', ...
+        'ButtonPushedFcn', @onColorOverlay, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Blend two images with different colormaps in a new figure');
+    btnColorOverlay.Layout.Row = 14; btnColorOverlay.Layout.Column = 2;
+
+    % Row 15: Export w/ Overlays / Batch Export
+    btnExportOverlays = uibutton(processInnerGL, 'Text', 'Export+OVL', ...
+        'ButtonPushedFcn', @onExportWithOverlays, ...
+        'BackgroundColor', BTN_EXPORT, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Export current view with all overlays burned in (scale bar, annotations, measurements)');
+    btnExportOverlays.Layout.Row = 15; btnExportOverlays.Layout.Column = 1;
+
+    btnBatchExport = uibutton(processInnerGL, 'Text', 'Batch Export', ...
+        'ButtonPushedFcn', @onBatchExport, ...
+        'BackgroundColor', BTN_EXPORT, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Export all loaded images with current contrast settings to a folder');
+    btnBatchExport.Layout.Row = 15; btnBatchExport.Layout.Column = 2;
+
+    % Row 16: Copy to Clipboard
+    btnCopyClipboard = uibutton(processInnerGL, 'Text', 'Copy to Clipboard', ...
+        'ButtonPushedFcn', @onCopyClipboard, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Copy the current image view to the system clipboard');
+    btnCopyClipboard.Layout.Row = 16; btnCopyClipboard.Layout.Column = [1 2];
+
+    % Row 17: reserved
+
+    % Row 18 = separator gap
+
+    % Row 19: Live Threshold / Otsu Auto
+    btnLiveThresh = uibutton(processInnerGL, 'Text', 'Threshold...', ...
+        'ButtonPushedFcn', @onLiveThreshold, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Interactive threshold preview with live overlay; Otsu auto-threshold');
+    btnLiveThresh.Layout.Row = 19; btnLiveThresh.Layout.Column = 1;
+
+    btnImgMath = uibutton(processInnerGL, 'Text', 'Img Math...', ...
+        'ButtonPushedFcn', @onImageMath, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Image arithmetic: subtract, divide, or ratio two loaded images');
+    btnImgMath.Layout.Row = 19; btnImgMath.Layout.Column = 2;
+
+    % Row 20: Watershed / Batch Crop
+    btnWatershed = uibutton(processInnerGL, 'Text', 'Watershed...', ...
+        'ButtonPushedFcn', @onWatershed, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Watershed segmentation to split touching particles (no toolbox)');
+    btnWatershed.Layout.Row = 20; btnWatershed.Layout.Column = 1;
+
+    btnBatchCrop = uibutton(processInnerGL, 'Text', 'Batch Crop', ...
+        'ButtonPushedFcn', @onBatchCrop, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Define crop region, apply to all loaded images');
+    btnBatchCrop.Layout.Row = 20; btnBatchCrop.Layout.Column = 2;
+
+    % Row 21: Montage (spans both columns)
+    btnMontage = uibutton(processInnerGL, 'Text', 'Montage / Stitch...', ...
+        'ButtonPushedFcn', @onMontage, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Grid-based tiled image stitching with overlap cross-correlation');
+    btnMontage.Layout.Row = 21; btnMontage.Layout.Column = [1 2];
+
+    % Row 22: Session Save / Session Load
+    btnSessionSave = uibutton(processInnerGL, 'Text', 'Save Session', ...
+        'ButtonPushedFcn', @onSessionSave, ...
+        'BackgroundColor', BTN_EXPORT, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Save all images, contrast, overlays, annotations to a .mat session file');
+    btnSessionSave.Layout.Row = 22; btnSessionSave.Layout.Column = 1;
+
+    btnSessionLoad = uibutton(processInnerGL, 'Text', 'Load Session', ...
+        'ButtonPushedFcn', @onSessionLoad, ...
+        'BackgroundColor', BTN_EXPORT, ...
+        'FontColor', BTN_FG, ...
+        'Tooltip', 'Restore a previously saved session');
+    btnSessionLoad.Layout.Row = 22; btnSessionLoad.Layout.Column = 2;
+
+    % Row 23: Pixel Inspector toggle (spans both)
+    cbPixelInspector = uicheckbox(processInnerGL, ...
+        'Text',    'Pixel Inspector', ...
+        'Value',   false, ...
+        'Enable',  'off', ...
+        'ValueChangedFcn', @onPixelInspectorToggle, ...
+        'Tooltip', 'Show NxN pixel neighborhood with intensity values near cursor');
+    cbPixelInspector.Layout.Row = 23; cbPixelInspector.Layout.Column = [1 2];
+
+    hPixelInspector = [];   % handle to pixel inspector axes overlay
 
     % ── Section 5: Annotations ──────────────────────────────────────────
     lblAnnotHeader = uilabel(toolsGL, 'Text', 'Annotations', ...
@@ -640,6 +1059,9 @@ function varargout = emViewerGUI()
         'FontSize', 10, 'FontColor', [0.45 0.45 0.45]);
     lblStatusMouse.Layout.Row = 1; lblStatusMouse.Layout.Column = 4;
 
+    % Populate recent files dropdown from persisted state
+    updateRecentDropdown();
+
     % ════════════════════════════════════════════════════════════════════
     %  PROGRAMMATIC API (returned when nargout > 0)
     % ════════════════════════════════════════════════════════════════════
@@ -670,6 +1092,15 @@ function varargout = emViewerGUI()
         % Annotations
         api.placeAnnotation = @(x, y, str, sz, col) placeAnnotationAPI(x, y, str, sz, col);
         api.clearAnnotations = @() onClearAnnotations([], []);
+
+        % New features
+        api.rotateFlip     = @(mode) onRotateFlip(mode);
+        api.setPixelSize   = @(sz, unit) setPixelSizeAPI(sz, unit);
+
+        % Phase 2 features
+        api.setGamma       = @(g) setGammaAPI(g);
+        api.sessionSave    = @(fp) sessionSaveAPI(fp);
+        api.sessionLoad    = @(fp) sessionLoadAPI(fp);
 
         api.close          = @() close(fig);
         varargout{1}       = api;
@@ -899,6 +1330,11 @@ function varargout = emViewerGUI()
         else
             lblStatusMouse.Text = sprintf('(%d, %d) = %.4g', col, row, intensity);
         end
+
+        % Update pixel inspector if active
+        if cbPixelInspector.Value && ~isempty(hPixelInspector) && isvalid(hPixelInspector)
+            updatePixelInspector(col, row);
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -938,6 +1374,31 @@ function varargout = emViewerGUI()
         % Store the image pipeline state
         appData.rawPixels      = rawGray;
         appData.filteredPixels = rawGray;
+
+        % Clear undo stack on image switch
+        appData.undoStack = {};
+
+        % Detect multi-frame stacks (e.g. multi-page TIFFs)
+        if isfield(imgInfo, 'numFrames') && imgInfo.numFrames > 1 && ...
+                isfield(imgInfo, 'frames') && ~isempty(imgInfo.frames)
+            nF = numel(imgInfo.frames);
+            appData.stackFrames = cell(1, nF);
+            for fi = 1:nF
+                frm = imgInfo.frames{fi};
+                if size(frm, 3) == 3
+                    frm = double(frm);
+                    frm = 0.299*frm(:,:,1) + 0.587*frm(:,:,2) + 0.114*frm(:,:,3);
+                else
+                    frm = double(frm);
+                end
+                appData.stackFrames{fi} = frm;
+            end
+            showStackControls(nF);
+        else
+            appData.stackFrames = {};
+            appData.stackIdx    = 0;
+            showStackControls(0);
+        end
 
         % Set slider ranges based on actual data range
         dMin = min(rawGray(:));
@@ -1018,18 +1479,47 @@ function varargout = emViewerGUI()
         end
         btnLineProfile.Enable   = 'on';
         btnDistance.Enable      = 'on';
+        btnAngle.Enable        = 'on';
+        btnPolyline.Enable     = 'on';
         btnClearOverlays.Enable = 'on';
 
         % Enable processing controls
+        btnRotCW.Enable       = 'on';
+        btnRotCCW.Enable      = 'on';
+        btnFlipH.Enable       = 'on';
+        btnFlipV.Enable       = 'on';
         btnGaussian.Enable    = 'on';
         btnMedian.Enable      = 'on';
         btnShowFFT.Enable     = 'on';
+        btnCLAHE.Enable       = 'on';
         btnUndoFilters.Enable = 'on';
+        btnROIStats.Enable    = 'on';
         btnZoomBox.Enable     = 'on';
         btnResetZoom.Enable   = 'on';
         btnCropImage.Enable   = 'on';
         btnSaveCrop.Enable    = 'on';
         btnSaveImage.Enable   = 'on';
+        btnSetPixelSize.Enable  = 'on';
+        btnFFTMask.Enable       = 'on';
+        btnParticles.Enable     = 'on';
+        btnAlignStack.Enable    = onOff(numel(appData.images) >= 2);
+        btnColorOverlay.Enable  = onOff(numel(appData.images) >= 2);
+        btnExportOverlays.Enable = 'on';
+        btnBatchExport.Enable   = onOff(numel(appData.images) >= 1);
+        btnCopyClipboard.Enable = 'on';
+        cbColorbar.Enable       = 'on';
+        cbMinimap.Enable        = 'on';
+        cbPixelInspector.Enable = 'on';
+        btnLiveThresh.Enable    = 'on';
+        btnImgMath.Enable       = onOff(numel(appData.images) >= 2);
+        btnWatershed.Enable     = 'on';
+        btnBatchCrop.Enable     = onOff(numel(appData.images) >= 2);
+        btnMontage.Enable       = onOff(numel(appData.images) >= 2);
+        btnSessionSave.Enable   = 'on';
+        btnGrid.Enable          = onOff(numel(appData.images) >= 2);
+        btnExportMeasure.Enable = 'on';
+        btnDiffRings.Enable     = 'on';
+        btnROIManager.Enable    = 'on';
 
         % Enable annotation controls
         btnPlaceAnnot.Enable  = 'on';
@@ -1065,21 +1555,80 @@ function varargout = emViewerGUI()
         lblStatusMouse.Text   = '';
         taMetadata.Value      = {'(no image loaded)'};
 
+        % Disable measurement controls
+        btnLineProfile.Enable   = 'off';
+        btnDistance.Enable      = 'off';
+        btnExportProfile.Enable = 'off';
+        btnAngle.Enable         = 'off';
+        btnPolyline.Enable      = 'off';
+        btnClearOverlays.Enable = 'off';
+        cbScaleBar.Enable       = 'off';
+        btnScaleBarColor.Enable = 'off';
+        spnScaleBarFont.Enable  = 'off';
+
         % Disable processing controls
+        btnRotCW.Enable       = 'off';
+        btnRotCCW.Enable      = 'off';
+        btnFlipH.Enable       = 'off';
+        btnFlipV.Enable       = 'off';
         btnGaussian.Enable    = 'off';
         btnMedian.Enable      = 'off';
         btnShowFFT.Enable     = 'off';
+        btnCLAHE.Enable       = 'off';
         btnUndoFilters.Enable = 'off';
+        btnROIStats.Enable    = 'off';
         btnZoomBox.Enable     = 'off';
         btnResetZoom.Enable   = 'off';
         btnCropImage.Enable   = 'off';
         btnSaveCrop.Enable    = 'off';
         btnSaveImage.Enable   = 'off';
+        btnSetPixelSize.Enable   = 'off';
+        btnFFTMask.Enable        = 'off';
+        btnParticles.Enable      = 'off';
+        btnAlignStack.Enable     = 'off';
+        btnColorOverlay.Enable   = 'off';
+        btnExportOverlays.Enable = 'off';
+        btnBatchExport.Enable    = 'off';
+        btnCopyClipboard.Enable  = 'off';
+        cbColorbar.Enable        = 'off';
+        cbColorbar.Value         = false;
+        cbMinimap.Enable         = 'off';
+        cbMinimap.Value          = false;
+        cbPixelInspector.Enable  = 'off';
+        cbPixelInspector.Value   = false;
+        btnLiveThresh.Enable     = 'off';
+        btnImgMath.Enable        = 'off';
+        btnWatershed.Enable      = 'off';
+        btnBatchCrop.Enable      = 'off';
+        btnMontage.Enable        = 'off';
+        btnSessionSave.Enable    = 'off';
+        btnGrid.Enable           = 'off';
+        btnExportMeasure.Enable  = 'off';
+        btnDiffRings.Enable      = 'off';
+        btnROIManager.Enable     = 'off';
+        if ~isempty(hColorbar) && isvalid(hColorbar)
+            delete(hColorbar);
+            hColorbar = [];
+        end
+        if ~isempty(hMinimap) && isvalid(hMinimap)
+            delete(hMinimap);
+            hMinimap = [];
+        end
+        if ~isempty(hPixelInspector) && isvalid(hPixelInspector)
+            delete(hPixelInspector);
+            hPixelInspector = [];
+        end
 
         % Disable annotation controls
         btnPlaceAnnot.Enable  = 'off';
         btnClearAnnot.Enable  = 'off';
         btnAnnotColor.Enable  = 'off';
+
+        % Hide stack navigator and reset stack state
+        appData.stackFrames = {};
+        appData.stackIdx    = 0;
+        appData.undoStack   = {};
+        showStackControls(0);
 
         % Clear histogram
         cla(histAx);
@@ -1244,6 +1793,7 @@ function varargout = emViewerGUI()
                     case {'.tif', '.tiff'}
                         data = parser.importTIFF(fp);
                         appendImage(data);
+                        addToRecentFiles(fp);
                         loadedAny = true;
 
                     case '.raw'
@@ -1251,12 +1801,14 @@ function varargout = emViewerGUI()
                         data = promptAndLoadRaw(fp);
                         if ~isempty(data)
                             appendImage(data);
+                            addToRecentFiles(fp);
                             loadedAny = true;
                         end
 
                     case {'.dm3', '.dm4'}
                         data = parser.importDM3(fp);
                         appendImage(data);
+                        addToRecentFiles(fp);
                         loadedAny = true;
 
                     otherwise
@@ -1452,6 +2004,9 @@ function varargout = emViewerGUI()
         end
 
         dispImg = imaging.adjustContrast(appData.filteredPixels, Low=lo, High=hi);
+        if appData.gamma ~= 1.0
+            dispImg = dispImg .^ appData.gamma;
+        end
         appData.displayImg = dispImg;
 
         % Update CData without recreating imagesc (preserves zoom/pan state)
@@ -1539,6 +2094,7 @@ function varargout = emViewerGUI()
         drawnow;
 
         try
+            undoPush();
             appData.filteredPixels = imaging.applyGaussian( ...
                 appData.filteredPixels, Sigma=sigma);
             refreshDisplay();
@@ -1576,6 +2132,7 @@ function varargout = emViewerGUI()
         drawnow;
 
         try
+            undoPush();
             appData.filteredPixels = imaging.applyMedian( ...
                 appData.filteredPixels, WindowSize=wSize);
             refreshDisplay();
@@ -1634,12 +2191,13 @@ function varargout = emViewerGUI()
             return;
         end
 
-        % If a crop was applied, restore the pre-crop original
-        if ~isempty(appData.preCropPixels)
-            appData.rawPixels     = appData.preCropPixels;
-            appData.preCropPixels = [];
+        % Try multi-level undo stack first
+        if ~isempty(appData.undoStack)
+            undoPop();
+            return;
         end
 
+        % Fallback: if no undo stack, revert to raw
         appData.filteredPixels = appData.rawPixels;
         refreshDisplay();
         setStatus('Filters undone — reverted to original image.');
@@ -1767,6 +2325,10 @@ function varargout = emViewerGUI()
                 setStatus('Click first corner of crop region... (Esc to cancel)');
             case 'savecrop'
                 setStatus('Click first corner of region to save... (Esc to cancel)');
+            case 'roistats'
+                setStatus('Click first corner for ROI... (Esc to cancel)');
+            case 'batchcrop'
+                setStatus('Click first corner of batch crop region... (Esc to cancel)');
         end
     end
 
@@ -1774,7 +2336,7 @@ function varargout = emViewerGUI()
     %  CALLBACK: onRectClick — Handle clicks during rectangle selection
     % ════════════════════════════════════════════════════════════════════
     function onRectClick(~, ~)
-        if ~ismember(appData.captureMode, {'zoom', 'crop', 'savecrop'})
+        if ~ismember(appData.captureMode, {'zoom', 'crop', 'savecrop', 'roistats', 'batchcrop'})
             return;
         end
 
@@ -1809,6 +2371,8 @@ function varargout = emViewerGUI()
                     setStatus('Click second corner to crop... (Esc to cancel)');
                 case 'savecrop'
                     setStatus('Click second corner to save... (Esc to cancel)');
+                case 'roistats'
+                    setStatus('Click second corner for ROI... (Esc to cancel)');
             end
 
         elseif size(appData.captureClicks, 1) >= 2
@@ -1848,8 +2412,7 @@ function varargout = emViewerGUI()
                         xMin, xMax, yMin, yMax));
 
                 case 'crop'
-                    % Save pre-crop state so Undo Filters can restore it
-                    appData.preCropPixels  = appData.rawPixels;
+                    undoPush();
                     appData.rawPixels      = appData.rawPixels(yMin:yMax, xMin:xMax);
                     appData.filteredPixels = appData.filteredPixels(yMin:yMax, xMin:xMax);
                     refreshDisplay();
@@ -1858,6 +2421,12 @@ function varargout = emViewerGUI()
 
                 case 'savecrop'
                     saveCroppedRegion(xMin, xMax, yMin, yMax);
+
+                case 'roistats'
+                    showROIStatistics(xMin, xMax, yMin, yMax);
+
+                case 'batchcrop'
+                    applyBatchCrop(xMin, xMax, yMin, yMax);
             end
         end
     end
@@ -1962,6 +2531,94 @@ function varargout = emViewerGUI()
     end
 
     % ════════════════════════════════════════════════════════════════════
+    %  HELPER: showROIStatistics — Compute and display ROI statistics
+    % ════════════════════════════════════════════════════════════════════
+    function showROIStatistics(xMin, xMax, yMin, yMax)
+        roiPx = appData.filteredPixels(yMin:yMax, xMin:xMax);
+        vals = double(roiPx(:));
+
+        roiMean = mean(vals);
+        roiStd  = std(vals);
+        roiMin  = min(vals);
+        roiMax  = max(vals);
+        roiArea = numel(vals);
+
+        % Calibrated area if available
+        areaStr = sprintf('%d px²', roiArea);
+        if appData.activeIdx >= 1
+            imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
+            if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
+                calibArea = roiArea * imgInfo.pixelSize^2;
+                areaStr = sprintf('%.4g %s²', calibArea, imgInfo.pixelUnit);
+            end
+        end
+
+        % Build stats text
+        statsLines = { ...
+            sprintf('ROI: [%d:%d, %d:%d]', xMin, xMax, yMin, yMax), ...
+            sprintf('Size: %d x %d px', xMax - xMin + 1, yMax - yMin + 1), ...
+            sprintf('Area: %s', areaStr), ...
+            '', ...
+            sprintf('Mean:  %.4g', roiMean), ...
+            sprintf('Std:   %.4g', roiStd), ...
+            sprintf('Min:   %.4g', roiMin), ...
+            sprintf('Max:   %.4g', roiMax), ...
+            sprintf('Range: %.4g', roiMax - roiMin)};
+
+        % Show in a figure with histogram
+        roiFig = figure('Name', 'ROI Statistics', 'NumberTitle', 'off', ...
+            'Units', 'pixels', 'Position', [300 250 420 380]);
+        roiLayout = uigridlayout(roiFig, [2 1], ...
+            'RowHeight', {'1x', '1x'}, 'Padding', [10 10 10 10]);
+
+        % Top: histogram
+        roiAx = uiaxes(roiLayout);
+        roiAx.Layout.Row = 1;
+        histogram(roiAx, vals, 128, ...
+            'FaceColor', [0.4 0.6 0.8], 'EdgeColor', 'none');
+        title(roiAx, 'ROI Histogram', 'Interpreter', 'none');
+        xlabel(roiAx, 'Intensity');
+        ylabel(roiAx, 'Count');
+        roiAx.Box = 'on';
+
+        % Bottom: stats text
+        taStats = uitextarea(roiLayout, ...
+            'Value', statsLines, ...
+            'Editable', 'off', ...
+            'FontName', 'Courier New', ...
+            'FontSize', 11);
+        taStats.Layout.Row = 2;
+
+        % Draw the ROI rectangle on the main image (persistent overlay)
+        hRect = rectangle(ax, 'Position', [xMin yMin xMax-xMin yMax-yMin], ...
+            'EdgeColor', [1 1 0], ...
+            'LineWidth', 1.5, ...
+            'LineStyle', '-', ...
+            'HandleVisibility', 'off');
+        appData.overlays.lines{end+1} = hRect;
+
+        % Log to measurement table
+        appData.measurementLog{end+1} = struct( ...
+            'type', 'ROI', ...
+            'value', roiMean, ...
+            'unit', 'intensity', ...
+            'details', sprintf('[%d:%d, %d:%d] mean=%.4g std=%.4g min=%.4g max=%.4g area=%s', ...
+                xMin, xMax, yMin, yMax, roiMean, roiStd, roiMin, roiMax, areaStr), ...
+            'timestamp', datestr(now, 'yyyy-mm-dd HH:MM:SS'));
+
+        % Add to ROI list for ROI Manager
+        roiEntry = struct('name', sprintf('ROI_%d', numel(appData.roiList)+1), ...
+            'xMin', xMin, 'xMax', xMax, 'yMin', yMin, 'yMax', yMax, ...
+            'stats', struct('mean', roiMean, 'std', roiStd, 'min', roiMin, ...
+                            'max', roiMax, 'area', roiArea), ...
+            'areaStr', areaStr, 'hRect', hRect);
+        appData.roiList{end+1} = roiEntry;
+
+        setStatus(sprintf('ROI: mean=%.1f, std=%.1f, min=%.0f, max=%.0f', ...
+            roiMean, roiStd, roiMin, roiMax));
+    end
+
+    % ════════════════════════════════════════════════════════════════════
     %  HELPER: refreshDisplay — Re-apply contrast to filteredPixels; update
     %  histogram and CData without resetting zoom
     % ════════════════════════════════════════════════════════════════════
@@ -1975,10 +2632,22 @@ function varargout = emViewerGUI()
         hi = sldHigh.Value;
 
         dispImg = imaging.adjustContrast(appData.filteredPixels, Low=lo, High=hi);
+
+        % Apply gamma correction
+        if appData.gamma ~= 1.0
+            dispImg = dispImg .^ appData.gamma;
+        end
+
         appData.displayImg = dispImg;
         appData.imgHandle.CData = dispImg;
 
         updateHistogram();
+        refreshHistogramMarkers();
+
+        % Update minimap if active
+        if cbMinimap.Value && ~isempty(hMinimap) && isvalid(hMinimap)
+            updateMinimapRect();
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2073,6 +2742,23 @@ function varargout = emViewerGUI()
         sldLow.Value  = lo;
         sldHigh.Value = hi;
         onContrastChanged([], []);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  API: setPixelSizeAPI — Programmatic pixel calibration override
+    % ════════════════════════════════════════════════════════════════════
+    function setPixelSizeAPI(sz, unit)
+    %SETPIXELSIZEAPI  Override pixel calibration from API.
+    %   api.setPixelSize(2.4, 'nm')
+        if appData.activeIdx < 1
+            warning('emViewerGUI:noImage', 'No image loaded.');
+            return;
+        end
+        appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.pixelSize  = sz;
+        appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.pixelUnit  = unit;
+        appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.calibrated = true;
+        updateStatusBar();
+        updateMetadataPanel();
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2405,6 +3091,55 @@ function varargout = emViewerGUI()
                 return;
             end
 
+            % +/= or - → linked zoom in compare mode
+            if strcmp(evt.Key, 'equal') || strcmp(evt.Key, 'add')
+                % Zoom in on active panel, sync to other
+                if appData.compareActivePanel == 'L' && ~isempty(axL) && isvalid(axL)
+                    cx = mean(axL.XLim); cy = mean(axL.YLim);
+                    hw = diff(axL.XLim)/4; hh = diff(axL.YLim)/4;
+                    axL.XLim = [cx-hw, cx+hw]; axL.YLim = [cy-hh, cy+hh];
+                    syncCompareZoom(axL, axR);
+                elseif ~isempty(axR) && isvalid(axR)
+                    cx = mean(axR.XLim); cy = mean(axR.YLim);
+                    hw = diff(axR.XLim)/4; hh = diff(axR.YLim)/4;
+                    axR.XLim = [cx-hw, cx+hw]; axR.YLim = [cy-hh, cy+hh];
+                    syncCompareZoom(axR, axL);
+                end
+                return;
+            end
+            if strcmp(evt.Key, 'hyphen') || strcmp(evt.Key, 'subtract')
+                if appData.compareActivePanel == 'L' && ~isempty(axL) && isvalid(axL)
+                    cx = mean(axL.XLim); cy = mean(axL.YLim);
+                    hw = diff(axL.XLim); hh = diff(axL.YLim);
+                    axL.XLim = [cx-hw, cx+hw]; axL.YLim = [cy-hh, cy+hh];
+                    syncCompareZoom(axL, axR);
+                elseif ~isempty(axR) && isvalid(axR)
+                    cx = mean(axR.XLim); cy = mean(axR.YLim);
+                    hw = diff(axR.XLim); hh = diff(axR.YLim);
+                    axR.XLim = [cx-hw, cx+hw]; axR.YLim = [cy-hh, cy+hh];
+                    syncCompareZoom(axR, axL);
+                end
+                return;
+            end
+            % F → fit both panels
+            if strcmp(evt.Key, 'f')
+                if ~isempty(axL) && isvalid(axL)
+                    cdata = axL.Children;
+                    if ~isempty(cdata)
+                        axL.XLim = [0.5, size(cdata(1).CData, 2) + 0.5];
+                        axL.YLim = [0.5, size(cdata(1).CData, 1) + 0.5];
+                    end
+                end
+                if ~isempty(axR) && isvalid(axR)
+                    cdata = axR.Children;
+                    if ~isempty(cdata)
+                        axR.XLim = [0.5, size(cdata(1).CData, 2) + 0.5];
+                        axR.YLim = [0.5, size(cdata(1).CData, 1) + 0.5];
+                    end
+                end
+                return;
+            end
+
             if nImages < 2, return; end
 
             delta = 0;
@@ -2426,6 +3161,75 @@ function varargout = emViewerGUI()
                 displayCompareImage('R');
             end
             return;
+        end
+
+        % ── Keyboard shortcuts (with modifiers) ────────────────────────
+        hasMod = ~isempty(evt.Modifier);
+        hasCtrl = hasMod && any(strcmp(evt.Modifier, 'control'));
+        hasShift = hasMod && any(strcmp(evt.Modifier, 'shift'));
+
+        % Ctrl+Shift+S → Session save (must precede Ctrl+S)
+        if hasCtrl && hasShift && strcmp(evt.Key, 's')
+            onSessionSave([], []);
+            return;
+        end
+        % Ctrl+Shift+L → Session load
+        if hasCtrl && hasShift && strcmp(evt.Key, 'l')
+            onSessionLoad([], []);
+            return;
+        end
+        % Ctrl+O  → Open files
+        if hasCtrl && strcmp(evt.Key, 'o')
+            onOpenFiles([], []);
+            return;
+        end
+        % Ctrl+S  → Save image
+        if hasCtrl && strcmp(evt.Key, 's')
+            onSaveImage([], []);
+            return;
+        end
+        % Ctrl+Z  → Undo filters
+        if hasCtrl && strcmp(evt.Key, 'z')
+            onUndoFilters([], []);
+            return;
+        end
+
+        % No-modifier shortcuts
+        if ~hasMod
+            % A  → Auto contrast
+            if strcmp(evt.Key, 'a')
+                onAutoContrast([], []);
+                return;
+            end
+            % F  → Fit to window
+            if strcmp(evt.Key, 'f')
+                onZoomFit([], []);
+                return;
+            end
+            % +/= → Zoom in (2x)
+            if strcmp(evt.Key, 'equal') || strcmp(evt.Key, 'add')
+                if appData.activeIdx >= 1 && ~isempty(appData.rawPixels)
+                    cx = mean(ax.XLim);
+                    cy = mean(ax.YLim);
+                    hw = diff(ax.XLim) / 4;
+                    hh = diff(ax.YLim) / 4;
+                    ax.XLim = [cx - hw, cx + hw];
+                    ax.YLim = [cy - hh, cy + hh];
+                end
+                return;
+            end
+            % -  → Zoom out (2x)
+            if strcmp(evt.Key, 'hyphen') || strcmp(evt.Key, 'subtract')
+                if appData.activeIdx >= 1 && ~isempty(appData.rawPixels)
+                    cx = mean(ax.XLim);
+                    cy = mean(ax.YLim);
+                    hw = diff(ax.XLim);
+                    hh = diff(ax.YLim);
+                    ax.XLim = [cx - hw, cx + hw];
+                    ax.YLim = [cy - hh, cy + hh];
+                end
+                return;
+            end
         end
 
         % ── Normal mode: left/right arrows cycle through images ──────────
@@ -2521,9 +3325,11 @@ function varargout = emViewerGUI()
         axL = [];
         axR = [];
 
-        % Recreate single-view axes
-        axGL = uigridlayout(axPanel, [1 1], 'Padding', [2 2 2 2]);
+        % Recreate single-view axes with stack navigator row
+        axGL = uigridlayout(axPanel, [2 1], ...
+            'RowHeight', {'1x', 0}, 'Padding', [2 2 2 2]);
         ax = uiaxes(axGL);
+        ax.Layout.Row = 1;
         ax.Box = 'on';
         ax.XTick = [];
         ax.YTick = [];
@@ -2532,6 +3338,37 @@ function varargout = emViewerGUI()
         ylabel(ax, '');
         colormap(ax, gray(256));
         ax.Toolbar.Visible = 'off';
+
+        % Recreate stack navigator row (hidden until multi-frame detected)
+        stackGL = uigridlayout(axGL, [1 5], ...
+            'ColumnWidth', {40, 40, '1x', 40, 80}, 'Padding', [0 0 0 0]);
+        stackGL.Layout.Row = 2;
+        btnStackPrev = uibutton(stackGL, 'Text', '<', ...
+            'ButtonPushedFcn', @(~,~) onStackNav(-1), ...
+            'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+            'Tooltip', 'Previous frame');
+        btnStackPrev.Layout.Column = 1;
+        btnStackNext = uibutton(stackGL, 'Text', '>', ...
+            'ButtonPushedFcn', @(~,~) onStackNav(1), ...
+            'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+            'Tooltip', 'Next frame');
+        btnStackNext.Layout.Column = 2;
+        sldStackFrame = uislider(stackGL, ...
+            'Value', 1, 'Limits', [1 2], ...
+            'ValueChangedFcn', @onStackSlider, ...
+            'Tooltip', 'Scroll through frames');
+        sldStackFrame.Layout.Column = 3;
+        sldStackFrame.MajorTicks = [];
+        sldStackFrame.MinorTicks = [];
+        btnStackMIP = uibutton(stackGL, 'Text', 'MIP', ...
+            'ButtonPushedFcn', @onStackMIP, ...
+            'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+            'Tooltip', 'Maximum Intensity Projection across all frames');
+        btnStackMIP.Layout.Column = 4;
+        lblStackFrame = uilabel(stackGL, 'Text', '1 / 1', ...
+            'FontSize', 10, 'HorizontalAlignment', 'center', ...
+            'FontColor', [0.7 0.7 0.7]);
+        lblStackFrame.Layout.Column = 5;
 
         fig.WindowButtonMotionFcn = @onMouseMotion;
 
@@ -2600,6 +3437,15 @@ function varargout = emViewerGUI()
             'Interpreter', 'none', 'FontSize', 10);
     end
 
+    function syncCompareZoom(sourceAx, targetAx2)
+    %SYNCCOMPAREZOOM  Copy axis limits from source to target in compare mode.
+        if ~compareLinkedZoom, return; end
+        if isempty(sourceAx) || ~isvalid(sourceAx), return; end
+        if isempty(targetAx2) || ~isvalid(targetAx2), return; end
+        targetAx2.XLim = sourceAx.XLim;
+        targetAx2.YLim = sourceAx.YLim;
+    end
+
     function updateCompareHighlight()
     %UPDATECOMPAREHIGHLIGHT  Show cyan border on the active compare panel.
         if isempty(axL) || ~isvalid(axL), return; end
@@ -2627,22 +3473,52 @@ function varargout = emViewerGUI()
     %SETTOOLSENABLED  Enable or disable measurement/processing/annotation buttons.
         btnLineProfile.Enable   = state;
         btnDistance.Enable      = state;
+        btnAngle.Enable        = state;
+        btnPolyline.Enable     = state;
+        btnExportProfile.Enable = state;
         btnClearOverlays.Enable = state;
+        btnRotCW.Enable        = state;
+        btnRotCCW.Enable       = state;
+        btnFlipH.Enable        = state;
+        btnFlipV.Enable        = state;
         btnGaussian.Enable     = state;
         btnMedian.Enable       = state;
         btnShowFFT.Enable      = state;
+        btnCLAHE.Enable        = state;
         btnUndoFilters.Enable  = state;
+        btnROIStats.Enable     = state;
         btnZoomBox.Enable      = state;
         btnResetZoom.Enable    = state;
         btnCropImage.Enable    = state;
         btnSaveCrop.Enable     = state;
         btnSaveImage.Enable    = state;
+        btnSetPixelSize.Enable   = state;
+        btnFFTMask.Enable        = state;
+        btnParticles.Enable      = state;
+        btnAlignStack.Enable     = state;
+        btnColorOverlay.Enable   = state;
+        btnExportOverlays.Enable = state;
+        btnBatchExport.Enable    = state;
+        btnCopyClipboard.Enable  = state;
+        cbMinimap.Enable         = state;
+        cbPixelInspector.Enable  = state;
+        btnLiveThresh.Enable     = state;
+        btnImgMath.Enable        = state;
+        btnWatershed.Enable      = state;
+        btnBatchCrop.Enable      = state;
+        btnMontage.Enable        = state;
+        btnSessionSave.Enable    = state;
+        btnGrid.Enable           = state;
+        btnExportMeasure.Enable  = state;
+        btnDiffRings.Enable      = state;
+        btnROIManager.Enable     = state;
         btnPlaceAnnot.Enable   = state;
         btnClearAnnot.Enable   = state;
         btnAnnotColor.Enable   = state;
         cbScaleBar.Enable      = state;
         btnScaleBarColor.Enable = state;
         spnScaleBarFont.Enable = state;
+        cbColorbar.Enable      = state;
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2936,6 +3812,11 @@ function varargout = emViewerGUI()
             'EdgeColor',           OVERLAY_COLOR, ...
             'Margin',              2, ...
             'HandleVisibility',    'off');
+
+        % Log measurement
+        appData.measurementLog{end+1} = struct( ...
+            'type', 'distance', 'value', dVal, 'unit', dUnit, ...
+            'details', sprintf('(%.0f,%.0f)-(%.0f,%.0f)', x1, y1, x2, y2));
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3218,6 +4099,2343 @@ function varargout = emViewerGUI()
             fig.WindowButtonUpFcn    = origReleaseFcn;
         end
     end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onRotateFlip — Rotate or flip the image
+    % ════════════════════════════════════════════════════════════════════
+    function onRotateFlip(mode)
+        if isempty(appData.rawPixels)
+            return;
+        end
+
+        undoPush();
+
+        switch mode
+            case 'rot90cw'
+                appData.rawPixels      = rot90(appData.rawPixels, -1);
+                appData.filteredPixels = rot90(appData.filteredPixels, -1);
+                msg = 'Rotated 90° CW';
+            case 'rot90ccw'
+                appData.rawPixels      = rot90(appData.rawPixels, 1);
+                appData.filteredPixels = rot90(appData.filteredPixels, 1);
+                msg = 'Rotated 90° CCW';
+            case 'fliph'
+                appData.rawPixels      = fliplr(appData.rawPixels);
+                appData.filteredPixels = fliplr(appData.filteredPixels);
+                msg = 'Flipped horizontally';
+            case 'flipv'
+                appData.rawPixels      = flipud(appData.rawPixels);
+                appData.filteredPixels = flipud(appData.filteredPixels);
+                msg = 'Flipped vertically';
+            otherwise
+                return;
+        end
+
+        % Rebuild display (need new imagesc for changed dimensions on rotation)
+        [H, W] = size(appData.filteredPixels);
+        lo = sldLow.Value;
+        hi = sldHigh.Value;
+        dispImg = imaging.adjustContrast(appData.filteredPixels, Low=lo, High=hi);
+        appData.displayImg = dispImg;
+
+        delete(ax.Children);
+        cla(ax);
+        hImg = imagesc(ax, 'XData', [1 W], 'YData', [1 H], 'CData', dispImg);
+        appData.imgHandle = hImg;
+        cmapName = ddColormap.Value;
+        colormap(ax, feval(cmapName, 256));
+        ax.CLim = [0 1];
+        ax.YDir = 'reverse';
+        axis(ax, 'equal');
+        ax.XLim = [0.5, W + 0.5];
+        ax.YLim = [0.5, H + 0.5];
+        ax.XTick = [];
+        ax.YTick = [];
+        ax.Toolbar.Visible = 'off';
+
+        % Rebuild colorbar if visible
+        if cbColorbar.Value
+            if ~isempty(hColorbar) && isvalid(hColorbar)
+                delete(hColorbar);
+            end
+            hColorbar = colorbar(ax);
+        end
+
+        clearAllOverlays();
+        setStatus(msg);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onCLAHE — Contrast-Limited Adaptive Histogram Equalization
+    % ════════════════════════════════════════════════════════════════════
+    function onCLAHE(~, ~)
+        if isempty(appData.filteredPixels)
+            return;
+        end
+
+        answer = inputdlg( ...
+            {'Tile size (pixels per tile, e.g. 64):', ...
+             'Clip limit (contrast factor, e.g. 3.0):'}, ...
+            'CLAHE Parameters', [1 44], {'64', '3.0'});
+        if isempty(answer)
+            return;
+        end
+
+        tileSize  = round(str2double(answer{1}));
+        clipLimit = str2double(answer{2});
+        if isnan(tileSize) || tileSize < 8
+            uialert(fig, 'Tile size must be >= 8.', 'Invalid Input', 'Icon', 'error');
+            return;
+        end
+        if isnan(clipLimit) || clipLimit <= 0
+            uialert(fig, 'Clip limit must be positive.', 'Invalid Input', 'Icon', 'error');
+            return;
+        end
+
+        fig.Pointer = 'watch';
+        drawnow;
+
+        try
+            undoPush();
+            appData.filteredPixels = applyCLAHE(appData.filteredPixels, tileSize, clipLimit);
+            refreshDisplay();
+            setStatus(sprintf('CLAHE applied (tile=%d, clip=%.1f)', tileSize, clipLimit));
+        catch ME
+            uialert(fig, sprintf('CLAHE failed:\n%s', ME.message), ...
+                'Filter Error', 'Icon', 'error');
+        end
+
+        fig.Pointer = 'arrow';
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: applyCLAHE — No-toolbox CLAHE implementation
+    %  Tiles the image, computes clipped local histograms, bilinear-
+    %  interpolates the mappings across tile boundaries.
+    % ════════════════════════════════════════════════════════════════════
+    function out = applyCLAHE(img, tileSize, clipLimit)
+        [H, W] = size(img);
+
+        % Normalize to [0, 1]
+        dMin = min(img(:));
+        dMax = max(img(:));
+        if dMax == dMin, dMax = dMin + 1; end
+        imgNorm = (img - dMin) / (dMax - dMin);
+
+        nBins = 256;
+        nTilesR = max(1, round(H / tileSize));
+        nTilesC = max(1, round(W / tileSize));
+        tileH = H / nTilesR;
+        tileW = W / nTilesC;
+
+        % Compute clipped CDF for each tile
+        mappings = cell(nTilesR, nTilesC);
+        for tr = 1:nTilesR
+            r1 = round((tr-1) * tileH) + 1;
+            r2 = min(H, round(tr * tileH));
+            for tc = 1:nTilesC
+                c1 = round((tc-1) * tileW) + 1;
+                c2 = min(W, round(tc * tileW));
+                tile = imgNorm(r1:r2, c1:c2);
+
+                % Histogram
+                counts = histcounts(tile(:), linspace(0, 1, nBins+1));
+
+                % Clip and redistribute
+                nPix = numel(tile);
+                clipCount = clipLimit * (nPix / nBins);
+                excess = sum(max(0, counts - clipCount));
+                counts = min(counts, clipCount);
+                counts = counts + excess / nBins;
+
+                % CDF as mapping table
+                cdf = cumsum(counts);
+                if cdf(end) == 0
+                    cdf = linspace(0, 1, nBins);  % uniform tile fallback
+                else
+                    cdf = cdf / cdf(end);
+                end
+                mappings{tr, tc} = cdf;
+            end
+        end
+
+        % Apply mappings with bilinear interpolation
+        out = zeros(H, W);
+        for r = 1:H
+            % Which tiles does this row relate to?
+            ty = (r - 0.5) / tileH - 0.5;   % tile-space coord (0-based)
+            tr1 = max(1, floor(ty) + 1);
+            tr2 = min(nTilesR, tr1 + 1);
+            fy = ty - (tr1 - 1);  % fractional position [0, 1]
+            fy = max(0, min(1, fy));
+
+            for c = 1:W
+                tx = (c - 0.5) / tileW - 0.5;
+                tc1 = max(1, floor(tx) + 1);
+                tc2 = min(nTilesC, tc1 + 1);
+                fx = tx - (tc1 - 1);
+                fx = max(0, min(1, fx));
+
+                % Bin index for this pixel
+                val = imgNorm(r, c);
+                bin = max(1, min(nBins, round(val * (nBins-1)) + 1));
+
+                % Bilinear interpolation of 4 tile CDFs
+                v11 = mappings{tr1, tc1}(bin);
+                v12 = mappings{tr1, tc2}(bin);
+                v21 = mappings{tr2, tc1}(bin);
+                v22 = mappings{tr2, tc2}(bin);
+
+                mapped = (1-fy) * ((1-fx)*v11 + fx*v12) + ...
+                          fy    * ((1-fx)*v21 + fx*v22);
+                out(r, c) = mapped;
+            end
+        end
+
+        % Rescale back to original range
+        out = out * (dMax - dMin) + dMin;
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onROIStats — Draw rectangle ROI and show statistics
+    % ════════════════════════════════════════════════════════════════════
+    function onROIStats(~, ~)
+        if appData.activeIdx < 1 || isempty(appData.displayImg)
+            return;
+        end
+        if appData.compareMode
+            return;
+        end
+        startRectCapture('roistats');
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onAngleMeasure — Three-click angle measurement
+    % ════════════════════════════════════════════════════════════════════
+    function onAngleMeasure(~, ~)
+        if appData.activeIdx < 1 || isempty(appData.displayImg)
+            return;
+        end
+        if appData.compareMode
+            return;
+        end
+        if ~isempty(appData.captureMode)
+            cancelCapture();
+        end
+
+        appData.captureMode = 'angle';
+        appData.captureClicks = [];
+        fig.Pointer = 'crosshair';
+        fig.WindowButtonDownFcn = @onAngleClick;
+        setStatus('Click vertex point (1 of 3)... (Esc to cancel)');
+    end
+
+    function onAngleClick(~, ~)
+        if ~strcmp(appData.captureMode, 'angle')
+            return;
+        end
+
+        cp = ax.CurrentPoint;
+        x = cp(1,1);
+        y = cp(1,2);
+
+        % Validate within image bounds
+        if isempty(appData.displayImg), return; end
+        [H, W] = size(appData.displayImg);
+        if x < 0.5 || x > W + 0.5 || y < 0.5 || y > H + 0.5
+            return;
+        end
+
+        appData.captureClicks(end+1, :) = [x, y];
+        nClicks = size(appData.captureClicks, 1);
+
+        % Draw marker
+        hM = line(ax, x, y, ...
+            'Marker', 'o', 'MarkerSize', 8, ...
+            'MarkerFaceColor', OVERLAY_COLOR, ...
+            'MarkerEdgeColor', 'none', ...
+            'LineStyle', 'none', ...
+            'HandleVisibility', 'off');
+        appData.overlays.clickMarkers{end+1} = hM;
+
+        if nClicks == 1
+            setStatus('Click first ray endpoint (2 of 3)... (Esc to cancel)');
+        elseif nClicks == 2
+            % Draw line from vertex to first ray
+            pts = appData.captureClicks;
+            hL = line(ax, [pts(1,1) pts(2,1)], [pts(1,2) pts(2,2)], ...
+                'Color', OVERLAY_COLOR, 'LineWidth', 1.5, ...
+                'HandleVisibility', 'off');
+            appData.overlays.lines{end+1} = hL;
+            setStatus('Click second ray endpoint (3 of 3)... (Esc to cancel)');
+        elseif nClicks >= 3
+            % Draw second ray and compute angle
+            pts = appData.captureClicks;
+            hL2 = line(ax, [pts(1,1) pts(3,1)], [pts(1,2) pts(3,2)], ...
+                'Color', OVERLAY_COLOR, 'LineWidth', 1.5, ...
+                'HandleVisibility', 'off');
+            appData.overlays.lines{end+1} = hL2;
+
+            % Compute angle at vertex (pts(1,:))
+            v1 = pts(2,:) - pts(1,:);
+            v2 = pts(3,:) - pts(1,:);
+            cosA = dot(v1, v2) / (norm(v1) * norm(v2) + eps);
+            cosA = max(-1, min(1, cosA));   % clamp for acosd
+            angleDeg = acosd(cosA);
+
+            % Draw arc to visualize the angle
+            arcRadius = min(norm(v1), norm(v2)) * 0.3;
+            a1 = atan2d(v1(2), v1(1));
+            a2 = atan2d(v2(2), v2(1));
+            % Ensure arc goes the short way
+            if abs(a2 - a1) > 180
+                if a2 > a1
+                    a1 = a1 + 360;
+                else
+                    a2 = a2 + 360;
+                end
+            end
+            arcAngles = linspace(a1, a2, 40);
+            arcX = pts(1,1) + arcRadius * cosd(arcAngles);
+            arcY = pts(1,2) + arcRadius * sind(arcAngles);
+            hArc = line(ax, arcX, arcY, ...
+                'Color', OVERLAY_COLOR, 'LineWidth', 1, ...
+                'LineStyle', '--', ...
+                'HandleVisibility', 'off');
+            appData.overlays.lines{end+1} = hArc;
+
+            % Label at midpoint of arc
+            midAngle = (a1 + a2) / 2;
+            labelX = pts(1,1) + arcRadius * 1.4 * cosd(midAngle);
+            labelY = pts(1,2) + arcRadius * 1.4 * sind(midAngle);
+            hLabel = text(ax, labelX, labelY, ...
+                sprintf('%.1f°', angleDeg), ...
+                'Color', OVERLAY_COLOR, 'FontSize', 12, ...
+                'FontWeight', 'bold', ...
+                'HorizontalAlignment', 'center', ...
+                'HandleVisibility', 'off');
+            appData.overlays.distLabels{end+1} = hLabel;
+
+            % Clean up temporary click markers (keep lines and labels)
+            for ci = 1:numel(appData.overlays.clickMarkers)
+                h = appData.overlays.clickMarkers{ci};
+                if isvalid(h), delete(h); end
+            end
+            appData.overlays.clickMarkers = {};
+
+            finishCapture();
+            setStatus(sprintf('Angle: %.1f°', angleDeg));
+
+            % Log measurement
+            appData.measurementLog{end+1} = struct( ...
+                'type', 'angle', 'value', angleDeg, 'unit', 'deg', ...
+                'details', sprintf('vertex=(%.0f,%.0f)', pts(1,1), pts(1,2)));
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onPolylineMeasure — Multi-point distance measurement
+    % ════════════════════════════════════════════════════════════════════
+    function onPolylineMeasure(~, ~)
+        if appData.activeIdx < 1 || isempty(appData.displayImg)
+            return;
+        end
+        if appData.compareMode
+            return;
+        end
+        if ~isempty(appData.captureMode)
+            cancelCapture();
+        end
+
+        appData.captureMode = 'polyline';
+        appData.captureClicks = [];
+        fig.Pointer = 'crosshair';
+        fig.WindowButtonDownFcn = @onPolylineClick;
+        setStatus('Click points to measure path length; double-click to finish (Esc to cancel)');
+    end
+
+    function onPolylineClick(~, ~)
+        if ~strcmp(appData.captureMode, 'polyline')
+            return;
+        end
+
+        cp = ax.CurrentPoint;
+        x = cp(1,1);
+        y = cp(1,2);
+
+        if isempty(appData.displayImg), return; end
+        [H, W] = size(appData.displayImg);
+        if x < 0.5 || x > W + 0.5 || y < 0.5 || y > H + 0.5
+            return;
+        end
+
+        % Check for double-click BEFORE adding the point (avoids duplicate)
+        isDoubleClick = false;
+        if isprop(fig, 'SelectionType')
+            isDoubleClick = strcmp(fig.SelectionType, 'open');
+        end
+
+        if isDoubleClick && size(appData.captureClicks, 1) >= 2
+            % Double-click finishes — do NOT add the duplicate point
+            pts = appData.captureClicks;
+            totalDist = 0;
+            for si = 2:size(pts, 1)
+                segLen = sqrt((pts(si,1) - pts(si-1,1))^2 + ...
+                              (pts(si,2) - pts(si-1,2))^2);
+                totalDist = totalDist + segLen;
+            end
+
+            % Convert to calibrated units if available
+            unitStr = 'px';
+            if appData.activeIdx >= 1
+                imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
+                if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
+                    totalDist = totalDist * imgInfo.pixelSize;
+                    unitStr = imgInfo.pixelUnit;
+                end
+            end
+
+            nSegs = size(pts, 1) - 1;
+
+            % Label at midpoint of polyline
+            midIdx = max(1, round(size(pts, 1) / 2));
+            hLabel = text(ax, pts(midIdx, 1), pts(midIdx, 2), ...
+                sprintf('%.2f %s', totalDist, unitStr), ...
+                'Color', OVERLAY_COLOR, 'FontSize', 11, ...
+                'FontWeight', 'bold', ...
+                'HorizontalAlignment', 'center', ...
+                'VerticalAlignment', 'bottom', ...
+                'HandleVisibility', 'off');
+            appData.overlays.distLabels{end+1} = hLabel;
+
+            finishCapture();
+            setStatus(sprintf('Polyline: %.2f %s (%d segments)', ...
+                totalDist, unitStr, nSegs));
+            return;
+        end
+
+        % Single click — add point
+        appData.captureClicks(end+1, :) = [x, y];
+        nPts = size(appData.captureClicks, 1);
+
+        % Draw marker
+        hM = line(ax, x, y, ...
+            'Marker', 'o', 'MarkerSize', 6, ...
+            'MarkerFaceColor', OVERLAY_COLOR, ...
+            'MarkerEdgeColor', 'none', ...
+            'LineStyle', 'none', ...
+            'HandleVisibility', 'off');
+        appData.overlays.clickMarkers{end+1} = hM;
+
+        % Draw line segment from previous point
+        if nPts >= 2
+            px = appData.captureClicks(nPts-1, 1);
+            py = appData.captureClicks(nPts-1, 2);
+            hL = line(ax, [px x], [py y], ...
+                'Color', OVERLAY_COLOR, 'LineWidth', 1.5, ...
+                'HandleVisibility', 'off');
+            appData.overlays.lines{end+1} = hL;
+        end
+
+        setStatus(sprintf('Point %d placed — click next or double-click to finish', nPts));
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onColorbarToggle — Show/hide colorbar
+    % ════════════════════════════════════════════════════════════════════
+    function onColorbarToggle(~, ~)
+        if appData.activeIdx < 1 || isempty(ax) || ~isvalid(ax)
+            return;
+        end
+
+        if cbColorbar.Value
+            hColorbar = colorbar(ax);
+        else
+            if ~isempty(hColorbar) && isvalid(hColorbar)
+                delete(hColorbar);
+                hColorbar = [];
+            end
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onSetPixelSize — Override pixel calibration
+    % ════════════════════════════════════════════════════════════════════
+    function onSetPixelSize(~, ~)
+        if appData.activeIdx < 1
+            return;
+        end
+
+        imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
+        if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
+            defSize = num2str(imgInfo.pixelSize);
+            defUnit = imgInfo.pixelUnit;
+        else
+            defSize = '1.0';
+            defUnit = 'nm';
+        end
+
+        answer = inputdlg( ...
+            {'Pixel size:', 'Unit (nm, µm, Å, mm, etc.):'}, ...
+            'Set Pixel Calibration', [1 36], {defSize, defUnit});
+        if isempty(answer)
+            return;
+        end
+
+        newSize = str2double(answer{1});
+        newUnit = strtrim(answer{2});
+        if isnan(newSize) || newSize <= 0
+            uialert(fig, 'Pixel size must be a positive number.', ...
+                'Invalid Input', 'Icon', 'error');
+            return;
+        end
+        if isempty(newUnit)
+            newUnit = 'px';
+        end
+
+        % Update the stored imageData
+        appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.pixelSize  = newSize;
+        appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.pixelUnit  = newUnit;
+        appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.calibrated = true;
+
+        % Refresh UI elements that depend on calibration
+        updateStatusBar();
+        updateMetadataPanel();
+
+        % Enable and show scale bar
+        cbScaleBar.Enable       = 'on';
+        btnScaleBarColor.Enable = 'on';
+        spnScaleBarFont.Enable  = 'on';
+        cbScaleBar.Value        = true;
+        rebuildScaleBar();
+
+        setStatus(sprintf('Pixel size set to %.4g %s/px', newSize, newUnit));
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  UNDO STACK: push / pop
+    % ════════════════════════════════════════════════════════════════════
+    function undoPush()
+    %UNDOPUSH  Push current pixel state onto the undo stack.
+        snapshot = {appData.rawPixels, appData.filteredPixels};
+        appData.undoStack{end+1} = snapshot;
+        if numel(appData.undoStack) > appData.undoStackMax
+            appData.undoStack(1) = [];   % discard oldest
+        end
+    end
+
+    function undoPop()
+    %UNDOPOP  Pop the most recent snapshot and restore it.
+        if isempty(appData.undoStack)
+            setStatus('Nothing to undo.');
+            return;
+        end
+        snapshot = appData.undoStack{end};
+        appData.undoStack(end) = [];
+        appData.rawPixels      = snapshot{1};
+        appData.filteredPixels = snapshot{2};
+
+        % If dimensions changed (e.g. undoing a rotation), do full rebuild
+        [H2, W2] = size(appData.filteredPixels);
+        if ~isempty(appData.imgHandle) && isvalid(appData.imgHandle) && ...
+                ~isequal(size(appData.imgHandle.CData), [H2 W2])
+            lo = sldLow.Value;
+            hi = sldHigh.Value;
+            dispImg = imaging.adjustContrast(appData.filteredPixels, Low=lo, High=hi);
+            appData.displayImg = dispImg;
+            delete(ax.Children);
+            cla(ax);
+            hImg = imagesc(ax, 'XData', [1 W2], 'YData', [1 H2], 'CData', dispImg);
+            appData.imgHandle = hImg;
+            colormap(ax, feval(ddColormap.Value, 256));
+            ax.CLim = [0 1]; ax.YDir = 'reverse';
+            axis(ax, 'equal');
+            ax.XLim = [0.5, W2+0.5]; ax.YLim = [0.5, H2+0.5];
+            ax.XTick = []; ax.YTick = []; ax.Toolbar.Visible = 'off';
+            if cbColorbar.Value
+                if ~isempty(hColorbar) && isvalid(hColorbar)
+                    delete(hColorbar);
+                end
+                hColorbar = colorbar(ax);
+            end
+        else
+            refreshDisplay();
+        end
+        setStatus(sprintf('Undo — %d states remaining', numel(appData.undoStack)));
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onFFTMask — Interactive FFT masking with inverse FFT
+    % ════════════════════════════════════════════════════════════════════
+    function onFFTMask(~, ~)
+        if isempty(appData.filteredPixels)
+            return;
+        end
+
+        fig.Pointer = 'watch'; drawnow;
+        pixels = appData.filteredPixels;
+        F = fft2(double(pixels));
+        Fshift = fftshift(F);
+        magImg = log10(abs(Fshift) + 1);
+        fig.Pointer = 'arrow';
+
+        % Show FFT in a new figure with masking controls
+        fftFig = figure('Name', 'FFT Mask Editor', 'NumberTitle', 'off', ...
+            'Units', 'pixels', 'Position', [200 150 700 560]);
+        fftLayout = uigridlayout(fftFig, [2 1], ...
+            'RowHeight', {'1x', 30}, 'Padding', [6 6 6 6]);
+
+        fftAx = axes('Parent', uipanel(fftLayout));
+        fftAx.Parent.Layout.Row = 1;
+        imagesc(fftAx, magImg);
+        colormap(fftAx, parula(256));
+        axis(fftAx, 'image');
+        fftAx.XTick = []; fftAx.YTick = [];
+        title(fftAx, 'Click to place circular masks, then Apply', 'Interpreter', 'none');
+
+        btnRow = uigridlayout(fftLayout, [1 5], ...
+            'ColumnWidth', {60, 80, 80, 80, 80}, 'Padding', [0 0 0 0]);
+        btnRow.Layout.Row = 2;
+
+        % Mask radius spinner
+        lblRadius = uilabel(btnRow, 'Text', 'Radius:', 'HorizontalAlignment', 'right');
+        lblRadius.Layout.Column = 1;
+        spnRadius = uispinner(btnRow, 'Value', 15, 'Limits', [3 200], 'Step', 2);
+        spnRadius.Layout.Column = 2;
+
+        btnAddMask = uibutton(btnRow, 'Text', 'Add Mask', ...
+            'ButtonPushedFcn', @(~,~) fftAddMask());
+        btnAddMask.Layout.Column = 3;
+
+        btnApply = uibutton(btnRow, 'Text', 'Apply', ...
+            'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
+            'ButtonPushedFcn', @(~,~) fftApplyMask());
+        btnApply.Layout.Column = 4;
+
+        btnCancel = uibutton(btnRow, 'Text', 'Cancel', ...
+            'ButtonPushedFcn', @(~,~) close(fftFig));
+        btnCancel.Layout.Column = 5;
+
+        maskCircles = {};   % store mask center + radius
+
+        function fftAddMask()
+            % Use ButtonDownFcn instead of ginput (ginput unreliable from uifigure)
+            title(fftAx, 'Click on the FFT image to place mask center...', ...
+                'Interpreter', 'none');
+            fftAx.ButtonDownFcn = @captureMaskClick;
+        end
+
+        function captureMaskClick(~, evt)
+            fftAx.ButtonDownFcn = [];   % one-shot
+            cx = evt.IntersectionPoint(1);
+            cy = evt.IntersectionPoint(2);
+            r = spnRadius.Value;
+            th = linspace(0, 2*pi, 60);
+            xc = cx + r * cos(th);
+            yc = cy + r * sin(th);
+            hold(fftAx, 'on');
+            plot(fftAx, xc, yc, 'r-', 'LineWidth', 1.5, 'HitTest', 'off');
+            hold(fftAx, 'off');
+            maskCircles{end+1} = [cx, cy, r];
+            title(fftAx, sprintf('%d mask(s) placed — Add more or Apply', ...
+                numel(maskCircles)), 'Interpreter', 'none');
+        end
+
+        function fftApplyMask()
+            if isempty(maskCircles)
+                return;
+            end
+
+            undoPush();
+
+            [H2, W2] = size(Fshift);
+            mask = ones(H2, W2);
+            [XX, YY] = meshgrid(1:W2, 1:H2);
+            for mi = 1:numel(maskCircles)
+                mc = maskCircles{mi};
+                dist2 = (XX - mc(1)).^2 + (YY - mc(2)).^2;
+                mask(dist2 <= mc(3)^2) = 0;
+                % Mirror mask (FFT symmetry)
+                mcx = W2 + 1 - mc(1);
+                mcy = H2 + 1 - mc(2);
+                dist2m = (XX - mcx).^2 + (YY - mcy).^2;
+                mask(dist2m <= mc(3)^2) = 0;
+            end
+
+            Fmasked = Fshift .* mask;
+            recovered = real(ifft2(ifftshift(Fmasked)));
+
+            appData.filteredPixels = recovered;
+            refreshDisplay();
+            close(fftFig);
+            setStatus(sprintf('FFT mask applied (%d regions masked)', numel(maskCircles)));
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onParticleCount — Threshold and count connected components
+    % ════════════════════════════════════════════════════════════════════
+    function onParticleCount(~, ~)
+        if isempty(appData.filteredPixels)
+            return;
+        end
+
+        % Prompt for threshold
+        dMin = min(appData.filteredPixels(:));
+        dMax = max(appData.filteredPixels(:));
+        defThresh = num2str(round((dMin + dMax) / 2));
+        answer = inputdlg( ...
+            {sprintf('Threshold (%.0f – %.0f):', dMin, dMax), ...
+             'Min particle area (pixels):'}, ...
+            'Particle Detection', [1 44], {defThresh, '10'});
+        if isempty(answer), return; end
+
+        thresh = str2double(answer{1});
+        minArea = str2double(answer{2});
+        if isnan(thresh) || isnan(minArea) || minArea < 1
+            uialert(fig, 'Invalid parameters.', 'Error', 'Icon', 'error');
+            return;
+        end
+
+        fig.Pointer = 'watch'; drawnow;
+
+        % Binary threshold
+        bw = appData.filteredPixels > thresh;
+
+        % Connected-component labeling (no toolbox — flood fill)
+        labelMap = bwlabelNoToolbox(bw);
+        nLabels = max(labelMap(:));
+
+        % Compute areas and filter
+        areas = [];
+        for li = 1:nLabels
+            a = sum(labelMap(:) == li);
+            if a >= minArea
+                areas(end+1) = a; %#ok<AGROW>
+            end
+        end
+
+        fig.Pointer = 'arrow';
+
+        % Calibrate areas if possible
+        unitStr = 'px²';
+        areaScale = 1;
+        if appData.activeIdx >= 1
+            imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
+            if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
+                areaScale = imgInfo.pixelSize^2;
+                unitStr = sprintf('%s²', imgInfo.pixelUnit);
+            end
+        end
+
+        % Show results in a figure
+        pFig = figure('Name', 'Particle Analysis', 'NumberTitle', 'off', ...
+            'Units', 'pixels', 'Position', [280 200 550 450]);
+        pLayout = uigridlayout(pFig, [2 1], ...
+            'RowHeight', {'1x', '1x'}, 'Padding', [10 10 10 10]);
+
+        % Top: labeled image
+        pAx1 = uiaxes(pLayout);
+        pAx1.Layout.Row = 1;
+        imagesc(pAx1, labelMap);
+        colormap(pAx1, [0 0 0; lines(max(1, nLabels))]);
+        axis(pAx1, 'image');
+        pAx1.XTick = []; pAx1.YTick = [];
+        title(pAx1, sprintf('%d particles (>%d px)', numel(areas), minArea), ...
+            'Interpreter', 'none');
+
+        % Bottom: size distribution
+        pAx2 = uiaxes(pLayout);
+        pAx2.Layout.Row = 2;
+        if ~isempty(areas)
+            histogram(pAx2, areas * areaScale, min(30, numel(areas)), ...
+                'FaceColor', [0.4 0.7 0.4], 'EdgeColor', 'none');
+        end
+        xlabel(pAx2, sprintf('Area (%s)', unitStr));
+        ylabel(pAx2, 'Count');
+        title(pAx2, 'Size Distribution', 'Interpreter', 'none');
+
+        setStatus(sprintf('Found %d particles (threshold=%.0f, minArea=%d)', ...
+            numel(areas), thresh, minArea));
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: bwlabelNoToolbox — Connected-component labeling (4-connected)
+    % ════════════════════════════════════════════════════════════════════
+    function L = bwlabelNoToolbox(bw)
+    %BWLABELNOTTOOLBOX  Label connected components using two-pass algorithm.
+        [H2, W2] = size(bw);
+        L = zeros(H2, W2);
+        nextLabel = 1;
+        equiv = (1:H2*W2);   % union-find parent array
+
+        % Pass 1: assign provisional labels
+        for r = 1:H2
+            for c = 1:W2
+                if ~bw(r, c), continue; end
+
+                neighbors = [];
+                if r > 1 && bw(r-1, c)
+                    neighbors(end+1) = L(r-1, c); %#ok<AGROW>
+                end
+                if c > 1 && bw(r, c-1)
+                    neighbors(end+1) = L(r, c-1); %#ok<AGROW>
+                end
+
+                if isempty(neighbors)
+                    L(r, c) = nextLabel;
+                    nextLabel = nextLabel + 1;
+                else
+                    minL = min(neighbors);
+                    L(r, c) = minL;
+                    for ni = 1:numel(neighbors)
+                        equiv = ufUnion(equiv, minL, neighbors(ni));
+                    end
+                end
+            end
+        end
+
+        % Resolve equivalences
+        for k = 1:nextLabel-1
+            equiv = ufFind(equiv, k);
+        end
+
+        % Pass 2: relabel
+        remap = zeros(1, nextLabel-1);
+        newLabel = 0;
+        for k = 1:nextLabel-1
+            root = ufFindSingle(equiv, k);
+            if remap(root) == 0
+                newLabel = newLabel + 1;
+                remap(root) = newLabel;
+            end
+            remap(k) = remap(root);
+        end
+
+        for r = 1:H2
+            for c = 1:W2
+                if L(r, c) > 0
+                    L(r, c) = remap(L(r, c));
+                end
+            end
+        end
+    end
+
+    function p = ufFind(parent, k)
+    %UFFIND  Union-find: path-compress all entries up to k.
+        p = parent;
+        for i = 1:k
+            root = i;
+            while p(root) ~= root
+                root = p(root);
+            end
+            % Path compression
+            j = i;
+            while p(j) ~= root
+                next = p(j);
+                p(j) = root;
+                j = next;
+            end
+        end
+    end
+
+    function root = ufFindSingle(parent, x)
+    %UFFINDSINGLE  Find root of x with path compression.
+        root = x;
+        while parent(root) ~= root
+            root = parent(root);
+        end
+    end
+
+    function p = ufUnion(parent, a, b)
+    %UFUNION  Union two labels.
+        p = parent;
+        rootA = a;
+        while p(rootA) ~= rootA, rootA = p(rootA); end
+        rootB = b;
+        while p(rootB) ~= rootB, rootB = p(rootB); end
+        if rootA ~= rootB
+            p(rootB) = rootA;
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onAlignStack — Cross-correlation drift correction
+    % ════════════════════════════════════════════════════════════════════
+    function onAlignStack(~, ~)
+        if numel(appData.images) < 2
+            uialert(fig, 'Need at least 2 images to align.', ...
+                'Align Stack', 'Icon', 'warning');
+            return;
+        end
+
+        answer = questdlg( ...
+            sprintf('Align %d loaded images using cross-correlation?\nThe first image is the reference.', ...
+            numel(appData.images)), ...
+            'Drift Correction', 'Align', 'Cancel', 'Align');
+        if ~strcmp(answer, 'Align')
+            return;
+        end
+
+        fig.Pointer = 'watch'; drawnow;
+
+        try
+            % Get reference image (first loaded)
+            refInfo = appData.images{1}.metadata.parserSpecific.imageData;
+            refPx = double(refInfo.pixels);
+            if refInfo.numChannels == 3
+                refPx = 0.299*refPx(:,:,1) + 0.587*refPx(:,:,2) + 0.114*refPx(:,:,3);
+            end
+
+            shifts = zeros(numel(appData.images), 2);
+            for ki = 2:numel(appData.images)
+                imgInfo = appData.images{ki}.metadata.parserSpecific.imageData;
+                movPx = double(imgInfo.pixels);
+                if imgInfo.numChannels == 3
+                    movPx = 0.299*movPx(:,:,1) + 0.587*movPx(:,:,2) + 0.114*movPx(:,:,3);
+                end
+
+                % Cross-correlation via FFT
+                [H2, W2] = size(refPx);
+                [Hm, Wm] = size(movPx);
+                padH = max(H2, Hm);
+                padW = max(W2, Wm);
+
+                refPad = zeros(padH, padW);
+                refPad(1:H2, 1:W2) = refPx;
+                movPad = zeros(padH, padW);
+                movPad(1:Hm, 1:Wm) = movPx;
+
+                cc = real(ifft2(fft2(refPad) .* conj(fft2(movPad))));
+                [~, maxIdx] = max(cc(:));
+                [peakR, peakC] = ind2sub(size(cc), maxIdx);
+
+                % Convert to shift (handle wrap-around)
+                dy = peakR - 1;
+                dx = peakC - 1;
+                if dy > padH/2, dy = dy - padH; end
+                if dx > padW/2, dx = dx - padW; end
+                shifts(ki, :) = [dy, dx];
+
+                % Apply shift via circshift
+                shiftedPx = circshift(movPx, [dy, dx]);
+                appData.images{ki}.metadata.parserSpecific.imageData.pixels = ...
+                    cast(shiftedPx, class(imgInfo.pixels));
+            end
+
+            fig.Pointer = 'arrow';
+
+            % Show results
+            shiftStr = '';
+            for ki = 2:numel(appData.images)
+                [~, fn, fe] = fileparts(appData.images{ki}.metadata.source);
+                shiftStr = [shiftStr sprintf('  %s%s: dy=%+d, dx=%+d\n', fn, fe, ...
+                    shifts(ki,1), shifts(ki,2))]; %#ok<AGROW>
+            end
+            uialert(fig, sprintf('Alignment complete:\n\n%s', shiftStr), ...
+                'Drift Correction', 'Icon', 'info');
+
+            % Refresh display
+            displayImage();
+            setStatus(sprintf('Aligned %d images to reference', numel(appData.images) - 1));
+        catch ME
+            fig.Pointer = 'arrow';
+            uialert(fig, sprintf('Alignment failed:\n%s', ME.message), ...
+                'Error', 'Icon', 'error');
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onColorOverlay — Blend two images with different colormaps
+    % ════════════════════════════════════════════════════════════════════
+    function onColorOverlay(~, ~)
+        if numel(appData.images) < 2
+            uialert(fig, 'Need at least 2 images for color overlay.', ...
+                'Color Overlay', 'Icon', 'warning');
+            return;
+        end
+
+        % Build list of loaded image names
+        names = cell(1, numel(appData.images));
+        for ki = 1:numel(appData.images)
+            [~, fn, fe] = fileparts(appData.images{ki}.metadata.source);
+            names{ki} = sprintf('[%d] %s%s', ki, fn, fe);
+        end
+
+        % Prompt for which two images and colormaps
+        answer = inputdlg( ...
+            {'Image A index (1-based):', ...
+             'Image A colormap (red, green, blue, cyan, magenta, yellow):', ...
+             'Image B index (1-based):', ...
+             'Image B colormap:', ...
+             'Blend alpha (0-1, for image B):'}, ...
+            'Color Overlay', [1 50], ...
+            {'1', 'green', '2', 'magenta', '0.5'});
+        if isempty(answer), return; end
+
+        idxA = str2double(answer{1});
+        cmapA = lower(strtrim(answer{2}));
+        idxB = str2double(answer{3});
+        cmapB = lower(strtrim(answer{4}));
+        alpha = str2double(answer{5});
+
+        if isnan(idxA) || isnan(idxB) || idxA < 1 || idxB < 1 || ...
+                idxA > numel(appData.images) || idxB > numel(appData.images)
+            uialert(fig, 'Invalid image indices.', 'Error', 'Icon', 'error');
+            return;
+        end
+        alpha = max(0, min(1, alpha));
+
+        % Extract grayscale
+        imgA = getGrayscale(appData.images{round(idxA)});
+        imgB = getGrayscale(appData.images{round(idxB)});
+
+        % Normalize to [0,1]
+        imgA = (imgA - min(imgA(:))) / max(1, max(imgA(:)) - min(imgA(:)));
+        imgB = (imgB - min(imgB(:))) / max(1, max(imgB(:)) - min(imgB(:)));
+
+        % Resize to match (use smaller dimensions)
+        [Ha, Wa] = size(imgA);
+        [Hb, Wb] = size(imgB);
+        H2 = min(Ha, Hb);
+        W2 = min(Wa, Wb);
+        imgA = imgA(1:H2, 1:W2);
+        imgB = imgB(1:H2, 1:W2);
+
+        % Apply pseudo-colormaps
+        rgbA = applyColorChannel(imgA, cmapA);
+        rgbB = applyColorChannel(imgB, cmapB);
+
+        % Blend
+        blended = rgbA * (1 - alpha) + rgbB * alpha;
+        blended = max(0, min(1, blended));
+
+        % Show in new figure
+        ovFig = figure('Name', 'Color Overlay', 'NumberTitle', 'off', ...
+            'Units', 'pixels', 'Position', [250 180 650 550]);
+        ovAx = axes(ovFig);
+        image(ovAx, blended);
+        axis(ovAx, 'image');
+        ovAx.XTick = []; ovAx.YTick = [];
+        title(ovAx, sprintf('%s (%s) + %s (%s), alpha=%.1f', ...
+            names{round(idxA)}, cmapA, names{round(idxB)}, cmapB, alpha), ...
+            'Interpreter', 'none');
+
+        setStatus('Color overlay displayed.');
+    end
+
+    function gray = getGrayscale(dataStruct)
+    %GETGRAYSCALE  Extract grayscale double from a data struct.
+        imgInfo = dataStruct.metadata.parserSpecific.imageData;
+        px = double(imgInfo.pixels);
+        if imgInfo.numChannels == 3
+            gray = 0.299*px(:,:,1) + 0.587*px(:,:,2) + 0.114*px(:,:,3);
+        else
+            gray = px;
+        end
+    end
+
+    function rgb = applyColorChannel(gray, colorName)
+    %APPLYCOLORCHANNEL  Map grayscale [0,1] to an RGB image using a named color.
+        [H2, W2] = size(gray);
+        rgb = zeros(H2, W2, 3);
+        switch colorName
+            case 'red',     rgb(:,:,1) = gray;
+            case 'green',   rgb(:,:,2) = gray;
+            case 'blue',    rgb(:,:,3) = gray;
+            case 'cyan',    rgb(:,:,2) = gray; rgb(:,:,3) = gray;
+            case 'magenta', rgb(:,:,1) = gray; rgb(:,:,3) = gray;
+            case 'yellow',  rgb(:,:,1) = gray; rgb(:,:,2) = gray;
+            otherwise,      rgb(:,:,1) = gray; rgb(:,:,2) = gray; rgb(:,:,3) = gray;
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onExportWithOverlays — Burn overlays into exported image
+    % ════════════════════════════════════════════════════════════════════
+    function onExportWithOverlays(~, ~)
+        if isempty(appData.displayImg) || isempty(ax) || ~isvalid(ax)
+            return;
+        end
+
+        if appData.activeIdx >= 1
+            [~, bname] = fileparts(appData.images{appData.activeIdx}.metadata.source);
+            defName = [bname '_overlay.png'];
+        else
+            defName = 'overlay.png';
+        end
+
+        startPath = appData.lastDir;
+        if isempty(startPath) || ~isfolder(startPath)
+            startPath = pwd;
+        end
+
+        [saveName, saveDir] = uiputfile( ...
+            {'*.png', 'PNG (*.png)'; '*.tif;*.tiff', 'TIFF (*.tif)'}, ...
+            'Export with Overlays', fullfile(startPath, defName));
+        if isequal(saveName, 0), return; end
+
+        outPath = fullfile(saveDir, saveName);
+
+        fig.Pointer = 'watch'; drawnow;
+
+        try
+            % Use print to capture the axes content including overlays
+            tmpFig = figure('Visible', 'off', 'Color', 'k');
+            copyobj(ax, tmpFig);
+            tmpAx = findobj(tmpFig, 'Type', 'axes');
+            tmpAx.Units = 'normalized';
+            tmpAx.Position = [0 0 1 1];
+
+            % Match colormap
+            cmapName = ddColormap.Value;
+            colormap(tmpFig, feval(cmapName, 256));
+
+            % Capture at configured DPI resolution
+            dpi = getExportDPI();
+            set(tmpFig, 'PaperUnits', 'inches', ...
+                'PaperPosition', [0 0 size(appData.displayImg,2)/dpi size(appData.displayImg,1)/dpi]);
+            frame = getframe(tmpAx);
+            close(tmpFig);
+
+            [~, ~, ext] = fileparts(outPath);
+            if strcmpi(ext, '.tif') || strcmpi(ext, '.tiff')
+                imwrite(frame.cdata, outPath, 'Compression', 'none');
+            else
+                imwrite(frame.cdata, outPath);
+            end
+
+            setStatus(sprintf('Exported with overlays: %s', saveName));
+        catch ME
+            fig.Pointer = 'arrow';
+            uialert(fig, sprintf('Export failed:\n%s', ME.message), ...
+                'Error', 'Icon', 'error');
+            return;
+        end
+
+        fig.Pointer = 'arrow';
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onBatchExport — Export all loaded images to a folder
+    % ════════════════════════════════════════════════════════════════════
+    function onBatchExport(~, ~)
+        if isempty(appData.images)
+            return;
+        end
+
+        outDir = uigetdir(appData.lastDir, 'Select Output Folder for Batch Export');
+        if isequal(outDir, 0), return; end
+
+        fig.Pointer = 'watch'; drawnow;
+
+        nExported = 0;
+        for ki = 1:numel(appData.images)
+            try
+                imgInfo = appData.images{ki}.metadata.parserSpecific.imageData;
+                px = double(imgInfo.pixels);
+                if imgInfo.numChannels == 3
+                    px = 0.299*px(:,:,1) + 0.587*px(:,:,2) + 0.114*px(:,:,3);
+                end
+
+                % Per-image auto-contrast (2nd/98th percentile)
+                lo = percentileNoToolbox(px(:), 2);
+                hi = percentileNoToolbox(px(:), 98);
+                if lo >= hi
+                    lo = min(px(:)); hi = max(px(:));
+                end
+                if hi <= lo, hi = lo + 1; end
+                dispPx = (px - lo) / (hi - lo);
+                dispPx = max(0, min(1, dispPx));
+
+                [~, bname] = fileparts(appData.images{ki}.metadata.source);
+                outPath = fullfile(outDir, [bname '_export.png']);
+                imwrite(uint8(dispPx * 255), outPath);
+                nExported = nExported + 1;
+            catch
+                % Skip failed images
+            end
+        end
+
+        fig.Pointer = 'arrow';
+        setStatus(sprintf('Batch exported %d / %d images to %s', ...
+            nExported, numel(appData.images), outDir));
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onCopyClipboard — Copy current view to system clipboard
+    % ════════════════════════════════════════════════════════════════════
+    function onCopyClipboard(~, ~)
+        if isempty(appData.displayImg) || isempty(ax) || ~isvalid(ax)
+            return;
+        end
+
+        try
+            % Create a temporary invisible figure, copy axes, capture
+            tmpFig = figure('Visible', 'off', 'Color', 'k');
+            newAx = copyobj(ax, tmpFig);
+            newAx.Units = 'normalized';
+            newAx.Position = [0 0 1 1];
+            cmapName = ddColormap.Value;
+            colormap(tmpFig, feval(cmapName, 256));
+
+            % Use print to clipboard (Windows)
+            print(tmpFig, '-clipboard', '-dbitmap');
+            close(tmpFig);
+            setStatus('Copied to clipboard.');
+        catch ME
+            % Fallback: try copygraphics (R2020a+)
+            try
+                tmpFig2 = figure('Visible', 'off', 'Color', 'k');
+                newAx2 = copyobj(ax, tmpFig2);
+                newAx2.Units = 'normalized';
+                newAx2.Position = [0 0 1 1];
+                colormap(tmpFig2, feval(ddColormap.Value, 256));
+                copygraphics(tmpFig2);
+                close(tmpFig2);
+                setStatus('Copied to clipboard.');
+            catch
+                setStatus(sprintf('Clipboard copy failed: %s', ME.message));
+            end
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onFileDrop — Handle drag-and-drop files onto the figure
+    % ════════════════════════════════════════════════════════════════════
+    function onFileDrop(~, evt)
+        % evt.Items contains the dropped file paths
+        if isempty(evt) || ~isprop(evt, 'Items')
+            return;
+        end
+
+        items = evt.Items;
+        fpaths = {};
+
+        for ki = 1:numel(items)
+            fp = items(ki);
+            if ischar(fp) || isstring(fp)
+                fp = char(fp);
+            elseif isstruct(fp) && isfield(fp, 'Path')
+                fp = char(fp.Path);
+            else
+                continue;
+            end
+
+            [~, ~, ext] = fileparts(fp);
+            if ismember(lower(ext), {'.tif', '.tiff', '.raw', '.dm3', '.dm4'})
+                fpaths{end+1} = fp; %#ok<AGROW>
+            end
+        end
+
+        if ~isempty(fpaths)
+            loadImagesFromPaths(fpaths);
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  STACK NAVIGATOR: frame slider, prev/next, MIP
+    % ════════════════════════════════════════════════════════════════════
+    function showStackControls(nFrames)
+    %SHOWSTACKCONTROLS  Show/configure the frame slider for multi-frame images.
+        if nFrames <= 1
+            axGL.RowHeight = {'1x', 0};
+            appData.stackFrames = {};
+            appData.stackIdx = 0;
+            return;
+        end
+        axGL.RowHeight = {'1x', 28};
+        sldStackFrame.Limits = [1 nFrames];
+        sldStackFrame.Value  = 1;
+        sldStackFrame.MajorTicks = [];
+        sldStackFrame.MinorTicks = [];
+        lblStackFrame.Text = sprintf('1 / %d', nFrames);
+        appData.stackIdx = 1;
+    end
+
+    function onStackNav(delta)
+    %ONSTACKNAV  Navigate stack frames by delta (+1 / -1).
+        if isempty(appData.stackFrames)
+            return;
+        end
+        nFrames = numel(appData.stackFrames);
+        newIdx = appData.stackIdx + delta;
+        if newIdx < 1, newIdx = nFrames; end
+        if newIdx > nFrames, newIdx = 1; end
+        appData.stackIdx = newIdx;
+        sldStackFrame.Value = newIdx;
+        lblStackFrame.Text = sprintf('%d / %d', newIdx, nFrames);
+        displayStackFrame(newIdx);
+    end
+
+    function onStackSlider(~, ~)
+    %ONSTACKSLIDER  Handle frame slider value change.
+        if isempty(appData.stackFrames)
+            return;
+        end
+        idx = round(sldStackFrame.Value);
+        idx = max(1, min(numel(appData.stackFrames), idx));
+        appData.stackIdx = idx;
+        sldStackFrame.Value = idx;
+        lblStackFrame.Text = sprintf('%d / %d', idx, numel(appData.stackFrames));
+        displayStackFrame(idx);
+    end
+
+    function onStackMIP(~, ~)
+    %ONSTACKMIP  Maximum Intensity Projection across all stack frames.
+        if isempty(appData.stackFrames)
+            return;
+        end
+
+        fig.Pointer = 'watch'; drawnow;
+
+        % Stack all frames into 3D array and take max along dim 3
+        nFrames = numel(appData.stackFrames);
+        [H2, W2] = size(appData.stackFrames{1});
+        stack3D = zeros(H2, W2, nFrames);
+        for fi = 1:nFrames
+            frame = appData.stackFrames{fi};
+            % Handle size mismatch gracefully
+            [fh, fw] = size(frame);
+            mh = min(H2, fh); mw = min(W2, fw);
+            stack3D(1:mh, 1:mw, fi) = frame(1:mh, 1:mw);
+        end
+
+        mipImg = max(stack3D, [], 3);
+
+        appData.rawPixels      = mipImg;
+        appData.filteredPixels = mipImg;
+
+        % Update slider ranges
+        dMin = min(mipImg(:));
+        dMax = max(mipImg(:));
+        if dMax == dMin, dMax = dMin + 1; end
+        sldLow.Limits = [dMin, dMax];
+        sldHigh.Limits = [dMin, dMax];
+
+        onAutoContrast([], []);
+        setStatus(sprintf('MIP of %d frames', nFrames));
+        fig.Pointer = 'arrow';
+    end
+
+    function displayStackFrame(idx)
+    %DISPLAYSTACKFRAME  Render a specific frame from the stack.
+        if idx < 1 || idx > numel(appData.stackFrames)
+            return;
+        end
+
+        frame = appData.stackFrames{idx};
+        appData.rawPixels      = frame;
+        appData.filteredPixels = frame;
+
+        % Update slider ranges for this frame
+        dMin = min(frame(:));
+        dMax = max(frame(:));
+        if dMax == dMin, dMax = dMin + 1; end
+        sldLow.Limits = [dMin, dMax];
+        sldHigh.Limits = [dMin, dMax];
+
+        % Auto-contrast
+        pLow  = percentileNoToolbox(frame(:), 2);
+        pHigh = percentileNoToolbox(frame(:), 98);
+        if pLow >= pHigh
+            pLow = dMin; pHigh = dMax;
+        end
+        sldLow.Value = pLow;
+        sldHigh.Value = pHigh;
+
+        dispImg = imaging.adjustContrast(frame, Low=pLow, High=pHigh);
+        appData.displayImg = dispImg;
+
+        if ~isempty(appData.imgHandle) && isvalid(appData.imgHandle)
+            appData.imgHandle.CData = dispImg;
+        end
+
+        updateHistogram();
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: saveRecentFiles — Persist recent file list to MAT
+    % ════════════════════════════════════════════════════════════════════
+    function saveRecentFiles()
+        try
+            recentFiles = appData.recentFiles; %#ok<NASGU>
+            save(recentFilePath, 'recentFiles');
+        catch
+            % Ignore save errors
+        end
+    end
+
+    function addToRecentFiles(fp)
+    %ADDTORECENTFILES  Add a file path to the recent files list (deduplicated).
+        fp = char(fp);
+        % Remove if already present
+        appData.recentFiles(strcmp(appData.recentFiles, fp)) = [];
+        % Prepend
+        appData.recentFiles = [{fp}, appData.recentFiles];
+        % Cap at 10
+        if numel(appData.recentFiles) > 10
+            appData.recentFiles = appData.recentFiles(1:10);
+        end
+        saveRecentFiles();
+        updateRecentDropdown();
+    end
+
+    function updateRecentDropdown()
+    %UPDATERECENTDROPDOWN  Refresh the Recent dropdown in the toolbar.
+        if isempty(appData.recentFiles)
+            ddRecent.Items = {'(recent files)'};
+            ddRecent.Value = '(recent files)';
+        else
+            shortNames = cell(size(appData.recentFiles));
+            for ri = 1:numel(appData.recentFiles)
+                [~, fn, fe] = fileparts(appData.recentFiles{ri});
+                shortNames{ri} = [fn fe];
+            end
+            ddRecent.Items     = shortNames;
+            ddRecent.ItemsData = appData.recentFiles;
+            ddRecent.Value     = appData.recentFiles{1};
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 2 CALLBACKS
+    % ════════════════════════════════════════════════════════════════════
+
+    % ── Feature 1+3: Live Threshold Preview with Otsu ─────────────────
+    function onLiveThreshold(~, ~)
+        if isempty(appData.filteredPixels), return; end
+
+        px = appData.filteredPixels;
+        dMin = min(px(:)); dMax = max(px(:));
+        otsuThresh = otsuThreshold(px);
+
+        tFig = uifigure('Name', 'Live Threshold Preview', ...
+            'Position', [250 200 500 400]);
+        tGL = uigridlayout(tFig, [3 1], ...
+            'RowHeight', {'1x', 30, 30}, 'Padding', [6 6 6 6]);
+
+        tAx = uiaxes(tGL);
+        tAx.Layout.Row = 1;
+        imagesc(tAx, px); colormap(tAx, gray(256));
+        axis(tAx, 'image'); tAx.XTick = []; tAx.YTick = [];
+        tAx.Toolbar.Visible = 'off';
+
+        % Threshold slider row
+        sldRow = uigridlayout(tGL, [1 3], ...
+            'ColumnWidth', {60, '1x', 60}, 'Padding', [0 0 0 0]);
+        sldRow.Layout.Row = 2;
+        uilabel(sldRow, 'Text', 'Threshold:', 'HorizontalAlignment', 'right');
+        sldThresh = uislider(sldRow, 'Limits', [dMin dMax], 'Value', otsuThresh);
+        sldThresh.Layout.Column = 2;
+        sldThresh.MajorTicks = []; sldThresh.MinorTicks = [];
+        lblThVal = uilabel(sldRow, 'Text', sprintf('%.0f', otsuThresh));
+        lblThVal.Layout.Column = 3;
+
+        % Button row
+        btnRowT = uigridlayout(tGL, [1 3], ...
+            'ColumnWidth', {'1x', 80, 80}, 'Padding', [0 0 0 0]);
+        btnRowT.Layout.Row = 3;
+        uilabel(btnRowT, 'Text', sprintf('Otsu: %.0f', otsuThresh), ...
+            'FontColor', [0.4 0.7 0.4]);
+        uibutton(btnRowT, 'Text', 'Apply', ...
+            'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
+            'ButtonPushedFcn', @(~,~) applyThreshold());
+        uibutton(btnRowT, 'Text', 'Cancel', ...
+            'ButtonPushedFcn', @(~,~) close(tFig));
+
+        hOverlay = [];
+        sldThresh.ValueChangedFcn = @(~,~) updateThreshPreview();
+        updateThreshPreview();
+
+        function updateThreshPreview()
+            tv = sldThresh.Value;
+            lblThVal.Text = sprintf('%.0f', tv);
+            bw = px > tv;
+            % Show red overlay on thresholded regions
+            if ~isempty(hOverlay) && isvalid(hOverlay)
+                delete(hOverlay);
+            end
+            hold(tAx, 'on');
+            alphaMap = double(bw) * 0.35;
+            redImg = zeros([size(bw) 3]);
+            redImg(:,:,1) = 1;
+            hOverlay = image(tAx, 'CData', redImg, 'AlphaData', alphaMap);
+            hOverlay.HitTest = 'off';
+            hold(tAx, 'off');
+        end
+
+        function applyThreshold()
+            undoPush();
+            tv = sldThresh.Value;
+            appData.filteredPixels = double(px > tv) .* px;
+            refreshDisplay();
+            close(tFig);
+            setStatus(sprintf('Threshold applied at %.0f', tv));
+        end
+    end
+
+    function thresh = otsuThreshold(img)
+    %OTSUTHRESHOLD  Compute Otsu's optimal threshold (no toolbox).
+        img = double(img(:));
+        nBins = 256;
+        [counts, edges] = histcounts(img, nBins);
+        binCenters = (edges(1:end-1) + edges(2:end)) / 2;
+        totalPx = numel(img);
+        sumTotal = sum(binCenters .* counts);
+        sumB = 0; wB = 0;
+        maxVar = 0; thresh = binCenters(1);
+        for bi = 1:nBins
+            wB = wB + counts(bi);
+            if wB == 0, continue; end
+            wF = totalPx - wB;
+            if wF == 0, break; end
+            sumB = sumB + binCenters(bi) * counts(bi);
+            mB = sumB / wB;
+            mF = (sumTotal - sumB) / wF;
+            varBetween = wB * wF * (mB - mF)^2;
+            if varBetween > maxVar
+                maxVar = varBetween;
+                thresh = binCenters(bi);
+            end
+        end
+    end
+
+    % ── Feature 2: Image Arithmetic ───────────────────────────────────
+    function onImageMath(~, ~)
+        if numel(appData.images) < 2, return; end
+
+        % Build image name list
+        names = cell(1, numel(appData.images));
+        for mi = 1:numel(appData.images)
+            [~, fn, fe] = fileparts(appData.images{mi}.metadata.source);
+            names{mi} = sprintf('%d: %s%s', mi, fn, fe);
+        end
+
+        answer = inputdlg( ...
+            {'Image A (index):', 'Image B (index):', ...
+             'Operation (subtract, divide, ratio, add):'}, ...
+            'Image Arithmetic', [1 44], ...
+            {num2str(1), num2str(2), 'subtract'});
+        if isempty(answer), return; end
+
+        idxA = str2double(answer{1});
+        idxB = str2double(answer{2});
+        op   = lower(strtrim(answer{3}));
+
+        if isnan(idxA) || isnan(idxB) || idxA < 1 || idxB < 1 || ...
+                idxA > numel(appData.images) || idxB > numel(appData.images)
+            uialert(fig, 'Invalid image indices.', 'Error', 'Icon', 'error');
+            return;
+        end
+
+        pxA = getGrayscaleFromIdx(idxA);
+        pxB = getGrayscaleFromIdx(idxB);
+
+        % Resize to match smaller
+        [hA, wA] = size(pxA); [hB, wB] = size(pxB);
+        mh = min(hA, hB); mw = min(wA, wB);
+        pxA = pxA(1:mh, 1:mw); pxB = pxB(1:mh, 1:mw);
+
+        switch op
+            case 'subtract'
+                result = pxA - pxB;
+            case 'divide'
+                result = pxA ./ max(pxB, 1);
+            case 'ratio'
+                result = pxA ./ max(pxA + pxB, 1);
+            case 'add'
+                result = pxA + pxB;
+            otherwise
+                uialert(fig, 'Unknown operation. Use: subtract, divide, ratio, add.', ...
+                    'Error', 'Icon', 'error');
+                return;
+        end
+
+        % Show result in new figure
+        rFig = figure('Name', sprintf('Image Math: %s', op), 'NumberTitle', 'off');
+        imagesc(result); colormap(gray(256)); axis image; colorbar;
+        title(sprintf('%s — %s', names{idxA}, op), 'Interpreter', 'none');
+
+        % Offer to replace active image
+        undoPush();
+        appData.rawPixels = result;
+        appData.filteredPixels = result;
+        refreshDisplay();
+        setStatus(sprintf('Image math: %s (A=%d, B=%d)', op, idxA, idxB));
+    end
+
+    function px = getGrayscaleFromIdx(idx)
+    %GETGRAYSCALEFROMIDX  Get grayscale double pixels for image at index.
+        imgInfo = appData.images{idx}.metadata.parserSpecific.imageData;
+        if imgInfo.numChannels == 3
+            p = double(imgInfo.pixels);
+            px = 0.299*p(:,:,1) + 0.587*p(:,:,2) + 0.114*p(:,:,3);
+        else
+            px = double(imgInfo.pixels);
+        end
+    end
+
+    % ── Feature 4: ROI Manager ────────────────────────────────────────
+    function onROIManager(~, ~)
+        if isempty(appData.filteredPixels), return; end
+
+        rmFig = uifigure('Name', 'ROI Manager', ...
+            'Position', [280 200 500 350]);
+        rmGL = uigridlayout(rmFig, [2 1], ...
+            'RowHeight', {'1x', 30}, 'Padding', [6 6 6 6]);
+
+        % Table of ROIs
+        if isempty(appData.roiList)
+            tData = {};
+        else
+            tData = cell(numel(appData.roiList), 6);
+            for ri = 1:numel(appData.roiList)
+                roi = appData.roiList{ri};
+                tData{ri, 1} = roi.name;
+                tData{ri, 2} = sprintf('[%d:%d, %d:%d]', roi.xMin, roi.xMax, roi.yMin, roi.yMax);
+                tData{ri, 3} = sprintf('%.1f', roi.stats.mean);
+                tData{ri, 4} = sprintf('%.1f', roi.stats.std);
+                tData{ri, 5} = sprintf('%.1f', roi.stats.min);
+                tData{ri, 6} = sprintf('%.1f', roi.stats.max);
+            end
+        end
+
+        uit = uitable(rmGL, ...
+            'ColumnName', {'Name', 'Region', 'Mean', 'Std', 'Min', 'Max'}, ...
+            'ColumnWidth', {80, 120, 60, 60, 60, 60});
+        uit.Layout.Row = 1;
+        if ~isempty(tData)
+            uit.Data = tData;
+        end
+
+        btnRowRM = uigridlayout(rmGL, [1 3], ...
+            'ColumnWidth', {80, 80, '1x'}, 'Padding', [0 0 0 0]);
+        btnRowRM.Layout.Row = 2;
+
+        uibutton(btnRowRM, 'Text', 'Add ROI', ...
+            'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
+            'ButtonPushedFcn', @(~,~) addROI());
+        uibutton(btnRowRM, 'Text', 'Export CSV', ...
+            'BackgroundColor', BTN_EXPORT, 'FontColor', BTN_FG, ...
+            'ButtonPushedFcn', @(~,~) exportROIs());
+
+        function addROI()
+            setStatus('Draw rectangle for ROI... (Esc to cancel)');
+            % Use existing rect capture mechanism
+            startRectCapture('roistats');
+            % The ROI will be added via showROIStatistics
+        end
+
+        function exportROIs()
+            if isempty(appData.roiList), return; end
+            [fn, fp] = uiputfile('*.csv', 'Export ROIs');
+            if isequal(fn, 0), return; end
+            fid = fopen(fullfile(fp, fn), 'w');
+            fprintf(fid, 'Name,xMin,xMax,yMin,yMax,Mean,Std,Min,Max,Area\n');
+            for eri = 1:numel(appData.roiList)
+                roi = appData.roiList{eri};
+                fprintf(fid, '%s,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%d\n', ...
+                    roi.name, roi.xMin, roi.xMax, roi.yMin, roi.yMax, ...
+                    roi.stats.mean, roi.stats.std, roi.stats.min, roi.stats.max, roi.stats.area);
+            end
+            fclose(fid);
+            setStatus(sprintf('Exported %d ROIs to %s', numel(appData.roiList), fn));
+        end
+    end
+
+    % ── Feature 5: Session Save/Load ──────────────────────────────────
+    function onSessionSave(~, ~)
+        defName = 'emviewer_session.mat';
+        startPath = appData.lastDir;
+        if isempty(startPath) || ~isfolder(startPath), startPath = pwd; end
+
+        [fn, fp] = uiputfile({'*.mat', 'Session File (*.mat)'}, ...
+            'Save Session', fullfile(startPath, defName));
+        if isequal(fn, 0), return; end
+        sessionSaveAPI(fullfile(fp, fn));
+    end
+
+    function sessionSaveAPI(outPath)
+        fig.Pointer = 'watch'; drawnow;
+        try
+            session.images     = appData.images;
+            session.activeIdx  = appData.activeIdx;
+            session.gamma      = appData.gamma;
+            session.roiList    = appData.roiList;
+            session.measureLog = appData.measurementLog;
+            session.contrastLow  = sldLow.Value;
+            session.contrastHigh = sldHigh.Value;
+            session.colormap     = ddColormap.Value;
+            session.prefs        = appData.prefs;
+            save(outPath, 'session', '-v7.3');
+            appData.sessionFile = outPath;
+            setStatus(sprintf('Session saved: %s', outPath));
+        catch ME
+            uialert(fig, sprintf('Save failed:\n%s', ME.message), ...
+                'Session Error', 'Icon', 'error');
+        end
+        fig.Pointer = 'arrow';
+    end
+
+    function onSessionLoad(~, ~)
+        startPath = appData.lastDir;
+        if isempty(startPath) || ~isfolder(startPath), startPath = pwd; end
+        [fn, fp] = uigetfile({'*.mat', 'Session File (*.mat)'}, ...
+            'Load Session', startPath);
+        if isequal(fn, 0), return; end
+        sessionLoadAPI(fullfile(fp, fn));
+    end
+
+    function sessionLoadAPI(inPath)
+        fig.Pointer = 'watch'; drawnow;
+        try
+            tmp = load(inPath, 'session');
+            if ~isfield(tmp, 'session')
+                uialert(fig, 'Not a valid session file.', 'Error', 'Icon', 'error');
+                fig.Pointer = 'arrow'; return;
+            end
+            s = tmp.session;
+            appData.images        = s.images;
+            appData.activeIdx     = s.activeIdx;
+            if isfield(s, 'gamma'), appData.gamma = s.gamma; sldGamma.Value = s.gamma; end
+            if isfield(s, 'roiList'), appData.roiList = s.roiList; end
+            if isfield(s, 'measureLog'), appData.measurementLog = s.measureLog; end
+            if isfield(s, 'colormap'), ddColormap.Value = s.colormap; end
+            if isfield(s, 'prefs')
+                flds = fieldnames(s.prefs);
+                for fi2 = 1:numel(flds)
+                    appData.prefs.(flds{fi2}) = s.prefs.(flds{fi2});
+                end
+            end
+            rebuildImageList();
+            if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
+                displayImage();
+                if isfield(s, 'contrastLow') && isfield(s, 'contrastHigh')
+                    sldLow.Value = s.contrastLow;
+                    sldHigh.Value = s.contrastHigh;
+                    refreshDisplay();
+                end
+            end
+            appData.sessionFile = inPath;
+            setStatus(sprintf('Session loaded: %d images from %s', numel(appData.images), inPath));
+        catch ME
+            uialert(fig, sprintf('Load failed:\n%s', ME.message), ...
+                'Session Error', 'Icon', 'error');
+        end
+        fig.Pointer = 'arrow';
+    end
+
+    function setGammaAPI(g)
+        appData.gamma = g;
+        sldGamma.Value = g;
+        lblGamma.Text = sprintf('Gamma: %.2f', g);
+        refreshDisplay();
+    end
+
+    % ── Feature 6: Recent Files Menu callback ─────────────────────────
+    function onRecentFileSelected(~, evt)
+        fp = evt.Value;
+        if ischar(fp) && strcmp(fp, '(recent files)'), return; end
+        if ~isfile(fp)
+            uialert(fig, sprintf('File not found:\n%s', fp), ...
+                'File Missing', 'Icon', 'warning');
+            return;
+        end
+        loadImagesFromPaths({fp});
+    end
+
+    % ── Feature 7: Export Resolution (helper for export dialogs) ──────
+    function dpi = getExportDPI()
+    %GETEXPORTDPI  Prompt for DPI or use preference default.
+        answer = inputdlg({'Export DPI (72-600):'}, 'Resolution', [1 30], ...
+            {num2str(appData.prefs.exportDPI)});
+        if isempty(answer)
+            dpi = appData.prefs.exportDPI;
+        else
+            dpi = round(str2double(answer{1}));
+            if isnan(dpi) || dpi < 72, dpi = 150; end
+            if dpi > 600, dpi = 600; end
+        end
+    end
+
+    % ── Feature 8: Thumbnail Grid View ────────────────────────────────
+    function onThumbnailGrid(~, ~)
+        nImgs = numel(appData.images);
+        if nImgs < 1, return; end
+
+        nCols = ceil(sqrt(nImgs));
+        nRows = ceil(nImgs / nCols);
+
+        gFig = figure('Name', 'Image Grid', 'NumberTitle', 'off', ...
+            'Units', 'normalized', 'Position', [0.1 0.1 0.7 0.7]);
+
+        for gi = 1:nImgs
+            subplot(nRows, nCols, gi);
+            imgInfo = appData.images{gi}.metadata.parserSpecific.imageData;
+            px = double(imgInfo.pixels);
+            if imgInfo.numChannels == 3
+                px = 0.299*px(:,:,1) + 0.587*px(:,:,2) + 0.114*px(:,:,3);
+            end
+            thumb = imaging.generateThumbnail(px, MaxSize=128);
+            % Auto-contrast
+            lo = percentileNoToolbox(thumb(:), 2);
+            hi = percentileNoToolbox(thumb(:), 98);
+            if hi <= lo, hi = lo + 1; end
+            thumbDisp = max(0, min(1, (thumb - lo) / (hi - lo)));
+            imagesc(thumbDisp); colormap(gray(256)); axis image off;
+            [~, fn, fe] = fileparts(appData.images{gi}.metadata.source);
+            title([fn fe], 'Interpreter', 'none', 'FontSize', 8);
+
+            % Click handler to jump to image
+            ax_g = gca;
+            ax_g.UserData = gi;
+            ax_g.ButtonDownFcn = @(src, ~) gridClickJump(src);
+        end
+
+        function gridClickJump(src)
+            idx = src.UserData;
+            appData.activeIdx = idx;
+            lbImages.Value = {idx};
+            displayImage();
+            setStatus(sprintf('Jumped to image %d', idx));
+        end
+    end
+
+    % ── Feature 9: Histogram Markers (integrated into updateHistogram) ──
+    % (Handled by modifying updateHistogram to draw vertical lines at
+    %  sldLow/sldHigh positions — see refreshHistogramMarkers below)
+
+    function refreshHistogramMarkers()
+    %REFRESHHISTOGRAMMARKERS  Draw vertical lines on histogram at contrast bounds.
+        if isempty(appData.filteredPixels), return; end
+        if isempty(histAx) || ~isvalid(histAx), return; end
+
+        % Remove old markers
+        delete(findobj(histAx, 'Tag', 'histMarker'));
+
+        lo = sldLow.Value;
+        hi = sldHigh.Value;
+        yLims = histAx.YLim;
+        hold(histAx, 'on');
+        plot(histAx, [lo lo], yLims, 'c-', 'LineWidth', 1.5, ...
+            'Tag', 'histMarker', 'HitTest', 'off');
+        plot(histAx, [hi hi], yLims, 'm-', 'LineWidth', 1.5, ...
+            'Tag', 'histMarker', 'HitTest', 'off');
+        hold(histAx, 'off');
+    end
+
+    % ── Feature 10: Batch Crop Template ───────────────────────────────
+    function onBatchCrop(~, ~)
+        if numel(appData.images) < 2 || isempty(appData.displayImg), return; end
+
+        setStatus('Draw crop rectangle on current image... (Esc to cancel)');
+        startRectCapture('batchcrop');
+    end
+
+    function applyBatchCrop(xMin, xMax, yMin, yMax)
+    %APPLYBATCHCROP  Apply the same crop region to all loaded images.
+        nCropped = 0;
+        for ci = 1:numel(appData.images)
+            try
+                imgInfo = appData.images{ci}.metadata.parserSpecific.imageData;
+                px = imgInfo.pixels;
+                [pH, pW, ~] = size(px);
+                x1 = max(1, min(pW, xMin));
+                x2 = max(1, min(pW, xMax));
+                y1 = max(1, min(pH, yMin));
+                y2 = max(1, min(pH, yMax));
+                if x2 > x1 && y2 > y1
+                    appData.images{ci}.metadata.parserSpecific.imageData.pixels = px(y1:y2, x1:x2, :);
+                    [newH, newW, ~] = size(appData.images{ci}.metadata.parserSpecific.imageData.pixels);
+                    appData.images{ci}.metadata.parserSpecific.imageData.width = newW;
+                    appData.images{ci}.metadata.parserSpecific.imageData.height = newH;
+                    nCropped = nCropped + 1;
+                end
+            catch
+            end
+        end
+        displayImage();
+        setStatus(sprintf('Batch crop applied to %d / %d images [%d:%d, %d:%d]', ...
+            nCropped, numel(appData.images), xMin, xMax, yMin, yMax));
+    end
+
+    % ── Feature 11: Watershed Segmentation ────────────────────────────
+    function onWatershed(~, ~)
+        if isempty(appData.filteredPixels), return; end
+
+        px = appData.filteredPixels;
+        dMin = min(px(:)); dMax = max(px(:));
+        otsu = otsuThreshold(px);
+
+        answer = inputdlg( ...
+            {sprintf('Threshold (%.0f – %.0f):', dMin, dMax), ...
+             'Min particle area (pixels):'}, ...
+            'Watershed Segmentation', [1 44], {num2str(round(otsu)), '10'});
+        if isempty(answer), return; end
+
+        thresh = str2double(answer{1});
+        minArea = str2double(answer{2});
+        if isnan(thresh) || isnan(minArea), return; end
+
+        fig.Pointer = 'watch'; drawnow;
+
+        % Binary threshold
+        bw = px > thresh;
+
+        % Distance transform (no toolbox) — iterative erosion
+        dist = zeros(size(bw));
+        current = bw;
+        level = 0;
+        while any(current(:))
+            level = level + 1;
+            dist(current) = level;
+            % Erode by 1 pixel (4-connected)
+            eroded = current;
+            eroded(1:end-1, :) = eroded(1:end-1, :) & current(2:end, :);
+            eroded(2:end, :)   = eroded(2:end, :)   & current(1:end-1, :);
+            eroded(:, 1:end-1) = eroded(:, 1:end-1) & current(:, 2:end);
+            eroded(:, 2:end)   = eroded(:, 2:end)   & current(:, 1:end-1);
+            current = eroded;
+        end
+
+        % Find local maxima in distance map (seeds)
+        seeds = false(size(dist));
+        padD = padarray(dist, [1 1], 0);
+        for dr = -1:1
+            for dc = -1:1
+                if dr == 0 && dc == 0, continue; end
+                seeds = seeds & (dist >= padD((2:end-1)+dr, (2:end-1)+dc));
+            end
+        end
+        % Actually: initialize seeds as true, then AND
+        seeds = true(size(dist));
+        padD = padarray(dist, [1 1], 0);
+        for dr = -1:1
+            for dc = -1:1
+                if dr == 0 && dc == 0, continue; end
+                seeds = seeds & (dist >= padD((2:end-1)+dr, (2:end-1)+dc));
+            end
+        end
+        seeds = seeds & (dist > 1);   % must be interior points
+
+        % Label seeds
+        seedLabel = bwlabelNoToolbox(seeds);
+        nSeeds = max(seedLabel(:));
+
+        % Grow seeds outward using distance-ordered expansion
+        labelMap = zeros(size(bw));
+        labelMap(seeds) = seedLabel(seeds);
+
+        % Flatten distance, sort descending for marker-controlled expansion
+        [sortDist, sortIdx] = sort(dist(:), 'descend');
+        for si = 1:numel(sortIdx)
+            if sortDist(si) == 0, break; end
+            [sr, sc] = ind2sub(size(bw), sortIdx(si));
+            if labelMap(sr, sc) > 0, continue; end
+            % Find labeled neighbor
+            neighbors = [];
+            if sr > 1 && labelMap(sr-1, sc) > 0, neighbors(end+1) = labelMap(sr-1, sc); end
+            if sr < size(bw,1) && labelMap(sr+1, sc) > 0, neighbors(end+1) = labelMap(sr+1, sc); end
+            if sc > 1 && labelMap(sr, sc-1) > 0, neighbors(end+1) = labelMap(sr, sc-1); end
+            if sc < size(bw,2) && labelMap(sr, sc+1) > 0, neighbors(end+1) = labelMap(sr, sc+1); end
+            if ~isempty(neighbors)
+                un = unique(neighbors);
+                if numel(un) == 1
+                    labelMap(sr, sc) = un;
+                end
+                % If multiple different labels meet, this is a watershed line — leave as 0
+            end
+        end
+
+        % Filter by area
+        areas = [];
+        for li = 1:nSeeds
+            a = sum(labelMap(:) == li);
+            if a < minArea
+                labelMap(labelMap == li) = 0;
+            else
+                areas(end+1) = a; %#ok<AGROW>
+            end
+        end
+
+        fig.Pointer = 'arrow';
+
+        % Display result
+        wFig = figure('Name', 'Watershed Segmentation', 'NumberTitle', 'off', ...
+            'Units', 'pixels', 'Position', [280 200 550 450]);
+        wLayout = uigridlayout(wFig, [2 1], ...
+            'RowHeight', {'1x', '1x'}, 'Padding', [10 10 10 10]);
+
+        wAx1 = uiaxes(wLayout); wAx1.Layout.Row = 1;
+        imagesc(wAx1, labelMap);
+        colormap(wAx1, [0 0 0; lines(max(1, nSeeds))]);
+        axis(wAx1, 'image'); wAx1.XTick = []; wAx1.YTick = [];
+        title(wAx1, sprintf('Watershed: %d segments', numel(areas)), 'Interpreter', 'none');
+
+        wAx2 = uiaxes(wLayout); wAx2.Layout.Row = 2;
+        if ~isempty(areas)
+            histogram(wAx2, areas, min(30, numel(areas)), ...
+                'FaceColor', [0.4 0.7 0.4], 'EdgeColor', 'none');
+        end
+        xlabel(wAx2, 'Area (px)'); ylabel(wAx2, 'Count');
+        title(wAx2, 'Size Distribution', 'Interpreter', 'none');
+
+        setStatus(sprintf('Watershed: %d segments (threshold=%.0f)', numel(areas), thresh));
+    end
+
+    % ── Feature 12: Measurement Table Export ──────────────────────────
+    function onExportMeasurements(~, ~)
+        if isempty(appData.measurementLog)
+            uialert(fig, 'No measurements recorded yet.', 'Empty', 'Icon', 'info');
+            return;
+        end
+
+        [fn, fp] = uiputfile('*.csv', 'Export Measurements');
+        if isequal(fn, 0), return; end
+
+        fid = fopen(fullfile(fp, fn), 'w');
+        fprintf(fid, 'Type,Value,Unit,Details\n');
+        for mi = 1:numel(appData.measurementLog)
+            m = appData.measurementLog{mi};
+            fprintf(fid, '%s,%.6g,%s,%s\n', m.type, m.value, m.unit, m.details);
+        end
+        fclose(fid);
+        setStatus(sprintf('Exported %d measurements to %s', numel(appData.measurementLog), fn));
+    end
+
+    % ── Feature 13: Gamma Curve ───────────────────────────────────────
+    function onGammaChanged(~, ~)
+        appData.gamma = sldGamma.Value;
+        lblGamma.Text = sprintf('Gamma: %.2f', appData.gamma);
+        refreshDisplay();
+    end
+
+    % ── Feature 14: Image Montage / Stitching ─────────────────────────
+    function onMontage(~, ~)
+        if numel(appData.images) < 2, return; end
+
+        nImgs = numel(appData.images);
+        defCols = ceil(sqrt(nImgs));
+
+        answer = inputdlg( ...
+            {'Columns:', 'Overlap % (0-50):'}, ...
+            'Montage / Stitch', [1 36], {num2str(defCols), '0'});
+        if isempty(answer), return; end
+
+        nCols = round(str2double(answer{1}));
+        overlap = str2double(answer{2}) / 100;
+        if isnan(nCols) || nCols < 1, nCols = defCols; end
+        if isnan(overlap), overlap = 0; end
+        overlap = max(0, min(0.5, overlap));
+
+        fig.Pointer = 'watch'; drawnow;
+
+        nRows2 = ceil(nImgs / nCols);
+
+        % Get all tiles as grayscale
+        tiles = cell(1, nImgs);
+        maxH = 0; maxW = 0;
+        for ti = 1:nImgs
+            tiles{ti} = getGrayscaleFromIdx(ti);
+            [h, w] = size(tiles{ti});
+            maxH = max(maxH, h); maxW = max(maxW, w);
+        end
+
+        % Compute output size
+        stepY = round(maxH * (1 - overlap));
+        stepX = round(maxW * (1 - overlap));
+        outH = (nRows2 - 1) * stepY + maxH;
+        outW = (nCols - 1) * stepX + maxW;
+        montage = zeros(outH, outW);
+        weight  = zeros(outH, outW);
+
+        for ti = 1:nImgs
+            row = floor((ti - 1) / nCols);
+            col = mod(ti - 1, nCols);
+            y0 = row * stepY + 1;
+            x0 = col * stepX + 1;
+            [th, tw] = size(tiles{ti});
+            yEnd = min(outH, y0 + th - 1);
+            xEnd = min(outW, x0 + tw - 1);
+            rh = yEnd - y0 + 1; rw = xEnd - x0 + 1;
+            montage(y0:yEnd, x0:xEnd) = montage(y0:yEnd, x0:xEnd) + tiles{ti}(1:rh, 1:rw);
+            weight(y0:yEnd, x0:xEnd)  = weight(y0:yEnd, x0:xEnd)  + 1;
+        end
+
+        weight(weight == 0) = 1;
+        montage = montage ./ weight;
+
+        fig.Pointer = 'arrow';
+
+        % Display in new figure
+        mFig = figure('Name', 'Montage', 'NumberTitle', 'off');
+        imagesc(montage); colormap(gray(256)); axis image;
+        title(sprintf('%d images, %dx%d grid, %.0f%% overlap', ...
+            nImgs, nRows2, nCols, overlap*100), 'Interpreter', 'none');
+        colorbar;
+
+        setStatus(sprintf('Montage: %dx%d grid (%dx%d px)', nRows2, nCols, outW, outH));
+    end
+
+    % ── Feature 15: Diffraction Ring Overlay ──────────────────────────
+    function onDiffRings(~, ~)
+        if isempty(appData.displayImg), return; end
+
+        answer = inputdlg( ...
+            {'d-spacings (Angstrom, comma-separated):', ...
+             'Camera length (mm):', ...
+             'Wavelength (Angstrom, e.g. 0.0251 for 200kV e-):'}, ...
+            'Diffraction Ring Overlay', [1 50], ...
+            {'2.338, 2.024, 1.431, 1.221', '500', '0.0251'});
+        if isempty(answer), return; end
+
+        dSpacings = str2double(strsplit(answer{1}, ','));
+        camLength = str2double(answer{2});
+        wavelength = str2double(answer{3});
+
+        if any(isnan(dSpacings)) || isnan(camLength) || isnan(wavelength)
+            uialert(fig, 'Invalid parameters.', 'Error', 'Icon', 'error');
+            return;
+        end
+
+        [H, W] = size(appData.displayImg);
+        cx = W / 2; cy = H / 2;
+
+        % Pixel size for conversion
+        pixSize = 1;
+        if appData.activeIdx >= 1
+            imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
+            if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
+                pixSize = imgInfo.pixelSize;
+            end
+        end
+
+        colors = lines(numel(dSpacings));
+        hold(ax, 'on');
+        for di = 1:numel(dSpacings)
+            % Bragg angle: sin(theta) = lambda / (2*d)
+            sinTheta = wavelength / (2 * dSpacings(di));
+            if sinTheta > 1, continue; end
+            % Radius on detector: R = L * tan(2*theta), in pixels
+            radius = camLength * tan(2 * asin(sinTheta)) / pixSize;
+
+            th = linspace(0, 2*pi, 120);
+            xr = cx + radius * cos(th);
+            yr = cy + radius * sin(th);
+            plot(ax, xr, yr, '-', 'Color', colors(di,:), 'LineWidth', 1.2, ...
+                'HandleVisibility', 'off', 'HitTest', 'off');
+            text(ax, cx + radius * 0.72, cy - radius * 0.72, ...
+                sprintf('%.3f A', dSpacings(di)), ...
+                'Color', colors(di,:), 'FontSize', 8, ...
+                'HandleVisibility', 'off', 'HitTest', 'off');
+        end
+        hold(ax, 'off');
+
+        setStatus(sprintf('%d diffraction rings overlaid', numel(dSpacings)));
+    end
+
+    % ── Feature 16: Minimap / Overview ────────────────────────────────
+    function onMinimapToggle(~, ~)
+        if cbMinimap.Value && ~isempty(appData.displayImg)
+            buildMinimap();
+        else
+            if ~isempty(hMinimap) && isvalid(hMinimap)
+                delete(hMinimap);
+                hMinimap = [];
+            end
+            if ~isempty(hMinimapRect) && isvalid(hMinimapRect)
+                delete(hMinimapRect);
+                hMinimapRect = [];
+            end
+        end
+    end
+
+    function buildMinimap()
+    %BUILDMINIMAP  Create a small overview inset in the corner of the axes.
+        if isempty(appData.displayImg) || isempty(ax) || ~isvalid(ax)
+            return;
+        end
+
+        % Remove old minimap
+        if ~isempty(hMinimap) && isvalid(hMinimap), delete(hMinimap); end
+        if ~isempty(hMinimapRect) && isvalid(hMinimapRect), delete(hMinimapRect); end
+
+        [H, W] = size(appData.displayImg);
+        thumb = imaging.generateThumbnail(appData.displayImg, MaxSize=80);
+        [th, tw] = size(thumb);
+
+        % Create overlay axes positioned in upper-right corner
+        % Use annotation or axes overlay
+        hMinimap = axes('Parent', ax.Parent, ...
+            'Units', 'pixels', 'Position', [5 5 tw+4 th+4], ...
+            'Tag', 'minimap');
+        imagesc(hMinimap, 'XData', [1 W], 'YData', [1 H], 'CData', thumb);
+        colormap(hMinimap, gray(256)); hMinimap.CLim = [0 1];
+        axis(hMinimap, 'image'); hMinimap.XTick = []; hMinimap.YTick = [];
+        hMinimap.Box = 'on'; hMinimap.XColor = [0.5 0.8 1]; hMinimap.YColor = [0.5 0.8 1];
+        hMinimap.YDir = 'reverse';
+
+        updateMinimapRect();
+    end
+
+    function updateMinimapRect()
+    %UPDATEMINIMAPVIEWPORT  Update the viewport rectangle on the minimap.
+        if isempty(hMinimap) || ~isvalid(hMinimap), return; end
+        if ~isempty(hMinimapRect) && isvalid(hMinimapRect), delete(hMinimapRect); end
+
+        xl = ax.XLim; yl = ax.YLim;
+        hold(hMinimap, 'on');
+        hMinimapRect = rectangle(hMinimap, ...
+            'Position', [xl(1) yl(1) diff(xl) diff(yl)], ...
+            'EdgeColor', [0.5 0.8 1], 'LineWidth', 1.5, ...
+            'HitTest', 'off');
+        hold(hMinimap, 'off');
+    end
+
+    % ── Feature 17: Pixel Inspector ───────────────────────────────────
+    function onPixelInspectorToggle(~, ~)
+        if cbPixelInspector.Value && ~isempty(appData.displayImg)
+            buildPixelInspector();
+        else
+            if ~isempty(hPixelInspector) && isvalid(hPixelInspector)
+                delete(hPixelInspector);
+                hPixelInspector = [];
+            end
+        end
+    end
+
+    function buildPixelInspector()
+    %BUILDPIXELINSPECTOR  Create a small axes overlay for pixel neighborhood.
+        if ~isempty(hPixelInspector) && isvalid(hPixelInspector)
+            delete(hPixelInspector);
+        end
+        N = appData.prefs.pixelInspectorSize;
+        sz = N * 18 + 4;
+        hPixelInspector = axes('Parent', ax.Parent, ...
+            'Units', 'pixels', 'Position', [5 90 sz sz], ...
+            'Tag', 'pixelInspector');
+        hPixelInspector.XTick = []; hPixelInspector.YTick = [];
+        hPixelInspector.Box = 'on';
+        hPixelInspector.XColor = [1 0.8 0.3]; hPixelInspector.YColor = [1 0.8 0.3];
+        title(hPixelInspector, 'Pixel', 'FontSize', 7, 'Color', [1 0.8 0.3]);
+    end
+
+    function updatePixelInspector(px, py)
+    %UPDATEPIXELINSPECTOR  Show NxN neighborhood of pixel values.
+        if isempty(hPixelInspector) || ~isvalid(hPixelInspector), return; end
+        if isempty(appData.filteredPixels), return; end
+
+        N = appData.prefs.pixelInspectorSize;
+        halfN = floor(N / 2);
+        [H, W] = size(appData.filteredPixels);
+        px = round(px); py = round(py);
+        if px < 1 || py < 1 || px > W || py > H, return; end
+
+        % Extract neighborhood with boundary clamping
+        rows = max(1, py-halfN):min(H, py+halfN);
+        cols = max(1, px-halfN):min(W, px+halfN);
+        neighborhood = appData.filteredPixels(rows, cols);
+
+        % Display as color-coded grid with text values
+        cla(hPixelInspector);
+        imagesc(hPixelInspector, neighborhood);
+        colormap(hPixelInspector, gray(256));
+        hPixelInspector.XTick = []; hPixelInspector.YTick = [];
+        axis(hPixelInspector, 'image');
+
+        % Overlay text values
+        [nR, nC] = size(neighborhood);
+        for ri = 1:nR
+            for ci = 1:nC
+                v = neighborhood(ri, ci);
+                if v > mean(appData.filteredPixels(:))
+                    tc = [0 0 0];
+                else
+                    tc = [1 1 1];
+                end
+                text(hPixelInspector, ci, ri, sprintf('%.0f', v), ...
+                    'HorizontalAlignment', 'center', 'FontSize', 6, ...
+                    'Color', tc, 'HitTest', 'off');
+            end
+        end
+    end
+
+    % ── Feature 18: Preferences Dialog ────────────────────────────────
+    function onPreferences(~, ~)
+        pFig2 = uifigure('Name', 'Preferences', 'Position', [350 250 360 280]);
+        pGL = uigridlayout(pFig2, [7 2], ...
+            'RowHeight', {25, 25, 25, 25, 25, 25, 30}, ...
+            'ColumnWidth', {160, '1x'}, ...
+            'Padding', [10 10 10 10], 'RowSpacing', 4);
+
+        uilabel(pGL, 'Text', 'Default Colormap:').Layout.Row = 1;
+        ddPrefCmap = uidropdown(pGL, 'Items', {'gray','parula','hot','jet','bone'}, ...
+            'Value', appData.prefs.defaultColormap);
+        ddPrefCmap.Layout.Row = 1; ddPrefCmap.Layout.Column = 2;
+
+        uilabel(pGL, 'Text', 'Auto-Contrast Low %:').Layout.Row = 2;
+        spnPrefLow = uispinner(pGL, 'Value', appData.prefs.autoContrastLow, ...
+            'Limits', [0 49], 'Step', 1);
+        spnPrefLow.Layout.Row = 2; spnPrefLow.Layout.Column = 2;
+
+        uilabel(pGL, 'Text', 'Auto-Contrast High %:').Layout.Row = 3;
+        spnPrefHigh = uispinner(pGL, 'Value', appData.prefs.autoContrastHigh, ...
+            'Limits', [51 100], 'Step', 1);
+        spnPrefHigh.Layout.Row = 3; spnPrefHigh.Layout.Column = 2;
+
+        uilabel(pGL, 'Text', 'Export DPI:').Layout.Row = 4;
+        spnPrefDPI = uispinner(pGL, 'Value', appData.prefs.exportDPI, ...
+            'Limits', [72 600], 'Step', 50);
+        spnPrefDPI.Layout.Row = 4; spnPrefDPI.Layout.Column = 2;
+
+        uilabel(pGL, 'Text', 'Pixel Inspector Size:').Layout.Row = 5;
+        spnPrefInsp = uispinner(pGL, 'Value', appData.prefs.pixelInspectorSize, ...
+            'Limits', [3 15], 'Step', 2);
+        spnPrefInsp.Layout.Row = 5; spnPrefInsp.Layout.Column = 2;
+
+        % Spacer row 6
+
+        btnRowP = uigridlayout(pGL, [1 2], 'ColumnWidth', {'1x', '1x'}, 'Padding', [0 0 0 0]);
+        btnRowP.Layout.Row = 7; btnRowP.Layout.Column = [1 2];
+
+        uibutton(btnRowP, 'Text', 'Save', ...
+            'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
+            'ButtonPushedFcn', @(~,~) savePrefs());
+        uibutton(btnRowP, 'Text', 'Cancel', ...
+            'ButtonPushedFcn', @(~,~) close(pFig2));
+
+        function savePrefs()
+            appData.prefs.defaultColormap    = ddPrefCmap.Value;
+            appData.prefs.autoContrastLow    = spnPrefLow.Value;
+            appData.prefs.autoContrastHigh   = spnPrefHigh.Value;
+            appData.prefs.exportDPI          = spnPrefDPI.Value;
+            appData.prefs.pixelInspectorSize = spnPrefInsp.Value;
+            try
+                prefs = appData.prefs; %#ok<NASGU>
+                save(prefsFilePath, 'prefs');
+            catch
+            end
+            close(pFig2);
+            setStatus('Preferences saved.');
+        end
+    end
+
+    % ── Feature 19: Progress indicator (helper) ──────────────────────
+    function showProgress(msg, frac)
+    %SHOWPROGRESS  Update status bar with progress percentage.
+        if frac >= 1
+            setStatus(msg);
+        else
+            setStatus(sprintf('%s (%.0f%%)', msg, frac * 100));
+        end
+        drawnow;
+    end
+
+    % ── Feature 20: Dual-Cursor Line Profile (enhanced) ──────────────
+    % (The dual-cursor is implemented by making existing line profile
+    %  endpoints draggable after placement — integrated into the
+    %  existing distance/profile callback flow via draggable markers)
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: setStatus — Write a message to the mouse status label

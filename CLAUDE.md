@@ -266,6 +266,8 @@ api = emViewerGUI();
 api.loadImages({'sem_image.tif'});
 api.autoContrast();
 api.getLineProfile(10, 10, 200, 200);
+api.rotateFlip('rot90cw');       % rotate/flip: 'rot90cw','rot90ccw','fliph','flipv'
+api.setPixelSize(2.4, 'nm');     % override pixel calibration
 api.close();
 
 % Import EM image data directly from the command line
@@ -291,6 +293,26 @@ smoothed = imaging.applyGaussian(img.pixels, Sigma=2);
 [dist, intensity] = imaging.lineProfile(img.pixels, 1, 1, 100, 100, PixelSize=2.4, PixelUnit='nm');
 thumb = imaging.generateThumbnail(img.pixels, MaxSize=256);
 ```
+
+#### emViewerGUI Feature Summary
+
+**Contrast & Display:** Auto-contrast (2nd/98th percentile), manual Low/High sliders, CLAHE (no-toolbox), colormap selection, colorbar toggle, histogram panel.
+
+**Measurements:** Line profile with export, point-to-point distance, angle (3-click), polyline (multi-click, double-click to finish), ROI statistics (mean/std/min/max/area + mini-histogram).
+
+**Processing:** Gaussian filter, median filter, CLAHE, rotate 90°CW/CCW, flip H/V, FFT display, FFT masking with inverse FFT (interactive mask placement via ButtonDownFcn), crop, zoom box.
+
+**Advanced:** Particle/feature counting (threshold + connected-component labeling via two-pass union-find, no toolbox), drift correction / image alignment (cross-correlation), color overlay / channel merge (assign colormaps to two images and blend).
+
+**Stack Navigator:** Multi-frame TIFF detection with frame slider, prev/next buttons, and Maximum Intensity Projection (MIP). Shown automatically when loading multi-page TIFFs.
+
+**Undo:** Multi-level undo stack (cap 5 entries). `undoPush()` called inside `try` blocks before each destructive operation (filter, rotate, crop, FFT mask). Ctrl+Z triggers undo; handles dimension changes from rotation undo.
+
+**Export:** Save image, save crop, export with overlays (burns scale bar, annotations, measurements into image via `copyobj`+`getframe`), batch export (all loaded images with per-image auto-contrast), copy to clipboard.
+
+**Quality of Life:** Keyboard shortcuts (Ctrl+O open, Ctrl+S save, Ctrl+Z undo, A auto-contrast, F fit, +/- zoom), drag-and-drop file loading, recent files list (persisted to `.emviewer_recent.mat`, cap 10), pixel calibration override, linked zoom in compare mode, text annotations.
+
+**Capture modes** (`appData.captureMode`): `'profile'`, `'distance'`, `'angle'`, `'polyline'`, `'roistats'`, `'zoom'`, `'crop'`, `'savecrop'`, `'annotation'`.
 
 ### Running the test suite
 ```matlab
@@ -330,7 +352,20 @@ run tests/test_em_gui_harness     % EM Viewer GUI API (requires display)
 
 ## GUI Notes
 
+### dataImportGUI
 - `cla()` alone does not remove graphics objects with `HandleVisibility='off'` (peak markers).
   Use `delete(ax.Children)` before `cla()` to clear all children.
 - Each dataset in `appData.datasets` stores its own axis limits (`ds.axLims`) so zoom
   levels are restored when switching between loaded files.
+
+### emViewerGUI
+- Image pipeline: `rawPixels` → `filteredPixels` (after filters) → `displayImg` ([0,1] after contrast).
+- `displayImage()`, `clearDisplay()`, and `setToolsEnabled()` must all be updated when adding new buttons (the enable/disable triad).
+- `exitCompareMode()` recreates `axGL` as `[2 1]` grid (row 1 = axes, row 2 = stack navigator). Stack controls must be recreated with full styling (`BTN_TOOL`, `BTN_FG`, tooltips).
+- `undoPush()` must go **inside** `try` blocks, not before — prevents phantom undo entries on filter failure.
+- `undoPop()` must detect dimension changes (e.g. undoing a rotation on non-square images) and do full axes rebuild instead of just updating CData.
+- FFT mask editor uses `ButtonDownFcn` on axes, not `ginput()` — `ginput` is unreliable from uifigure callback contexts.
+- Polyline double-click: `WindowButtonDownFcn` fires twice; check `fig.SelectionType == 'open'` before adding click points.
+- Recent files persisted to `.emviewer_recent.mat` in the toolbox root directory.
+- CLAHE: uniform tiles can produce `cdf(end) == 0`; fallback: `cdf = linspace(0, 1, nBins)`.
+- Batch export uses per-image auto-contrast (2nd/98th percentile), not the active image's slider values.
