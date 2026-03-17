@@ -97,7 +97,7 @@ function varargout = emViewerGUI()
         'measurements', {{}}, ...   % cell array of measurement structs (for draggable endpoints)
         'textAnnotations', {{}});  % cell array of text annotation structs
     appData.lastProfile   = struct('dist', [], 'intensity', [], 'unit', 'px');
-    appData.captureMode   = '';     % '' | 'profile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'roistats' | 'scalebar'
+    appData.captureMode   = '';     % '' | 'profile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'roistats' | 'scalebar' | 'dspacing' | 'roiellipse' | 'roipoly' | 'arrow' | 'annotline' | 'annotrect' | 'annotcircle'
     appData.captureClicks = [];     % [Nx2] accumulated click coords (x y per row)
     appData.selectedMeasIdx = 0;    % index into overlays.measurements; 0 = none selected
     appData.lastDir       = '';     % last browsed directory for file open dialog
@@ -124,6 +124,10 @@ function varargout = emViewerGUI()
 
     % Gamma
     appData.gamma         = 1.0;   % gamma correction exponent
+
+    % Contrast transform and invert
+    appData.contrastTransform = 'linear';   % 'linear' | 'log' | 'sqrt' | 'power'
+    appData.contrastInvert    = false;       % true = invert image after contrast
 
     % Theme
     appData.darkMode      = true;  % true = dark (default), false = light
@@ -544,15 +548,15 @@ function varargout = emViewerGUI()
 
     % ── Collapsible section configuration ────────────────────────────────
     % Sections: {name, headerRow, panelRow, openHeight, defaultCollapsed}
-    SECT_CONTRAST   = struct('name','Contrast',    'headerRow',1, 'panelRow',2,  'openHeight',198, 'collapsed',false);
+    SECT_CONTRAST   = struct('name','Contrast',    'headerRow',1, 'panelRow',2,  'openHeight',230, 'collapsed',false);
     SECT_HISTOGRAM  = struct('name','Histogram',   'headerRow',3, 'panelRow',4,  'openHeight',80,  'collapsed',false);
-    SECT_MEASURE    = struct('name','Measurement', 'headerRow',5, 'panelRow',6,  'openHeight',252, 'collapsed',true);
-    SECT_PROCESS    = struct('name','Processing',  'headerRow',7, 'panelRow',8,  'openHeight',310, 'collapsed',true);
-    SECT_ANNOT      = struct('name','Annotations', 'headerRow',9, 'panelRow',10, 'openHeight',100, 'collapsed',true);
+    SECT_MEASURE    = struct('name','Measurement', 'headerRow',5, 'panelRow',6,  'openHeight',310, 'collapsed',true);
+    SECT_PROCESS    = struct('name','Processing',  'headerRow',7, 'panelRow',8,  'openHeight',420, 'collapsed',true);
+    SECT_ANNOT      = struct('name','Annotations', 'headerRow',9, 'panelRow',10, 'openHeight',145, 'collapsed',true);
     SECT_META       = struct('name','Metadata',    'headerRow',11,'panelRow',12, 'openHeight',120, 'collapsed',true);
 
     % Compute initial row heights: collapsed sections get 0
-    initH = {22, 198, 22, 80, 22, 0, 22, 0, 22, 0, 22, 0};
+    initH = {22, 230, 22, 80, 22, 0, 22, 0, 22, 0, 22, 0};
     % (Measurement=0, Processing=0, Annotations=0, Metadata=0 on startup)
 
     toolsGL = uigridlayout(toolsPanel, [12 1], ...
@@ -578,8 +582,8 @@ function varargout = emViewerGUI()
     pnlContrast.Layout.Row = 2;
 
     % Inner grid: Low label+slider, High label+slider, two buttons, colormap
-    contrastInnerGL = uigridlayout(pnlContrast, [11 2], ...
-        'RowHeight',   {12, 20, 12, 20, 2, 20, 20, 18, 12, 20, 18}, ...
+    contrastInnerGL = uigridlayout(pnlContrast, [13 2], ...
+        'RowHeight',   {12, 20, 12, 20, 2, 20, 20, 18, 12, 20, 18, 20, 18}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding',     [3 2 3 2], ...
         'RowSpacing',  1, ...
@@ -664,6 +668,22 @@ function varargout = emViewerGUI()
         'Tooltip', 'Show overview inset with zoomed viewport rectangle');
     cbMinimap.Layout.Row = 11; cbMinimap.Layout.Column = [1 2];
 
+    % Row 12: Contrast transform dropdown
+    ddContrastTransform = uidropdown(contrastInnerGL, ...
+        'Items', {'linear', 'log', 'sqrt', 'power'}, ...
+        'Value', 'linear', ...
+        'ValueChangedFcn', @onContrastTransformChanged, ...
+        'Tooltip', 'Display transform applied before contrast window (log for FFT/diffraction)');
+    ddContrastTransform.Layout.Row = 12; ddContrastTransform.Layout.Column = [1 2];
+
+    % Row 13: Invert checkbox
+    cbInvert = uicheckbox(contrastInnerGL, ...
+        'Text',    'Invert', ...
+        'Value',   false, ...
+        'ValueChangedFcn', @onInvertToggle, ...
+        'Tooltip', 'Invert image contrast (bright-field / dark-field toggle)');
+    cbInvert.Layout.Row = 13; cbInvert.Layout.Column = [1 2];
+
     hMinimap     = [];   % handle to minimap axes (created/deleted dynamically)
     hMinimapRect = [];   % handle to viewport rectangle on minimap
 
@@ -715,8 +735,8 @@ function varargout = emViewerGUI()
     %   Row 6: Export Profile button
     %   Row 7: Clear All button
     %   Row 8: (padding)
-    measureInnerGL = uigridlayout(pnlMeasure, [12 2], ...
-        'RowHeight',   {18, 20, 2, 20, 20, 20, 20, 20, 2, 20, 20, 20}, ...
+    measureInnerGL = uigridlayout(pnlMeasure, [15 2], ...
+        'RowHeight',   {18, 20, 2, 20, 20, 20, 20, 20, 2, 20, 20, 20, 20, 20, 20}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding',     [3 2 3 2], ...
         'RowSpacing',  2, ...
@@ -831,6 +851,48 @@ function varargout = emViewerGUI()
         'Tooltip', 'Draw along a scale bar in the image to calibrate pixel size; auto-detect available');
     btnCalibrateBar.Layout.Row = 12; btnCalibrateBar.Layout.Column = [1 2];
 
+    % Row 13: d-Spacing measurement
+    btnDSpacing = uibutton(measureInnerGL, 'Text', 'd-Spacing', ...
+        'ButtonPushedFcn', @onDSpacing, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor',       BTN_FG, ...
+        'Enable',          'off', ...
+        'Tooltip',         'Click FFT spots to measure d-spacing (requires calibration)');
+    btnDSpacing.Layout.Row = 13; btnDSpacing.Layout.Column = 1;
+
+    % Row 13 col 2: Profile width spinner
+    spnProfileWidth = uispinner(measureInnerGL, ...
+        'Value', 1, 'Limits', [1 50], 'Step', 2, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Line profile averaging width (px) — 1 = single pixel');
+    spnProfileWidth.Layout.Row = 13; spnProfileWidth.Layout.Column = 2;
+
+    % Row 14: Ellipse ROI / Polygon ROI
+    btnEllipseROI = uibutton(measureInnerGL, 'Text', 'Circle ROI', ...
+        'ButtonPushedFcn', @onEllipseROI, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor',       BTN_FG, ...
+        'Enable',          'off', ...
+        'Tooltip',         'Click center then edge to define a circular ROI; reports statistics');
+    btnEllipseROI.Layout.Row = 14; btnEllipseROI.Layout.Column = 1;
+
+    btnPolygonROI = uibutton(measureInnerGL, 'Text', 'Polygon ROI', ...
+        'ButtonPushedFcn', @onPolygonROI, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor',       BTN_FG, ...
+        'Enable',          'off', ...
+        'Tooltip',         'Click vertices to define polygon ROI; double-click to close');
+    btnPolygonROI.Layout.Row = 14; btnPolygonROI.Layout.Column = 2;
+
+    % Row 15: Image Inversion
+    btnInvertImg = uibutton(measureInnerGL, 'Text', 'Invert Image', ...
+        'ButtonPushedFcn', @onInvertImage, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor',       BTN_FG, ...
+        'Enable',          'off', ...
+        'Tooltip',         'Invert pixel values: img = max - img (bright-field / dark-field)');
+    btnInvertImg.Layout.Row = 15; btnInvertImg.Layout.Column = [1 2];
+
     % ROI Manager state
     appData.roiList = {};   % cell array of ROI structs: {name, xMin, xMax, yMin, yMax, stats}
 
@@ -845,8 +907,8 @@ function varargout = emViewerGUI()
     pnlProcess = uipanel(toolsGL, 'BorderType', 'line');
     pnlProcess.Layout.Row = 8;
 
-    processInnerGL = uigridlayout(pnlProcess, [18 2], ...
-        'RowHeight',   {20, 20, 20, 20, 2, 20, 20, 2, 20, 20, 2, 20, 20, 2, 20, 20, 20, 20}, ...
+    processInnerGL = uigridlayout(pnlProcess, [24 2], ...
+        'RowHeight',   {20, 20, 20, 20, 2, 20, 20, 2, 20, 20, 2, 20, 20, 2, 20, 20, 20, 20, 2, 20, 20, 20, 20, 20}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding',     [3 2 3 2], ...
         'RowSpacing',  2, ...
@@ -1074,6 +1136,85 @@ function varargout = emViewerGUI()
         'Tooltip', 'Show NxN pixel neighborhood with intensity values near cursor');
     cbPixelInspector.Layout.Row = 18; cbPixelInspector.Layout.Column = [1 2];
 
+    % Row 19 = separator gap
+
+    % Row 20: Sharpen / Bin Image
+    btnSharpen = uibutton(processInnerGL, 'Text', 'Sharpen...', ...
+        'ButtonPushedFcn', @onSharpen, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Unsharp mask sharpening — prompts for sigma and amount');
+    btnSharpen.Layout.Row = 20; btnSharpen.Layout.Column = 1;
+
+    btnBinImage = uibutton(processInnerGL, 'Text', 'Bin Image...', ...
+        'ButtonPushedFcn', @onBinImage, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Spatial binning (2x2, 4x4, 8x8) — sum or average mode');
+    btnBinImage.Layout.Row = 20; btnBinImage.Layout.Column = 2;
+
+    % Row 21: Morph Op / Butterworth
+    btnMorphOp = uibutton(processInnerGL, 'Text', 'Morph Op...', ...
+        'ButtonPushedFcn', @onMorphOp, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Morphological operations (erode/dilate/open/close) on binary images');
+    btnMorphOp.Layout.Row = 21; btnMorphOp.Layout.Column = 1;
+
+    btnButterworth = uibutton(processInnerGL, 'Text', 'Butterworth...', ...
+        'ButtonPushedFcn', @onButterworth, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Butterworth bandpass filter — smooth frequency-domain filtering');
+    btnButterworth.Layout.Row = 21; btnButterworth.Layout.Column = 2;
+
+    % Row 22: Radial Profile / Az Integrate
+    btnRadialProfile = uibutton(processInnerGL, 'Text', 'Radial Profile', ...
+        'ButtonPushedFcn', @onRadialProfile, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Compute radial average/max profile from FFT or diffraction pattern');
+    btnRadialProfile.Layout.Row = 22; btnRadialProfile.Layout.Column = 1;
+
+    btnAzIntegrate = uibutton(processInnerGL, 'Text', 'Az Integrate', ...
+        'ButtonPushedFcn', @onAzIntegrate, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Full azimuthal integration of 2D pattern → 1D powder pattern');
+    btnAzIntegrate.Layout.Row = 22; btnAzIntegrate.Layout.Column = 2;
+
+    % Row 23: Surface Plot / Batch Convert
+    btnSurfacePlot = uibutton(processInnerGL, 'Text', 'Surface Plot', ...
+        'ButtonPushedFcn', @onSurfacePlot, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Render image intensity as a 3D surface plot in a new figure');
+    btnSurfacePlot.Layout.Row = 23; btnSurfacePlot.Layout.Column = 1;
+
+    btnBatchConvert = uibutton(processInnerGL, 'Text', 'Batch Convert', ...
+        'ButtonPushedFcn', @onBatchConvert, ...
+        'BackgroundColor', BTN_EXPORT, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Convert loaded images between formats (PNG/TIFF/JPEG)');
+    btnBatchConvert.Layout.Row = 23; btnBatchConvert.Layout.Column = 2;
+
+    % Row 24: Custom Colormap (spans both)
+    btnCustomCmap = uibutton(processInnerGL, 'Text', 'Custom Colormap...', ...
+        'ButtonPushedFcn', @onCustomColormap, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Create a custom colormap from user-defined color stops');
+    btnCustomCmap.Layout.Row = 24; btnCustomCmap.Layout.Column = [1 2];
+
     hPixelInspector = [];   % handle to pixel inspector axes overlay
 
     % ── Section 5: Annotations ──────────────────────────────────────────
@@ -1087,8 +1228,8 @@ function varargout = emViewerGUI()
     pnlAnnot = uipanel(toolsGL, 'BorderType', 'line');
     pnlAnnot.Layout.Row = 10;
 
-    annotInnerGL = uigridlayout(pnlAnnot, [4 2], ...
-        'RowHeight',   {20, 20, 20, 20}, ...
+    annotInnerGL = uigridlayout(pnlAnnot, [6 2], ...
+        'RowHeight',   {20, 20, 20, 20, 20, 20}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding',     [3 2 3 2], ...
         'RowSpacing',  2, ...
@@ -1132,7 +1273,39 @@ function varargout = emViewerGUI()
         'Tooltip', 'Remove all text annotations from the image');
     btnClearAnnot.Layout.Row = 4; btnClearAnnot.Layout.Column = [1 2];
 
-    % Row 5: (padding — unused for now)
+    % Row 5: Arrow / Line shape annotations
+    btnPlaceArrow = uibutton(annotInnerGL, 'Text', 'Arrow', ...
+        'ButtonPushedFcn', @onPlaceArrow, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Click start → end to draw an arrow annotation');
+    btnPlaceArrow.Layout.Row = 5; btnPlaceArrow.Layout.Column = 1;
+
+    btnPlaceLine = uibutton(annotInnerGL, 'Text', 'Line', ...
+        'ButtonPushedFcn', @onPlaceLine, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Click two points to draw a line annotation');
+    btnPlaceLine.Layout.Row = 5; btnPlaceLine.Layout.Column = 2;
+
+    % Row 6: Rect / Circle shape + line width
+    btnPlaceRect = uibutton(annotInnerGL, 'Text', 'Rect', ...
+        'ButtonPushedFcn', @onPlaceRect, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Click two corners to draw a rectangle annotation');
+    btnPlaceRect.Layout.Row = 6; btnPlaceRect.Layout.Column = 1;
+
+    btnPlaceCircle = uibutton(annotInnerGL, 'Text', 'Circle', ...
+        'ButtonPushedFcn', @onPlaceCircle, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Click center then edge to draw a circle annotation');
+    btnPlaceCircle.Layout.Row = 6; btnPlaceCircle.Layout.Column = 2;
 
     % ── Section 6: Metadata (populated) ──────────────────────────────────
     btnMetaHeader = uibutton(toolsGL, 'Text', [ARROW_SHUT ' Metadata'], ...
@@ -1232,9 +1405,11 @@ function varargout = emViewerGUI()
     % ════════════════════════════════════════════════════════════════════
     function onOpenFiles(~, ~)
         filterSpec = { ...
-            '*.tif;*.tiff;*.raw;*.dm3;*.dm4', 'Image Files (*.tif, *.tiff, *.raw, *.dm3, *.dm4)'; ...
+            '*.tif;*.tiff;*.raw;*.dm3;*.dm4;*.ser;*.mrc;*.mrcs', 'Image Files (*.tif, *.tiff, *.raw, *.dm3, *.dm4, *.ser, *.mrc)'; ...
             '*.tif;*.tiff',                   'TIFF Files (*.tif, *.tiff)'; ...
             '*.dm3;*.dm4',                    'Gatan Files (*.dm3, *.dm4)'; ...
+            '*.ser',                          'FEI SER Files (*.ser)'; ...
+            '*.mrc;*.mrcs',                   'MRC Files (*.mrc, *.mrcs)'; ...
             '*.raw',                          'RAW Binary Files (*.raw)'; ...
             '*.*',                            'All Files (*.*)'};
 
@@ -1570,8 +1745,8 @@ function varargout = emViewerGUI()
         delete(ax.Children);
         cla(ax);
 
-        % Compute initial contrast-adjusted image
-        dispImg = imaging.adjustContrast(rawGray, Low=pLow, High=pHigh);
+        % Compute initial contrast-adjusted image via pipeline
+        dispImg = applyContrastPipeline(rawGray, pLow, pHigh);
         appData.displayImg = dispImg;
 
         hImg = imagesc(ax, 'XData', [1 W], 'YData', [1 H], 'CData', dispImg);
@@ -1659,10 +1834,32 @@ function varargout = emViewerGUI()
         btnBatchRename.Enable   = onOff(numel(appData.images) >= 1);
         btnRenameSelected.Enable = 'on';
 
+        % Enable Phase 3 measurement controls
+        btnDSpacing.Enable    = onOff(isCalib);
+        spnProfileWidth.Enable = 'on';
+        btnEllipseROI.Enable  = 'on';
+        btnPolygonROI.Enable  = 'on';
+        btnInvertImg.Enable   = 'on';
+
+        % Enable Phase 3 processing controls
+        btnSharpen.Enable      = 'on';
+        btnBinImage.Enable     = 'on';
+        btnMorphOp.Enable      = 'on';
+        btnButterworth.Enable  = 'on';
+        btnRadialProfile.Enable = 'on';
+        btnAzIntegrate.Enable  = 'on';
+        btnSurfacePlot.Enable  = 'on';
+        btnBatchConvert.Enable = onOff(numel(appData.images) >= 1);
+        btnCustomCmap.Enable   = 'on';
+
         % Enable annotation controls
         btnPlaceAnnot.Enable  = 'on';
         btnClearAnnot.Enable  = 'on';
         btnAnnotColor.Enable  = 'on';
+        btnPlaceArrow.Enable  = 'on';
+        btnPlaceLine.Enable   = 'on';
+        btnPlaceRect.Enable   = 'on';
+        btnPlaceCircle.Enable = 'on';
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2144,10 +2341,7 @@ function varargout = emViewerGUI()
             end
         end
 
-        dispImg = imaging.adjustContrast(appData.filteredPixels, Low=lo, High=hi);
-        if appData.gamma ~= 1.0
-            dispImg = dispImg .^ appData.gamma;
-        end
+        dispImg = applyContrastPipeline(appData.filteredPixels, lo, hi);
         appData.displayImg = dispImg;
 
         % Update CData without recreating imagesc (preserves zoom/pan state)
@@ -2772,12 +2966,7 @@ function varargout = emViewerGUI()
         lo = sldLow.Value;
         hi = sldHigh.Value;
 
-        dispImg = imaging.adjustContrast(appData.filteredPixels, Low=lo, High=hi);
-
-        % Apply gamma correction
-        if appData.gamma ~= 1.0
-            dispImg = dispImg .^ appData.gamma;
-        end
+        dispImg = applyContrastPipeline(appData.filteredPixels, lo, hi);
 
         appData.displayImg = dispImg;
         appData.imgHandle.CData = dispImg;
@@ -3204,6 +3393,18 @@ function varargout = emViewerGUI()
                     executeMeasureDistance(x1, y1, x2, y2);
                 case 'scalebar'
                     executeScaleBarCalibration(x1, y1, x2, y2);
+                case 'dspacing'
+                    executeDSpacing(x1, y1, x2, y2);
+                case 'roiellipse'
+                    executeEllipseROI(x1, y1, x2, y2);
+                case 'arrow'
+                    executeArrow(x1, y1, x2, y2);
+                case 'annotline'
+                    executeAnnotLine(x1, y1, x2, y2);
+                case 'annotrect'
+                    executeAnnotRect(x1, y1, x2, y2);
+                case 'annotcircle'
+                    executeAnnotCircle(x1, y1, x2, y2);
             end
         end
     end
@@ -3677,6 +3878,25 @@ function varargout = emViewerGUI()
         btnScaleBarColor.Enable = state;
         spnScaleBarFont.Enable = state;
         cbColorbar.Enable      = state;
+        % Phase 3 buttons
+        btnDSpacing.Enable      = state;
+        spnProfileWidth.Enable  = state;
+        btnEllipseROI.Enable    = state;
+        btnPolygonROI.Enable    = state;
+        btnInvertImg.Enable     = state;
+        btnSharpen.Enable       = state;
+        btnBinImage.Enable      = state;
+        btnMorphOp.Enable       = state;
+        btnButterworth.Enable   = state;
+        btnRadialProfile.Enable = state;
+        btnAzIntegrate.Enable   = state;
+        btnSurfacePlot.Enable   = state;
+        btnBatchConvert.Enable  = state;
+        btnCustomCmap.Enable    = state;
+        btnPlaceArrow.Enable    = state;
+        btnPlaceLine.Enable     = state;
+        btnPlaceRect.Enable     = state;
+        btnPlaceCircle.Enable   = state;
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3954,6 +4174,16 @@ function varargout = emViewerGUI()
         listGL.BackgroundColor    = panelBG;
         exportGL.BackgroundColor  = panelBG;
 
+        % Inner section grid backgrounds
+        try
+            contrastInnerGL.BackgroundColor = panelBG;
+            measureInnerGL.BackgroundColor  = panelBG;
+            processInnerGL.BackgroundColor  = panelBG;
+            annotInnerGL.BackgroundColor    = panelBG;
+            toolsGL.BackgroundColor         = panelBG;
+        catch
+        end
+
         % Rename label
         lblRename.FontColor = hdrFG;
         lblDPI.FontColor    = hdrFG;
@@ -4091,6 +4321,18 @@ function varargout = emViewerGUI()
                 setStatus('Click first point for distance... (Escape to cancel)');
             case 'scalebar'
                 setStatus('Click one end of the scale bar... (Escape to cancel)');
+            case 'dspacing'
+                setStatus('Click first FFT spot for d-spacing measurement... (Escape to cancel)');
+            case 'roiellipse'
+                setStatus('Click center of ellipse... (Escape to cancel)');
+            case 'arrow'
+                setStatus('Click arrow start point... (Escape to cancel)');
+            case 'annotline'
+                setStatus('Click line start point... (Escape to cancel)');
+            case 'annotrect'
+                setStatus('Click first corner of rectangle... (Escape to cancel)');
+            case 'annotcircle'
+                setStatus('Click center of circle... (Escape to cancel)');
         end
     end
 
@@ -4277,12 +4519,24 @@ function varargout = emViewerGUI()
         end
 
         try
-            if ~isnan(ps)
-                [dist, intensity] = imaging.lineProfile(appData.filteredPixels, ...
-                    x1, y1, x2, y2, PixelSize=ps, PixelUnit=pu);
+            profileWidth = spnProfileWidth.Value;
+            if profileWidth > 1
+                % Width-averaged profile
+                profResult = runWidthAveragedProfile(x1, y1, x2, y2, profileWidth);
+                dist = profResult.dist;
+                intensity = profResult.intensity;
+                % Scale distance if calibrated
+                if ~isnan(ps)
+                    dist = dist * ps;
+                end
             else
-                [dist, intensity] = imaging.lineProfile(appData.filteredPixels, ...
-                    x1, y1, x2, y2);
+                if ~isnan(ps)
+                    [dist, intensity] = imaging.lineProfile(appData.filteredPixels, ...
+                        x1, y1, x2, y2, PixelSize=ps, PixelUnit=pu);
+                else
+                    [dist, intensity] = imaging.lineProfile(appData.filteredPixels, ...
+                        x1, y1, x2, y2);
+                end
             end
         catch ME
             uialert(fig, sprintf('Line profile failed:\n%s', ME.message), ...
@@ -4583,7 +4837,7 @@ function varargout = emViewerGUI()
         [H, W] = size(appData.filteredPixels);
         lo = sldLow.Value;
         hi = sldHigh.Value;
-        dispImg = imaging.adjustContrast(appData.filteredPixels, Low=lo, High=hi);
+        dispImg = applyContrastPipeline(appData.filteredPixels, lo, hi);
         appData.displayImg = dispImg;
 
         delete(ax.Children);
@@ -5473,7 +5727,7 @@ function varargout = emViewerGUI()
                 ~isequal(size(appData.imgHandle.CData), [H2 W2])
             lo = sldLow.Value;
             hi = sldHigh.Value;
-            dispImg = imaging.adjustContrast(appData.filteredPixels, Low=lo, High=hi);
+            dispImg = applyContrastPipeline(appData.filteredPixels, lo, hi);
             appData.displayImg = dispImg;
             delete(ax.Children);
             cla(ax);
@@ -6373,7 +6627,7 @@ function varargout = emViewerGUI()
         sldLow.Value = pLow;
         sldHigh.Value = pHigh;
 
-        dispImg = imaging.adjustContrast(frame, Low=pLow, High=pHigh);
+        dispImg = applyContrastPipeline(frame, pLow, pHigh);
         appData.displayImg = dispImg;
 
         if ~isempty(appData.imgHandle) && isvalid(appData.imgHandle)
@@ -7458,6 +7712,747 @@ function varargout = emViewerGUI()
             frac = h - lo;
             v = x(lo) * (1 - frac) + x(hi) * frac;
         end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 3: Contrast Pipeline Helper
+    % ════════════════════════════════════════════════════════════════════
+    function dispImg = applyContrastPipeline(pixels, lo, hi)
+    %APPLYCONTRASTPIPELINE  Apply contrast transform → window → gamma → invert.
+    %  Centralizes the display pipeline so log/sqrt/power transforms,
+    %  gamma correction, and image inversion are handled uniformly.
+        img = double(pixels);
+
+        % Step 1: Apply contrast transform
+        switch appData.contrastTransform
+            case 'log'
+                % Clamp to >= -1 so log1p never produces NaN or complex values.
+                % Negative slider values (post-filter images) would otherwise
+                % yield log1p(lo) = NaN and divide-by-zero in the stretch step.
+                img = log1p(max(img, -1));
+                lo  = log1p(max(lo,  -1));
+                hi  = log1p(max(hi,  -1));
+            case 'sqrt'
+                img = sqrt(max(img, 0));
+                lo = sqrt(max(lo, 0));
+                hi = sqrt(max(hi, 0));
+            case 'power'
+                % Clamp to >= 0: raising a negative to 0.3 yields complex
+                % in MATLAB, which crashes imagesc CData assignment.
+                img = max(img, 0) .^ 0.3;
+                lo  = max(lo,  0) ^ 0.3;
+                hi  = max(hi,  0) ^ 0.3;
+            % 'linear' — no transform
+        end
+
+        % Step 2: Linear contrast stretch
+        if hi <= lo
+            hi = lo + 1;
+        end
+        dispImg = (img - lo) / (hi - lo);
+        dispImg = max(0, min(1, dispImg));
+
+        % Step 3: Gamma correction
+        if appData.gamma ~= 1.0
+            dispImg = dispImg .^ appData.gamma;
+        end
+
+        % Step 4: Invert
+        if appData.contrastInvert
+            dispImg = 1 - dispImg;
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 3: Contrast Transform & Invert Callbacks
+    % ════════════════════════════════════════════════════════════════════
+    function onContrastTransformChanged(~, ~)
+        appData.contrastTransform = ddContrastTransform.Value;
+        refreshDisplay();
+    end
+
+    function onInvertToggle(~, ~)
+        appData.contrastInvert = cbInvert.Value;
+        refreshDisplay();
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 3: d-Spacing Measurement
+    % ════════════════════════════════════════════════════════════════════
+    function onDSpacing(~, ~)
+        if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
+        if appData.compareMode, return; end
+        startTwoClickCapture('dspacing');
+    end
+
+    function executeDSpacing(x1, y1, x2, y2)
+    %EXECUTEDSPACING  Compute d-spacing from two FFT spots.
+    %  d = N * pixelSize / r_px where r_px is distance from center.
+        if appData.activeIdx < 1, return; end
+
+        imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
+        if ~imgInfo.calibrated || isnan(imgInfo.pixelSize)
+            setStatus('d-spacing requires pixel size calibration.');
+            return;
+        end
+
+        [H, W] = size(appData.filteredPixels);
+        cx = W / 2;
+        cy = H / 2;
+        pixSize = imgInfo.pixelSize;
+
+        % Compute distances from center for each spot
+        r1 = sqrt((x1 - cx)^2 + (y1 - cy)^2);
+        r2 = sqrt((x2 - cx)^2 + (y2 - cy)^2);
+
+        % d-spacing: d = N * pixelSize / r_px
+        % N is the image dimension (use geometric mean for non-square)
+        N = sqrt(H * W);
+
+        results = {};
+        hold(ax, 'on');
+        for si = 1:2
+            if si == 1, rPx = r1; sx = x1; sy = y1;
+            else,       rPx = r2; sx = x2; sy = y2;
+            end
+            if rPx < 1, continue; end
+            dSpace = N * pixSize / rPx;
+            results{end+1} = sprintf('%.3f %s', dSpace, imgInfo.pixelUnit); %#ok<AGROW>
+
+            % Draw circle around spot
+            th = linspace(0, 2*pi, 60);
+            spotR = max(5, min(15, rPx * 0.05));
+            plot(ax, sx + spotR*cos(th), sy + spotR*sin(th), '-', ...
+                'Color', OVERLAY_COLOR, 'LineWidth', 1.5, ...
+                'HandleVisibility', 'off', 'HitTest', 'off');
+            text(ax, sx + spotR + 3, sy, sprintf('d=%.3f %s', dSpace, imgInfo.pixelUnit), ...
+                'Color', OVERLAY_COLOR, 'FontSize', 9, ...
+                'HandleVisibility', 'off', 'HitTest', 'off');
+        end
+        hold(ax, 'off');
+
+        if ~isempty(results)
+            setStatus(['d-spacing: ' strjoin(results, ', ')]);
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 3: Ellipse ROI
+    % ════════════════════════════════════════════════════════════════════
+    function onEllipseROI(~, ~)
+        if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
+        if appData.compareMode, return; end
+        startTwoClickCapture('roiellipse');
+    end
+
+    function executeEllipseROI(cx, cy, ex, ey)
+    %EXECUTEELLIPSEROI  Compute stats over a circular ROI.
+    %  Center=(cx,cy), edge point=(ex,ey) defines the radius.
+    %  A single edge click only provides one distance, so the ROI is always
+    %  circular (radius = Euclidean distance from center to click).
+        if isempty(appData.filteredPixels), return; end
+
+        [H, W] = size(appData.filteredPixels);
+        r = sqrt((ex - cx)^2 + (ey - cy)^2);
+        if r < 1
+            setStatus('Circle ROI too small.'); return;
+        end
+
+        % Create circular mask
+        [XX, YY] = meshgrid(1:W, 1:H);
+        mask = (XX - cx).^2 + (YY - cy).^2 <= r^2;
+        vals = appData.filteredPixels(mask);
+
+        if isempty(vals)
+            setStatus('No pixels in circle ROI.'); return;
+        end
+
+        % Compute statistics
+        roiMean = mean(vals);
+        roiStd  = std(vals);
+        roiMin  = min(vals);
+        roiMax  = max(vals);
+        roiArea = numel(vals);
+
+        % Draw circle overlay
+        hold(ax, 'on');
+        th = linspace(0, 2*pi, 120);
+        plot(ax, cx + r*cos(th), cy + r*sin(th), '-', ...
+            'Color', OVERLAY_COLOR, 'LineWidth', 1.5, ...
+            'HandleVisibility', 'off', 'HitTest', 'off');
+        hold(ax, 'off');
+
+        % Log measurement
+        meas = struct('type', 'circleROI', 'cx', cx, 'cy', cy, ...
+            'radius', r, 'mean', roiMean, 'std', roiStd, ...
+            'min', roiMin, 'max', roiMax, 'area', roiArea);
+        appData.measurementLog{end+1} = meas;
+
+        setStatus(sprintf('Circle ROI (r=%.0fpx): mean=%.1f std=%.1f min=%.0f max=%.0f area=%d px', ...
+            r, roiMean, roiStd, roiMin, roiMax, roiArea));
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 3: Polygon ROI (multi-click)
+    % ════════════════════════════════════════════════════════════════════
+    function onPolygonROI(~, ~)
+        if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
+        if appData.compareMode, return; end
+        if ~isempty(appData.captureMode), cancelCapture(); end
+
+        appData.captureMode = 'roipoly';
+        appData.captureClicks = [];
+        fig.Pointer = 'crosshair';
+        fig.WindowButtonDownFcn = @onPolygonClick;
+        setStatus('Click polygon vertices; double-click to close (Esc to cancel)');
+    end
+
+    function onPolygonClick(~, ~)
+        if ~strcmp(appData.captureMode, 'roipoly'), return; end
+
+        cp = ax.CurrentPoint;
+        x = cp(1, 1); y = cp(1, 2);
+        [H, W] = size(appData.displayImg);
+        if x < 0.5 || x > W+0.5 || y < 0.5 || y > H+0.5, return; end
+
+        % Check for double-click BEFORE appending: WindowButtonDownFcn fires
+        % twice for a double-click (first as 'normal', then as 'open').
+        % Checking here avoids adding a duplicate vertex on the second fire.
+        if strcmp(fig.SelectionType, 'open') && size(appData.captureClicks, 1) >= 3
+            pts = appData.captureClicks;
+            finishCapture();
+            executePolygonROI(pts);
+            return;
+        end
+
+        % Single click: append vertex and draw marker
+        hMark = line(ax, x, y, 'Marker', 'o', 'MarkerSize', 5, ...
+            'Color', OVERLAY_COLOR, 'MarkerFaceColor', OVERLAY_COLOR, ...
+            'LineStyle', 'none', 'HandleVisibility', 'off');
+        appData.overlays.clickMarkers{end+1} = hMark;
+        appData.captureClicks(end+1, :) = [x, y];
+
+        setStatus(sprintf('%d vertices placed; double-click to close', ...
+            size(appData.captureClicks, 1)));
+    end
+
+    function executePolygonROI(pts)
+    %EXECUTEPOLYGONROI  Compute stats over a polygon ROI defined by vertices.
+        if isempty(appData.filteredPixels), return; end
+        [H, W] = size(appData.filteredPixels);
+
+        % Create polygon mask using inpolygon
+        [XX, YY] = meshgrid(1:W, 1:H);
+        mask = inpolygon(XX, YY, pts(:,1), pts(:,2));
+        vals = appData.filteredPixels(mask);
+
+        if isempty(vals)
+            setStatus('No pixels in polygon ROI.'); return;
+        end
+
+        roiMean = mean(vals);
+        roiStd  = std(vals);
+        roiMin  = min(vals);
+        roiMax  = max(vals);
+        roiArea = numel(vals);
+
+        % Draw polygon overlay
+        hold(ax, 'on');
+        plot(ax, [pts(:,1); pts(1,1)], [pts(:,2); pts(1,2)], '-', ...
+            'Color', OVERLAY_COLOR, 'LineWidth', 1.5, ...
+            'HandleVisibility', 'off', 'HitTest', 'off');
+        hold(ax, 'off');
+
+        meas = struct('type', 'polygonROI', 'vertices', pts, ...
+            'mean', roiMean, 'std', roiStd, 'min', roiMin, 'max', roiMax, ...
+            'area', roiArea);
+        appData.measurementLog{end+1} = meas;
+
+        setStatus(sprintf('Polygon ROI: mean=%.1f std=%.1f min=%.0f max=%.0f area=%d px', ...
+            roiMean, roiStd, roiMin, roiMax, roiArea));
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 3: Image Inversion (Process)
+    % ════════════════════════════════════════════════════════════════════
+    function onInvertImage(~, ~)
+        if isempty(appData.filteredPixels), return; end
+        try
+            undoPush();
+            appData.filteredPixels = max(appData.filteredPixels(:)) - appData.filteredPixels;
+            refreshDisplay();
+            setStatus('Image inverted.');
+        catch ME
+            setStatus(['Invert failed: ' ME.message]);
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 3: Unsharp Mask / Sharpen
+    % ════════════════════════════════════════════════════════════════════
+    function onSharpen(~, ~)
+        if isempty(appData.filteredPixels), return; end
+        answer = inputdlg({'Sigma:', 'Amount:'}, 'Unsharp Mask', [1 30], {'2', '1.0'});
+        if isempty(answer), return; end
+        sigma  = str2double(answer{1});
+        amount = str2double(answer{2});
+        if isnan(sigma) || isnan(amount), return; end
+        try
+            undoPush();
+            appData.filteredPixels = imaging.unsharpMask(appData.filteredPixels, ...
+                Sigma=sigma, Amount=amount);
+            refreshDisplay();
+            setStatus(sprintf('Sharpened (sigma=%.1f, amount=%.1f)', sigma, amount));
+        catch ME
+            setStatus(['Sharpen failed: ' ME.message]);
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 3: Image Binning
+    % ════════════════════════════════════════════════════════════════════
+    function onBinImage(~, ~)
+        if isempty(appData.filteredPixels), return; end
+        answer = inputdlg({'Bin size (2, 4, or 8):', 'Mode (average or sum):'}, ...
+            'Bin Image', [1 30], {'2', 'average'});
+        if isempty(answer), return; end
+        binSz = round(str2double(answer{1}));
+        mode  = strtrim(answer{2});
+        if isnan(binSz) || ~any(binSz == [2 4 8]), binSz = 2; end
+        if ~any(strcmp(mode, {'average', 'sum'})), mode = 'average'; end
+        try
+            undoPush();
+            appData.filteredPixels = imaging.binImage(appData.filteredPixels, ...
+                BinSize=binSz, Mode=mode);
+            appData.rawPixels = appData.filteredPixels;
+            rebuildAxesForNewSize();
+            setStatus(sprintf('Binned %dx%d (%s)', binSz, binSz, mode));
+        catch ME
+            setStatus(['Bin failed: ' ME.message]);
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 3: Morphological Operations
+    % ════════════════════════════════════════════════════════════════════
+    function onMorphOp(~, ~)
+        if isempty(appData.filteredPixels), return; end
+        answer = inputdlg({'Operation (erode/dilate/open/close):', 'Radius (1-10):'}, ...
+            'Morphological Operation', [1 40], {'open', '2'});
+        if isempty(answer), return; end
+        op = strtrim(answer{1});
+        radius = round(str2double(answer{2}));
+        if isnan(radius) || radius < 1, radius = 2; end
+        try
+            undoPush();
+            appData.filteredPixels = imaging.morphOp(appData.filteredPixels, op, ...
+                Radius=radius);
+            refreshDisplay();
+            setStatus(sprintf('Morphological %s (radius=%d)', op, radius));
+        catch ME
+            setStatus(['Morph op failed: ' ME.message]);
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 3: Butterworth Bandpass Filter
+    % ════════════════════════════════════════════════════════════════════
+    function onButterworth(~, ~)
+        if isempty(appData.filteredPixels), return; end
+        answer = inputdlg({'Low cutoff (0-1, 0=no highpass):', ...
+                           'High cutoff (0-1, 1=no lowpass):', ...
+                           'Order (1-10):'}, ...
+            'Butterworth Filter', [1 40], {'0', '0.5', '2'});
+        if isempty(answer), return; end
+        lowC  = str2double(answer{1});
+        highC = str2double(answer{2});
+        order = round(str2double(answer{3}));
+        if isnan(lowC),  lowC  = 0; end
+        if isnan(highC), highC = 0.5; end
+        if isnan(order), order = 2; end
+        try
+            undoPush();
+            appData.filteredPixels = imaging.butterworthFilter(appData.filteredPixels, ...
+                LowCutoff=lowC, HighCutoff=highC, Order=order);
+            refreshDisplay();
+            setStatus(sprintf('Butterworth filter (low=%.2f, high=%.2f, order=%d)', ...
+                lowC, highC, order));
+        catch ME
+            setStatus(['Butterworth failed: ' ME.message]);
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 3: Radial Profile from FFT / Diffraction
+    % ════════════════════════════════════════════════════════════════════
+    function onRadialProfile(~, ~)
+        if isempty(appData.filteredPixels), return; end
+        try
+            % Compute FFT magnitude for radial profile
+            [mag, ~] = imaging.computeFFT(appData.filteredPixels);
+            [radii, avgProf, maxProf] = imaging.radialProfile(mag);
+
+            % Plot in new figure
+            fRP = figure('Name', 'Radial Profile', 'NumberTitle', 'off');
+            subplot(1, 2, 1);
+            plot(radii, avgProf, 'b-', 'LineWidth', 1.2);
+            xlabel('Spatial Frequency (px^{-1})'); ylabel('Mean Intensity');
+            title('Radial Average'); grid on;
+
+            subplot(1, 2, 2);
+            plot(radii, maxProf, 'r-', 'LineWidth', 1.2);
+            xlabel('Spatial Frequency (px^{-1})'); ylabel('Max Intensity');
+            title('Radial Maximum'); grid on;
+
+            setStatus('Radial profile computed from FFT.');
+        catch ME
+            setStatus(['Radial profile failed: ' ME.message]);
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 3: Azimuthal Integration
+    % ════════════════════════════════════════════════════════════════════
+    function onAzIntegrate(~, ~)
+        if isempty(appData.filteredPixels), return; end
+        try
+            [mag, ~] = imaging.computeFFT(appData.filteredPixels);
+            [radii, intensity] = imaging.azimuthalIntegrate(mag);
+
+            fAZ = figure('Name', 'Azimuthal Integration', 'NumberTitle', 'off');
+            plot(radii, intensity, 'k-', 'LineWidth', 1.2);
+            xlabel('Spatial Frequency (px^{-1})'); ylabel('Integrated Intensity');
+            title('Azimuthal Integration'); grid on;
+
+            setStatus('Azimuthal integration complete.');
+        catch ME
+            setStatus(['Azimuthal integration failed: ' ME.message]);
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 3: Surface / 3D Plot
+    % ════════════════════════════════════════════════════════════════════
+    function onSurfacePlot(~, ~)
+        if isempty(appData.filteredPixels), return; end
+        try
+            img = appData.filteredPixels;
+            % Downsample if large (>512 in any dimension)
+            [H, W] = size(img);
+            maxDim = 512;
+            if H > maxDim || W > maxDim
+                scaleFactor = maxDim / max(H, W);
+                newH = round(H * scaleFactor);
+                newW = round(W * scaleFactor);
+                [Xq, Yq] = meshgrid(linspace(1, W, newW), linspace(1, H, newH));
+                [Xo, Yo] = meshgrid(1:W, 1:H);
+                img = interp2(Xo, Yo, img, Xq, Yq, 'linear');
+            end
+
+            fSurf = figure('Name', 'Surface Plot', 'NumberTitle', 'off');
+            surf(img, 'EdgeColor', 'none');
+            colormap(parula); colorbar;
+            xlabel('X (px)'); ylabel('Y (px)'); zlabel('Intensity');
+            title('Image Intensity Surface');
+            view(45, 30);
+
+            setStatus('Surface plot opened.');
+        catch ME
+            setStatus(['Surface plot failed: ' ME.message]);
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 3: Batch Format Conversion
+    % ════════════════════════════════════════════════════════════════════
+    function onBatchConvert(~, ~)
+        if isempty(appData.images), return; end
+
+        answer = inputdlg({'Output format (png/tiff/jpeg):', 'Output directory (blank = same as source):'}, ...
+            'Batch Convert', [1 50], {'png', ''});
+        if isempty(answer), return; end
+        fmt = lower(strtrim(answer{1}));
+        outDir = strtrim(answer{2});
+        if ~any(strcmp(fmt, {'png', 'tiff', 'jpeg', 'jpg'}))
+            setStatus('Unsupported format. Use png, tiff, or jpeg.');
+            return;
+        end
+        if strcmp(fmt, 'jpg'), fmt = 'jpeg'; end
+
+        fig.Pointer = 'watch'; drawnow;
+        nConverted = 0;
+        for ki = 1:numel(appData.images)
+            try
+                ds = appData.images{ki};
+                imgInfo = ds.metadata.parserSpecific.imageData;
+                pixels = double(imgInfo.pixels);
+                if size(pixels, 3) == 3
+                    pixels = 0.299*pixels(:,:,1) + 0.587*pixels(:,:,2) + 0.114*pixels(:,:,3);
+                end
+
+                % Auto-contrast for export
+                pL = percentileNoToolbox(pixels(:), 2);
+                pH = percentileNoToolbox(pixels(:), 98);
+                if pH <= pL, pH = pL + 1; end
+                outImg = (pixels - pL) / (pH - pL);
+                outImg = max(0, min(1, outImg));
+
+                [srcDir, srcName, ~] = fileparts(ds.metadata.source);
+                if ~isempty(outDir), srcDir = outDir; end
+                if ~isfolder(srcDir), mkdir(srcDir); end
+                outPath = fullfile(srcDir, [srcName '.' fmt]);
+                imwrite(uint8(outImg * 255), outPath, fmt);
+                nConverted = nConverted + 1;
+            catch ME
+                setStatus(sprintf('Batch convert: image %d failed — %s', ki, ME.message));
+            end
+        end
+        fig.Pointer = 'arrow';
+        setStatus(sprintf('Converted %d / %d images to %s.', nConverted, numel(appData.images), fmt));
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 3: Custom Colormap
+    % ════════════════════════════════════════════════════════════════════
+    function onCustomColormap(~, ~)
+        answer = inputdlg({'Color stops (e.g. "0 0 0; 1 0 0; 1 1 1" for black→red→white):'}, ...
+            'Custom Colormap', [3 60], {'0 0 0; 1 0 0; 1 1 1'});
+        if isempty(answer), return; end
+        try
+            % Parse color stops without eval (str2num is eval-based).
+            % Expected input: "R G B; R G B; ..." where values are 0-1 doubles.
+            rawRows = strsplit(strtrim(answer{1}), ';');
+            stops = zeros(numel(rawRows), 3);
+            parseOk = true;
+            for rr = 1:numel(rawRows)
+                rowVals = str2double(strsplit(strtrim(rawRows{rr})));
+                if numel(rowVals) ~= 3 || any(isnan(rowVals))
+                    parseOk = false; break;
+                end
+                stops(rr, :) = rowVals;
+            end
+            if ~parseOk || size(stops, 1) < 2
+                setStatus('Enter at least 2 rows of R G B values (0-1).');
+                return;
+            end
+            stops = max(0, min(1, stops));
+            nStops = size(stops, 1);
+            cmap = zeros(256, 3);
+            for ch = 1:3
+                cmap(:, ch) = interp1(linspace(0, 1, nStops), stops(:, ch), ...
+                    linspace(0, 1, 256), 'linear');
+            end
+            if ~isempty(ax) && isvalid(ax)
+                colormap(ax, cmap);
+            end
+            setStatus('Custom colormap applied.');
+        catch ME
+            setStatus(['Custom colormap failed: ' ME.message]);
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 3: Arrow Annotation
+    % ════════════════════════════════════════════════════════════════════
+    function onPlaceArrow(~, ~)
+        if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
+        if appData.compareMode, return; end
+        startTwoClickCapture('arrow');
+    end
+
+    function executeArrow(x1, y1, x2, y2)
+    %EXECUTEARROW  Draw an arrow from (x1,y1) to (x2,y2) with arrowhead.
+        color = appData.annotationColor;
+
+        % Draw line
+        hold(ax, 'on');
+        hLine = plot(ax, [x1 x2], [y1 y2], '-', ...
+            'Color', color, 'LineWidth', 2, ...
+            'HandleVisibility', 'off', 'HitTest', 'off');
+
+        % Draw arrowhead using a small triangle patch
+        dx = x2 - x1;
+        dy = y2 - y1;
+        len = sqrt(dx^2 + dy^2);
+        if len < 1, hold(ax, 'off'); return; end
+        ux = dx / len;
+        uy = dy / len;
+
+        headLen = min(15, len * 0.2);
+        headW   = headLen * 0.5;
+
+        % Arrowhead vertices: tip, left, right
+        tipX = x2;
+        tipY = y2;
+        leftX = x2 - headLen * ux + headW * uy;
+        leftY = y2 - headLen * uy - headW * ux;
+        rightX = x2 - headLen * ux - headW * uy;
+        rightY = y2 - headLen * uy + headW * ux;
+
+        hHead = patch(ax, [tipX leftX rightX], [tipY leftY rightY], color, ...
+            'EdgeColor', color, 'FaceColor', color, ...
+            'HandleVisibility', 'off', 'HitTest', 'off');
+        hold(ax, 'off');
+
+        annot = struct('type', 'arrow', 'hLine', hLine, 'hHead', hHead, ...
+            'x1', x1, 'y1', y1, 'x2', x2, 'y2', y2, 'color', color);
+        appData.overlays.textAnnotations{end+1} = annot;
+
+        setStatus(sprintf('Arrow placed (%.0f,%.0f) → (%.0f,%.0f)', x1, y1, x2, y2));
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 3: Line / Rectangle / Circle Shape Annotations
+    % ════════════════════════════════════════════════════════════════════
+    function onPlaceLine(~, ~)
+        if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
+        if appData.compareMode, return; end
+        startTwoClickCapture('annotline');
+    end
+
+    function onPlaceRect(~, ~)
+        if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
+        if appData.compareMode, return; end
+        startTwoClickCapture('annotrect');
+    end
+
+    function onPlaceCircle(~, ~)
+        if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
+        if appData.compareMode, return; end
+        startTwoClickCapture('annotcircle');
+    end
+
+    function executeAnnotLine(x1, y1, x2, y2)
+        color = appData.annotationColor;
+        hold(ax, 'on');
+        hL = plot(ax, [x1 x2], [y1 y2], '-', 'Color', color, 'LineWidth', 2, ...
+            'HandleVisibility', 'off', 'HitTest', 'off');
+        hold(ax, 'off');
+        annot = struct('type', 'line', 'hLine', hL, ...
+            'x1', x1, 'y1', y1, 'x2', x2, 'y2', y2, 'color', color);
+        appData.overlays.textAnnotations{end+1} = annot;
+        setStatus(sprintf('Line annotation placed.'));
+    end
+
+    function executeAnnotRect(x1, y1, x2, y2)
+        color = appData.annotationColor;
+        xMin = min(x1, x2); yMin = min(y1, y2);
+        w = abs(x2 - x1); h = abs(y2 - y1);
+        hold(ax, 'on');
+        hR = rectangle(ax, 'Position', [xMin yMin w h], ...
+            'EdgeColor', color, 'LineWidth', 2, ...
+            'FaceColor', 'none', 'HitTest', 'off');
+        hold(ax, 'off');
+        annot = struct('type', 'rectangle', 'hRect', hR, ...
+            'x1', x1, 'y1', y1, 'x2', x2, 'y2', y2, 'color', color);
+        appData.overlays.textAnnotations{end+1} = annot;
+        setStatus('Rectangle annotation placed.');
+    end
+
+    function executeAnnotCircle(cx, cy, ex, ey)
+        color = appData.annotationColor;
+        r = sqrt((ex - cx)^2 + (ey - cy)^2);
+        if r < 1, return; end
+        hold(ax, 'on');
+        th = linspace(0, 2*pi, 120);
+        hC = plot(ax, cx + r*cos(th), cy + r*sin(th), '-', ...
+            'Color', color, 'LineWidth', 2, ...
+            'HandleVisibility', 'off', 'HitTest', 'off');
+        hold(ax, 'off');
+        annot = struct('type', 'circle', 'hCircle', hC, ...
+            'cx', cx, 'cy', cy, 'radius', r, 'color', color);
+        appData.overlays.textAnnotations{end+1} = annot;
+        setStatus(sprintf('Circle annotation placed (r=%.0f px).', r));
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 3: Width-Averaged Line Profile
+    % ════════════════════════════════════════════════════════════════════
+    function profile = runWidthAveragedProfile(x1, y1, x2, y2, width)
+    %RUNWIDTHAVERAGEDPROFILE  Compute a width-averaged intensity profile.
+    %  Samples 'width' parallel lines perpendicular to the profile direction
+    %  and averages them.
+        if width <= 1
+            % Standard single-pixel profile
+            [profile.dist, profile.intensity] = imaging.lineProfile(...
+                appData.filteredPixels, x1, y1, x2, y2);
+            return;
+        end
+
+        % Perpendicular unit vector
+        dx = x2 - x1;
+        dy = y2 - y1;
+        len = sqrt(dx^2 + dy^2);
+        if len < 1
+            profile.dist = 0;
+            profile.intensity = 0;
+            return;
+        end
+        px = -dy / len;  % perpendicular x
+        py =  dx / len;  % perpendicular y
+
+        halfW = (width - 1) / 2;
+        offsets = linspace(-halfW, halfW, width);
+
+        % Sample parallel profiles
+        % Use NaN initialisation so that out-of-boundary pixels (returned as
+        % NaN by imaging.lineProfile's interp2) do not bias the average toward
+        % zero when lines extend outside the image.
+        allI = [];
+        for oi = 1:numel(offsets)
+            off = offsets(oi);
+            ox1 = x1 + off * px;
+            oy1 = y1 + off * py;
+            ox2 = x2 + off * px;
+            oy2 = y2 + off * py;
+            [d, intensity] = imaging.lineProfile(appData.filteredPixels, ...
+                ox1, oy1, ox2, oy2);
+            if isempty(allI)
+                allI = NaN(numel(offsets), numel(intensity));
+            end
+            nPts = min(size(allI, 2), numel(intensity));
+            allI(oi, 1:nPts) = intensity(1:nPts);
+        end
+
+        profile.dist = d;
+        profile.intensity = mean(allI, 1, 'omitnan');
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 3: Helper — rebuild axes after dimension-changing operations
+    % ════════════════════════════════════════════════════════════════════
+    function rebuildAxesForNewSize()
+    %REBUILDAXESFORNEWSIZE  Rebuild image display after binning/crop changes dimensions.
+        [H, W] = size(appData.filteredPixels);
+        lo = sldLow.Value;
+        hi = sldHigh.Value;
+
+        % Clamp slider limits to new data range
+        dMin = min(appData.filteredPixels(:));
+        dMax = max(appData.filteredPixels(:));
+        if dMax == dMin, dMax = dMin + 1; end
+        sldLow.Limits = [dMin dMax];
+        sldHigh.Limits = [dMin dMax];
+        sldLow.Value = max(dMin, min(lo, dMax));
+        sldHigh.Value = max(dMin, min(hi, dMax));
+
+        dispImg = applyContrastPipeline(appData.filteredPixels, sldLow.Value, sldHigh.Value);
+        appData.displayImg = dispImg;
+
+        if ~isempty(ax) && isvalid(ax)
+            delete(ax.Children);
+            cla(ax);
+            hImg = imagesc(ax, 'XData', [1 W], 'YData', [1 H], 'CData', dispImg);
+            appData.imgHandle = hImg;
+            colormap(ax, feval(ddColormap.Value, 256));
+            ax.CLim = [0 1]; ax.YDir = 'reverse';
+            axis(ax, 'equal');
+            ax.XLim = [0.5, W+0.5]; ax.YLim = [0.5, H+0.5];
+            ax.XTick = []; ax.YTick = []; ax.Toolbar.Visible = 'off';
+        end
+
+        updateStatusBar();
+        updateHistogram();
     end
 
 end

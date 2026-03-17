@@ -87,6 +87,12 @@ function result = resolveParser(filepath)
         case {'.dm3', '.dm4'}
             result.name = 'importDM3';
 
+        case '.ser'
+            result.name = 'importSER';
+
+        case {'.mrc', '.mrcs'}
+            result.name = 'importMRC';
+
         case {'.xlsx', '.xls', '.xlsm', '.xlsb', '.ods'}
             result.name = 'importExcel';
 
@@ -112,6 +118,7 @@ function result = resolveParser(filepath)
             error('parser:resolveParser:unknownExtension', ...
                 ['No parser registered for extension "%s".\n' ...
                  'Supported: .xrdml, .brml, .raw, .tif/.tiff, .dm3/.dm4, ' ...
+                 '.ser, .mrc/.mrcs, ' ...
                  '.xlsx/.xls/.xlsm/.xlsb/.ods, .csv/.tsv/.txt, ' ...
                  '.refl, .pnr, .datA/B/C/D, .dat\n' ...
                  'For headerless binary images use parser.importRawImage directly.'], ext);
