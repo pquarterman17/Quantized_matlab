@@ -97,8 +97,9 @@ function varargout = emViewerGUI()
         'measurements', {{}}, ...   % cell array of measurement structs (for draggable endpoints)
         'textAnnotations', {{}});  % cell array of text annotation structs
     appData.lastProfile   = struct('dist', [], 'intensity', [], 'unit', 'px');
-    appData.captureMode   = '';     % '' | 'profile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'roistats'
+    appData.captureMode   = '';     % '' | 'profile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'roistats' | 'scalebar'
     appData.captureClicks = [];     % [Nx2] accumulated click coords (x y per row)
+    appData.selectedMeasIdx = 0;    % index into overlays.measurements; 0 = none selected
     appData.lastDir       = '';     % last browsed directory for file open dialog
 
     % Comparison mode state
@@ -124,6 +125,9 @@ function varargout = emViewerGUI()
     % Gamma
     appData.gamma         = 1.0;   % gamma correction exponent
 
+    % Theme
+    appData.darkMode      = true;  % true = dark (default), false = light
+
     % Preferences (persisted to .emviewer_prefs.mat)
     appData.prefs = struct( ...
         'defaultColormap', 'gray', ...
@@ -137,6 +141,19 @@ function varargout = emViewerGUI()
 
     % Session state
     appData.sessionFile = '';
+
+    % Panel drag-resize state
+    appData.panelResizeDir   = '';    % '' | 'v_col12' | 'v_col23' | 'h_listexp'
+    appData.panelResizeStart = [];   % [x y] fig-pixel at drag start
+    appData.panelResizeOrig  = [];   % panel dimension (px) at drag start
+    appData.leftPanelWidth   = 160;  % user-resized left panel width (px)
+    appData.toolsPanelWidth  = 240;  % user-resized tools panel width (px)
+    appData.listPanelHeight  = 195;  % user-resized export panel height (px)
+    MIN_LEFT_W  = 100;
+    MIN_TOOLS_W = 180;
+    MIN_LIST_H  = 60;
+    MIN_EXPORT_H = 120;
+    SNAP_PX     = 5;
 
     % Load recent files from persistent storage
     recentFilePath = fullfile(fileparts(mfilename('fullpath')), '.emviewer_recent.mat');
@@ -208,8 +225,8 @@ function varargout = emViewerGUI()
     %  ROW 1: TOOLBAR
     %  [Open Files...] [Remove] | gap | [Fit] [1:1] | filename label
     % ════════════════════════════════════════════════════════════════════
-    toolbarGL = uigridlayout(rootGL, [1 13], ...
-        'ColumnWidth', {90, 65, 65, 14, 40, 40, 14, 65, 40, 14, 30, 14, '1x'}, ...
+    toolbarGL = uigridlayout(rootGL, [1 14], ...
+        'ColumnWidth', {80, 120, 55, 14, 35, 35, 14, 60, 35, 14, 26, 26, 14, '1x'}, ...
         'RowHeight',   {'1x'}, ...
         'Padding',     [4 2 4 2], ...
         'ColumnSpacing', 4);
@@ -292,16 +309,23 @@ function varargout = emViewerGUI()
         'Tooltip', 'Preferences — default colormap, percentiles, export settings');
     btnPrefs.Layout.Row = 1; btnPrefs.Layout.Column = 11;
 
+    btnThemeToggle = uibutton(toolbarGL, 'Text', char(9790), ...
+        'ButtonPushedFcn', @onThemeToggle, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Tooltip', 'Toggle dark / light mode');
+    btnThemeToggle.Layout.Row = 1; btnThemeToggle.Layout.Column = 12;
+
     lblSep4 = uilabel(toolbarGL, 'Text', '|', ...
         'FontColor', [0.5 0.5 0.5], ...
         'HorizontalAlignment', 'center');
-    lblSep4.Layout.Row = 1; lblSep4.Layout.Column = 12; %#ok<NASGU>
+    lblSep4.Layout.Row = 1; lblSep4.Layout.Column = 13; %#ok<NASGU>
 
     lblFilename = uilabel(toolbarGL, 'Text', '(no image loaded)', ...
         'FontSize', 11, ...
         'FontColor', [0.85 0.85 0.85], ...
         'HorizontalAlignment', 'left');
-    lblFilename.Layout.Row = 1; lblFilename.Layout.Column = 13;
+    lblFilename.Layout.Row = 1; lblFilename.Layout.Column = 14;
 
     % ════════════════════════════════════════════════════════════════════
     %  ROW 2: MAIN CONTENT — 3 columns
@@ -322,8 +346,10 @@ function varargout = emViewerGUI()
     listPanel.Layout.Row = 1;
     listPanel.Layout.Column = 1;
 
-    listGL = uigridlayout(listPanel, [1 1], ...
-        'Padding', [4 4 4 4]);
+    listGL = uigridlayout(listPanel, [2 1], ...
+        'RowHeight', {'1x', 195}, ...
+        'Padding', [4 4 4 4], ...
+        'RowSpacing', 4);
 
     lbImages = uilistbox(listGL, ...
         'Items', {'(no images loaded)'}, ...
@@ -331,6 +357,109 @@ function varargout = emViewerGUI()
         'Multiselect', 'on', ...
         'ValueChangedFcn', @onSelectImage, ...
         'Tooltip', 'Loaded images — click to display; Ctrl+click for multi-select');
+    lbImages.Layout.Row = 1;
+
+    % ── Export & Files section (bottom of left panel) ──────────────────
+    exportPanel = uipanel(listGL, 'Title', 'Export & Files', 'FontSize', 10);
+    exportPanel.Layout.Row = 2;
+
+    exportGL = uigridlayout(exportPanel, [7 3], ...
+        'RowHeight', {22, 22, 22, 22, 2, 22, 22}, ...
+        'ColumnWidth', {'1x', '1x', '1x'}, ...
+        'Padding', [3 2 3 2], ...
+        'RowSpacing', 2, ...
+        'ColumnSpacing', 2);
+
+    % Row 1: Save / Copy / Overlays (3-column)
+    btnSaveImage = uibutton(exportGL, 'Text', 'Save', ...
+        'ButtonPushedFcn', @onSaveImage, ...
+        'BackgroundColor', BTN_EXPORT, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Save current processed image to PNG or TIFF');
+    btnSaveImage.Layout.Row = 1; btnSaveImage.Layout.Column = 1;
+
+    btnCopyClipboard = uibutton(exportGL, 'Text', 'Copy', ...
+        'ButtonPushedFcn', @onCopyClipboard, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Copy current view to clipboard');
+    btnCopyClipboard.Layout.Row = 1; btnCopyClipboard.Layout.Column = 2;
+
+    btnExportOverlays = uibutton(exportGL, 'Text', 'Burn', ...
+        'ButtonPushedFcn', @onExportWithOverlays, ...
+        'BackgroundColor', BTN_EXPORT, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Save with overlays burned in (scale bar, annotations, measurements)');
+    btnExportOverlays.Layout.Row = 1; btnExportOverlays.Layout.Column = 3;
+
+    % Row 2: Batch Export (full width)
+    btnBatchExport = uibutton(exportGL, 'Text', 'Batch Export All...', ...
+        'ButtonPushedFcn', @onBatchExport, ...
+        'BackgroundColor', BTN_EXPORT, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Export all loaded images with current contrast to a folder');
+    btnBatchExport.Layout.Row = 2; btnBatchExport.Layout.Column = [1 3];
+
+    % Row 3: Session Save / Load (full width each half)
+    btnSessionSave = uibutton(exportGL, 'Text', 'Save .mat', ...
+        'ButtonPushedFcn', @onSessionSave, ...
+        'BackgroundColor', BTN_EXPORT, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Save images, contrast, overlays, annotations to .mat session');
+    btnSessionSave.Layout.Row = 3; btnSessionSave.Layout.Column = [1 2];
+
+    btnSessionLoad = uibutton(exportGL, 'Text', 'Load', ...
+        'ButtonPushedFcn', @onSessionLoad, ...
+        'BackgroundColor', BTN_EXPORT, ...
+        'FontColor', BTN_FG, ...
+        'Tooltip', 'Restore a previously saved session');
+    btnSessionLoad.Layout.Row = 3; btnSessionLoad.Layout.Column = 3;
+
+    % Row 4: DPI dropdown + label
+    lblDPI = uilabel(exportGL, 'Text', 'DPI:', 'FontSize', 10);
+    lblDPI.Layout.Row = 4; lblDPI.Layout.Column = 1;
+    ddExportDPI = uidropdown(exportGL, ...
+        'Items', {'72', '150', '300', '600'}, ...
+        'ItemsData', [72, 150, 300, 600], ...
+        'Value', 300, ...
+        'Tooltip', 'DPI for overlay and clipboard exports');
+    ddExportDPI.Layout.Row = 4; ddExportDPI.Layout.Column = [2 3];
+
+    % Row 5: separator
+
+    % Row 6: Rename header label
+    lblRename = uilabel(exportGL, 'Text', 'Rename', ...
+        'FontWeight', 'bold', 'FontSize', 10, ...
+        'FontColor', [0.15 0.15 0.15]);
+    lblRename.Layout.Row = 6; lblRename.Layout.Column = 1;
+
+    % Row 6: base name field (shares row with label)
+    efRenameBase = uieditfield(exportGL, 'text', ...
+        'Placeholder', 'base_name', ...
+        'Tooltip', 'Base name for rename — files become name_001, _002, etc.');
+    efRenameBase.Layout.Row = 6; efRenameBase.Layout.Column = [2 3];
+
+    % Row 7: Rename All / Rename Selected
+    btnBatchRename = uibutton(exportGL, 'Text', 'All', ...
+        'ButtonPushedFcn', @onBatchRename, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Rename all loaded files: base_001, _002, etc.');
+    btnBatchRename.Layout.Row = 7; btnBatchRename.Layout.Column = 1;
+
+    btnRenameSelected = uibutton(exportGL, 'Text', 'Selected', ...
+        'ButtonPushedFcn', @onRenameSelected, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Rename only selected file(s) with sequential numbering');
+    btnRenameSelected.Layout.Row = 7; btnRenameSelected.Layout.Column = [2 3];
 
     % ── Col 2: Image display axes ────────────────────────────────────────
     axPanel = uipanel(mainGL, 'Title', '', 'BorderType', 'none');
@@ -401,6 +530,9 @@ function varargout = emViewerGUI()
     % Mouse hover tracking via figure-level motion callback
     fig.WindowButtonMotionFcn = @onMouseMotion;
 
+    % Idle-mode mouse-down: starts panel resize if near a border
+    fig.WindowButtonDownFcn = @onIdleMouseDown;
+
     % Keyboard: Escape cancels any in-progress two-click capture
     fig.KeyPressFcn = @onKeyPress;
 
@@ -410,17 +542,37 @@ function varargout = emViewerGUI()
     toolsPanel.Layout.Row = 1;
     toolsPanel.Layout.Column = 3;
 
+    % ── Collapsible section configuration ────────────────────────────────
+    % Sections: {name, headerRow, panelRow, openHeight, defaultCollapsed}
+    SECT_CONTRAST   = struct('name','Contrast',    'headerRow',1, 'panelRow',2,  'openHeight',198, 'collapsed',false);
+    SECT_HISTOGRAM  = struct('name','Histogram',   'headerRow',3, 'panelRow',4,  'openHeight',80,  'collapsed',false);
+    SECT_MEASURE    = struct('name','Measurement', 'headerRow',5, 'panelRow',6,  'openHeight',252, 'collapsed',true);
+    SECT_PROCESS    = struct('name','Processing',  'headerRow',7, 'panelRow',8,  'openHeight',310, 'collapsed',true);
+    SECT_ANNOT      = struct('name','Annotations', 'headerRow',9, 'panelRow',10, 'openHeight',100, 'collapsed',true);
+    SECT_META       = struct('name','Metadata',    'headerRow',11,'panelRow',12, 'openHeight',120, 'collapsed',true);
+
+    % Compute initial row heights: collapsed sections get 0
+    initH = {22, 198, 22, 80, 22, 0, 22, 0, 22, 0, 22, 0};
+    % (Measurement=0, Processing=0, Annotations=0, Metadata=0 on startup)
+
     toolsGL = uigridlayout(toolsPanel, [12 1], ...
-        'RowHeight', {14, 198, 14, 90, 14, 252, 14, 540, 14, 108, 14, '1x'}, ...
+        'RowHeight', initH, ...
         'ColumnWidth', {'1x'}, ...
         'Padding', [4 4 4 4], ...
         'RowSpacing', 1);
 
     % ── Section 1: Contrast ───────────────────────────────────────────────
-    lblContrastHeader = uilabel(toolsGL, 'Text', 'Contrast', ...
+    ARROW_OPEN = char(9660);   % ▼
+    ARROW_SHUT = char(9654);   % ►
+    HDR_BG   = [0.92 0.92 0.92];
+    HDR_FG   = [0.15 0.15 0.15];
+
+    btnContrastHeader = uibutton(toolsGL, 'Text', [ARROW_OPEN ' Contrast'], ...
+        'HorizontalAlignment', 'left', ...
+        'BackgroundColor', HDR_BG, 'FontColor', HDR_FG, ...
         'FontWeight', 'bold', 'FontSize', 11, ...
-        'FontColor', [0.15 0.15 0.15]);
-    lblContrastHeader.Layout.Row = 1; %#ok<NASGU>
+        'ButtonPushedFcn', @(~,~) toggleSection(SECT_CONTRAST));
+    btnContrastHeader.Layout.Row = 1;
 
     pnlContrast = uipanel(toolsGL, 'BorderType', 'line');
     pnlContrast.Layout.Row = 2;
@@ -516,10 +668,12 @@ function varargout = emViewerGUI()
     hMinimapRect = [];   % handle to viewport rectangle on minimap
 
     % ── Section 2: Histogram ──────────────────────────────────────────────
-    lblHistogramHeader = uilabel(toolsGL, 'Text', 'Histogram', ...
+    btnHistogramHeader = uibutton(toolsGL, 'Text', [ARROW_OPEN ' Histogram'], ...
+        'HorizontalAlignment', 'left', ...
+        'BackgroundColor', HDR_BG, 'FontColor', HDR_FG, ...
         'FontWeight', 'bold', 'FontSize', 11, ...
-        'FontColor', [0.15 0.15 0.15]);
-    lblHistogramHeader.Layout.Row = 3; %#ok<NASGU>
+        'ButtonPushedFcn', @(~,~) toggleSection(SECT_HISTOGRAM));
+    btnHistogramHeader.Layout.Row = 3;
 
     pnlHistogram = uipanel(toolsGL, 'BorderType', 'line');
     pnlHistogram.Layout.Row = 4;
@@ -542,10 +696,12 @@ function varargout = emViewerGUI()
     ylabel(histAx, '');
 
     % ── Section 3: Measurement ────────────────────────────────────────────
-    lblMeasureHeader = uilabel(toolsGL, 'Text', 'Measurement', ...
+    btnMeasureHeader = uibutton(toolsGL, 'Text', [ARROW_SHUT ' Measurement'], ...
+        'HorizontalAlignment', 'left', ...
+        'BackgroundColor', HDR_BG, 'FontColor', HDR_FG, ...
         'FontWeight', 'bold', 'FontSize', 11, ...
-        'FontColor', [0.15 0.15 0.15]);
-    lblMeasureHeader.Layout.Row = 5; %#ok<NASGU>
+        'ButtonPushedFcn', @(~,~) toggleSection(SECT_MEASURE));
+    btnMeasureHeader.Layout.Row = 5;
 
     pnlMeasure = uipanel(toolsGL, 'BorderType', 'line');
     pnlMeasure.Layout.Row = 6;
@@ -679,16 +835,18 @@ function varargout = emViewerGUI()
     appData.roiList = {};   % cell array of ROI structs: {name, xMin, xMax, yMin, yMax, stats}
 
     % ── Section 4: Processing ────────────────────────────────────────────
-    lblProcessHeader = uilabel(toolsGL, 'Text', 'Processing', ...
+    btnProcessHeader = uibutton(toolsGL, 'Text', [ARROW_SHUT ' Processing'], ...
+        'HorizontalAlignment', 'left', ...
+        'BackgroundColor', HDR_BG, 'FontColor', HDR_FG, ...
         'FontWeight', 'bold', 'FontSize', 11, ...
-        'FontColor', [0.15 0.15 0.15]);
-    lblProcessHeader.Layout.Row = 7; %#ok<NASGU>
+        'ButtonPushedFcn', @(~,~) toggleSection(SECT_PROCESS));
+    btnProcessHeader.Layout.Row = 7;
 
     pnlProcess = uipanel(toolsGL, 'BorderType', 'line');
     pnlProcess.Layout.Row = 8;
 
-    processInnerGL = uigridlayout(pnlProcess, [23 2], ...
-        'RowHeight',   {20, 20, 20, 20, 2, 20, 20, 2, 20, 20, 20, 2, 20, 20, 20, 20, 20, 2, 20, 20, 20, 20, 20}, ...
+    processInnerGL = uigridlayout(pnlProcess, [18 2], ...
+        'RowHeight',   {20, 20, 20, 20, 2, 20, 20, 2, 20, 20, 2, 20, 20, 2, 20, 20, 20, 20}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding',     [3 2 3 2], ...
         'RowSpacing',  2, ...
@@ -817,34 +975,25 @@ function varargout = emViewerGUI()
         'Tooltip', 'Save a cropped region to file (draw box, then save)');
     btnSaveCrop.Layout.Row = 9; btnSaveCrop.Layout.Column = 2;
 
-    % Row 10: Save Image
-    btnSaveImage = uibutton(processInnerGL, 'Text', 'Save Image...', ...
-        'ButtonPushedFcn', @onSaveImage, ...
-        'BackgroundColor', BTN_EXPORT, ...
-        'FontColor', BTN_FG, ...
-        'Enable', 'off', ...
-        'Tooltip', 'Save current processed image to PNG or TIFF');
-    btnSaveImage.Layout.Row = 10; btnSaveImage.Layout.Column = [1 2];
-
-    % Row 11: Set Pixel Size
+    % Row 10: Set Pixel Size
     btnSetPixelSize = uibutton(processInnerGL, 'Text', 'Set Pixel Size...', ...
         'ButtonPushedFcn', @onSetPixelSize, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Manually set or override pixel size calibration (nm/px, µm/px, etc.)');
-    btnSetPixelSize.Layout.Row = 11; btnSetPixelSize.Layout.Column = [1 2];
+    btnSetPixelSize.Layout.Row = 10; btnSetPixelSize.Layout.Column = [1 2];
 
-    % Row 12 = separator gap
+    % Row 11 = separator gap
 
-    % Row 13: FFT Mask / Particles
+    % Row 12: FFT Mask / Particles
     btnFFTMask = uibutton(processInnerGL, 'Text', 'FFT Mask...', ...
         'ButtonPushedFcn', @onFFTMask, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Draw masks on FFT to remove periodic noise; apply inverse FFT');
-    btnFFTMask.Layout.Row = 13; btnFFTMask.Layout.Column = 1;
+    btnFFTMask.Layout.Row = 12; btnFFTMask.Layout.Column = 1;
 
     btnParticles = uibutton(processInnerGL, 'Text', 'Particles...', ...
         'ButtonPushedFcn', @onParticleCount, ...
@@ -852,16 +1001,16 @@ function varargout = emViewerGUI()
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Threshold + count particles; show size distribution');
-    btnParticles.Layout.Row = 13; btnParticles.Layout.Column = 2;
+    btnParticles.Layout.Row = 12; btnParticles.Layout.Column = 2;
 
-    % Row 14: Align Stack / Color Overlay
+    % Row 13: Align Stack / Color Overlay
     btnAlignStack = uibutton(processInnerGL, 'Text', 'Align Stack', ...
         'ButtonPushedFcn', @onAlignStack, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Cross-correlation drift correction for loaded image stack');
-    btnAlignStack.Layout.Row = 14; btnAlignStack.Layout.Column = 1;
+    btnAlignStack.Layout.Row = 13; btnAlignStack.Layout.Column = 1;
 
     btnColorOverlay = uibutton(processInnerGL, 'Text', 'Overlay...', ...
         'ButtonPushedFcn', @onColorOverlay, ...
@@ -869,46 +1018,18 @@ function varargout = emViewerGUI()
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Blend two images with different colormaps in a new figure');
-    btnColorOverlay.Layout.Row = 14; btnColorOverlay.Layout.Column = 2;
+    btnColorOverlay.Layout.Row = 13; btnColorOverlay.Layout.Column = 2;
 
-    % Row 15: Export w/ Overlays / Batch Export
-    btnExportOverlays = uibutton(processInnerGL, 'Text', 'Export+OVL', ...
-        'ButtonPushedFcn', @onExportWithOverlays, ...
-        'BackgroundColor', BTN_EXPORT, ...
-        'FontColor', BTN_FG, ...
-        'Enable', 'off', ...
-        'Tooltip', 'Export current view with all overlays burned in (scale bar, annotations, measurements)');
-    btnExportOverlays.Layout.Row = 15; btnExportOverlays.Layout.Column = 1;
+    % Row 14 = separator gap
 
-    btnBatchExport = uibutton(processInnerGL, 'Text', 'Batch Export', ...
-        'ButtonPushedFcn', @onBatchExport, ...
-        'BackgroundColor', BTN_EXPORT, ...
-        'FontColor', BTN_FG, ...
-        'Enable', 'off', ...
-        'Tooltip', 'Export all loaded images with current contrast settings to a folder');
-    btnBatchExport.Layout.Row = 15; btnBatchExport.Layout.Column = 2;
-
-    % Row 16: Copy to Clipboard
-    btnCopyClipboard = uibutton(processInnerGL, 'Text', 'Copy to Clipboard', ...
-        'ButtonPushedFcn', @onCopyClipboard, ...
-        'BackgroundColor', BTN_TOOL, ...
-        'FontColor', BTN_FG, ...
-        'Enable', 'off', ...
-        'Tooltip', 'Copy the current image view to the system clipboard');
-    btnCopyClipboard.Layout.Row = 16; btnCopyClipboard.Layout.Column = [1 2];
-
-    % Row 17: reserved
-
-    % Row 18 = separator gap
-
-    % Row 19: Live Threshold / Otsu Auto
+    % Row 15: Live Threshold / Img Math
     btnLiveThresh = uibutton(processInnerGL, 'Text', 'Threshold...', ...
         'ButtonPushedFcn', @onLiveThreshold, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Interactive threshold preview with live overlay; Otsu auto-threshold');
-    btnLiveThresh.Layout.Row = 19; btnLiveThresh.Layout.Column = 1;
+    btnLiveThresh.Layout.Row = 15; btnLiveThresh.Layout.Column = 1;
 
     btnImgMath = uibutton(processInnerGL, 'Text', 'Img Math...', ...
         'ButtonPushedFcn', @onImageMath, ...
@@ -916,16 +1037,16 @@ function varargout = emViewerGUI()
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Image arithmetic: subtract, divide, or ratio two loaded images');
-    btnImgMath.Layout.Row = 19; btnImgMath.Layout.Column = 2;
+    btnImgMath.Layout.Row = 15; btnImgMath.Layout.Column = 2;
 
-    % Row 20: Watershed / Batch Crop
+    % Row 16: Watershed / Batch Crop
     btnWatershed = uibutton(processInnerGL, 'Text', 'Watershed...', ...
         'ButtonPushedFcn', @onWatershed, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Watershed segmentation to split touching particles (no toolbox)');
-    btnWatershed.Layout.Row = 20; btnWatershed.Layout.Column = 1;
+    btnWatershed.Layout.Row = 16; btnWatershed.Layout.Column = 1;
 
     btnBatchCrop = uibutton(processInnerGL, 'Text', 'Batch Crop', ...
         'ButtonPushedFcn', @onBatchCrop, ...
@@ -933,49 +1054,35 @@ function varargout = emViewerGUI()
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Define crop region, apply to all loaded images');
-    btnBatchCrop.Layout.Row = 20; btnBatchCrop.Layout.Column = 2;
+    btnBatchCrop.Layout.Row = 16; btnBatchCrop.Layout.Column = 2;
 
-    % Row 21: Montage (spans both columns)
+    % Row 17: Montage (spans both columns)
     btnMontage = uibutton(processInnerGL, 'Text', 'Montage / Stitch...', ...
         'ButtonPushedFcn', @onMontage, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Grid-based tiled image stitching with overlap cross-correlation');
-    btnMontage.Layout.Row = 21; btnMontage.Layout.Column = [1 2];
+    btnMontage.Layout.Row = 17; btnMontage.Layout.Column = [1 2];
 
-    % Row 22: Session Save / Session Load
-    btnSessionSave = uibutton(processInnerGL, 'Text', 'Save Session', ...
-        'ButtonPushedFcn', @onSessionSave, ...
-        'BackgroundColor', BTN_EXPORT, ...
-        'FontColor', BTN_FG, ...
-        'Enable', 'off', ...
-        'Tooltip', 'Save all images, contrast, overlays, annotations to a .mat session file');
-    btnSessionSave.Layout.Row = 22; btnSessionSave.Layout.Column = 1;
-
-    btnSessionLoad = uibutton(processInnerGL, 'Text', 'Load Session', ...
-        'ButtonPushedFcn', @onSessionLoad, ...
-        'BackgroundColor', BTN_EXPORT, ...
-        'FontColor', BTN_FG, ...
-        'Tooltip', 'Restore a previously saved session');
-    btnSessionLoad.Layout.Row = 22; btnSessionLoad.Layout.Column = 2;
-
-    % Row 23: Pixel Inspector toggle (spans both)
+    % Row 18: Pixel Inspector toggle (spans both)
     cbPixelInspector = uicheckbox(processInnerGL, ...
         'Text',    'Pixel Inspector', ...
         'Value',   false, ...
         'Enable',  'off', ...
         'ValueChangedFcn', @onPixelInspectorToggle, ...
         'Tooltip', 'Show NxN pixel neighborhood with intensity values near cursor');
-    cbPixelInspector.Layout.Row = 23; cbPixelInspector.Layout.Column = [1 2];
+    cbPixelInspector.Layout.Row = 18; cbPixelInspector.Layout.Column = [1 2];
 
     hPixelInspector = [];   % handle to pixel inspector axes overlay
 
     % ── Section 5: Annotations ──────────────────────────────────────────
-    lblAnnotHeader = uilabel(toolsGL, 'Text', 'Annotations', ...
+    btnAnnotHeader = uibutton(toolsGL, 'Text', [ARROW_SHUT ' Annotations'], ...
+        'HorizontalAlignment', 'left', ...
+        'BackgroundColor', HDR_BG, 'FontColor', HDR_FG, ...
         'FontWeight', 'bold', 'FontSize', 11, ...
-        'FontColor', [0.15 0.15 0.15]);
-    lblAnnotHeader.Layout.Row = 9; %#ok<NASGU>
+        'ButtonPushedFcn', @(~,~) toggleSection(SECT_ANNOT));
+    btnAnnotHeader.Layout.Row = 9;
 
     pnlAnnot = uipanel(toolsGL, 'BorderType', 'line');
     pnlAnnot.Layout.Row = 10;
@@ -1028,10 +1135,12 @@ function varargout = emViewerGUI()
     % Row 5: (padding — unused for now)
 
     % ── Section 6: Metadata (populated) ──────────────────────────────────
-    lblMetaHeader = uilabel(toolsGL, 'Text', 'Metadata', ...
+    btnMetaHeader = uibutton(toolsGL, 'Text', [ARROW_SHUT ' Metadata'], ...
+        'HorizontalAlignment', 'left', ...
+        'BackgroundColor', HDR_BG, 'FontColor', HDR_FG, ...
         'FontWeight', 'bold', 'FontSize', 11, ...
-        'FontColor', [0.15 0.15 0.15]);
-    lblMetaHeader.Layout.Row = 11; %#ok<NASGU>
+        'ButtonPushedFcn', @(~,~) toggleSection(SECT_META));
+    btnMetaHeader.Layout.Row = 11;
 
     taMetadata = uitextarea(toolsGL, ...
         'Value', {'(no image loaded)'}, ...
@@ -1114,6 +1223,9 @@ function varargout = emViewerGUI()
         api.close          = @() close(fig);
         varargout{1}       = api;
     end
+
+    % Apply initial theme
+    applyTheme();
 
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onOpenFiles — Browse for image files via uigetfile
@@ -1296,6 +1408,17 @@ function varargout = emViewerGUI()
     %  CALLBACK: onMouseMotion — Track mouse over axes, show pixel info
     % ════════════════════════════════════════════════════════════════════
     function onMouseMotion(~, ~)
+        % Panel resize border detection: skip during capture mode
+        if isempty(appData.captureMode) || strcmp(appData.captureMode, '')
+            dir = detectResizeBorder();
+            appData.panelResizeDir = dir;
+            if     ~isempty(dir) && startsWith(dir, 'v_'), fig.Pointer = 'left';
+            elseif ~isempty(dir) && startsWith(dir, 'h_'), fig.Pointer = 'top';
+            else
+                fig.Pointer = 'arrow';
+            end
+        end
+
         % In compare mode, ax may not exist
         if isempty(ax) || ~isvalid(ax)
             return;
@@ -1364,6 +1487,9 @@ function varargout = emViewerGUI()
             clearDisplay();
             return;
         end
+
+        % Clear any measurement selection when switching images
+        deselectMeasurement();
 
         dataStruct = appData.images{appData.activeIdx};
         imgInfo    = dataStruct.metadata.parserSpecific.imageData;
@@ -1530,6 +1656,8 @@ function varargout = emViewerGUI()
         btnDiffRings.Enable     = 'on';
         btnROIManager.Enable    = 'on';
         btnCalibrateBar.Enable  = 'on';
+        btnBatchRename.Enable   = onOff(numel(appData.images) >= 1);
+        btnRenameSelected.Enable = 'on';
 
         % Enable annotation controls
         btnPlaceAnnot.Enable  = 'on';
@@ -1617,6 +1745,8 @@ function varargout = emViewerGUI()
         btnDiffRings.Enable      = 'off';
         btnROIManager.Enable     = 'off';
         btnCalibrateBar.Enable   = 'off';
+        btnBatchRename.Enable    = 'off';
+        btnRenameSelected.Enable = 'off';
         if ~isempty(hColorbar) && isvalid(hColorbar)
             delete(hColorbar);
             hColorbar = [];
@@ -3211,6 +3341,14 @@ function varargout = emViewerGUI()
             return;
         end
 
+        % Delete / Backspace → Remove selected measurement
+        if strcmp(evt.Key, 'delete') || strcmp(evt.Key, 'backspace')
+            if appData.selectedMeasIdx > 0
+                deleteSelectedMeasurement();
+                return;
+            end
+        end
+
         % No-modifier shortcuts
         if ~hasMod
             % A  → Auto contrast
@@ -3530,6 +3668,8 @@ function varargout = emViewerGUI()
         btnDiffRings.Enable      = state;
         btnROIManager.Enable     = state;
         btnCalibrateBar.Enable   = state;
+        btnBatchRename.Enable    = state;
+        btnRenameSelected.Enable = state;
         btnPlaceAnnot.Enable   = state;
         btnClearAnnot.Enable   = state;
         btnAnnotColor.Enable   = state;
@@ -3537,6 +3677,286 @@ function varargout = emViewerGUI()
         btnScaleBarColor.Enable = state;
         spnScaleBarFont.Enable = state;
         cbColorbar.Enable      = state;
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  COLLAPSIBLE SECTION TOGGLE
+    % ════════════════════════════════════════════════════════════════════
+    function toggleSection(sect)
+    %TOGGLESECTION  Collapse or expand a tools panel section.
+        % Map section name → header button handle
+        switch sect.name
+            case 'Contrast',    hdr = btnContrastHeader;
+            case 'Histogram',   hdr = btnHistogramHeader;
+            case 'Measurement', hdr = btnMeasureHeader;
+            case 'Processing',  hdr = btnProcessHeader;
+            case 'Annotations', hdr = btnAnnotHeader;
+            case 'Metadata',    hdr = btnMetaHeader;
+            otherwise, return;
+        end
+
+        currentH = toolsGL.RowHeight{sect.panelRow};
+        if currentH == 0
+            % Expand
+            toolsGL.RowHeight{sect.panelRow} = sect.openHeight;
+            hdr.Text = [ARROW_OPEN ' ' sect.name];
+        else
+            % Collapse
+            toolsGL.RowHeight{sect.panelRow} = 0;
+            hdr.Text = [ARROW_SHUT ' ' sect.name];
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PANEL DRAG-RESIZE
+    % ════════════════════════════════════════════════════════════════════
+
+    function onIdleMouseDown(~, ~)
+    %ONIDLEMOUSEDOWN  Figure-level mouse-down in idle mode — starts resize if near border.
+        if strcmp(fig.SelectionType, 'alt'), return; end   % right-click: skip
+        if ~isempty(appData.panelResizeDir)
+            startPanelResize();
+        end
+    end
+
+    function dir = detectResizeBorder()
+    %DETECTRESIZEBORDER  Check if cursor is near a draggable panel border.
+    %  Returns:  'v_col12'   — left panel / image border
+    %            'v_col23'   — image / tools panel border
+    %            'h_listexp' — image-list / export-panel border (left panel)
+    %            ''          — not near any border
+        dir = '';
+        try
+            mp = fig.CurrentPoint;   % [x y] from bottom-left
+
+            % v_col12: right edge of left listPanel
+            lPos = getpixelposition(listPanel, true);
+            borderX = lPos(1) + lPos(3);
+            if abs(mp(1) - borderX) <= SNAP_PX && ...
+               mp(2) >= lPos(2) && mp(2) <= lPos(2) + lPos(4)
+                dir = 'v_col12'; return;
+            end
+
+            % v_col23: left edge of tools panel
+            tPos = getpixelposition(toolsPanel, true);
+            borderX = tPos(1);
+            if abs(mp(1) - borderX) <= SNAP_PX && ...
+               mp(2) >= tPos(2) && mp(2) <= tPos(2) + tPos(4)
+                dir = 'v_col23'; return;
+            end
+
+            % h_listexp: border between image list (row 1) and export panel (row 2)
+            ePos = getpixelposition(exportPanel, true);
+            borderY = ePos(2) + ePos(4);
+            if abs(mp(2) - borderY) <= SNAP_PX && ...
+               mp(1) >= lPos(1) && mp(1) <= lPos(1) + lPos(3)
+                dir = 'h_listexp'; return;
+            end
+        catch
+            % getpixelposition may throw on first render — silently skip
+        end
+    end
+
+    function startPanelResize()
+    %STARTPANELRESIZE  Begin dragging a panel border.
+        mp = fig.CurrentPoint;
+        appData.panelResizeStart = mp;
+
+        if strcmp(appData.panelResizeDir, 'v_col12')
+            try
+                lPos = getpixelposition(listPanel, true);
+                appData.panelResizeOrig = lPos(3);
+            catch
+                appData.panelResizeOrig = appData.leftPanelWidth;
+            end
+        elseif strcmp(appData.panelResizeDir, 'v_col23')
+            try
+                tPos = getpixelposition(toolsPanel, true);
+                appData.panelResizeOrig = tPos(3);
+            catch
+                appData.panelResizeOrig = appData.toolsPanelWidth;
+            end
+        elseif strcmp(appData.panelResizeDir, 'h_listexp')
+            try
+                ePos = getpixelposition(exportPanel, true);
+                appData.panelResizeOrig = ePos(4);
+            catch
+                appData.panelResizeOrig = appData.listPanelHeight;
+            end
+        end
+
+        fig.WindowButtonMotionFcn = @onPanelResizeMove;
+        fig.WindowButtonUpFcn     = @onPanelResizeUp;
+    end
+
+    function onPanelResizeMove(~, ~)
+    %ONPANELRESIZEMOVE  Live-update layout while dragging a panel border.
+        if isempty(appData.panelResizeStart), return; end
+        mp = fig.CurrentPoint;
+
+        if strcmp(appData.panelResizeDir, 'v_col12')
+            % Drag right → left panel wider
+            delta = mp(1) - appData.panelResizeStart(1);
+            newW  = round(appData.panelResizeOrig + delta);
+            newW  = max(MIN_LEFT_W, min(newW, 400));
+            appData.leftPanelWidth = newW;
+            cw = mainGL.ColumnWidth;
+            cw{1} = newW;
+            mainGL.ColumnWidth = cw;
+
+        elseif strcmp(appData.panelResizeDir, 'v_col23')
+            % Drag left → tools panel wider (note: delta is negative when dragging left)
+            delta = mp(1) - appData.panelResizeStart(1);
+            newW  = round(appData.panelResizeOrig - delta);
+            newW  = max(MIN_TOOLS_W, min(newW, 500));
+            appData.toolsPanelWidth = newW;
+            cw = mainGL.ColumnWidth;
+            cw{3} = newW;
+            mainGL.ColumnWidth = cw;
+
+        elseif strcmp(appData.panelResizeDir, 'h_listexp')
+            % Drag down → export panel taller (mouse down = negative delta)
+            delta = mp(2) - appData.panelResizeStart(2);
+            newH  = round(appData.panelResizeOrig - delta);
+            newH  = max(MIN_EXPORT_H, min(newH, 500));
+            appData.listPanelHeight = newH;
+            rh = listGL.RowHeight;
+            rh{2} = newH;
+            listGL.RowHeight = rh;
+        end
+    end
+
+    function onPanelResizeUp(~, ~)
+    %ONPANELRESIZEUP  Finish a panel border drag and restore normal handlers.
+        fig.WindowButtonMotionFcn = @onMouseMotion;
+        fig.WindowButtonUpFcn     = '';
+        appData.panelResizeStart  = [];
+        appData.panelResizeOrig   = [];
+        appData.panelResizeDir    = '';
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  THEME: dark / light mode toggle
+    % ════════════════════════════════════════════════════════════════════
+    function onThemeToggle(~, ~)
+        appData.darkMode = ~appData.darkMode;
+        applyTheme();
+    end
+
+    function applyTheme()
+    %APPLYTHEME  Apply dark or light colour scheme to all GUI elements.
+        if appData.darkMode
+            % ── Dark theme ──
+            figBG     = [0.15 0.15 0.15];
+            panelBG   = [0.18 0.18 0.18];
+            panelFG   = [0.9 0.9 0.9];
+            hdrBG     = [0.22 0.22 0.22];
+            hdrFG     = [0.85 0.85 0.85];
+            statusFG  = [0.45 0.45 0.45];
+            filenameFG = [0.85 0.85 0.85];
+            sepFG     = [0.5 0.5 0.5];
+            axBG      = [0 0 0];
+            editBG    = [0.22 0.22 0.22];
+            editFG    = [0.9 0.9 0.9];
+            btnThemeToggle.Text = char(9790);   % moon
+            btnThemeToggle.Tooltip = 'Switch to light mode';
+        else
+            % ── Light theme ──
+            figBG     = [0.94 0.94 0.94];
+            panelBG   = [0.96 0.96 0.96];
+            panelFG   = [0.1 0.1 0.1];
+            hdrBG     = [0.88 0.88 0.88];
+            hdrFG     = [0.15 0.15 0.15];
+            statusFG  = [0.4 0.4 0.4];
+            filenameFG = [0.2 0.2 0.2];
+            sepFG     = [0.65 0.65 0.65];
+            axBG      = [1 1 1];
+            editBG    = [1 1 1];
+            editFG    = [0.1 0.1 0.1];
+            btnThemeToggle.Text = char(9728);   % sun
+            btnThemeToggle.Tooltip = 'Switch to dark mode';
+        end
+
+        % Figure
+        fig.Color = figBG;
+
+        % Panels
+        listPanel.BackgroundColor  = panelBG;
+        listPanel.ForegroundColor  = panelFG;
+        toolsPanel.BackgroundColor = panelBG;
+        toolsPanel.ForegroundColor = panelFG;
+        exportPanel.BackgroundColor = panelBG;
+        exportPanel.ForegroundColor = panelFG;
+
+        % Section panels
+        pnlContrast.BackgroundColor  = panelBG;
+        pnlHistogram.BackgroundColor = panelBG;
+        pnlMeasure.BackgroundColor   = panelBG;
+        pnlProcess.BackgroundColor   = panelBG;
+        pnlAnnot.BackgroundColor     = panelBG;
+
+        % Section header buttons
+        btnContrastHeader.BackgroundColor  = hdrBG;
+        btnContrastHeader.FontColor        = hdrFG;
+        btnHistogramHeader.BackgroundColor = hdrBG;
+        btnHistogramHeader.FontColor       = hdrFG;
+        btnMeasureHeader.BackgroundColor   = hdrBG;
+        btnMeasureHeader.FontColor         = hdrFG;
+        btnProcessHeader.BackgroundColor   = hdrBG;
+        btnProcessHeader.FontColor         = hdrFG;
+        btnAnnotHeader.BackgroundColor     = hdrBG;
+        btnAnnotHeader.FontColor           = hdrFG;
+        btnMetaHeader.BackgroundColor      = hdrBG;
+        btnMetaHeader.FontColor            = hdrFG;
+
+        % Status bar labels
+        lblStatusDims.FontColor    = statusFG;
+        lblStatusBits.FontColor    = statusFG;
+        lblStatusPixSize.FontColor = statusFG;
+        lblStatusMouse.FontColor   = statusFG;
+
+        % Filename label
+        lblFilename.FontColor = filenameFG;
+
+        % Separator labels
+        lblSep.FontColor  = sepFG;
+        lblSep2.FontColor = sepFG;
+        lblSep3.FontColor = sepFG;
+        lblSep4.FontColor = sepFG;
+
+        % Image axes
+        if ~isempty(ax) && isvalid(ax)
+            ax.Color = axBG;
+        end
+
+        % Histogram axes
+        histAx.Color = axBG;
+        histAx.XColor = sepFG;
+        histAx.YColor = sepFG;
+
+        % Metadata textarea
+        taMetadata.BackgroundColor = editBG;
+        taMetadata.FontColor       = editFG;
+
+        % Edit fields and listbox
+        efRenameBase.BackgroundColor = editBG;
+        efRenameBase.FontColor       = editFG;
+        efAnnotText.BackgroundColor  = editBG;
+        efAnnotText.FontColor        = editFG;
+        lbImages.BackgroundColor     = editBG;
+        lbImages.FontColor           = editFG;
+
+        % Grid layout backgrounds
+        rootGL.BackgroundColor    = figBG;
+        mainGL.BackgroundColor    = figBG;
+        toolbarGL.BackgroundColor = figBG;
+        statusGL.BackgroundColor  = figBG;
+        listGL.BackgroundColor    = panelBG;
+        exportGL.BackgroundColor  = panelBG;
+
+        % Rename label
+        lblRename.FontColor = hdrFG;
+        lblDPI.FontColor    = hdrFG;
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3681,7 +4101,7 @@ function varargout = emViewerGUI()
         appData.captureMode   = '';
         appData.captureClicks = [];
         fig.Pointer = 'arrow';
-        fig.WindowButtonDownFcn = '';
+        fig.WindowButtonDownFcn = @onIdleMouseDown;
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3734,9 +4154,11 @@ function varargout = emViewerGUI()
         midx = numel(appData.overlays.measurements) + 1;
         appData.overlays.measurements{midx} = meas;
 
-        % Attach drag callbacks
-        hP1.ButtonDownFcn = @(~,~) startEndpointDrag(midx, 1);
-        hP2.ButtonDownFcn = @(~,~) startEndpointDrag(midx, 2);
+        % Attach drag + selection callbacks
+        hP1.ButtonDownFcn   = @(~,~) startEndpointDrag(midx, 1);
+        hP2.ButtonDownFcn   = @(~,~) startEndpointDrag(midx, 2);
+        hLine.ButtonDownFcn = @(~,~) selectMeasurement(midx);
+        hLine.HitTest = 'on'; hLine.PickableParts = 'all';
 
         % Run the profile computation
         runProfile(x1, y1, x2, y2);
@@ -3776,9 +4198,11 @@ function varargout = emViewerGUI()
         midx = numel(appData.overlays.measurements) + 1;
         appData.overlays.measurements{midx} = meas;
 
-        % Attach drag callbacks
-        hP1.ButtonDownFcn = @(~,~) startEndpointDrag(midx, 1);
-        hP2.ButtonDownFcn = @(~,~) startEndpointDrag(midx, 2);
+        % Attach drag + selection callbacks
+        hP1.ButtonDownFcn   = @(~,~) startEndpointDrag(midx, 1);
+        hP2.ButtonDownFcn   = @(~,~) startEndpointDrag(midx, 2);
+        hLine.ButtonDownFcn = @(~,~) selectMeasurement(midx);
+        hLine.HitTest = 'on'; hLine.PickableParts = 'all';
 
         appData.overlays.distLabels{end+1} = hTxt;
         setStatus(sprintf('Distance: %s', hTxt.String));
@@ -3919,6 +4343,9 @@ function varargout = emViewerGUI()
         if ~isvalid(meas.hLine)
             return;
         end
+
+        % Select this measurement (highlight + enable Delete key)
+        selectMeasurement(measIdx);
 
         % Store original callbacks
         origMotionFcn  = fig.WindowButtonMotionFcn;
@@ -4670,26 +5097,13 @@ function varargout = emViewerGUI()
         end
         appData.overlays.clickMarkers = {};
 
-        % Prompt for real distance
-        answer = inputdlg( ...
-            {sprintf('Pixel length of drawn line: %.1f px\n\nScale bar distance:'), ...
-             'Unit (nm, \x00B5m, mm, etc.):'}, ...
-            'Enter Scale Bar Value', [1 40], {'', 'nm'});
+        % Prompt for real distance with unit dropdown
+        [realDist, realUnit, cancelled] = promptScaleBarDistance(pxDist);
 
         % Remove overlay line
         if isvalid(hLine), delete(hLine); end
 
-        if isempty(answer), return; end
-
-        realDist = str2double(answer{1});
-        realUnit = strtrim(answer{2});
-
-        if isnan(realDist) || realDist <= 0
-            uialert(fig, 'Distance must be a positive number.', ...
-                'Invalid Input', 'Icon', 'error');
-            return;
-        end
-        if isempty(realUnit), realUnit = 'px'; end
+        if cancelled, return; end
 
         % Compute pixel size = realDist / pxDist
         newPixelSize = realDist / pxDist;
@@ -4822,18 +5236,13 @@ function varargout = emViewerGUI()
                 sprintf('%.0f px detected', bestBarLen), ...
                 'Color', barColor, 'FontSize', 11, 'FontWeight', 'bold', ...
                 'HorizontalAlignment', 'center', ...
-                'BackgroundColor', [0.1 0.1 0.1 0.7], ...
+                'BackgroundColor', [0.1 0.1 0.1], ...
                 'HandleVisibility', 'off');
 
             drawnow;
 
-            % Ask user to confirm and enter real distance
-            answer = inputdlg( ...
-                {sprintf(['Detected scale bar: %.0f px long\n' ...
-                 '(cyan overlay on image)\n\n' ...
-                 'Enter the real distance this bar represents:'], bestBarLen), ...
-                 'Unit (nm, \x00B5m, mm, etc.):'}, ...
-                'Confirm Scale Bar', [1 44], {'', 'nm'});
+            % Ask user to confirm and enter real distance with unit dropdown
+            [realDist, realUnit, cancelled] = promptScaleBarDistance(bestBarLen);
 
             % Clean up overlay
             if isvalid(hBarLine),  delete(hBarLine);  end
@@ -4841,17 +5250,7 @@ function varargout = emViewerGUI()
             if isvalid(hBarEnd2),  delete(hBarEnd2);  end
             if isvalid(hBarLabel), delete(hBarLabel); end
 
-            if isempty(answer), return; end
-
-            realDist = str2double(answer{1});
-            realUnit = strtrim(answer{2});
-
-            if isnan(realDist) || realDist <= 0
-                uialert(fig, 'Distance must be a positive number.', ...
-                    'Invalid Input', 'Icon', 'error');
-                return;
-            end
-            if isempty(realUnit), realUnit = 'px'; end
+            if cancelled, return; end
 
             newPixelSize = realDist / bestBarLen;
             applyCalibration(newPixelSize, realUnit);
@@ -4881,6 +5280,168 @@ function varargout = emViewerGUI()
         spnScaleBarFont.Enable  = 'on';
         cbScaleBar.Value        = true;
         rebuildScaleBar();
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: promptScaleBarDistance — Modal dialog with distance + unit dropdown
+    % ════════════════════════════════════════════════════════════════════
+    function [dist, unit, cancelled] = promptScaleBarDistance(pxLen)
+    %PROMPTSCALEBARDISTANCE  Show a dialog with distance field + unit dropdown.
+    %   Returns dist (double), unit (char), cancelled (logical).
+        UNITS = {char(197), 'nm', [char(181) 'm'], 'mm', 'cm', 'm'};  % Å, nm, µm, mm, cm, m
+
+        cancelled = true;
+        dist = 0;
+        unit = 'nm';
+
+        dlgFig = uifigure('Name', 'Scale Bar Distance', ...
+            'Position', [400 350 320 170], ...
+            'WindowStyle', 'modal', ...
+            'Resize', 'off', ...
+            'Color', [0.94 0.94 0.94]);
+
+        dlgGL = uigridlayout(dlgFig, [5 2], ...
+            'RowHeight', {20, 28, 28, 10, 32}, ...
+            'ColumnWidth', {'1x', '1x'}, ...
+            'Padding', [15 15 15 15], ...
+            'RowSpacing', 6);
+
+        % Info label
+        lblInfo = uilabel(dlgGL, ...
+            'Text', sprintf('Drawn line: %.1f px', pxLen), ...
+            'FontWeight', 'bold', 'FontSize', 12);
+        lblInfo.Layout.Row = 1; lblInfo.Layout.Column = [1 2];
+
+        % Distance label + field
+        lblDist = uilabel(dlgGL, 'Text', 'Distance:');
+        lblDist.Layout.Row = 2;
+        edDist = uieditfield(dlgGL, 'numeric', ...
+            'Value', 0, 'Limits', [0 Inf], ...
+            'LowerLimitInclusive', 'off');
+        edDist.Layout.Row = 2; edDist.Layout.Column = 2;
+
+        % Unit label + dropdown
+        lblUnit = uilabel(dlgGL, 'Text', 'Unit:');
+        lblUnit.Layout.Row = 3;
+        ddUnit = uidropdown(dlgGL, 'Items', UNITS, 'Value', 'nm');
+        ddUnit.Layout.Row = 3; ddUnit.Layout.Column = 2;
+
+        % Buttons
+        btnOK = uibutton(dlgGL, 'Text', 'OK', ...
+            'ButtonPushedFcn', @(~,~) okCB());
+        btnOK.Layout.Row = 5; btnOK.Layout.Column = 1;
+
+        btnCancel = uibutton(dlgGL, 'Text', 'Cancel', ...
+            'ButtonPushedFcn', @(~,~) delete(dlgFig));
+        btnCancel.Layout.Row = 5; btnCancel.Layout.Column = 2;
+
+        uiwait(dlgFig);
+
+        function okCB()
+            dist = edDist.Value;
+            unit = ddUnit.Value;
+            cancelled = false;
+            delete(dlgFig);
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: selectMeasurement — Highlight a measurement overlay
+    % ════════════════════════════════════════════════════════════════════
+    function selectMeasurement(idx)
+        % Deselect previous
+        deselectMeasurement();
+
+        if idx < 1 || idx > numel(appData.overlays.measurements)
+            return;
+        end
+
+        meas = appData.overlays.measurements{idx};
+        if ~isvalid(meas.hLine), return; end
+
+        appData.selectedMeasIdx = idx;
+
+        % Highlight: thicken line and change marker color
+        meas.hLine.LineWidth = 3;
+        meas.hLine.Color = [1 1 0];   % yellow highlight
+        if isvalid(meas.hP1)
+            meas.hP1.Color = [1 1 0];
+            meas.hP1.MarkerFaceColor = [1 1 0];
+        end
+        if isvalid(meas.hP2)
+            meas.hP2.Color = [1 1 0];
+            meas.hP2.MarkerFaceColor = [1 1 0];
+        end
+
+        setStatus(sprintf('Selected %s measurement %d (press Delete to remove)', ...
+            meas.type, idx));
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: deselectMeasurement — Restore normal styling
+    % ════════════════════════════════════════════════════════════════════
+    function deselectMeasurement()
+        idx = appData.selectedMeasIdx;
+        if idx < 1 || idx > numel(appData.overlays.measurements)
+            appData.selectedMeasIdx = 0;
+            return;
+        end
+
+        meas = appData.overlays.measurements{idx};
+        if isvalid(meas.hLine)
+            meas.hLine.LineWidth = 1.5;
+            meas.hLine.Color = OVERLAY_COLOR;
+        end
+        if isvalid(meas.hP1)
+            meas.hP1.Color = OVERLAY_COLOR;
+            meas.hP1.MarkerFaceColor = OVERLAY_COLOR;
+        end
+        if isvalid(meas.hP2)
+            meas.hP2.Color = OVERLAY_COLOR;
+            meas.hP2.MarkerFaceColor = OVERLAY_COLOR;
+        end
+
+        appData.selectedMeasIdx = 0;
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: deleteSelectedMeasurement — Remove selected overlay
+    % ════════════════════════════════════════════════════════════════════
+    function deleteSelectedMeasurement()
+        idx = appData.selectedMeasIdx;
+        if idx < 1 || idx > numel(appData.overlays.measurements)
+            return;
+        end
+
+        meas = appData.overlays.measurements{idx};
+
+        % Delete graphics objects
+        if isvalid(meas.hLine), delete(meas.hLine); end
+        if isvalid(meas.hP1),   delete(meas.hP1);   end
+        if isvalid(meas.hP2),   delete(meas.hP2);   end
+        if ~isempty(meas.hText) && isvalid(meas.hText)
+            delete(meas.hText);
+        end
+
+        % Remove from list
+        appData.overlays.measurements(idx) = [];
+
+        % Re-bind drag + selection callbacks with updated indices
+        for mi = 1:numel(appData.overlays.measurements)
+            m = appData.overlays.measurements{mi};
+            if isvalid(m.hP1)
+                m.hP1.ButtonDownFcn = @(~,~) startEndpointDrag(mi, 1);
+            end
+            if isvalid(m.hP2)
+                m.hP2.ButtonDownFcn = @(~,~) startEndpointDrag(mi, 2);
+            end
+            if isvalid(m.hLine)
+                m.hLine.ButtonDownFcn = @(~,~) selectMeasurement(mi);
+            end
+        end
+
+        appData.selectedMeasIdx = 0;
+        setStatus(sprintf('Deleted %s measurement', meas.type));
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -5534,6 +6095,102 @@ function varargout = emViewerGUI()
     end
 
     % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onBatchRename — Rename all loaded files with base_NNN
+    % ════════════════════════════════════════════════════════════════════
+    function onBatchRename(~, ~)
+        renameBatch(1:numel(appData.images));
+    end
+
+    function onRenameSelected(~, ~)
+        selVals = lbImages.Value;
+        if iscell(selVals)
+            idxs = [selVals{:}];
+        else
+            idxs = selVals;
+        end
+        idxs(idxs < 1 | idxs > numel(appData.images)) = [];
+        if isempty(idxs)
+            setStatus('No valid files selected for rename.');
+            return;
+        end
+        renameBatch(idxs);
+    end
+
+    function renameBatch(idxs)
+    %RENAMEBATCH  Rename files on disk with baseName_001, _002, ... pattern.
+        if isempty(appData.images)
+            setStatus('No images loaded.'); return;
+        end
+
+        baseName = strtrim(efRenameBase.Value);
+        if isempty(baseName)
+            setStatus('Enter a base name before renaming.');
+            return;
+        end
+
+        % Confirm with user
+        msg = sprintf('Rename %d file(s) on disk to %s_001, _002, ...?\nThis cannot be undone.', ...
+            numel(idxs), baseName);
+        answer = uiconfirm(fig, msg, 'Confirm Batch Rename', ...
+            'Options', {'Rename', 'Cancel'}, 'DefaultOption', 2, 'CancelOption', 2);
+        if ~strcmp(answer, 'Rename'), return; end
+
+        fig.Pointer = 'watch'; drawnow;
+        nRenamed = 0;
+        for ri = 1:numel(idxs)
+            ki = idxs(ri);
+            try
+                srcPath = appData.images{ki}.metadata.source;
+                [srcDir, ~, srcExt] = fileparts(srcPath);
+                newName = sprintf('%s_%03d%s', baseName, ri, srcExt);
+                newPath = fullfile(srcDir, newName);
+
+                if ~strcmp(srcPath, newPath)
+                    if isfile(newPath)
+                        warning('emViewerGUI:rename', ...
+                            'Skipped %s: target %s already exists.', srcPath, newName);
+                        continue;
+                    end
+                    movefile(srcPath, newPath);
+                    appData.images{ki}.metadata.source = newPath;
+                    nRenamed = nRenamed + 1;
+                end
+            catch ME
+                warning('emViewerGUI:rename', 'Failed to rename %s: %s', ...
+                    srcPath, ME.message);
+            end
+        end
+
+        % Update listbox display
+        refreshImageList();
+        fig.Pointer = 'arrow';
+        setStatus(sprintf('Renamed %d / %d files with base "%s".', ...
+            nRenamed, numel(idxs), baseName));
+    end
+
+    function refreshImageList()
+    %REFRESHIMAGELIST  Rebuild listbox items from current appData.images.
+        if isempty(appData.images)
+            lbImages.Items = {'(no images loaded)'};
+            lbImages.ItemsData = {0};
+            return;
+        end
+        names = cell(1, numel(appData.images));
+        data  = cell(1, numel(appData.images));
+        for ri = 1:numel(appData.images)
+            [~, nm, ex] = fileparts(appData.images{ri}.metadata.source);
+            names{ri} = [nm ex];
+            data{ri}  = ri;
+        end
+        lbImages.Items = names;
+        lbImages.ItemsData = data;
+        % Restore selection to current active
+        if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
+            lbImages.Value = {appData.activeIdx};
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onCopyClipboard — Copy current view to system clipboard
     % ════════════════════════════════════════════════════════════════════
     function onCopyClipboard(~, ~)
@@ -5609,6 +6266,7 @@ function varargout = emViewerGUI()
     % ════════════════════════════════════════════════════════════════════
     function showStackControls(nFrames)
     %SHOWSTACKCONTROLS  Show/configure the frame slider for multi-frame images.
+        if ~isvalid(axGL), return; end
         if nFrames <= 1
             axGL.RowHeight = {'1x', 0};
             appData.stackFrames = {};
@@ -6126,16 +6784,8 @@ function varargout = emViewerGUI()
 
     % ── Feature 7: Export Resolution (helper for export dialogs) ──────
     function dpi = getExportDPI()
-    %GETEXPORTDPI  Prompt for DPI or use preference default.
-        answer = inputdlg({'Export DPI (72-600):'}, 'Resolution', [1 30], ...
-            {num2str(appData.prefs.exportDPI)});
-        if isempty(answer)
-            dpi = appData.prefs.exportDPI;
-        else
-            dpi = round(str2double(answer{1}));
-            if isnan(dpi) || dpi < 72, dpi = 150; end
-            if dpi > 600, dpi = 600; end
-        end
+    %GETEXPORTDPI  Read DPI from the Export DPI dropdown in the left panel.
+        dpi = ddExportDPI.Value;
     end
 
     % ── Feature 8: Thumbnail Grid View ────────────────────────────────
@@ -6646,27 +7296,32 @@ function varargout = emViewerGUI()
             'ColumnWidth', {160, '1x'}, ...
             'Padding', [10 10 10 10], 'RowSpacing', 4);
 
-        uilabel(pGL, 'Text', 'Default Colormap:').Layout.Row = 1;
+        lbl1 = uilabel(pGL, 'Text', 'Default Colormap:');
+        lbl1.Layout.Row = 1;
         ddPrefCmap = uidropdown(pGL, 'Items', {'gray','parula','hot','jet','bone'}, ...
             'Value', appData.prefs.defaultColormap);
         ddPrefCmap.Layout.Row = 1; ddPrefCmap.Layout.Column = 2;
 
-        uilabel(pGL, 'Text', 'Auto-Contrast Low %:').Layout.Row = 2;
+        lbl2 = uilabel(pGL, 'Text', 'Auto-Contrast Low %:');
+        lbl2.Layout.Row = 2;
         spnPrefLow = uispinner(pGL, 'Value', appData.prefs.autoContrastLow, ...
             'Limits', [0 49], 'Step', 1);
         spnPrefLow.Layout.Row = 2; spnPrefLow.Layout.Column = 2;
 
-        uilabel(pGL, 'Text', 'Auto-Contrast High %:').Layout.Row = 3;
+        lbl3 = uilabel(pGL, 'Text', 'Auto-Contrast High %:');
+        lbl3.Layout.Row = 3;
         spnPrefHigh = uispinner(pGL, 'Value', appData.prefs.autoContrastHigh, ...
             'Limits', [51 100], 'Step', 1);
         spnPrefHigh.Layout.Row = 3; spnPrefHigh.Layout.Column = 2;
 
-        uilabel(pGL, 'Text', 'Export DPI:').Layout.Row = 4;
+        lbl4 = uilabel(pGL, 'Text', 'Export DPI:');
+        lbl4.Layout.Row = 4;
         spnPrefDPI = uispinner(pGL, 'Value', appData.prefs.exportDPI, ...
             'Limits', [72 600], 'Step', 50);
         spnPrefDPI.Layout.Row = 4; spnPrefDPI.Layout.Column = 2;
 
-        uilabel(pGL, 'Text', 'Pixel Inspector Size:').Layout.Row = 5;
+        lbl5 = uilabel(pGL, 'Text', 'Pixel Inspector Size:');
+        lbl5.Layout.Row = 5;
         spnPrefInsp = uispinner(pGL, 'Value', appData.prefs.pixelInspectorSize, ...
             'Limits', [3 15], 'Step', 2);
         spnPrefInsp.Layout.Row = 5; spnPrefInsp.Layout.Column = 2;

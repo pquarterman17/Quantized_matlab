@@ -487,8 +487,8 @@ function varargout = dataImportGUI()
         'Scrollable','on');
     ctrlPanel.Layout.Column = 2;
 
-    ctrlGL = uigridlayout(ctrlPanel,[7 1], ...
-        'RowHeight', {24,100,80,56,20,22,20}, ...
+    ctrlGL = uigridlayout(ctrlPanel,[8 1], ...
+        'RowHeight', {24,100,80,56,66,22,22,20}, ...
         'Padding',   [4 4 4 4], ...
         'RowSpacing', 2);
 
@@ -567,28 +567,39 @@ function varargout = dataImportGUI()
         'Tooltip','Plot with shaded error bands (auto-detects error columns)');
     btnStyleErrorBand.Layout.Row = 3; btnStyleErrorBand.Layout.Column = 4;
 
-    % Row 8: All log-scale checkboxes + Cts/s in one row
-    logChkGL = uigridlayout(ctrlGL,[1 4], ...
-        'Padding',[0 0 0 0],'ColumnWidth',{'1x','1x','1x','1x'},'ColumnSpacing',2);
-    logChkGL.Layout.Row = 5;
-    cbLogX = uicheckbox(logChkGL,'Text','Log X','ValueChangedFcn',@onAxisChanged);
-    cbLogX.Layout.Column = 1;
-    cbLogY = uicheckbox(logChkGL,'Text','Log Y','ValueChangedFcn',@onAxisChanged);
-    cbLogY.Layout.Column = 2;
-    cbLogY2 = uicheckbox(logChkGL,'Text','Log R', ...
-        'Value',false, ...
-        'Tooltip','Use log scale for the right Y-axis', ...
-        'ValueChangedFcn',@(~,~) onPlot([],[]));
-    cbLogY2.Layout.Column = 3;
-    cbCountsPerSec = uicheckbox(logChkGL,'Text','Cts/s', ...
-        'Value', false, 'Enable', 'off', ...
-        'Tooltip', 'Divide intensity by counting time (counts → counts/s). XRD files only.', ...
-        'ValueChangedFcn', @onAxisChanged);
-    cbCountsPerSec.Layout.Column = 4;
+    % Row 5: Axis scale dropdowns (3 rows: X, Left Y, Right Y)
+    scaleGL = uigridlayout(ctrlGL,[3 2], ...
+        'Padding',[0 0 0 0],'RowSpacing',2,'ColumnSpacing',4, ...
+        'RowHeight',{20,20,20},'ColumnWidth',{55,'1x'});
+    scaleGL.Layout.Row = 5;
 
-    % Row 9: Waterfall toggle + spacing + Replot button
-    wfGL = uigridlayout(ctrlGL,[1 3], ...
-        'Padding',[0 0 0 0],'ColumnSpacing',4,'ColumnWidth',{'1x',50,55});
+    lblScaleX = uilabel(scaleGL,'Text','X axis:','FontSize',11);
+    lblScaleX.Layout.Row = 1; lblScaleX.Layout.Column = 1;
+    ddScaleX = uidropdown(scaleGL,'Items',{'Linear','Log'}, ...
+        'Value','Linear','FontSize',11, ...
+        'ValueChangedFcn',@onAxisChanged, ...
+        'Tooltip','X-axis scale');
+    ddScaleX.Layout.Row = 1; ddScaleX.Layout.Column = 2;
+
+    lblScaleY = uilabel(scaleGL,'Text','Left Y:','FontSize',11);
+    lblScaleY.Layout.Row = 2; lblScaleY.Layout.Column = 1;
+    ddScaleY = uidropdown(scaleGL,'Items',{'Linear','Log'}, ...
+        'Value','Linear','FontSize',11, ...
+        'ValueChangedFcn',@onAxisChanged, ...
+        'Tooltip','Left Y-axis scale');
+    ddScaleY.Layout.Row = 2; ddScaleY.Layout.Column = 2;
+
+    lblScaleY2 = uilabel(scaleGL,'Text','Right Y:','FontSize',11);
+    lblScaleY2.Layout.Row = 3; lblScaleY2.Layout.Column = 1;
+    ddScaleY2 = uidropdown(scaleGL,'Items',{'Linear','Log'}, ...
+        'Value','Linear','FontSize',11, ...
+        'ValueChangedFcn',@(~,~) onPlot([],[]), ...
+        'Tooltip','Right Y-axis scale');
+    ddScaleY2.Layout.Row = 3; ddScaleY2.Layout.Column = 2;
+
+    % Row 6: Waterfall toggle + spacing
+    wfGL = uigridlayout(ctrlGL,[1 2], ...
+        'Padding',[0 0 0 0],'ColumnSpacing',4,'ColumnWidth',{'1x',50});
     wfGL.Layout.Row = 6;
 
     cbWaterfall = uicheckbox(wfGL, ...
@@ -604,9 +615,20 @@ function varargout = dataImportGUI()
         'ValueChangedFcn', @(~,~) onPlot([],[]));
     efWaterfallSpacing.Layout.Column = 2;
 
-    btnPlot = uibutton(wfGL,'Text','Refresh','ButtonPushedFcn',@onPlot, ...
+    % Row 7: Cts/s + Refresh
+    miscGL = uigridlayout(ctrlGL,[1 2], ...
+        'Padding',[0 0 0 0],'ColumnSpacing',4,'ColumnWidth',{'1x',55});
+    miscGL.Layout.Row = 7;
+
+    cbCountsPerSec = uicheckbox(miscGL,'Text','Cts/s', ...
+        'Value', false, 'Enable', 'off', ...
+        'Tooltip', 'Divide intensity by counting time (counts → counts/s). XRD files only.', ...
+        'ValueChangedFcn', @onAxisChanged);
+    cbCountsPerSec.Layout.Column = 1;
+
+    btnPlot = uibutton(miscGL,'Text','Refresh','ButtonPushedFcn',@onPlot, ...
     'Tooltip','Force a full redraw of the current plot');
-    btnPlot.Layout.Column = 3;
+    btnPlot.Layout.Column = 2;
 
     % Row 10: Annotation mode toggle
     cbAnnotationMode = uicheckbox(ctrlGL, ...
@@ -614,7 +636,7 @@ function varargout = dataImportGUI()
         'Value',   false, ...
         'Tooltip', 'Click on the plot to add text annotations. Right-click to delete.', ...
         'ValueChangedFcn', @onAnnotationModeChanged);
-    cbAnnotationMode.Layout.Row = 7;
+    cbAnnotationMode.Layout.Row = 8;
 
     % ── Right: preview axes ───────────────────────────────────────────────
     axPanel = uipanel(contentGL,'Title','Preview','FontSize',11);
@@ -2210,9 +2232,9 @@ function varargout = dataImportGUI()
             'xCol', ddX.Value, ...
             'yCol', lbY.Value, ...
             'y2Col', lbY2.Value, ...
-            'logX', cbLogX.Value, ...
-            'logY', cbLogY.Value, ...
-            'logY2', cbLogY2.Value);
+            'logX', strcmp(ddScaleX.Value, 'Log'), ...
+            'logY', strcmp(ddScaleY.Value, 'Log'), ...
+            'logY2', strcmp(ddScaleY2.Value, 'Log'));
 
         save(outPath, 'savedDatasets', 'savedState');
     end
@@ -2252,9 +2274,9 @@ function varargout = dataImportGUI()
                 ddX.Value = s.savedState.xCol;
                 lbY.Value = s.savedState.yCol;
                 lbY2.Value = s.savedState.y2Col;
-                cbLogX.Value = s.savedState.logX;
-                cbLogY.Value = s.savedState.logY;
-                cbLogY2.Value = s.savedState.logY2;
+                if s.savedState.logX, ddScaleX.Value = 'Log'; else, ddScaleX.Value = 'Linear'; end
+                if s.savedState.logY, ddScaleY.Value = 'Log'; else, ddScaleY.Value = 'Linear'; end
+                if s.savedState.logY2, ddScaleY2.Value = 'Log'; else, ddScaleY2.Value = 'Linear'; end
             catch
                 % Ignore state restoration errors; dataset structure is sufficient
             end
@@ -3054,11 +3076,11 @@ function varargout = dataImportGUI()
             if ~isempty(rIdx)
                 lbY.Value = d.labels(rIdx);
             end
-            cbLogY.Value = true;
+            ddScaleY.Value = 'Log';
         elseif isfield(ds, 'parserName') && strcmp(ds.parserName, 'importSIMS')
-            cbLogY.Value = true;  % SIMS concentrations span many decades
+            ddScaleY.Value = 'Log';  % SIMS concentrations span many decades
         elseif is2DDataset(ds)
-            cbLogY.Value = true;  % log intensity is standard for XRD reciprocal-space maps
+            ddScaleY.Value = 'Log';  % log intensity is standard for XRD reciprocal-space maps
             % Update map dimension info label
             map = ds.data.metadata.parserSpecific.map2D;
             lblMap2DInfo.Text = sprintf('%d %s positions  \xD7  %d 2\xB0 pixels', ...
@@ -3071,7 +3093,7 @@ function varargout = dataImportGUI()
                 cbMap2DQSpace.Value  = false;
             end
         else
-            cbLogY.Value = false;
+            ddScaleY.Value = 'Linear';
         end
 
         ddX.ValueChangedFcn  = @onAxisChanged;
@@ -4902,44 +4924,94 @@ function varargout = dataImportGUI()
         xHi = ax.XLim(2);
 
         % ── Create dialog figure ────────────────────────────────────────
-        fftFig = uifigure('Name', 'FFT Film Thickness', ...
-            'Position', [250 200 600 500], 'Resize', 'on');
-        fftGL = uigridlayout(fftFig, [3 1], ...
-            'RowHeight', {60, 28, '1x'}, ...
+        fftFig = uifigure('Name', 'FFT Film Thickness — Laue Fringes', ...
+            'Position', [250 150 680 580], 'Resize', 'on');
+        fftGL = uigridlayout(fftFig, [4 1], ...
+            'RowHeight', {78, 30, '1x', 72}, ...
             'Padding', [10 10 10 10], 'RowSpacing', 8);
 
-        % Row 1: Range controls
-        rangeGL = uigridlayout(fftGL, [2 4], ...
-            'ColumnWidth', {80, '1x', 80, '1x'}, ...
+        % ── Row 1: Parameter controls (titled panel) ───────────────────
+        paramPanel = uipanel(fftGL, 'Title', 'Parameters', 'FontSize', 11);
+        paramPanel.Layout.Row = 1;
+        paramGL = uigridlayout(paramPanel, [2 6], ...
+            'ColumnWidth', {80, '1x', 80, '1x', 80, '1x'}, ...
             'RowHeight', {24, 24}, ...
-            'Padding', [0 0 0 0], 'ColumnSpacing', 6, 'RowSpacing', 4);
-        rangeGL.Layout.Row = 1;
-        uilabel(rangeGL, 'Text', ['2' char(952) ' min (' char(176) '):'], 'FontWeight', 'bold');
-        efFFTMin = uieditfield(rangeGL, 'numeric', 'Value', xLo, 'Limits', [-10 180]);
+            'Padding', [6 4 6 4], 'ColumnSpacing', 6, 'RowSpacing', 4);
+
+        % Row 1 of params: 2theta range + max thickness
+        lbl1 = uilabel(paramGL, 'Text', ['2' char(952) ' min (' char(176) '):'], ...
+            'FontWeight', 'bold');
+        lbl1.Layout.Row = 1; lbl1.Layout.Column = 1;
+        efFFTMin = uieditfield(paramGL, 'numeric', 'Value', xLo, 'Limits', [-10 180], ...
+            'Tooltip', ['Lower bound of the 2' char(952) ' range for FFT analysis'], ...
+            'ValueChangedFcn', @(~,~) doFFT([],[]));
         efFFTMin.Layout.Row = 1; efFFTMin.Layout.Column = 2;
-        uilabel(rangeGL, 'Text', ['2' char(952) ' max (' char(176) '):'], 'FontWeight', 'bold');
-        efFFTMax = uieditfield(rangeGL, 'numeric', 'Value', xHi, 'Limits', [-10 180]);
+        lbl2 = uilabel(paramGL, 'Text', ['2' char(952) ' max (' char(176) '):'], ...
+            'FontWeight', 'bold');
+        lbl2.Layout.Row = 1; lbl2.Layout.Column = 3;
+        efFFTMax = uieditfield(paramGL, 'numeric', 'Value', xHi, 'Limits', [-10 180], ...
+            'Tooltip', ['Upper bound of the 2' char(952) ' range for FFT analysis'], ...
+            'ValueChangedFcn', @(~,~) doFFT([],[]));
         efFFTMax.Layout.Row = 1; efFFTMax.Layout.Column = 4;
-        uilabel(rangeGL, 'Text', 'Max t (nm):', 'FontWeight', 'bold');
-        efMaxThick = uieditfield(rangeGL, 'numeric', 'Value', 200, 'Limits', [1 10000], ...
-            'Tooltip', 'Maximum thickness to display on x-axis (nm)');
-        efMaxThick.Layout.Row = 2; efMaxThick.Layout.Column = 2;
-        uilabel(rangeGL, 'Text', 'Window:');
-        ddWindow = uidropdown(rangeGL, ...
+        lbl3 = uilabel(paramGL, 'Text', 'Max t (nm):', 'FontWeight', 'bold');
+        lbl3.Layout.Row = 1; lbl3.Layout.Column = 5;
+        efMaxThick = uieditfield(paramGL, 'numeric', 'Value', 200, 'Limits', [1 10000], ...
+            'Tooltip', 'Maximum thickness to display on the x-axis (nm)', ...
+            'ValueChangedFcn', @(~,~) doFFT([],[]));
+        efMaxThick.Layout.Row = 1; efMaxThick.Layout.Column = 6;
+
+        % Row 2 of params: window + compute button
+        lbl4 = uilabel(paramGL, 'Text', 'Window:', 'FontWeight', 'bold');
+        lbl4.Layout.Row = 2; lbl4.Layout.Column = 1;
+        ddWindow = uidropdown(paramGL, ...
             'Items', {'Hann', 'None', 'Blackman'}, 'Value', 'Hann', ...
-            'Tooltip', 'Windowing function applied before FFT');
-        ddWindow.Layout.Row = 2; ddWindow.Layout.Column = 4;
-
-        % Row 2: Compute button
-        btnCompute = uibutton(fftGL, 'Text', 'Compute FFT', ...
+            'Tooltip', ['Windowing function applied before FFT.' newline ...
+                        'Hann reduces spectral leakage (recommended).'], ...
+            'ValueChangedFcn', @(~,~) doFFT([],[]));
+        ddWindow.Layout.Row = 2; ddWindow.Layout.Column = 2;
+        btnCompute = uibutton(paramGL, 'Text', 'Compute FFT', ...
             'ButtonPushedFcn', @doFFT, ...
-            'BackgroundColor', BTN_ACCENT, 'FontColor', BTN_FG);
-        btnCompute.Layout.Row = 2;
+            'BackgroundColor', BTN_ACCENT, 'FontColor', BTN_FG, ...
+            'FontWeight', 'bold');
+        btnCompute.Layout.Row = 2; btnCompute.Layout.Column = [5 6];
 
-        % Row 3: Axes for FFT plot
+        % ── Row 2: Wavelength info label ────────────────────────────────
+        lblWavelength = uilabel(fftGL, 'Text', ...
+            sprintf('%s = %.5f %s', char(955), wl_A, char(197)), ...
+            'FontSize', 11, 'FontColor', [0.4 0.4 0.4]);
+        lblWavelength.Layout.Row = 2;
+
+        % ── Row 3: Axes for FFT plot ────────────────────────────────────
         fftAxPanel = uipanel(fftGL, 'BorderType', 'none');
         fftAxPanel.Layout.Row = 3;
         fftAx = axes(fftAxPanel);
+
+        % ── Row 4: Results panel ────────────────────────────────────────
+        resultPanel = uipanel(fftGL, 'Title', 'Result', ...
+            'FontSize', 11, 'FontWeight', 'bold');
+        resultPanel.Layout.Row = 4;
+        resultGL = uigridlayout(resultPanel, [2 4], ...
+            'ColumnWidth', {90, '1x', 100, '1x'}, ...
+            'RowHeight', {20, 20}, ...
+            'Padding', [8 4 8 4], 'ColumnSpacing', 6, 'RowSpacing', 2);
+        uilabel(resultGL, 'Text', 'Thickness:', 'FontWeight', 'bold', ...
+            'FontSize', 12);
+        lblResThick = uilabel(resultGL, 'Text', '---', 'FontSize', 12);
+        lblResThick.Layout.Row = 1; lblResThick.Layout.Column = 2;
+        uilabel(resultGL, 'Text', 'Uncertainty:', 'FontWeight', 'bold', ...
+            'FontSize', 12);
+        lblResUncert = uilabel(resultGL, 'Text', '---', 'FontSize', 12);
+        lblResUncert.Layout.Row = 1; lblResUncert.Layout.Column = 4;
+        uilabel(resultGL, 'Text', 'Range:', 'FontWeight', 'bold', ...
+            'FontSize', 11, 'FontColor', [0.4 0.4 0.4]);
+        lblResRange = uilabel(resultGL, 'Text', '---', 'FontSize', 11, ...
+            'FontColor', [0.4 0.4 0.4]);
+        lblResRange.Layout.Row = 2; lblResRange.Layout.Column = 2;
+        uilabel(resultGL, 'Text', 'Data points:', 'FontWeight', 'bold', ...
+            'FontSize', 11, 'FontColor', [0.4 0.4 0.4]);
+        lblResNpts = uilabel(resultGL, 'Text', '---', 'FontSize', 11, ...
+            'FontColor', [0.4 0.4 0.4]);
+        lblResNpts.Layout.Row = 2; lblResNpts.Layout.Column = 4;
 
         function doFFT(~, ~)
         %DOFFT  Run the FFT computation and plot results.
@@ -5024,14 +5096,21 @@ function varargout = dataImportGUI()
             hold(fftAx, 'off');
             xlabel(fftAx, 'Film thickness (nm)');
             ylabel(fftAx, 'FFT magnitude');
-            if ~isnan(dt_nm)
-                title(fftAx, sprintf('t = %.1f %s %.1f nm', t_nm, char(177), dt_nm/2));
-            else
-                title(fftAx, sprintf('t = %.1f nm', t_nm));
-            end
+            title(fftAx, 'FFT Magnitude Spectrum');
             grid(fftAx, 'on');
             box(fftAx, 'on');
             xlim(fftAx, [0 maxT_nm]);
+
+            % ── Update results panel ──────────────────────────────────
+            lblResThick.Text = sprintf('%.1f nm', t_nm);
+            if ~isnan(dt_nm)
+                lblResUncert.Text = sprintf('%s %.1f nm (FWHM/2)', char(177), dt_nm/2);
+            else
+                lblResUncert.Text = 'N/A (peak too broad)';
+            end
+            lblResRange.Text = sprintf(['%.2f' char(176) ' – %.2f' char(176) ...
+                ' 2' char(952)], twoThMin, twoThMax);
+            lblResNpts.Text = sprintf('%d', sum(mask));
 
             % Persist to dataset
             ds2 = appData.datasets{appData.activeIdx};
@@ -5044,6 +5123,9 @@ function varargout = dataImportGUI()
             ds2.filmThickness = fftResult;
             appData.datasets{appData.activeIdx} = ds2;
         end
+
+        % Auto-compute on open
+        doFFT([], []);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -5086,9 +5168,9 @@ function varargout = dataImportGUI()
 
         % ── Dialog figure ────────────────────────────────────────────────
         rfFig = uifigure('Name', 'Reflectivity FFT — Kiessig Thickness', ...
-            'Position', [200 150 780 640], 'Resize', 'on');
-        rfGL = uigridlayout(rfFig, [4 1], ...
-            'RowHeight', {80, 28, '2x', '1x'}, ...
+            'Position', [200 150 780 720], 'Resize', 'on');
+        rfGL = uigridlayout(rfFig, [5 1], ...
+            'RowHeight', {80, 28, '2x', 80, '1x'}, ...
             'Padding', [10 10 10 10], 'RowSpacing', 6);
 
         % ── Row 1: Controls ──────────────────────────────────────────────
@@ -5187,13 +5269,30 @@ function varargout = dataImportGUI()
         rfAxPanel.Layout.Row = 3;
         rfAx = axes(rfAxPanel);
 
-        % ── Row 4: Peak results table ────────────────────────────────────
+        % ── Row 4: Superlattice summary panel ────────────────────────────
+        slPanel = uipanel(rfGL, 'Title', 'Superlattice Analysis', 'FontSize', 11);
+        slPanel.Layout.Row = 4;
+        slGL = uigridlayout(slPanel, [3 2], ...
+            'ColumnWidth', {'1x', '1x'}, ...
+            'RowHeight', {20, 18, 18}, ...
+            'Padding', [6 2 6 2], 'ColumnSpacing', 12, 'RowSpacing', 2);
+        lblSLStatus    = uilabel(slGL, 'Text', 'No superlattice pattern detected', ...
+            'FontWeight', 'bold', 'FontColor', [0.4 0.4 0.4]);
+        lblSLStatus.Layout.Row = 1; lblSLStatus.Layout.Column = [1 2];
+        lblSLBilayer   = uilabel(slGL, 'Text', '', 'FontSize', 10);
+        lblSLBilayer.Layout.Row = 2; lblSLBilayer.Layout.Column = 1;
+        lblSLTotal     = uilabel(slGL, 'Text', '', 'FontSize', 10);
+        lblSLTotal.Layout.Row = 2; lblSLTotal.Layout.Column = 2;
+        lblSLSublayers = uilabel(slGL, 'Text', '', 'FontSize', 10);
+        lblSLSublayers.Layout.Row = 3; lblSLSublayers.Layout.Column = [1 2];
+
+        % ── Row 5: Peak results table ────────────────────────────────────
         rfTblPanel = uipanel(rfGL, 'Title', 'Detected Thickness Peaks', 'FontSize', 11);
-        rfTblPanel.Layout.Row = 4;
+        rfTblPanel.Layout.Row = 5;
         rfTblGL = uigridlayout(rfTblPanel, [1 1], 'Padding', [4 4 4 4]);
         rfPeakTable = uitable(rfTblGL, ...
-            'ColumnName',  {'#', 'Thickness (nm)', 'Amplitude', 'Rel (%)', 'Harmonic?'}, ...
-            'ColumnWidth', {30, 110, 80, 60, 100}, ...
+            'ColumnName',  {'#', 'Thickness (nm)', 'Amplitude', 'Rel (%)', 'Interpretation'}, ...
+            'ColumnWidth', {30, 110, 80, 60, 120}, ...
             'Data',        {}, ...
             'RowName',     {});
 
@@ -5342,31 +5441,155 @@ function varargout = dataImportGUI()
                 pkAbsIdx = pkAbsIdx(1:maxPeaks); %#ok<NASGU>
             end
 
-            % ── Identify harmonic relationships ───────────────────────
-            % A peak at thickness T is a harmonic of a fundamental T0 if
-            % T ≈ n × T0 for integer n (within 10% tolerance).
+            % ── Superlattice detection ────────────────────────────────
             nPk = numel(pkThick);
-            harmonicLabels = cell(nPk, 1);
+            interpLabels = cell(nPk, 1);
             for hi = 1:nPk
-                harmonicLabels{hi} = '';
+                interpLabels{hi} = '';
             end
+
+            slDetected     = false;
+            slLambda_nm    = NaN;
+            slTotal_nm     = NaN;
+            slNRepeats     = NaN;
+            slSubA_nm      = NaN;
+            slSubB_nm      = NaN;
+            slSuppressedOrders = [];
+
             if nPk >= 2
-                % Sort peaks by thickness for harmonic analysis
-                [tSorted, tSortIdx] = sort(pkThick, 'ascend');
-                for hi = 2:nPk
-                    for hj = 1:hi-1
-                        ratio = tSorted(hi) / tSorted(hj);
-                        nHarm = round(ratio);
-                        if nHarm >= 2 && abs(ratio - nHarm) < 0.10 * nHarm
-                            % hi is the n-th harmonic of hj
-                            origIdx = tSortIdx(hi);   % amplitude-sorted index of harmonic
-                            refIdx  = tSortIdx(hj);   % amplitude-sorted index of fundamental
-                            harmonicLabels{origIdx} = sprintf('%d%s #%d (%.1f nm)', ...
-                                nHarm, char(215), refIdx, pkThick(refIdx));
-                            break;  % only label as harmonic of the first match
+                % Sort peaks by thickness ascending for analysis
+                [tAsc, ~] = sort(pkThick, 'ascend');
+
+                % Try each of the 5 smallest peaks as candidate bilayer period
+                nCandidates = min(5, nPk);
+                bestScore   = 0;
+                bestLambda  = NaN;
+                harmTol     = 0.08;   % 8% ratio tolerance
+
+                for ci = 1:nCandidates
+                    Lambda_cand = tAsc(ci);
+                    score = 0;
+                    for pk = 1:nPk
+                        ratio = pkThick(pk) / Lambda_cand;
+                        nr    = round(ratio);
+                        if nr >= 1 && abs(ratio - nr) / nr < harmTol
+                            score = score + 1;
+                        end
+                    end
+                    if score > bestScore
+                        bestScore  = score;
+                        bestLambda = Lambda_cand;
+                    end
+                end
+
+                if bestScore >= 3
+                    slDetected  = true;
+                    slLambda_nm = bestLambda;
+
+                    % Assign labels: find which peaks are SL harmonics or satellites
+                    % First find highest matched harmonic order
+                    nMax = 1;
+                    for pk = 1:nPk
+                        ratio = pkThick(pk) / slLambda_nm;
+                        nr    = round(ratio);
+                        if nr >= 1 && abs(ratio - nr) / nr < harmTol
+                            if nr > nMax, nMax = nr; end
+                        end
+                    end
+
+                    % Count subsidiary peaks between Λ and 2Λ
+                    % Subsidiary peaks: in range [1.15×Λ, 1.85×Λ], not the 2Λ harmonic
+                    nSub = 0;
+                    for pk = 1:nPk
+                        t = pkThick(pk);
+                        if t > 1.15 * slLambda_nm && t < 1.85 * slLambda_nm
+                            ratio = t / slLambda_nm;
+                            nr    = round(ratio);
+                            if ~(nr == 2 && abs(ratio - 2) / 2 < harmTol)
+                                nSub = nSub + 1;
+                            end
+                        end
+                    end
+
+                    if nSub > 0
+                        slNRepeats = nSub + 2;
+                    else
+                        slNRepeats = nMax;
+                    end
+                    slTotal_nm = slNRepeats * slLambda_nm;
+
+                    % Find suppressed orders (2 through min(6, nMax))
+                    for ord = 2:min(6, max(nMax, 3))
+                        expectedT = ord * slLambda_nm;
+                        found = false;
+                        for pk = 1:nPk
+                            if abs(pkThick(pk) - expectedT) / expectedT < harmTol
+                                found = true;
+                                break;
+                            end
+                        end
+                        if ~found
+                            slSuppressedOrders(end+1) = ord; %#ok<AGROW>
+                        end
+                    end
+
+                    % Sublayer estimation from first missing order
+                    if ~isempty(slSuppressedOrders)
+                        firstMissing = slSuppressedOrders(1);
+                        slSubA_nm    = slLambda_nm / firstMissing;
+                        slSubB_nm    = slLambda_nm - slSubA_nm;
+                    end
+
+                    % Assign interpretation labels
+                    bilayerPeakAssigned = false;
+                    for pk = 1:nPk
+                        t     = pkThick(pk);
+                        ratio = t / slLambda_nm;
+                        nr    = round(ratio);
+                        isSLHarm = (nr >= 1) && (abs(ratio - nr) / nr < harmTol);
+
+                        if isSLHarm && nr == 1 && ~bilayerPeakAssigned
+                            interpLabels{pk}    = ['Bilayer ' char(923)];
+                            bilayerPeakAssigned = true;
+                        elseif isSLHarm && nr >= 2
+                            interpLabels{pk} = sprintf('SL order %d', nr);
+                        elseif t > 1.15 * slLambda_nm && t < 1.85 * slLambda_nm
+                            ratio2 = t / slLambda_nm;
+                            nr2    = round(ratio2);
+                            if ~(nr2 == 2 && abs(ratio2 - 2) / 2 < harmTol)
+                                interpLabels{pk} = 'Satellite';
+                            end
+                        else
+                            interpLabels{pk} = 'Independent';
                         end
                     end
                 end
+            end
+
+            % ── Update superlattice summary labels ────────────────────
+            if slDetected
+                lblSLStatus.Text      = sprintf(['Superlattice detected  ' char(8212) ...
+                    '  [A/B]%s%d'], char(215), slNRepeats);
+                lblSLStatus.FontColor = [0.10 0.45 0.10];
+                lblSLBilayer.Text     = sprintf(['Bilayer period ' char(923) ' = %.2f nm'], ...
+                    slLambda_nm);
+                lblSLTotal.Text       = sprintf('Total thickness D = %.1f nm  (%d repeats)', ...
+                    slTotal_nm, slNRepeats);
+                if ~isnan(slSubA_nm)
+                    lblSLSublayers.Text = sprintf( ...
+                        ['Estimated sublayers: d_A ' char(8776) ' %.2f nm,  ' ...
+                         'd_B ' char(8776) ' %.2f nm  ' ...
+                         '(suppressed order %d)'], ...
+                        slSubA_nm, slSubB_nm, slSuppressedOrders(1));
+                else
+                    lblSLSublayers.Text = 'd_A, d_B indeterminate (no suppressed orders)';
+                end
+            else
+                lblSLStatus.Text      = 'No superlattice pattern detected';
+                lblSLStatus.FontColor = [0.4 0.4 0.4];
+                lblSLBilayer.Text     = '';
+                lblSLTotal.Text       = '';
+                lblSLSublayers.Text   = '';
             end
 
             % ── Plot FFT spectrum with peak markers ───────────────────
@@ -5375,21 +5598,48 @@ function varargout = dataImportGUI()
                 'Color', [0.20 0.45 0.55], 'LineWidth', 1.2);
             hold(rfAx, 'on');
 
-            % Colour-code peaks: harmonics grey, fundamentals red
-            peakColors = repmat([0.85 0.15 0.15], nPk, 1);  % red default
+            % Colour-code peaks by interpretation
+            %   Bilayer Λ      → blue  [0.12 0.47 0.71]
+            %   SL harmonic    → red   [0.85 0.15 0.15]
+            %   Satellite      → cyan  [0.00 0.68 0.75]
+            %   Independent    → orange [0.90 0.50 0.00]
+            %   Unlabelled     → red (default, pre-superlattice-detection)
+            COL_BILAYER  = [0.12 0.47 0.71];
+            COL_SLHARM   = [0.85 0.15 0.15];
+            COL_SAT      = [0.00 0.68 0.75];
+            COL_INDEP    = [0.90 0.50 0.00];
+            COL_DEFAULT  = [0.85 0.15 0.15];
+
+            peakColors = repmat(COL_DEFAULT, nPk, 1);
             for ci = 1:nPk
-                if ~isempty(harmonicLabels{ci})
-                    peakColors(ci,:) = [0.55 0.55 0.55];  % grey for harmonics
+                lbl = interpLabels{ci};
+                if startsWith(lbl, 'Bilayer')
+                    peakColors(ci,:) = COL_BILAYER;
+                elseif startsWith(lbl, 'SL order')
+                    peakColors(ci,:) = COL_SLHARM;
+                elseif strcmp(lbl, 'Satellite')
+                    peakColors(ci,:) = COL_SAT;
+                elseif strcmp(lbl, 'Independent')
+                    peakColors(ci,:) = COL_INDEP;
                 end
             end
+
             for mi = 1:nPk
                 plot(rfAx, pkThick(mi), pkAmps(mi), 'v', ...
                     'MarkerSize', 10, 'MarkerFaceColor', peakColors(mi,:), ...
                     'MarkerEdgeColor', peakColors(mi,:));
-                text(rfAx, pkThick(mi), pkAmps(mi) * 1.06, ...
-                    sprintf('%.1f', pkThick(mi)), ...
-                    'HorizontalAlignment', 'center', 'FontSize', 8, ...
-                    'Color', peakColors(mi,:));
+                % Label bilayer period with Λ annotation; others with thickness value
+                if startsWith(interpLabels{mi}, 'Bilayer')
+                    lblTxt = sprintf('%s\n%.1f nm', char(923), pkThick(mi));
+                    text(rfAx, pkThick(mi), pkAmps(mi) * 1.06, lblTxt, ...
+                        'HorizontalAlignment', 'center', 'FontSize', 8, ...
+                        'FontWeight', 'bold', 'Color', peakColors(mi,:));
+                else
+                    text(rfAx, pkThick(mi), pkAmps(mi) * 1.06, ...
+                        sprintf('%.1f', pkThick(mi)), ...
+                        'HorizontalAlignment', 'center', 'FontSize', 8, ...
+                        'Color', peakColors(mi,:));
+                end
             end
             hold(rfAx, 'off');
             xlabel(rfAx, 'Film thickness (nm)');
@@ -5410,7 +5660,7 @@ function varargout = dataImportGUI()
                 tblData{ti,2} = round(pkThick(ti), 2);
                 tblData{ti,3} = round(pkAmps(ti), 4);
                 tblData{ti,4} = round(relPct(ti), 1);
-                tblData{ti,5} = harmonicLabels{ti};
+                tblData{ti,5} = interpLabels{ti};
             end
             rfPeakTable.Data = tblData;
 
@@ -5418,7 +5668,7 @@ function varargout = dataImportGUI()
             ds2 = appData.datasets{appData.activeIdx};
             rfResult.thicknesses_nm = pkThick(:);
             rfResult.amplitudes     = pkAmps(:);
-            rfResult.harmonicLabels = harmonicLabels;
+            rfResult.harmonicLabels = interpLabels;
             rfResult.Q_range        = [min(Q) max(Q)];
             rfResult.preprocess     = prepMode;
             rfResult.fft_magnitude  = F_search(:);
@@ -5427,6 +5677,14 @@ function varargout = dataImportGUI()
             if ~isNeutronDS && ~isempty(efRFWavelength)
                 rfResult.wavelength_A = efRFWavelength.Value;
             end
+            % Superlattice analysis results
+            rfResult.superlattice.detected           = slDetected;
+            rfResult.superlattice.bilayerPeriod_nm   = slLambda_nm;
+            rfResult.superlattice.totalThickness_nm  = slTotal_nm;
+            rfResult.superlattice.nRepeats           = slNRepeats;
+            rfResult.superlattice.sublayerA_nm       = slSubA_nm;
+            rfResult.superlattice.sublayerB_nm       = slSubB_nm;
+            rfResult.superlattice.suppressedOrders   = slSuppressedOrders;
             ds2.kiessigThickness = rfResult;
             appData.datasets{appData.activeIdx} = ds2;
         end
@@ -7468,8 +7726,8 @@ function varargout = dataImportGUI()
             'SheetName',  fn, ...
             'BookName',   'ThinFilmToolkit', ...
             'AxisLabels', axLabels, ...
-            'LogY',       cbLogY.Value, ...
-            'LogX',       cbLogX.Value);
+            'LogY',       strcmp(ddScaleY.Value, 'Log'), ...
+            'LogX',       strcmp(ddScaleX.Value, 'Log'));
 
         if ok
             uialert(fig, sprintf('Data sent to OriginPro.\nWorksheet: %s', fn), ...
@@ -7502,8 +7760,8 @@ function varargout = dataImportGUI()
         scriptPath = fullfile(outDir, outFile);
         try
             utilities.exportOriginScript(src, scriptPath, ...
-                'LogY', cbLogY.Value, ...
-                'LogX', cbLogX.Value);
+                'LogY', strcmp(ddScaleY.Value, 'Log'), ...
+                'LogX', strcmp(ddScaleX.Value, 'Log'));
             uialert(fig, sprintf('Origin script saved:\n%s\n\nRun in Origin: run.file("%s")', ...
                 scriptPath, outFile), 'Export Complete');
         catch ME
@@ -7673,9 +7931,9 @@ function varargout = dataImportGUI()
         if cbCalculateAsymmetry.Value
             % Asymmetry enabled: store previous log state and hide PNR data
             if ~isfield(appData, 'asymmetryPrevLogY')
-                appData.asymmetryPrevLogY = cbLogY.Value;
+                appData.asymmetryPrevLogY = strcmp(ddScaleY.Value, 'Log');
             end
-            cbLogY.Value = false;  % Switch to linear scale
+            ddScaleY.Value = 'Linear';  % Switch to linear scale
 
             % Hide all PNR datasets
             for i = 1:numel(appData.datasets)
@@ -7696,7 +7954,7 @@ function varargout = dataImportGUI()
 
             % Restore previous log Y state if we stored it
             if isfield(appData, 'asymmetryPrevLogY')
-                cbLogY.Value = appData.asymmetryPrevLogY;
+                if appData.asymmetryPrevLogY, ddScaleY.Value = 'Log'; else, ddScaleY.Value = 'Linear'; end
             end
         end
 
@@ -7813,7 +8071,7 @@ function varargout = dataImportGUI()
                 effectiveSpacing = 0;
             end
             % Log-mode waterfall uses multiplicative offsets instead of additive.
-            wfLogMode = waterfallOn && cbLogY.Value;
+            wfLogMode = waterfallOn && strcmp(ddScaleY.Value, 'Log');
 
             % For neutron data, group polarization cross-sections from the
             % same measurement so they share the same waterfall offset.
@@ -8279,7 +8537,7 @@ function varargout = dataImportGUI()
             if hasY2
                 yyaxis(targetAx, 'right');
                 hold(targetAx, 'off');
-                targetAx.YScale = guiTernary(cbLogY2.Value, 'log', 'linear');
+                targetAx.YScale = guiTernary(strcmp(ddScaleY2.Value, 'Log'), 'log', 'linear');
                 if ~isempty(efCustomY2Label.Value)
                     ylabel(targetAx, efCustomY2Label.Value);
                 elseif nY2 == 1
@@ -8348,8 +8606,8 @@ function varargout = dataImportGUI()
             % for asymmetry data or zero-padded theory curves).
             warnState = warning('off', 'MATLAB:Axes:NegativeDataInLogAxis');
             cleanupWarn = onCleanup(@() warning(warnState));
-            targetAx.XScale = guiTernary(cbLogX.Value,'log','linear');
-            targetAx.YScale = guiTernary(cbLogY.Value,'log','linear');
+            targetAx.XScale = guiTernary(strcmp(ddScaleX.Value, 'Log'),'log','linear');
+            targetAx.YScale = guiTernary(strcmp(ddScaleY.Value, 'Log'),'log','linear');
             grid(targetAx,'on');
             targetAx.FontSize       = 13;   % tick labels + axis labels
             targetAx.Title.FontSize = 14;   % title has its own independent property
@@ -8803,7 +9061,7 @@ function varargout = dataImportGUI()
     function draw2DMap(targetAx, ds)
     %DRAW2DMAP  Render a 2D area-detector intensity map into targetAx.
     %   Uses imagesc (Heatmap) or contour/contourf (Contour / Filled Contour).
-    %   cbLogY is reinterpreted as log-intensity toggle for 2D maps.
+    %   ddScaleY is reinterpreted as log-intensity toggle for 2D maps.
     %   Axis limits from ds.axLims are applied when present.
         ps  = ds.data.metadata.parserSpecific;
         map = ps.map2D;
@@ -8828,8 +9086,8 @@ function varargout = dataImportGUI()
             Xmat = [];  Ymat = [];
         end
 
-        % Log intensity (cbLogY re-purposed as log-I for 2D)
-        if cbLogY.Value
+        % Log intensity (ddScaleY re-purposed as log-I for 2D)
+        if strcmp(ddScaleY.Value, 'Log')
             I = log10(max(I, 1e-9));
         end
 
@@ -8873,7 +9131,7 @@ function varargout = dataImportGUI()
         end
 
         % Colorbar with intensity unit label
-        if cbLogY.Value
+        if strcmp(ddScaleY.Value, 'Log')
             cbStr = ['log_{10}(I / ' map.intensityUnit ')'];
         else
             cbStr = ['I (' map.intensityUnit ')'];
@@ -9019,8 +9277,8 @@ function varargout = dataImportGUI()
             useLogY = true;
         end
 
-        cbLogX.Value = useLogX;
-        cbLogY.Value = useLogY;
+        if useLogX, ddScaleX.Value = 'Log'; else, ddScaleX.Value = 'Linear'; end
+        if useLogY, ddScaleY.Value = 'Log'; else, ddScaleY.Value = 'Linear'; end
 
         % ── Set reasonable limits with margin ─────────────────────────
         if useLogX
@@ -9076,10 +9334,10 @@ function varargout = dataImportGUI()
     %ONCONTEXTTOGGLE  Toggle log scale, grid, or axis direction from context menu.
         switch what
             case 'logX'
-                cbLogX.Value = ~cbLogX.Value;
+                if strcmp(ddScaleX.Value,'Log'), ddScaleX.Value = 'Linear'; else, ddScaleX.Value = 'Log'; end
                 onPlot([], []);
             case 'logY'
-                cbLogY.Value = ~cbLogY.Value;
+                if strcmp(ddScaleY.Value,'Log'), ddScaleY.Value = 'Linear'; else, ddScaleY.Value = 'Log'; end
                 onPlot([], []);
             case 'grid'
                 if strcmp(ax.XGrid, 'on')
@@ -9755,8 +10013,8 @@ function varargout = dataImportGUI()
         savedXSel      = ddX.Value;
         savedYSel      = ensureCell(lbY.Value);
         savedY2Sel     = ensureCell(lbY2.Value);
-        savedLogX      = cbLogX.Value;
-        savedLogY      = cbLogY.Value;
+        savedLogX      = strcmp(ddScaleX.Value, 'Log');
+        savedLogY      = strcmp(ddScaleY.Value, 'Log');
         savedBGInterp  = ddBGInterp.Value;
 
         setStatus('Saving session...');
@@ -9866,8 +10124,8 @@ function varargout = dataImportGUI()
         if isfield(S,'savedColormap') && ismember(S.savedColormap, ddColormap.Items)
             ddColormap.Value = S.savedColormap;
         end
-        if isfield(S,'savedLogX'), cbLogX.Value = S.savedLogX; end
-        if isfield(S,'savedLogY'), cbLogY.Value = S.savedLogY; end
+        if isfield(S,'savedLogX'), if S.savedLogX, ddScaleX.Value = 'Log'; else, ddScaleX.Value = 'Linear'; end, end
+        if isfield(S,'savedLogY'), if S.savedLogY, ddScaleY.Value = 'Log'; else, ddScaleY.Value = 'Linear'; end, end
         if isfield(S,'savedBGInterp') && ismember(S.savedBGInterp, ddBGInterp.Items)
             ddBGInterp.Value = S.savedBGInterp;
         end
@@ -10109,7 +10367,7 @@ function varargout = dataImportGUI()
     %  Linear mode: 1.1× the maximum data range (additive offset).
     %  Log mode:    10^(1.1 × max log-range) as a multiplicative factor.
         ySel = ensureCell(lbY.Value);
-        if cbLogY.Value
+        if strcmp(ddScaleY.Value, 'Log')
             % Log mode — return a multiplier (ratio between adjacent traces)
             s = 10;   % safe fallback: one decade
             if isempty(ySel), return; end

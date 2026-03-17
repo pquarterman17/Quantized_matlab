@@ -1,2 +1,14 @@
+# Claude Code
 .claude/
 planning/
+
+# macOS
+.DS_Store
+._*
+
+# Visual Studio
+.vs/
+
+# MATLAB runtime state
+*.asv
+.emviewer_recent.mat
