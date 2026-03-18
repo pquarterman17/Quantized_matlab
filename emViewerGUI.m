@@ -157,7 +157,6 @@ function varargout = emViewerGUI()
     appData.listPanelHeight  = 195;  % user-resized export panel height (px)
     MIN_LEFT_W  = 100;
     MIN_TOOLS_W = 180;
-    MIN_LIST_H  = 60;
     MIN_EXPORT_H = 120;
     SNAP_PX     = 5;
 
@@ -181,8 +180,8 @@ function varargout = emViewerGUI()
             tmp = load(prefsFilePath, 'prefs');
             if isfield(tmp, 'prefs')
                 flds = fieldnames(tmp.prefs);
-                for fi = 1:numel(flds)
-                    appData.prefs.(flds{fi}) = tmp.prefs.(flds{fi});
+                for fj = 1:numel(flds)
+                    appData.prefs.(flds{fj}) = tmp.prefs.(flds{fj});
                 end
             end
         end
@@ -266,7 +265,7 @@ function varargout = emViewerGUI()
     lblSep = uilabel(toolbarGL, 'Text', '|', ...
         'FontColor', [0.5 0.5 0.5], ...
         'HorizontalAlignment', 'center');
-    lblSep.Layout.Row = 1; lblSep.Layout.Column = 4; %#ok<NASGU>
+    lblSep.Layout.Row = 1; lblSep.Layout.Column = 4;
 
     btnZoomFit = uibutton(toolbarGL, 'Text', 'Fit', ...
         'ButtonPushedFcn', @onZoomFit, ...
@@ -285,7 +284,7 @@ function varargout = emViewerGUI()
     lblSep2 = uilabel(toolbarGL, 'Text', '|', ...
         'FontColor', [0.5 0.5 0.5], ...
         'HorizontalAlignment', 'center');
-    lblSep2.Layout.Row = 1; lblSep2.Layout.Column = 7; %#ok<NASGU>
+    lblSep2.Layout.Row = 1; lblSep2.Layout.Column = 7;
 
     btnCompare = uibutton(toolbarGL, 'state', 'Text', 'Compare', ...
         'ValueChangedFcn', @onCompareToggle, ...
@@ -306,7 +305,7 @@ function varargout = emViewerGUI()
     lblSep3 = uilabel(toolbarGL, 'Text', '|', ...
         'FontColor', [0.5 0.5 0.5], ...
         'HorizontalAlignment', 'center');
-    lblSep3.Layout.Row = 1; lblSep3.Layout.Column = 10; %#ok<NASGU>
+    lblSep3.Layout.Row = 1; lblSep3.Layout.Column = 10;
 
     btnPrefs = uibutton(toolbarGL, 'Text', char(9881), ...
         'ButtonPushedFcn', @onPreferences, ...
@@ -325,7 +324,7 @@ function varargout = emViewerGUI()
     lblSep4 = uilabel(toolbarGL, 'Text', '|', ...
         'FontColor', [0.5 0.5 0.5], ...
         'HorizontalAlignment', 'center');
-    lblSep4.Layout.Row = 1; lblSep4.Layout.Column = 13; %#ok<NASGU>
+    lblSep4.Layout.Row = 1; lblSep4.Layout.Column = 13;
 
     lblFilename = uilabel(toolbarGL, 'Text', '(no image loaded)', ...
         'FontSize', 11, ...
@@ -602,7 +601,7 @@ function varargout = emViewerGUI()
 
     lblLow = uilabel(contrastInnerGL, 'Text', 'Low', ...
         'FontSize', 8, 'HorizontalAlignment', 'left');
-    lblLow.Layout.Row = 1; lblLow.Layout.Column = [1 2]; %#ok<NASGU>
+    lblLow.Layout.Row = 1; lblLow.Layout.Column = [1 2];
 
     sldLow = uislider(contrastInnerGL, ...
         'Value', 0, 'Limits', [0 1], ...
@@ -614,7 +613,7 @@ function varargout = emViewerGUI()
 
     lblHigh = uilabel(contrastInnerGL, 'Text', 'High', ...
         'FontSize', 8, 'HorizontalAlignment', 'left');
-    lblHigh.Layout.Row = 3; lblHigh.Layout.Column = [1 2]; %#ok<NASGU>
+    lblHigh.Layout.Row = 3; lblHigh.Layout.Column = [1 2];
 
     sldHigh = uislider(contrastInnerGL, ...
         'Value', 1, 'Limits', [0 1], ...
@@ -1704,15 +1703,15 @@ function varargout = emViewerGUI()
                 isfield(imgInfo, 'frames') && ~isempty(imgInfo.frames)
             nF = numel(imgInfo.frames);
             appData.stackFrames = cell(1, nF);
-            for fi = 1:nF
-                frm = imgInfo.frames{fi};
+            for fk = 1:nF
+                frm = imgInfo.frames{fk};
                 if size(frm, 3) == 3
                     frm = double(frm);
                     frm = 0.299*frm(:,:,1) + 0.587*frm(:,:,2) + 0.114*frm(:,:,3);
                 else
                     frm = double(frm);
                 end
-                appData.stackFrames{fi} = frm;
+                appData.stackFrames{fk} = frm;
             end
             showStackControls(nF);
         else
@@ -2586,14 +2585,13 @@ function varargout = emViewerGUI()
 
         outPath = fullfile(saveDir, saveName);
         [~, ~, ext] = fileparts(outPath);
-        ext = lower(ext);
 
         fig.Pointer = 'watch';
         drawnow;
 
         try
             dispImg = appData.displayImg;   % [0,1] double
-            if strcmp(ext, '.png')
+            if strcmpi(ext, '.png')
                 % Scale to uint8 for PNG
                 imwrite(uint8(dispImg * 255), outPath);
             else
@@ -2836,9 +2834,9 @@ function varargout = emViewerGUI()
 
         % Block overwrite of original source file (pure-MATLAB, no Java)
         if ~isempty(srcPath)
-            srcResolved = lower(fullfile(srcPath));
-            outResolved = lower(fullfile(outPath));
-            if strcmp(srcResolved, outResolved)
+            srcResolved = fullfile(srcPath);
+            outResolved = fullfile(outPath);
+            if strcmpi(srcResolved, outResolved)
                 uialert(fig, ...
                     'Cannot overwrite the original source file. Choose a different name.', ...
                     'Overwrite Blocked', 'Icon', 'warning');
@@ -2847,7 +2845,6 @@ function varargout = emViewerGUI()
         end
 
         [~, ~, ext] = fileparts(outPath);
-        ext = lower(ext);
 
         fig.Pointer = 'watch';
         drawnow;
@@ -2863,7 +2860,7 @@ function varargout = emViewerGUI()
             cropDisp = (cropPx - lo) / (hi - lo);
             cropDisp = max(0, min(1, cropDisp));
 
-            if strcmp(ext, '.png')
+            if strcmpi(ext, '.png')
                 imwrite(uint8(cropDisp * 255), outPath);
             else
                 imwrite(uint16(cropDisp * 65535), outPath);
@@ -2952,7 +2949,7 @@ function varargout = emViewerGUI()
             'unit', 'intensity', ...
             'details', sprintf('[%d:%d, %d:%d] mean=%.4g std=%.4g min=%.4g max=%.4g area=%s', ...
                 xMin, xMax, yMin, yMax, roiMean, roiStd, roiMin, roiMax, areaStr), ...
-            'timestamp', datestr(now, 'yyyy-mm-dd HH:MM:SS'));
+            'timestamp', char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
 
         % Add to ROI list for ROI Manager
         roiEntry = struct('name', sprintf('ROI_%d', numel(appData.roiList)+1), ...
@@ -3173,10 +3170,9 @@ function varargout = emViewerGUI()
         end
 
         [~, ~, ext] = fileparts(outPath);
-        ext = lower(ext);
 
         dispImg = appData.displayImg;   % [0,1] double
-        if strcmp(ext, '.png')
+        if strcmpi(ext, '.png')
             imwrite(uint8(dispImg * 255), outPath);
         else
             imwrite(uint16(dispImg * 65535), outPath);
@@ -3668,8 +3664,8 @@ function varargout = emViewerGUI()
 
         % Destroy single-view axes
         delete(axGL);
-        axGL = []; %#ok<NASGU>
-        ax   = []; %#ok<NASGU>
+        axGL = [];
+        ax   = [];
 
         % Create side-by-side layout inside axPanel
         compareGL = uigridlayout(axPanel, [1 2], ...
@@ -4584,7 +4580,7 @@ function varargout = emViewerGUI()
         appData.measurementLog{end+1} = struct( ...
             'type', 'distance', 'value', dVal, 'unit', dUnit, ...
             'details', sprintf('(%.0f,%.0f)-(%.0f,%.0f)', x1, y1, x2, y2), ...
-            'timestamp', datestr(now, 'yyyy-mm-dd HH:MM:SS'));
+            'timestamp', char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -5221,7 +5217,7 @@ function varargout = emViewerGUI()
             appData.measurementLog{end+1} = struct( ...
                 'type', 'angle', 'value', angleDeg, 'unit', 'deg', ...
                 'details', sprintf('vertex=(%.0f,%.0f)', pts(1,1), pts(1,2)), ...
-                'timestamp', datestr(now, 'yyyy-mm-dd HH:MM:SS'));
+                'timestamp', char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
         end
     end
 
@@ -5308,7 +5304,7 @@ function varargout = emViewerGUI()
             appData.measurementLog{end+1} = struct( ...
                 'type', 'polyline', 'value', totalDist, 'unit', unitStr, ...
                 'details', sprintf('%d segments', nSegs), ...
-                'timestamp', datestr(now, 'yyyy-mm-dd HH:MM:SS'));
+                'timestamp', char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
             return;
         end
 
@@ -5492,7 +5488,6 @@ function varargout = emViewerGUI()
             bestBarRow = 0;
             bestBarX1  = 0;
             bestBarX2  = 0;
-            bestIsWhite = true;
 
             for tryWhite = [true, false]
                 if tryWhite
@@ -5518,7 +5513,6 @@ function varargout = emViewerGUI()
                             % Verify it's a thin bar: check rows above/below
                             barHeight = 1;
                             for rr = ri+1:size(bw, 1)
-                                midRun = round((starts(si) + ends(si)) / 2);
                                 sampCols = max(1, starts(si)+2) : min(W, ends(si)-2);
                                 if numel(sampCols) < 3, break; end
                                 if mean(bw(rr, sampCols)) > 0.7
@@ -5533,7 +5527,6 @@ function varargout = emViewerGUI()
                                 bestBarRow  = ri;
                                 bestBarX1   = starts(si);
                                 bestBarX2   = ends(si);
-                                bestIsWhite = tryWhite;
                             end
                         end
                     end
@@ -5554,12 +5547,7 @@ function varargout = emViewerGUI()
             barX1 = bestBarX1;
             barX2 = bestBarX2;
 
-            % Try to guess the scale bar value from common SEM/TEM values
-            % by looking at the ratio of bar length to image width
-            guessValues = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
-            guessUnits  = {'nm', 'nm', 'nm', 'nm', 'nm', 'nm', 'nm', 'nm', 'nm', 'nm', 'nm', 'nm'; ...
-                           'um', 'um', 'um', 'um', 'um', 'um', 'um', 'um', 'um', 'um', 'um', 'um'};
-            % We can't truly know the value without OCR — just present the
+            % We can't truly know the bar value without OCR — just present the
             % pixel length and let the user type the real distance
 
             fig.Pointer = 'arrow';
@@ -6461,8 +6449,9 @@ function varargout = emViewerGUI()
             'RowSpacing', 6);
 
         % Row 1: Label
-        uilabel(dlgGL, 'Text', 'Select images:', 'FontWeight', 'bold', ...
-            'FontSize', 11).Layout.Row = 1;
+        lblGIFSelect = uilabel(dlgGL, 'Text', 'Select images:', 'FontWeight', 'bold', ...
+            'FontSize', 11);
+        lblGIFSelect.Layout.Row = 1;
 
         % Row 2: Image list (multi-select)
         lbGIFImages = uilistbox(dlgGL, ...
@@ -6474,16 +6463,18 @@ function varargout = emViewerGUI()
         lbGIFImages.Layout.Column = [1 2];
 
         % Row 3: Frame delay
-        uilabel(dlgGL, 'Text', 'Frame delay (s):', ...
-            'HorizontalAlignment', 'right').Layout.Row = 3;
+        lblDelay = uilabel(dlgGL, 'Text', 'Frame delay (s):', ...
+            'HorizontalAlignment', 'right');
+        lblDelay.Layout.Row = 3; lblDelay.Layout.Column = 1;
         efDelay = uieditfield(dlgGL, 'numeric', ...
             'Value', 0.5, 'Limits', [0.02 10], ...
             'Tooltip', 'Seconds per frame (0.02 – 10)');
         efDelay.Layout.Row = 3; efDelay.Layout.Column = 2;
 
         % Row 4: Loop count
-        uilabel(dlgGL, 'Text', 'Loop:', ...
-            'HorizontalAlignment', 'right').Layout.Row = 4;
+        lblLoop = uilabel(dlgGL, 'Text', 'Loop:', ...
+            'HorizontalAlignment', 'right');
+        lblLoop.Layout.Row = 4; lblLoop.Layout.Column = 1;
         ddLoop = uidropdown(dlgGL, ...
             'Items', {'Infinite', '1', '2', '3', '5', '10'}, ...
             'ItemsData', {Inf, 1, 2, 3, 5, 10}, ...
@@ -6500,8 +6491,9 @@ function varargout = emViewerGUI()
         cbScaleBarGIF.Layout.Column = [1 2];
 
         % Row 6: Scale bar color
-        uilabel(dlgGL, 'Text', 'Bar color:', ...
-            'HorizontalAlignment', 'right').Layout.Row = 6;
+        lblBarColor = uilabel(dlgGL, 'Text', 'Bar color:', ...
+            'HorizontalAlignment', 'right');
+        lblBarColor.Layout.Row = 6; lblBarColor.Layout.Column = 1;
         ddBarColor = uidropdown(dlgGL, ...
             'Items', {'White', 'Black'}, ...
             'Value', 'White', ...
@@ -6960,12 +6952,12 @@ function varargout = emViewerGUI()
         nFrames = numel(appData.stackFrames);
         [H2, W2] = size(appData.stackFrames{1});
         stack3D = zeros(H2, W2, nFrames);
-        for fi = 1:nFrames
-            frame = appData.stackFrames{fi};
+        for fm = 1:nFrames
+            frame = appData.stackFrames{fm};
             % Handle size mismatch gracefully
             [fh, fw] = size(frame);
             mh = min(H2, fh); mw = min(W2, fw);
-            stack3D(1:mh, 1:mw, fi) = frame(1:mh, 1:mw);
+            stack3D(1:mh, 1:mw, fm) = frame(1:mh, 1:mw);
         end
 
         mipImg = max(stack3D, [], 3);
@@ -7026,7 +7018,7 @@ function varargout = emViewerGUI()
     % ════════════════════════════════════════════════════════════════════
     function saveRecentFiles()
         try
-            recentFiles = appData.recentFiles; %#ok<NASGU>
+            recentFiles = appData.recentFiles;
             save(recentFilePath, 'recentFiles');
         catch
             % Ignore save errors
@@ -7220,7 +7212,7 @@ function varargout = emViewerGUI()
         end
 
         % Show result in new figure
-        rFig = figure('Name', sprintf('Image Math: %s', op), 'NumberTitle', 'off');
+        figure('Name', sprintf('Image Math: %s', op), 'NumberTitle', 'off');
         imagesc(result); colormap(gray(256)); axis image; colorbar;
         title(sprintf('%s — %s', names{idxA}, op), 'Interpreter', 'none');
 
@@ -7434,7 +7426,7 @@ function varargout = emViewerGUI()
         nCols = ceil(sqrt(nImgs));
         nRows = ceil(nImgs / nCols);
 
-        gFig = figure('Name', 'Image Grid', 'NumberTitle', 'off', ...
+        figure('Name', 'Image Grid', 'NumberTitle', 'off', ...
             'Units', 'normalized', 'Position', [0.1 0.1 0.7 0.7]);
 
         for gi = 1:nImgs
@@ -7592,15 +7584,16 @@ function varargout = emViewerGUI()
             if sortDist(si) == 0, break; end
             [sr, sc] = ind2sub(size(bw), sortIdx(si));
             if labelMap(sr, sc) > 0, continue; end
-            % Find labeled neighbor
-            neighbors = [];
-            if sr > 1 && labelMap(sr-1, sc) > 0, neighbors(end+1) = labelMap(sr-1, sc); end
-            if sr < size(bw,1) && labelMap(sr+1, sc) > 0, neighbors(end+1) = labelMap(sr+1, sc); end
-            if sc > 1 && labelMap(sr, sc-1) > 0, neighbors(end+1) = labelMap(sr, sc-1); end
-            if sc < size(bw,2) && labelMap(sr, sc+1) > 0, neighbors(end+1) = labelMap(sr, sc+1); end
-            if ~isempty(neighbors)
-                un = unique(neighbors);
-                if numel(un) == 1
+            % Find labeled neighbors (max 4 — N/S/W/E)
+            neighbors = zeros(1, 4);
+            nNbr = 0;
+            if sr > 1 && labelMap(sr-1, sc) > 0, nNbr = nNbr+1; neighbors(nNbr) = labelMap(sr-1, sc); end
+            if sr < size(bw,1) && labelMap(sr+1, sc) > 0, nNbr = nNbr+1; neighbors(nNbr) = labelMap(sr+1, sc); end
+            if sc > 1 && labelMap(sr, sc-1) > 0, nNbr = nNbr+1; neighbors(nNbr) = labelMap(sr, sc-1); end
+            if sc < size(bw,2) && labelMap(sr, sc+1) > 0, nNbr = nNbr+1; neighbors(nNbr) = labelMap(sr, sc+1); end
+            if nNbr > 0
+                un = unique(neighbors(1:nNbr));
+                if isscalar(un)
                     labelMap(sr, sc) = un;
                 end
                 % If multiple different labels meet, this is a watershed line — leave as 0
@@ -7734,7 +7727,7 @@ function varargout = emViewerGUI()
         fig.Pointer = 'arrow';
 
         % Display in new figure
-        mFig = figure('Name', 'Montage', 'NumberTitle', 'off');
+        figure('Name', 'Montage', 'NumberTitle', 'off');
         imagesc(montage); colormap(gray(256)); axis image;
         title(sprintf('%d images, %dx%d grid, %.0f%% overlap', ...
             nImgs, nRows2, nCols, overlap*100), 'Interpreter', 'none');
@@ -7982,7 +7975,7 @@ function varargout = emViewerGUI()
             appData.prefs.exportDPI          = spnPrefDPI.Value;
             appData.prefs.pixelInspectorSize = spnPrefInsp.Value;
             try
-                prefs = appData.prefs; %#ok<NASGU>
+                prefs = appData.prefs;
                 save(prefsFilePath, 'prefs');
             catch
             end
@@ -8477,7 +8470,7 @@ function varargout = emViewerGUI()
             [radii, avgProf, maxProf] = imaging.radialProfile(mag);
 
             % Plot in new figure
-            fRP = figure('Name', 'Radial Profile', 'NumberTitle', 'off');
+            figure('Name', 'Radial Profile', 'NumberTitle', 'off');
             subplot(1, 2, 1);
             plot(radii, avgProf, 'b-', 'LineWidth', 1.2);
             xlabel('Spatial Frequency (px^{-1})'); ylabel('Mean Intensity');
@@ -8503,7 +8496,7 @@ function varargout = emViewerGUI()
             [mag, ~] = imaging.computeFFT(appData.filteredPixels);
             [radii, intensity] = imaging.azimuthalIntegrate(mag);
 
-            fAZ = figure('Name', 'Azimuthal Integration', 'NumberTitle', 'off');
+            figure('Name', 'Azimuthal Integration', 'NumberTitle', 'off');
             plot(radii, intensity, 'k-', 'LineWidth', 1.2);
             xlabel('Spatial Frequency (px^{-1})'); ylabel('Integrated Intensity');
             title('Azimuthal Integration'); grid on;
@@ -8533,7 +8526,7 @@ function varargout = emViewerGUI()
                 img = interp2(Xo, Yo, img, Xq, Yq, 'linear');
             end
 
-            fSurf = figure('Name', 'Surface Plot', 'NumberTitle', 'off');
+            figure('Name', 'Surface Plot', 'NumberTitle', 'off');
             surf(img, 'EdgeColor', 'none');
             colormap(parula); colorbar;
             xlabel('X (px)'); ylabel('Y (px)'); zlabel('Intensity');
@@ -8782,19 +8775,21 @@ function varargout = emViewerGUI()
         % Use NaN initialisation so that out-of-boundary pixels (returned as
         % NaN by imaging.lineProfile's interp2) do not bias the average toward
         % zero when lines extend outside the image.
-        allI = [];
+        % Pre-compute profile length from the centre line
+        [d, refI] = imaging.lineProfile(appData.filteredPixels, x1, y1, x2, y2);
+        nProfPts = numel(refI);
+        allI = NaN(numel(offsets), nProfPts);
+        allI(1, :) = refI;  % centre line is offset index ceil(width/2)
         for oi = 1:numel(offsets)
             off = offsets(oi);
+            if off == 0, allI(oi, :) = refI; continue; end
             ox1 = x1 + off * px;
             oy1 = y1 + off * py;
             ox2 = x2 + off * px;
             oy2 = y2 + off * py;
-            [d, intensity] = imaging.lineProfile(appData.filteredPixels, ...
+            [~, intensity] = imaging.lineProfile(appData.filteredPixels, ...
                 ox1, oy1, ox2, oy2);
-            if isempty(allI)
-                allI = NaN(numel(offsets), numel(intensity));
-            end
-            nPts = min(size(allI, 2), numel(intensity));
+            nPts = min(nProfPts, numel(intensity));
             allI(oi, 1:nPts) = intensity(1:nPts);
         end
 
