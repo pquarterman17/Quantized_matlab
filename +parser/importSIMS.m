@@ -211,6 +211,59 @@ function data = importSIMS(filepath, options)
     [elemNames, concUnits] = cleanElementNames(elemHeaders);
 
     % ════════════════════════════════════════════════════════════════
+    %  STEP 9b: Recover element names from header metadata rows
+    %
+    %  Some SIMS vendors place element names in a
+    %  dedicated row *above* the Depth / CONC. header row, using the
+    %  depth (odd) column positions and leaving the concentration
+    %  (even) column positions blank:
+    %
+    %    H  |    | C  |    | O  |    | AL-> |    | Si-> |    | ...
+    %    Depth | CONC. | Depth | CONC. | ...
+    %    (nm) | (atoms/cc) | ...
+    %
+    %  When cleanElementNames produces empty labels (because the header
+    %  row contains bare unit strings like "(atoms/cc)"), we scan
+    %  headerMetadata for a row that fits this paired-name pattern and
+    %  use its odd-position tokens as element names.
+    % ════════════════════════════════════════════════════════════════
+    if isPaired && any(cellfun(@isempty, elemNames)) && ~isempty(headerMetadata)
+        nE = numel(elemNames);
+        for mi = 1:numel(headerMetadata)
+            % IMPORTANT: use CollapseDelimiters=false so consecutive
+            % delimiters (e.g. "H,,C") produce empty tokens ('H','','C'),
+            % not collapsed tokens ('H','C').
+            parts = strtrim(strsplit(headerMetadata{mi}, char(delim), ...
+                            'CollapseDelimiters', false));
+            if numel(parts) < nE, continue; end      % need at least nE name slots
+            % Trailing empty tokens may be absent (no trailing delimiter),
+            % so pad to 2*nE before slicing.
+            if numel(parts) < 2 * nE
+                parts(end+1 : 2*nE) = {''};
+            end
+            parts = parts(1 : 2 * nE);
+
+            oddParts  = parts(1:2:end);   % depth column positions → element names
+            evenParts = parts(2:2:end);   % conc column positions  → expected blank
+
+            nEvenBlank = sum(cellfun(@isempty, evenParts));
+            nOddText   = sum(cellfun( ...
+                @(s) ~isempty(s) && isnan(str2double(s)), oddParts));
+
+            % Accept when ≥50% of even slots are blank AND ≥50% of odd
+            % slots are non-numeric text (robust to partially missing names)
+            if nEvenBlank >= floor(nE * 0.5) && nOddText >= floor(nE * 0.5)
+                for p = 1:nE
+                    if isempty(elemNames{p}) && ~isempty(oddParts{p})
+                        elemNames{p} = oddParts{p};
+                    end
+                end
+                break;
+            end
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════
     %  STEP 10: Build union depth grid and interpolate
     % ════════════════════════════════════════════════════════════════
     [unionDepth, interpConcs] = buildUnionGrid(depths, concs);
@@ -393,6 +446,16 @@ function [elemNames, concUnits] = cleanElementNames(headers)
 
     for i = 1:nE
         h = strtrim(headers{i});
+
+        % Step 0: bare unit string — entire header is wrapped in parentheses,
+        % e.g. "(atoms/cc)" or "(arb. units)".  This happens when the parser
+        % selects the units row as the column header row (vendor multi-row header layout).
+        matchBare = regexp(h, '^\(([^)]+)\)$', 'tokens', 'once');
+        if ~isempty(matchBare)
+            elemNames{i} = '';
+            concUnits{i} = strtrim(matchBare{1});
+            continue;
+        end
 
         % Step 1: extract unit in parentheses or brackets
         unit = '';

@@ -147,7 +147,7 @@ function data = importExcel(filepath, options)
     % ════════════════════════════════════════════════════════════════
     %  STEP 4: Detect header row and data start row
     % ════════════════════════════════════════════════════════════════
-    [headerRow, dataStartRow] = detectLayout(numMat, nRows, nCols, ...
+    [headerRow, dataStartRow] = detectLayout(numMat, raw, nCols, ...
         options.HeaderRow, options.DataStartRow);
 
     % ════════════════════════════════════════════════════════════════
@@ -159,7 +159,7 @@ function data = importExcel(filepath, options)
             v = raw{headerRow, c};
             if ischar(v) || isstring(v)
                 colHeaders{c} = strtrim(char(v));
-            elseif isnumeric(v) && ~isnan(v)
+            elseif isnumeric(v) && isscalar(v) && ~isnan(v)
                 colHeaders{c} = num2str(v);
             else
                 colHeaders{c} = sprintf('Col%d', c);
@@ -322,7 +322,7 @@ function raw = trimRaw(raw)
 end
 
 
-function [headerRow, dataStartRow] = detectLayout(numMat, ~, nCols, hdrOpt, dsOpt)
+function [headerRow, dataStartRow] = detectLayout(numMat, raw, nCols, hdrOpt, dsOpt)
 %DETECTLAYOUT Infer header row and first data row from numeric density.
     if hdrOpt >= 0 && dsOpt >= 0
         headerRow    = hdrOpt;
@@ -347,10 +347,20 @@ function [headerRow, dataStartRow] = detectLayout(numMat, ~, nCols, hdrOpt, dsOp
     if hdrOpt >= 0
         headerRow = hdrOpt;
     else
-        if firstDataIdx > 1 && numericScore(firstDataIdx - 1) < 0.5
-            headerRow = firstDataIdx - 1;
-        else
-            headerRow = 0;
+        % Scan backward from firstDataIdx, skipping truly blank rows.
+        % A "truly blank" row has no numeric content AND all raw cells are
+        % empty ([]); this distinguishes blank separator rows from text-only
+        % header rows (which are also all-NaN in numMat but have strings in raw).
+        headerRow = 0;
+        for ri = (firstDataIdx - 1) : -1 : 1
+            rowHasContent = any(~isnan(numMat(ri, :))) || ...
+                any(~cellfun(@isempty, raw(ri, :)));
+            if rowHasContent
+                if numericScore(ri) < 0.5
+                    headerRow = ri;
+                end
+                break;   % stop at the first (bottommost) non-blank row
+            end
         end
     end
 end

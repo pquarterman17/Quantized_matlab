@@ -561,6 +561,64 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  12. importExcel  –  blank separator row between headers and data
+%      Regression test for vendor SIMS xlsx files that place a blank row
+%      between the column header row and the numeric data block.
+%      A blank row (all missing cells) previously caused a MATLAB scalar-AND
+%      error: "Operands to && must be convertible to logical scalar values"
+%      because isnumeric([]) = true but ~isnan([]) = [] (empty array).
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 12: parser.importExcel (blank row between headers and data) ══\n');
+tmpXlsx12 = fullfile(tempdir, 'test_importExcel_blankrow.xlsx');
+try
+    % Build xlsx with a vendor-style SIMS paired-column layout:
+    %   Row 1: column headers (text)
+    %   Row 2: BLANK separator (the bug trigger — all cells are missing)
+    %   Rows 3-6: numeric data
+    rawCell = {
+        'Depth (nm)', 'H (atoms/cc)', 'C (atoms/cc)', 'O (atoms/cc)', ...
+        'F (atoms/cc)', 'N (atoms/cc)', 'Al (arb. units)';   % row 1: headers
+        [], [], [], [], [], [], [];                           % row 2: blank (7 cols)
+        0.26918, 2.46e22, 1.17e20, 3.0e22, 2.06e19, 1.83e19, 1.45;  % data
+        0.89853, 1.83e22, 3.51e19, 3.6e22, 6.75e18, 7.2e17,  2.32;
+        1.53742, 3.14e22, 2.92e19, 3.11e22, 1.66e18, 2.75e17, 4.08;
+        2.17631, 3.78e22, 2.85e19, 1.72e22, 6.39e17, 9.0e16,  1.62;
+    };
+    writecell(rawCell, tmpXlsx12);
+
+    d = parser.importExcel(tmpXlsx12);
+
+    assert(isstruct(d),              'output must be a struct');
+    assert(isfield(d,'time'),        'missing field: time');
+    assert(isfield(d,'values'),      'missing field: values');
+    assert(numel(d.time) == 4,       'expected 4 data rows');
+    assert(size(d.values,2) == 6,    'expected 6 data channels');
+
+    % Header row 1 should be detected despite blank row 2 between it and data
+    assert(strcmpi(d.labels{1}, 'H'),  'first channel label should be H');
+    assert(strcmpi(d.units{1}, 'atoms/cc'), 'unit should be atoms/cc');
+
+    % Depth values should match the first column from the data rows
+    assert(abs(d.time(1) - 0.26918) < 1e-4, 'first depth wrong');
+    assert(abs(d.time(end) - 2.17631) < 1e-4, 'last depth wrong');
+
+    % First H concentration: 2.46e22
+    assert(abs(d.values(1,1) - 2.46e22) / 2.46e22 < 1e-4, 'H conc row 1 wrong');
+
+    fprintf('  Rows         : %d\n', numel(d.time));
+    fprintf('  Channels     : %s\n', strjoin(d.labels, ' | '));
+    fprintf('  Units        : %s\n', strjoin(d.units, ' | '));
+    fprintf('  Header row   : %d (blank row correctly skipped)\n', ...
+        d.metadata.parserSpecific.headerRow);
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+if isfile(tmpXlsx12), delete(tmpXlsx12); end
+
+% ════════════════════════════════════════════════════════════════════════
 %  Summary
 % ════════════════════════════════════════════════════════════════════════
 total = passed + failed;
