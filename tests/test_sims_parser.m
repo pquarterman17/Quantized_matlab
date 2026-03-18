@@ -214,6 +214,68 @@ catch ME
     fprintf('  ✘ Test 8: %s\n', ME.message);
 end
 
+% ── Test 9: vendor multi-row header SIMS format ───────────────────────
+% Reproduces a vendor SIMS export layout: company metadata rows, blank
+% separator lines, three-row column header block (element names /
+% Depth+CONC. labels / units), then data.  The four data rows match
+% values visible in a sample screenshot of a real instrument output file.
+try
+    fp = writeTempCSV('sims_t9_vendor_multirow', {
+        'SIMS Test Lab Corp.'
+        ':Sample 2829'
+        '2/17/2026'
+        'Drawn Curves,8'
+        'Num of Cycles,273'
+        ''
+        'H,,C,,O,,F,,N,,AL->,,Si->,,Ta->'
+        'Depth,CONC.,Depth,CONC.,Depth,CONC.,Depth,CONC.,Depth,CONC.,Depth,CONC.,Depth,CONC.,Depth,CONC.'
+        '(nm),(atoms/cc),(nm),(atoms/cc),(nm),(atoms/cc),(nm),(atoms/cc),(nm),(atoms/cc),(nm),(arb. units),(nm),(arb. units),(nm),(arb. units)'
+        ''
+        '0.26918,2.46E+22,0.31686,1.17E+20,0.37407,3E+22,0.47896,2.06E+19,0.52664,1.83E+19,0.03305,1.447731,0.1072,94.55794,0.4557,7.392328'
+        '0.89853,1.83E+22,0.95575,3.51E+19,1.00343,3.6E+22,1.10832,6.75E+18,1.16553,7.2E+17,0.61142,2.316867,0.68557,74.83689,1.03407,41.22428'
+        '1.53742,3.14E+22,1.5851,2.92E+19,1.64232,3.11E+22,1.74721,1.66E+18,1.80442,2.75E+17,1.18978,4.078207,1.26393,25.22221,1.61243,84.12749'
+        '2.17631,3.78E+22,2.22399,2.85E+19,2.28121,1.72E+22,2.3861,6.39E+17,2.43378,9E+16,1.76073,1.619716,1.8423,8.45145,2.1908,94.9156'
+    });
+    tmpFiles{end+1} = fp;
+    d = parser.importSIMS(fp);
+
+    % 8 element pairs (H, C, O, F, N, Al, Si, Ta)
+    assert(numel(d.labels) == 8, ...
+        sprintf('Expected 8 elements, got %d', numel(d.labels)));
+    assert(d.metadata.parserSpecific.isPairedLayout, ...
+        'Should detect paired layout');
+
+    % Depth grid is built from the union of 8 per-element depth vectors
+    assert(numel(d.time) >= 4, 'Expected at least 4 depth points');
+    assert(d.time(1) > 0,      'Depth should be positive');
+    assert(d.time(end) < 3,    'Depth should be < 3 nm for this dataset');
+
+    % Concentration units extracted from the units header row
+    % Parser picks the units row as colHeaders → units should be non-empty
+    hasUnits = any(~cellfun(@isempty, d.units));
+    assert(hasUnits, 'At least one concentration unit should be non-empty');
+
+    % All concentration values should be finite positive numbers or NaN
+    % (NaN is allowed at extrapolated grid edges)
+    assert(all(d.values(~isnan(d.values)) > 0), ...
+        'All valid concentrations should be positive');
+
+    % Company info and element name rows captured in headerMetadata
+    hm = d.metadata.parserSpecific.headerMetadata;
+    assert(~isempty(hm), 'Header metadata should not be empty');
+    allMeta = strjoin(hm, ' ');
+    assert(contains(allMeta, 'Sample 2829'), ...
+        'Sample ID should appear in header metadata');
+    assert(contains(allMeta, 'SIMS Test Lab'), ...
+        'Company name should appear in header metadata');
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 9: vendor multi-row header (8 elements, real data values)\n');
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 9: %s\n', ME.message);
+end
+
 catch ME
     fprintf('  ✘ FATAL: %s\n', ME.message);
     nFail = nFail + 1;
