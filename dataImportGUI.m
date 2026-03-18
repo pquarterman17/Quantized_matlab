@@ -544,7 +544,7 @@ function varargout = dataImportGUI()
     ddColormap.Layout.Row = 1; ddColormap.Layout.Column = [2 4];
 
     % Row 2: Theme selector
-    lblTheme = uilabel(styleGL,'Text','Theme:','FontSize',10); %#ok<NASGU>
+    lblTheme = uilabel(styleGL,'Text','Theme:','FontSize',10);
     lblTheme.Layout.Row = 2; lblTheme.Layout.Column = 1;
 
     ddTheme = uidropdown(styleGL, ...
@@ -1272,8 +1272,6 @@ function varargout = dataImportGUI()
 
     AXLIM_BG = [0.17 0.17 0.17];   % dark field background matching GUI theme
     AXLIM_FG = [0.92 0.92 0.92];   % light text for readability on dark background
-    AXLIM_PH = [0.70 0.70 0.70];   % placeholder "auto" text -- improved contrast on dark bg
-
     efXMin = uieditfield(axLimGL,'text','Value','', ...
         'Placeholder','auto', ...
         'Tooltip','X axis minimum — blank = auto-scale', ...
@@ -1361,7 +1359,7 @@ function varargout = dataImportGUI()
         'FontSize', 9, 'FontWeight', 'bold', ...
         'FontColor', [0.55 0.55 0.55], ...
         'HorizontalAlignment', 'left');
-    lblAxAppearance.Layout.Row = 6; lblAxAppearance.Layout.Column = [1 4]; %#ok<NASGU>
+    lblAxAppearance.Layout.Row = 6; lblAxAppearance.Layout.Column = [1 4];
 
     % ── Appearance controls (rows 7-12) ───────────────────────────────
     % Row 7: Color (L spans 2-3 normally; R in col 4 when Y2 active)
@@ -2610,7 +2608,6 @@ function varargout = dataImportGUI()
 
         try
             % Parse referenced dataset indices (D1, D2, ...)
-            refIdxs = unique(str2double(regexp(expr, 'D(\d+)', 'tokens', 'once')));
             allRefs = regexp(expr, 'D(\d+)', 'tokens');
             refIdxs = unique(cellfun(@(c) str2double(c{1}), allRefs));
 
@@ -2656,8 +2653,7 @@ function varargout = dataImportGUI()
             end
 
             % Evaluate expression
-            yResult = eval(safeExpr); %#ok<EVLC>
-
+            yResult = eval(safeExpr); 
             if ~isnumeric(yResult) || numel(yResult) ~= numel(xBase)
                 error('Expression did not produce a vector of the correct length.');
             end
@@ -9329,14 +9325,14 @@ function varargout = dataImportGUI()
                     targetAx.YAxis(1).Exponent     = 0;
                 catch
                     % R2022 fallback: use ruler property if available
-                    try targetAx.YRuler.Exponent = 0; catch, end %#ok<CTCH>
+                    try targetAx.YRuler.Exponent = 0; catch, end
                 end
             elseif isempty(yfmt)
                 ytickformat(targetAx, 'auto');
-                try targetAx.YAxis(1).ExponentMode = 'auto'; catch, end %#ok<CTCH>
+                try targetAx.YAxis(1).ExponentMode = 'auto'; catch, end
             else
                 ytickformat(targetAx, yfmt);
-                try targetAx.YAxis(1).ExponentMode = 'auto'; catch, end %#ok<CTCH>
+                try targetAx.YAxis(1).ExponentMode = 'auto'; catch, end
             end
 
             if hasY2
@@ -9347,13 +9343,14 @@ function varargout = dataImportGUI()
                     try
                         targetAx.YAxis(2).ExponentMode = 'manual';
                         targetAx.YAxis(2).Exponent     = 0;
-                    catch, end %#ok<CTCH>
+                    catch
+                    end
                 elseif isempty(y2fmt)
                     ytickformat(targetAx, 'auto');
-                    try targetAx.YAxis(2).ExponentMode = 'auto'; catch, end %#ok<CTCH>
+                    try targetAx.YAxis(2).ExponentMode = 'auto'; catch, end
                 else
                     ytickformat(targetAx, y2fmt);
-                    try targetAx.YAxis(2).ExponentMode = 'auto'; catch, end %#ok<CTCH>
+                    try targetAx.YAxis(2).ExponentMode = 'auto'; catch, end
                 end
                 yyaxis(targetAx, 'left');
             end
@@ -11391,7 +11388,7 @@ function varargout = dataImportGUI()
             for ci = sort(1:numel(d.labels), 'descend')
                 safeExpr = strrep(safeExpr, sprintf('C%d', ci), sprintf('colVars.C%d', ci));
             end
-            yResult = eval(safeExpr); %#ok<EVLC>
+            yResult = eval(safeExpr);
             if ~isnumeric(yResult) || numel(yResult) ~= size(d.values, 1)
                 error('Result must be a vector with %d elements.', size(d.values, 1));
             end
@@ -11467,7 +11464,7 @@ function idx = findErrorColumn(labels, yLabel)
         ['d' yLabel], ...        % e.g., 'dMoment' for 'Moment'
         [yLabel ' err'], ...     % e.g., 'Moment err'
         [yLabel ' Err'], ...
-        ['M. Std. Err.'], ...    % QD VSM standard error
+        'M. Std. Err.', ...      % QD VSM standard error
         [yLabel ' std'], ...
         [yLabel ' sigma'] };
     for ci = 1:numel(candidates)
