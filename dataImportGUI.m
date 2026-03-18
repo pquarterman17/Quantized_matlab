@@ -254,6 +254,13 @@ function varargout = dataImportGUI()
     appData.selectedPeakIdx   = 0;    % row highlighted in peakTable (0 = none)
     appData.zoomStartPt       = [];        % [x y] data coords where drag-zoom began
     appData.zoomRectPatch     = [];        % patch handle for the rubber-band rectangle
+    appData.maskStartPt       = [];        % [x y] data coords where mask drag began
+    appData.maskRectPatch     = [];        % patch handle for mask rubber-band rectangle
+    appData.fringeClickCount  = 0;         % 0, 1, or 2 — fringe thickness pick state
+    appData.fringeMarkers     = [];        % [2x1] line handles for draggable markers
+    appData.fringeAnnotation  = [];        % text handle showing thickness readout
+    appData.fringeQ           = [NaN NaN]; % Q values of the two picked fringe peaks
+    appData.fringeDragIdx     = 0;         % which marker (1 or 2) is being dragged
     appData.lastClickTic      = uint64(0); % tic timestamp of last ax click (double-click detection)
     appData.cursorText        = [];        % text handle for x,y hover readout (top-right of axes)
     appData.bgDataset         = [];        % background data struct loaded via importAuto (or [])
@@ -772,11 +779,11 @@ function varargout = dataImportGUI()
         'BGFILE',    13,  'BGSUBTR',   14,  'ASYM1',     15,  'ASYM2',     16, ...
         'SEC_MAG',   17,  'MAG_MASS',  18,  'MAG_DIM',   19,  'MAG_THICK', 20, ...
         'MAG_UNITS', 21,  'MAG_AUTO',  22, ...
-        'APPLY',     23,  'ACTIONS',   24);
+        'APPLY',     23,  'ACTIONS',   24,  'MASK',   25);
 
-    corrGL = uigridlayout(corrPanel,[24 4], ...
+    corrGL = uigridlayout(corrPanel,[25 4], ...
         'RowHeight',    {24, 20, 22,22,22,22, 20, 22,22,22,22, 20, 0,0, 0,0, ...
-                         0,0,0,0,0,0, 24,22}, ...
+                         0,0,0,0,0,0, 24,22, 22}, ...
         'ColumnWidth',  {72,'1x',80,'1x'}, ...
         'Padding',      [4 4 4 4], ...
         'RowSpacing',   2, ...
@@ -1215,6 +1222,21 @@ function varargout = dataImportGUI()
         'Tooltip','Hide/show the active dataset in the plot without removing it  [Space]', ...
         'FontColor',[0.75 0.75 0.75],'FontSize',9);
     btnToggleVis.Layout.Row = CROW.ACTIONS; btnToggleVis.Layout.Column = 4;
+
+    % Row 25: Mask Selection | Unmask All
+    btnMaskSelect = uibutton(corrGL,'Text','Mask Selection', ...
+        'ButtonPushedFcn',@onArmMaskSelection, ...
+        'BackgroundColor',[0.60 0.15 0.15], ...
+        'FontColor',BTN_FG,'FontSize',9, ...
+        'Tooltip','Click & drag a rectangle on the plot to mask (exclude) data points inside the box');
+    btnMaskSelect.Layout.Row = CROW.MASK; btnMaskSelect.Layout.Column = [1 2];
+
+    btnUnmaskAll = uibutton(corrGL,'Text','Unmask All', ...
+        'ButtonPushedFcn',@onUnmaskAll, ...
+        'BackgroundColor',BTN_TOOL, ...
+        'FontColor',[0.75 0.75 0.75],'FontSize',9, ...
+        'Tooltip','Restore all masked data points for the active dataset  [Ctrl+M]');
+    btnUnmaskAll.Layout.Row = CROW.MASK; btnUnmaskAll.Layout.Column = [3 4];
 
     % Region statistics readout — moved to status bar area (no longer a corrGL row)
     lblRegionStats = uilabel(corrGL,'Text','', 'FontSize',9, ...
@@ -1710,8 +1732,8 @@ function varargout = dataImportGUI()
     peakTable.Layout.Column = 1;
 
     % Peak buttons — 2-column layout: fitting/actions on left, export/settings on right
-    peakBtnGL = uigridlayout(peakGL,[9 2], ...
-        'RowHeight',    {24,22,22,22,22,22, 18, 0, 96}, ...
+    peakBtnGL = uigridlayout(peakGL,[10 2], ...
+        'RowHeight',    {24,22,22,22,22,22,0, 18, 0, 96}, ...
         'ColumnWidth',  {'1x','1x'}, ...
         'Padding',      [0 0 0 0], ...
         'RowSpacing',   2, ...
@@ -1792,21 +1814,31 @@ function varargout = dataImportGUI()
                     '-space if wavelength is set.']);
     btnReflFFT.Layout.Row = 6; btnReflFFT.Layout.Column = 2;
 
-    % Row 7: "Advanced..." toggle (collapsed by default)
-    PEAK_ADV_ROWS = 8;
+    % Row 7: Fringe thickness (2-click) — visible only in reflectometry mode
+    btnFringeThick = uibutton(peakBtnGL, 'Text', ['Fringe ' char(916) 't (2-click)'], ...
+        'ButtonPushedFcn', @onArmFringeThickness, ...
+        'BackgroundColor', BTN_ACCENT, 'FontColor', BTN_FG, ...
+        'FontSize', 9, ...
+        'Tooltip', ['Pick two fringe peaks to estimate film thickness via t = 2' char(960) ...
+                    '/' char(916) 'Q.  Points are draggable for refinement.']);
+    btnFringeThick.Layout.Row = 7; btnFringeThick.Layout.Column = [1 2];
+    btnFringeThick.Visible = 'off';  % shown only for reflectometry data
+
+    % Row 8: "Advanced..." toggle (collapsed by default)
+    PEAK_ADV_ROWS = 9;
     PEAK_ADV_HEIGHTS = 22;
     btnMorePeak = uibutton(peakBtnGL, 'Text', [char(9654) ' Advanced...'], ...
         'FontSize', 9, 'FontColor', [0.55 0.55 0.55], ...
         'BackgroundColor', peakBtnGL.BackgroundColor, ...
         'HorizontalAlignment', 'left', ...
         'ButtonPushedFcn', @(~,~) onToggleAdvancedPeakTools());
-    btnMorePeak.Layout.Row = 7; btnMorePeak.Layout.Column = [1 2];
+    btnMorePeak.Layout.Row = 8; btnMorePeak.Layout.Column = [1 2];
 
     % Row 8: Advanced peak tools (collapsed by default) — 3 buttons side-by-side in a sub-grid
     peakAdvGL = uigridlayout(peakBtnGL, [1 3], ...
         'Padding', [0 0 0 0], 'ColumnSpacing', 3, ...
         'ColumnWidth', {'1x','1x','1x'});
-    peakAdvGL.Layout.Row = 8; peakAdvGL.Layout.Column = [1 2];
+    peakAdvGL.Layout.Row = 9; peakAdvGL.Layout.Column = [1 2];
 
     btnWHPlot = uibutton(peakAdvGL, 'Text', 'W-H Plot', ...
         'ButtonPushedFcn', @onWilliamsonHallPlot, ...
@@ -1844,7 +1876,7 @@ function varargout = dataImportGUI()
     minSepGL = uigridlayout(peakBtnGL, [4 4], ...
         'RowHeight', {22,22,24,20}, 'ColumnWidth', {50, '1x', 50, '1x'}, ...
         'Padding', [0 0 0 0], 'ColumnSpacing', 3, 'RowSpacing', 2);
-    minSepGL.Layout.Row = 9; minSepGL.Layout.Column = [1 2];
+    minSepGL.Layout.Row = 10; minSepGL.Layout.Column = [1 2];
     % Row 1: Min sep | Wavelength (side by side)
     lblMinSep = uilabel(minSepGL, 'Text', 'Min sep:', 'FontSize', 9, ...
         'HorizontalAlignment', 'right', ...
@@ -2025,6 +2057,10 @@ function varargout = dataImportGUI()
     api.setQSpace           = @setQSpaceDirect;
     api.setContourLevels    = @setContourLevelsDirect;
     api.setColormap         = @setColormapDirect;
+    api.maskRegion          = @maskRegionDirect;
+    api.unmaskAll           = @() onUnmaskAll([],[]);
+    api.fringeThickness     = @fringeThicknessDirect;
+    api.clearFringe         = @clearFringeMarkers;
 
     % ════════════════════════════════════════════════════════════════════
     %  NESTED CALLBACKS  (share appData + all control handles via closure)
@@ -2392,11 +2428,36 @@ function varargout = dataImportGUI()
         drawnow;
     end
 
+    function maskRegionDirect(xMin, xMax, yMin, yMax)
+    %MASKREGIONDIRECT  Programmatic masking for testing.
+    %   api.maskRegion(xMin, xMax, yMin, yMax) masks data points in the box.
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        applyMaskInBox(xMin, xMax, yMin, yMax);
+    end
+
+    function result = fringeThicknessDirect(Q1, Q2)
+    %FRINGETHICKNESSDIRECT  Programmatic fringe thickness for testing.
+    %   result = api.fringeThickness(Q1, Q2) returns struct with fields:
+    %     .dQ, .thickness_A, .thickness_nm
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            result = struct(); return;
+        end
+        clearFringeMarkers();
+        appData.fringeQ = [Q1, Q2];
+        appData.fringeClickCount = 2;
+        dQ = abs(Q2 - Q1);
+        result.dQ = dQ;
+        result.thickness_A  = 2 * pi / dQ;
+        result.thickness_nm = result.thickness_A / 10;
+        % Place markers and annotation
+        recreateFringeMarkers();
+    end
+
     function onSelectDataset(~,~)
     %ONSELECTDATASET  Fires when the user clicks a row in lbDatasets.
     %  With Multiselect='on', lbDatasets.Value is a cell array of selected
     %  ItemsData values.  The active dataset is the first (most-recently
-    %  clicked) element.
+    %  clicked) element.  Only selected datasets are plotted.
         rawVal = lbDatasets.Value;
         % Normalise to a numeric scalar (the "primary" selection)
         if iscell(rawVal)
@@ -2407,16 +2468,18 @@ function varargout = dataImportGUI()
         end
         if ~isnumeric(val) || numel(val) ~= 1, return; end
         if val < 1 || val > numel(appData.datasets), return; end
-        if val == appData.activeIdx, return; end   % no change
 
-        saveAxisLimsToActiveDataset();   % persist zoom before leaving current dataset
-        % Don't cancel while a listbox drag has been initiated: cancelInteractions()
-        % would clear the WindowButtonMotionFcn/UpFcn that onAxesButtonDown just set.
-        if appData.listDragSrcIdx == 0
-            cancelInteractions();
+        activeChanged = (val ~= appData.activeIdx);
+        if activeChanged
+            saveAxisLimsToActiveDataset();   % persist zoom before leaving current dataset
+            % Don't cancel while a listbox drag has been initiated: cancelInteractions()
+            % would clear the WindowButtonMotionFcn/UpFcn that onAxesButtonDown just set.
+            if appData.listDragSrcIdx == 0
+                cancelInteractions();
+            end
+            appData.activeIdx = val;
+            updateControlsForActiveDataset();
         end
-        appData.activeIdx = val;
-        updateControlsForActiveDataset();
 
         % Update listbox tooltip with dataset metadata (#19)
         ds = appData.datasets{val};
@@ -2426,6 +2489,7 @@ function varargout = dataImportGUI()
         lbDatasets.Tooltip = sprintf('%s\nParser: %s  |  %d points  |  %s', ...
             ds.filepath, pName, nPts, hasCorrStr);
 
+        % Always replot — selection may have changed even if active didn't
         onPlot([],[]);
     end
 
@@ -2897,6 +2961,23 @@ function varargout = dataImportGUI()
         end
         appData.zoomRectPatch     = [];
         appData.zoomStartPt       = [];
+        % Abort any in-progress mask selection
+        if ~isempty(appData.maskRectPatch) && isvalid(appData.maskRectPatch)
+            delete(appData.maskRectPatch);
+        end
+        appData.maskRectPatch     = [];
+        appData.maskStartPt       = [];
+        btnMaskSelect.Text            = 'Mask Selection';
+        btnMaskSelect.BackgroundColor = [0.60 0.15 0.15];
+        btnMaskSelect.Enable          = 'on';
+        % Reset fringe thickness pick mode (but keep existing markers)
+        if appData.fringeClickCount > 0 && appData.fringeClickCount < 2
+            clearFringeMarkers();
+        end
+        appData.fringeDragIdx     = 0;
+        btnFringeThick.Text            = ['Fringe ' char(916) 't (2-click)'];
+        btnFringeThick.BackgroundColor = BTN_ACCENT;
+        btnFringeThick.Enable          = 'on';
         appData.lastClickTic      = uint64(0);
         if ~isempty(appData.yOriginMarker) && isvalid(appData.yOriginMarker)
             delete(appData.yOriginMarker);
@@ -3157,6 +3238,8 @@ function varargout = dataImportGUI()
                           btnFitColor, btnWHPlot, btnFFTThickness, btnRefineLattice, btnReflFFT}
                     hh{1}.Visible = 'on'; %#ok<FXSET>
                 end
+                btnFringeThick.Visible = 'off';
+                peakBtnGL.RowHeight{7} = 0;
                 % Hide asymmetry; respect BG file collapse state
                 corrGL.RowHeight{CROW.BGFILE}  = bgFileH;
                 corrGL.RowHeight{CROW.BGSUBTR} = bgFileH;
@@ -3240,6 +3323,8 @@ function varargout = dataImportGUI()
                     hh{1}.Visible = 'off'; %#ok<FXSET>
                 end
                 btnReflFFT.Visible = 'on';
+                btnFringeThick.Visible = 'on';
+                peakBtnGL.RowHeight{7} = 22;
                 % Hide BG file rows; show asymmetry rows
                 corrGL.RowHeight{CROW.BGFILE}  = 0;
                 corrGL.RowHeight{CROW.BGSUBTR} = 0;
@@ -3734,7 +3819,8 @@ function varargout = dataImportGUI()
             uialert(fig,'Could not find selected Y channel.','Auto Peaks'); return;
         end
         yv    = d.values(:, yIdx);
-        valid = ~isnan(xv) & ~isnan(yv);
+        dmask = buildDisplayMask(ds);
+        valid = ~isnan(xv) & ~isnan(yv) & dmask;
         xv = xv(valid);  yv = yv(valid);
         if numel(xv) < 5
             uialert(fig,'Too few valid data points for peak detection.','Auto Peaks'); return;
@@ -3883,11 +3969,12 @@ function varargout = dataImportGUI()
         yIdx = find(strcmp(d.labels, ySel{1}), 1);
         if isempty(yIdx), return; end
         yv = d.values(:, yIdx);
+        dmask = buildDisplayMask(ds);
 
         % Search within 3 % of x-axis range of click for the NEAREST local
         % maximum (not the global max — which misses the smaller of two close peaks).
         xWin  = diff(ax.XLim) * 0.03;
-        inWin = xv >= (xClick - xWin) & xv <= (xClick + xWin) & ~isnan(yv);
+        inWin = xv >= (xClick - xWin) & xv <= (xClick + xWin) & ~isnan(yv) & dmask;
         if any(inWin)
             xInWin = xv(inWin);
             yInWin = yv(inWin);
@@ -4013,7 +4100,8 @@ function varargout = dataImportGUI()
         if isempty(yIdx), uialert(fig,'Could not find Y channel.','Fit Peaks'); return; end
         yv = d.values(:, yIdx);
 
-        valid = ~isnan(xv) & ~isnan(yv);
+        dmask = buildDisplayMask(ds);
+        valid = ~isnan(xv) & ~isnan(yv) & dmask;
         xv = xv(valid);  yv = yv(valid);
         xSpan = diff([min(xv), max(xv)]);
 
@@ -4190,7 +4278,8 @@ function varargout = dataImportGUI()
         end
         yv = d.values(:, yIdx);
 
-        valid = ~isnan(xv) & ~isnan(yv);
+        dmask = buildDisplayMask(ds);
+        valid = ~isnan(xv) & ~isnan(yv) & dmask;
         xv = xv(valid);  yv = yv(valid);
         nP = numel(ds.peaks);
 
@@ -4913,11 +5002,12 @@ function varargout = dataImportGUI()
                 'No wavelength'); return;
         end
 
-        % Get current data (corrected if available)
+        % Get current data (corrected if available), exclude masked points
         d = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
-        xAll = d.time(:);
+        dmask = buildDisplayMask(ds);
+        xAll = d.time(dmask);
         % Use first y-channel (primary intensity)
-        yAll = d.values(:,1);
+        yAll = d.values(dmask,1);
 
         % Pre-fill range from current axis limits
         xLo = ax.XLim(1);
@@ -5129,6 +5219,288 @@ function varargout = dataImportGUI()
     end
 
     % ════════════════════════════════════════════════════════════════════
+    %  3.1c  FRINGE THICKNESS (2-CLICK ΔQ ESTIMATION)
+    % ════════════════════════════════════════════════════════════════════
+
+    function onArmFringeThickness(~,~)
+    %ONARMFRINGETHICKNESS  Arm 2-click fringe thickness pick mode.
+    %   Click two fringe peaks; thickness = 2*pi / |Q1 - Q2|.
+    %   Markers are draggable for refinement.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig,'Load a file first.','No data'); return;
+        end
+        cancelInteractions();
+        clearFringeMarkers();
+
+        appData.fringeClickCount = 0;
+        appData.fringeQ          = [NaN NaN];
+        btnFringeThick.Text            = 'Click peak 1 of 2...';
+        btnFringeThick.BackgroundColor = [0.20 0.55 0.75];
+        btnFringeThick.Enable          = 'off';
+        fig.Pointer = 'crosshair';
+        fig.WindowButtonDownFcn = @onFringeClick;
+    end
+
+    function onFringeClick(~,~)
+    %ONFRINGECLICK  Handle a click during fringe thickness pick mode.
+        cp = ax.CurrentPoint;
+        xClick = cp(1,1);  yClick = cp(1,2);
+        if xClick < ax.XLim(1) || xClick > ax.XLim(2) || ...
+           yClick < ax.YLim(1) || yClick > ax.YLim(2)
+            return;
+        end
+
+        % Get displayed data for the active dataset
+        ds = appData.datasets{appData.activeIdx};
+        primaryD = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
+        xVec = double(primaryD.time);
+
+        % Snap to nearest data point (normalized distance)
+        ySel2  = ensureCell(lbY.Value);
+        bestD  = Inf;
+        bestX  = xClick;
+        bestY  = yClick;
+        xRange = diff(ax.XLim);
+        yRange = diff(ax.YLim);
+        % In log scale, use log-space distances for Y
+        isLogY = strcmp(ax.YScale, 'log');
+        for k = 1:numel(ySel2)
+            yIdx = find(strcmp(primaryD.labels, ySel2{k}), 1);
+            if isempty(yIdx), continue; end
+            yVec = primaryD.values(:, yIdx);
+            valid = ~isnan(xVec) & ~isnan(yVec);
+            if isLogY
+                dy = (log10(max(yVec(valid), eps)) - log10(max(yClick, eps))) / log10(max(ax.YLim(2)/ax.YLim(1), 10));
+            else
+                dy = (yVec(valid) - yClick) / yRange;
+            end
+            dx = (xVec(valid) - xClick) / xRange;
+            dists = sqrt(dx.^2 + dy.^2);
+            [mD, mI] = min(dists);
+            if mD < bestD
+                bestD = mD;
+                validIdx = find(valid);
+                bestX = xVec(validIdx(mI));
+                bestY = yVec(validIdx(mI));
+            end
+        end
+
+        appData.fringeClickCount = appData.fringeClickCount + 1;
+        n = appData.fringeClickCount;
+        appData.fringeQ(n) = bestX;
+
+        % Place a draggable marker
+        markerColors = {[0.10 0.65 0.85], [0.85 0.35 0.10]};  % blue, orange
+        hold(ax, 'on');
+        hm = plot(ax, bestX, bestY, 'v', ...
+            'MarkerSize',       12, ...
+            'MarkerFaceColor',  markerColors{n}, ...
+            'MarkerEdgeColor',  'w', ...
+            'LineWidth',        1.2, ...
+            'HitTest',          'on', ...
+            'HandleVisibility', 'off', ...
+            'Tag',              'GUIFringeMarker');
+        % Enable dragging: mouse-down on marker starts a drag
+        hm.ButtonDownFcn = @(src, evt) onFringeMarkerDown(n);
+        hold(ax, 'off');
+
+        if n == 1
+            appData.fringeMarkers = hm;
+            btnFringeThick.Text = 'Click peak 2 of 2...';
+        else
+            appData.fringeMarkers(2) = hm;
+            % Restore normal interaction and compute thickness
+            fig.WindowButtonDownFcn   = @onAxesButtonDown;
+            fig.WindowButtonMotionFcn = @onMouseHover;
+            fig.Pointer               = 'arrow';
+            btnFringeThick.Text            = ['Fringe ' char(916) 't (2-click)'];
+            btnFringeThick.BackgroundColor = BTN_ACCENT;
+            btnFringeThick.Enable          = 'on';
+
+            updateFringeThickness();
+        end
+    end
+
+    function onFringeMarkerDown(markerIdx)
+    %ONFRINGEMARKERDOWN  Begin dragging a fringe marker along the data curve.
+        appData.fringeDragIdx = markerIdx;
+        fig.WindowButtonMotionFcn = @onFringeMarkerMove;
+        fig.WindowButtonUpFcn     = @onFringeMarkerUp;
+        fig.Pointer               = 'hand';
+    end
+
+    function onFringeMarkerMove(~,~)
+    %ONFRINGEMARKERMOVE  Update marker position as user drags.
+        idx = appData.fringeDragIdx;
+        if idx < 1 || idx > 2, return; end
+
+        cp = ax.CurrentPoint;
+        xDrag = cp(1,1);
+
+        % Snap to nearest data point in x
+        ds = appData.datasets{appData.activeIdx};
+        primaryD = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
+        xVec = double(primaryD.time);
+        ySel2 = ensureCell(lbY.Value);
+
+        bestX = xDrag;
+        bestY = cp(1,2);
+        bestDx = Inf;
+        for k = 1:numel(ySel2)
+            yIdx = find(strcmp(primaryD.labels, ySel2{k}), 1);
+            if isempty(yIdx), continue; end
+            yVec = primaryD.values(:, yIdx);
+            valid = ~isnan(xVec) & ~isnan(yVec);
+            [mDx, mI] = min(abs(xVec(valid) - xDrag));
+            if mDx < bestDx
+                bestDx = mDx;
+                validIdx = find(valid);
+                bestX = xVec(validIdx(mI));
+                bestY = yVec(validIdx(mI));
+            end
+        end
+
+        appData.fringeQ(idx) = bestX;
+        hm = appData.fringeMarkers(idx);
+        if isvalid(hm)
+            hm.XData = bestX;
+            hm.YData = bestY;
+        end
+
+        updateFringeThickness();
+        drawnow limitrate;
+    end
+
+    function onFringeMarkerUp(~,~)
+    %ONFRINGEMARKERUP  Finish dragging a fringe marker.
+        fig.WindowButtonMotionFcn = @onMouseHover;
+        fig.WindowButtonUpFcn     = '';
+        fig.Pointer               = 'arrow';
+        appData.fringeDragIdx     = 0;
+    end
+
+    function updateFringeThickness()
+    %UPDATEFRINGETHICKNESS  Compute and display t = 2*pi / |ΔQ|.
+        Q1 = appData.fringeQ(1);
+        Q2 = appData.fringeQ(2);
+        if isnan(Q1) || isnan(Q2), return; end
+
+        dQ = abs(Q2 - Q1);
+        if dQ < eps
+            tStr = 't = Inf (points overlap)';
+        else
+            % t = 2*pi / dQ in Å, convert to nm
+            t_A  = 2 * pi / dQ;
+            t_nm = t_A / 10;
+            tStr = sprintf('t %s %.1f nm  (%.1f %s)    %sQ = %.5f %s%s%s', ...
+                char(8776), t_nm, t_A, char(197), ...  % ≈, Å
+                char(916), dQ, char(197), char(8315), char(185));  % Δ, Å⁻¹
+        end
+
+        % Show thickness annotation on plot (top-left, below title)
+        if ~isempty(appData.fringeAnnotation) && isvalid(appData.fringeAnnotation)
+            appData.fringeAnnotation.String = tStr;
+        else
+            hold(ax, 'on');
+            appData.fringeAnnotation = text(ax, 0.02, 0.96, tStr, ...
+                'Units',              'normalized', ...
+                'FontSize',           12, ...
+                'FontWeight',         'bold', ...
+                'Color',              [0.95 0.85 0.20], ...
+                'BackgroundColor',    [0.10 0.10 0.10 0.75], ...
+                'Margin',             4, ...
+                'VerticalAlignment',  'top', ...
+                'HitTest',            'off', ...
+                'HandleVisibility',   'off', ...
+                'Tag',                'GUIFringeAnnotation');
+            hold(ax, 'off');
+        end
+
+        % Also update status bar
+        setStatus(tStr);
+
+        % Draw a horizontal double-arrow between the two markers
+        drawFringeSpan();
+    end
+
+    function drawFringeSpan()
+    %DRAWFRINGESPAN  Draw a line connecting the two fringe markers.
+        delete(findall(ax, 'Tag', 'GUIFringeSpan'));
+        if any(isnan(appData.fringeQ)), return; end
+        Q1 = appData.fringeQ(1);
+        Q2 = appData.fringeQ(2);
+        if numel(appData.fringeMarkers) < 2, return; end
+        y1 = appData.fringeMarkers(1).YData;
+        y2 = appData.fringeMarkers(2).YData;
+        yMid = (y1 + y2) / 2;
+        hold(ax, 'on');
+        plot(ax, [Q1, Q2], [yMid, yMid], '--', ...
+            'Color', [0.95 0.85 0.20 0.6], ...
+            'LineWidth', 1.5, ...
+            'HitTest', 'off', ...
+            'HandleVisibility', 'off', ...
+            'Tag', 'GUIFringeSpan');
+        hold(ax, 'off');
+    end
+
+    function recreateFringeMarkers()
+    %RECREATEFRINGEMARKERS  Re-place fringe markers after a full redraw.
+    %   The markers and annotation are destroyed by drawToAxes' cla().
+    %   This function rebuilds them at the stored Q positions.
+        ds = appData.datasets{appData.activeIdx};
+        primaryD = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
+        xVec = double(primaryD.time);
+        ySel2 = ensureCell(lbY.Value);
+        markerColors = {[0.10 0.65 0.85], [0.85 0.35 0.10]};
+        appData.fringeMarkers = gobjects(1, 2);
+        for mi = 1:2
+            Qval = appData.fringeQ(mi);
+            % Find nearest data point to get Y value
+            bestY = 0;
+            bestDx = Inf;
+            for k = 1:numel(ySel2)
+                yIdx = find(strcmp(primaryD.labels, ySel2{k}), 1);
+                if isempty(yIdx), continue; end
+                yVec = primaryD.values(:, yIdx);
+                valid = ~isnan(xVec) & ~isnan(yVec);
+                [mDx, mI] = min(abs(xVec(valid) - Qval));
+                if mDx < bestDx
+                    bestDx = mDx;
+                    validIdx = find(valid);
+                    bestY = yVec(validIdx(mI));
+                end
+            end
+            hold(ax, 'on');
+            hm = plot(ax, Qval, bestY, 'v', ...
+                'MarkerSize',       12, ...
+                'MarkerFaceColor',  markerColors{mi}, ...
+                'MarkerEdgeColor',  'w', ...
+                'LineWidth',        1.2, ...
+                'HitTest',          'on', ...
+                'HandleVisibility', 'off', ...
+                'Tag',              'GUIFringeMarker');
+            hm.ButtonDownFcn = @(~,~) onFringeMarkerDown(mi);
+            hold(ax, 'off');
+            appData.fringeMarkers(mi) = hm;
+        end
+        % Recreate the annotation and span line
+        appData.fringeAnnotation = [];  % force fresh creation
+        updateFringeThickness();
+    end
+
+    function clearFringeMarkers()
+    %CLEARFRINGEMARKERS  Remove fringe thickness markers and annotation.
+        delete(findall(ax, 'Tag', 'GUIFringeMarker'));
+        delete(findall(ax, 'Tag', 'GUIFringeAnnotation'));
+        delete(findall(ax, 'Tag', 'GUIFringeSpan'));
+        appData.fringeMarkers    = [];
+        appData.fringeAnnotation = [];
+        appData.fringeQ          = [NaN NaN];
+        appData.fringeClickCount = 0;
+        appData.fringeDragIdx    = 0;
+    end
+
+    % ════════════════════════════════════════════════════════════════════
     %  3.1b  REFLECTIVITY FFT (KIESSIG FRINGES)
     % ════════════════════════════════════════════════════════════════════
 
@@ -5157,10 +5529,11 @@ function varargout = dataImportGUI()
             end
         end
 
-        % Get current corrected data
+        % Get current corrected data, exclude masked points
         d    = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
-        xAll = d.time(:);      % Q (Å⁻¹) for neutron; 2θ (°) for XRR
-        yAll = d.values(:,1);  % R (reflectivity) or counts
+        dmask = buildDisplayMask(ds);
+        xAll = d.time(dmask);       % Q (Å⁻¹) for neutron; 2θ (°) for XRR
+        yAll = d.values(dmask,1);   % R (reflectivity) or counts
 
         % Pre-fill range from current axis limits
         xLo = ax.XLim(1);
@@ -5988,6 +6361,7 @@ function varargout = dataImportGUI()
 
             % Save undo state (same logic as onApplyCorrections)
             undoState.corrData       = ds.corrData;
+            undoState.mask           = guiTernary(isfield(ds,'mask'), ds.mask, true(size(ds.data.time)));
             undoState.xOff           = ds.xOff;
             undoState.yOff           = ds.yOff;
             undoState.bgSlope        = ds.bgSlope;
@@ -6125,6 +6499,7 @@ function varargout = dataImportGUI()
         %  Save undo state before applying new corrections
         % ════════════════════════════════════════════════════════════════
         undoState.corrData       = ds.corrData;
+        undoState.mask           = guiTernary(isfield(ds,'mask'), ds.mask, true(size(ds.data.time)));
         undoState.xOff           = ds.xOff;
         undoState.yOff           = ds.yOff;
         undoState.bgSlope        = ds.bgSlope;
@@ -6504,6 +6879,7 @@ function varargout = dataImportGUI()
         if appData.activeIdx >= 1 && ~isempty(appData.datasets)
             ds               = appData.datasets{appData.activeIdx};
             ds.corrData      = [];
+            ds.mask          = true(size(ds.data.time));
             ds.xOff          = 0;
             ds.yOff          = yOffDefault;
             ds.bgSlope       = 0;
@@ -6563,6 +6939,7 @@ function varargout = dataImportGUI()
 
         % Restore all correction state from the saved undo state
         ds.corrData      = undoState.corrData;
+        if isfield(undoState, 'mask'), ds.mask = undoState.mask; end
         ds.xOff          = undoState.xOff;
         ds.yOff          = undoState.yOff;
         ds.bgSlope       = undoState.bgSlope;
@@ -7034,6 +7411,176 @@ function varargout = dataImportGUI()
         rawRows = keptIdx(dispMask(1:numel(keptIdx)));
     end
 
+    function dmask = buildDisplayMask(ds)
+    %BUILDDISPLAYMASK  Return logical mask mapped to corrected/displayed data.
+    %  Translates the raw ds.mask through X-trim so it aligns with corrData.
+        if ~isfield(ds, 'mask') || isempty(ds.mask) || all(ds.mask)
+            d = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
+            dmask = true(size(d.time));
+            return;
+        end
+        if ~isempty(ds.corrData)
+            nRaw  = numel(ds.data.time);
+            keepM = true(nRaw, 1);
+            if ~isdatetime(ds.data.time)
+                tVM = double(ds.data.time);
+                trimMin = guiTernary(isfield(ds,'xTrimMin'), ds.xTrimMin, NaN);
+                trimMax = guiTernary(isfield(ds,'xTrimMax'), ds.xTrimMax, NaN);
+                if ~isnan(trimMin), keepM = keepM & tVM >= trimMin; end
+                if ~isnan(trimMax), keepM = keepM & tVM <= trimMax; end
+            end
+            dmask = ds.mask(keepM);
+        else
+            dmask = ds.mask;
+        end
+    end
+
+    % ── Data masking (box-select exclusion) ────────────────────────────────
+
+    function onArmMaskSelection(~,~)
+    %ONARMMASKSELECTION  Arm click-and-drag mask mode.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig,'Load a file first.','No data'); return;
+        end
+        cancelInteractions();
+        btnMaskSelect.Text            = 'Draw rectangle to mask...';
+        btnMaskSelect.BackgroundColor = [0.80 0.20 0.20];
+        btnMaskSelect.Enable          = 'off';
+        fig.Pointer = 'crosshair';
+        fig.WindowButtonDownFcn = @onMaskMouseDown;
+    end
+
+    function onMaskMouseDown(~,~)
+        cp = ax.CurrentPoint;
+        x0 = cp(1,1);  y0 = cp(1,2);
+        if x0 < ax.XLim(1) || x0 > ax.XLim(2) || ...
+           y0 < ax.YLim(1) || y0 > ax.YLim(2)
+            return;
+        end
+        appData.maskStartPt = [x0, y0];
+        hold(ax,'on');
+        appData.maskRectPatch = patch(ax, ...
+            [x0 x0 x0 x0], [y0 y0 y0 y0], [0.85 0.15 0.15], ...
+            'FaceAlpha', 0.15, ...
+            'EdgeColor', [0.85 0.15 0.15], ...
+            'LineWidth', 1.5, ...
+            'LineStyle', '--', ...
+            'HitTest',   'off', ...
+            'Tag',       'GUIMaskBox');
+        hold(ax,'off');
+        fig.WindowButtonMotionFcn = @onMaskMouseMove;
+        fig.WindowButtonUpFcn     = @onMaskMouseUp;
+    end
+
+    function onMaskMouseMove(~,~)
+        if isempty(appData.maskStartPt) || ...
+           isempty(appData.maskRectPatch) || ~isvalid(appData.maskRectPatch)
+            return;
+        end
+        cp = ax.CurrentPoint;
+        x1 = cp(1,1);  y1 = cp(1,2);
+        x0 = appData.maskStartPt(1);
+        y0 = appData.maskStartPt(2);
+        set(appData.maskRectPatch, ...
+            'XData', [x0, x1, x1, x0], ...
+            'YData', [y0, y0, y1, y1]);
+    end
+
+    function onMaskMouseUp(~,~)
+        % Restore normal interaction state
+        fig.WindowButtonDownFcn   = @onAxesButtonDown;
+        fig.WindowButtonMotionFcn = @onMouseHover;
+        fig.WindowButtonUpFcn     = '';
+        fig.Pointer               = 'arrow';
+        btnMaskSelect.Text            = 'Mask Selection';
+        btnMaskSelect.BackgroundColor = [0.60 0.15 0.15];
+        btnMaskSelect.Enable          = 'on';
+
+        % Clean up rectangle
+        if ~isempty(appData.maskRectPatch) && isvalid(appData.maskRectPatch)
+            delete(appData.maskRectPatch);
+        end
+        appData.maskRectPatch = [];
+
+        if isempty(appData.maskStartPt), return; end
+        cp    = ax.CurrentPoint;
+        endPt = [cp(1,1), cp(1,2)];
+
+        xMin = min(appData.maskStartPt(1), endPt(1));
+        xMax = max(appData.maskStartPt(1), endPt(1));
+        yMin = min(appData.maskStartPt(2), endPt(2));
+        yMax = max(appData.maskStartPt(2), endPt(2));
+        appData.maskStartPt = [];
+
+        if (xMax - xMin) < eps(xMax), return; end
+
+        applyMaskInBox(xMin, xMax, yMin, yMax);
+    end
+
+    function applyMaskInBox(xMin, xMax, yMin, yMax)
+    %APPLYMASKINBOX  Mask data points inside the given box for the active dataset.
+        ds = appData.datasets{appData.activeIdx};
+        primaryD = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
+
+        % Build displayed x vector (same logic as drawToAxes)
+        xSel2  = ddX.Value;
+        xName2 = guiXName(ds.data.metadata);
+        if strcmp(xSel2, xName2)
+            xVec = primaryD.time;
+        else
+            idx2 = find(strcmp(primaryD.labels, xSel2), 1);
+            if isempty(idx2)
+                xVec = primaryD.time;
+            else
+                xVec = primaryD.values(:, idx2);
+            end
+        end
+        xVec = double(xVec);
+
+        % Collect all selected Y channels so box-select hits any visible trace
+        ySel2 = ensureCell(lbY.Value);
+        inBox = false(size(xVec));
+        for k = 1:numel(ySel2)
+            yIdx = find(strcmp(primaryD.labels, ySel2{k}), 1);
+            if isempty(yIdx), continue; end
+            yVec = primaryD.values(:, yIdx);
+            inBox = inBox | (xVec >= xMin & xVec <= xMax & ...
+                             yVec >= yMin & yVec <= yMax);
+        end
+
+        % Map displayed indices back to raw indices
+        if ~isempty(ds.corrData)
+            rawRows = bgDisplayToRawRows(ds, inBox);
+        else
+            rawRows = find(inBox);
+        end
+
+        if isempty(rawRows), return; end
+
+        % Ensure mask exists
+        if ~isfield(ds, 'mask') || isempty(ds.mask)
+            ds.mask = true(size(ds.data.time));
+        end
+        ds.mask(rawRows) = false;
+        appData.datasets{appData.activeIdx} = ds;
+
+        nMasked = sum(~ds.mask);
+        setStatus(sprintf('Masked %d points (%d total masked)', numel(rawRows), nMasked));
+        onPlot([], []);
+    end
+
+    function onUnmaskAll(~,~)
+    %ONUNMASKALL  Restore all masked data points for the active dataset.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig,'Load a file first.','No data'); return;
+        end
+        ds = appData.datasets{appData.activeIdx};
+        ds.mask = true(size(ds.data.time));
+        appData.datasets{appData.activeIdx} = ds;
+        setStatus('All masked points restored.');
+        onPlot([], []);
+    end
+
     % ── Y-origin 2-click estimation ───────────────────────────────────────
 
     function onPickYOrigin(~,~)
@@ -7193,6 +7740,24 @@ function varargout = dataImportGUI()
             else
                 hasCorrected = ~isempty(ds.corrData);
                 exportData   = guiTernary(hasCorrected, ds.corrData, ds.data);
+                % Apply mask (exclude masked points from export)
+                if isfield(ds, 'mask') && ~isempty(ds.mask) && any(~ds.mask)
+                    if hasCorrected
+                        % Map raw mask through trim to match exportData rows
+                        nRawE = numel(ds.data.time);
+                        keepE = true(nRawE, 1);
+                        if ~isdatetime(ds.data.time)
+                            tVE = double(ds.data.time);
+                            if ~isnan(ds.xTrimMin), keepE = keepE & tVE >= ds.xTrimMin; end
+                            if ~isnan(ds.xTrimMax), keepE = keepE & tVE <= ds.xTrimMax; end
+                        end
+                        exportMask = ds.mask(keepE);
+                    else
+                        exportMask = ds.mask;
+                    end
+                    exportData.time   = exportData.time(exportMask);
+                    exportData.values = exportData.values(exportMask, :);
+                end
                 % Apply display-unit scaling (SI prefix + mag unit labels)
                 exportData = applyDisplayUnits(exportData, ds);
                 if hasCorrected
@@ -7962,7 +8527,9 @@ function varargout = dataImportGUI()
     end
 
     function drawToAxes(targetAx)
-    %DRAWTOAXES  Render ALL loaded datasets into targetAx.
+    %DRAWTOAXES  Render SELECTED datasets into targetAx.
+    %   Only datasets selected in lbDatasets are plotted.  Single-click
+    %   plots one dataset; Ctrl+click / Shift+click plots multiple.
     %   Channel selection and x-axis label are driven by the active dataset.
     %   Each (dataset, y-channel) pair gets a unique colour from lines().
     %   Called by onPlot (GUI uiaxes) and onExportFigure (regular axes).
@@ -7970,7 +8537,17 @@ function varargout = dataImportGUI()
             if isempty(appData.datasets) || appData.activeIdx < 1, return; end
 
             activeDs = appData.datasets{appData.activeIdx};
-            nDS      = numel(appData.datasets);
+
+            % ── Determine which datasets to plot (listbox selection) ─────
+            rawSel = lbDatasets.Value;
+            if ~iscell(rawSel), rawSel = {rawSel}; end
+            plotIdx = cell2mat(rawSel);
+            plotIdx = plotIdx(plotIdx >= 1 & plotIdx <= numel(appData.datasets));
+            % Always include active dataset so it is visible
+            if ~ismember(appData.activeIdx, plotIdx)
+                plotIdx = sort([plotIdx, appData.activeIdx]);
+            end
+            nDS = numel(plotIdx);
 
             % ── Channel selection from the active dataset ─────────────────
             xSel   = ddX.Value;
@@ -8005,8 +8582,8 @@ function varargout = dataImportGUI()
 
             % ── Colour allocation ─────────────────────────────────────────
             % Generate colors from selected colormap or default lines() palette.
-            % Left-axis indices:  (di-1)*nY  + k
-            % Right-axis indices: nDS*nY     + (di-1)*nY2 + k
+            % Left-axis indices:  (si-1)*nY  + k   (si = position in plotIdx)
+            % Right-axis indices: nDS*nY     + (si-1)*nY2 + k
             colormapName = ddColormap.Value;
             nColors = max(nDS * (nY + nY2), 1);
             colors = getColorsFromMap(colormapName, nColors);
@@ -8018,6 +8595,11 @@ function varargout = dataImportGUI()
             delete(findall(targetAx, 'Tag', 'GUISNIPBackground'));
             delete(findall(targetAx, 'Tag', 'GUIZoomBox'));
             delete(findall(targetAx, 'Tag', 'GUIRefLine'));
+            delete(findall(targetAx, 'Tag', 'GUIMaskedPoints'));
+            delete(findall(targetAx, 'Tag', 'GUIMaskBox'));
+            delete(findall(targetAx, 'Tag', 'GUIFringeMarker'));
+            delete(findall(targetAx, 'Tag', 'GUIFringeAnnotation'));
+            delete(findall(targetAx, 'Tag', 'GUIFringeSpan'));
             delete(targetAx.Children);
             cla(targetAx);
             % cla() removes plot children but DOES NOT reset XLim/YLim — MATLAB
@@ -8081,7 +8663,7 @@ function varargout = dataImportGUI()
                 anyNeutron = false;
                 baseNames = cell(nDS, 1);
                 for gi = 1:nDS
-                    gds = appData.datasets{gi};
+                    gds = appData.datasets{plotIdx(gi)};
                     if isfield(gds, 'parserName') && isNeutronParser(gds.parserName)
                         anyNeutron = true;
                         baseNames{gi} = neutronBaseName(gds.filepath);
@@ -8094,7 +8676,8 @@ function varargout = dataImportGUI()
                 end
             end
 
-            for di = 1:nDS
+            for si = 1:nDS
+                di          = plotIdx(si);
                 ds          = appData.datasets{di};
 
                 % Skip invisible datasets
@@ -8111,6 +8694,30 @@ function varargout = dataImportGUI()
                 hasCorrData = ~isempty(ds.corrData);
                 showRawOver = hasCorrData && cbShowRaw.Value;
                 primaryD    = guiTernary(hasCorrData, ds.corrData, d);
+
+                % ── Build display mask from ds.mask (raw row mask) ───────
+                if isfield(ds, 'mask') && ~isempty(ds.mask) && any(~ds.mask)
+                    if hasCorrData
+                        % Map raw mask through trim to match primaryD row count
+                        nRaw    = numel(d.time);
+                        rawMask = ds.mask;
+                        keepM   = true(nRaw, 1);
+                        if ~isdatetime(d.time)
+                            tVM = double(d.time);
+                            if isfield(ds,'xTrimMin') && ~isnan(ds.xTrimMin)
+                                keepM = keepM & tVM >= ds.xTrimMin;
+                            end
+                            if isfield(ds,'xTrimMax') && ~isnan(ds.xTrimMax)
+                                keepM = keepM & tVM <= ds.xTrimMax;
+                            end
+                        end
+                        displayMask = rawMask(keepM);
+                    else
+                        displayMask = ds.mask;
+                    end
+                else
+                    displayMask = true(size(primaryD.time));
+                end
 
                 % ── X vector for this dataset ─────────────────────────────
                 % Use xSel driven by the active dataset; for non-active
@@ -8150,7 +8757,7 @@ function varargout = dataImportGUI()
                 if isfield(ds,'colorR') && ~isempty(ds.colorR), dsColorROverride = ds.colorR; end
 
                 for k = 1:nY
-                    colorIdx  = (di-1)*nY + k;
+                    colorIdx  = (si-1)*nY + k;
                     baseColor = guiTernary(~isempty(dsColorOverride), dsColorOverride, colors(colorIdx,:));
 
                     idx = find(strcmp(d.labels, ySel{k}), 1);
@@ -8200,14 +8807,14 @@ function varargout = dataImportGUI()
                         % Apply waterfall offset for multi-dataset display
                         if effectiveSpacing ~= 0
                             if wfLogMode
-                                yR = yR * effectiveSpacing^(wfGroupIdx(di) - 1);
+                                yR = yR * effectiveSpacing^(wfGroupIdx(si) - 1);
                             else
-                                yR = yR + (wfGroupIdx(di) - 1) * effectiveSpacing;
+                                yR = yR + (wfGroupIdx(si) - 1) * effectiveSpacing;
                             end
                         end
 
-                        % Filter NaN
-                        good = ~isnan(xVecPrimary) & ~isnan(yR);
+                        % Filter NaN + masked points
+                        good = ~isnan(xVecPrimary) & ~isnan(yR) & displayMask;
                         xGood = xVecPrimary(good);
                         yGood = yR(good);
                         dyGood = dyR(good);
@@ -8261,9 +8868,9 @@ function varargout = dataImportGUI()
                             % Apply waterfall offset to theory so it aligns with measured data
                             if effectiveSpacing ~= 0
                                 if wfLogMode
-                                    yTheory = yTheory * effectiveSpacing^(wfGroupIdx(di) - 1);
+                                    yTheory = yTheory * effectiveSpacing^(wfGroupIdx(si) - 1);
                                 else
-                                    yTheory = yTheory + (wfGroupIdx(di) - 1) * effectiveSpacing;
+                                    yTheory = yTheory + (wfGroupIdx(si) - 1) * effectiveSpacing;
                                 end
                             end
 
@@ -8289,16 +8896,17 @@ function varargout = dataImportGUI()
                             if ctFactor > 0, yRaw = yRaw / ctFactor; end
                             if effectiveSpacing ~= 0
                                 if wfLogMode
-                                    yRaw = yRaw * effectiveSpacing^(wfGroupIdx(di) - 1);
+                                    yRaw = yRaw * effectiveSpacing^(wfGroupIdx(si) - 1);
                                 else
-                                    yRaw = yRaw + (wfGroupIdx(di) - 1) * effectiveSpacing;
+                                    yRaw = yRaw + (wfGroupIdx(si) - 1) * effectiveSpacing;
                                 end
                             end
                             rawColor = 0.5 * baseColor + 0.5 * [1 1 1];
+                            rawMaskVec = guiTernary(isfield(ds,'mask') && ~isempty(ds.mask), ds.mask, true(size(xVecRaw)));
                             if isdatetime(xVecRaw)
-                                good = ~isnat(xVecRaw) & ~isnan(yRaw);
+                                good = ~isnat(xVecRaw) & ~isnan(yRaw) & rawMaskVec;
                             else
-                                good = ~isnan(xVecRaw) & ~isnan(yRaw);
+                                good = ~isnan(xVecRaw) & ~isnan(yRaw) & rawMaskVec;
                             end
                             plot(targetAx, xVecRaw(good), yRaw(good), lsRaw{:}, ...
                                 'Color',       rawColor, ...
@@ -8311,15 +8919,15 @@ function varargout = dataImportGUI()
                         if ctFactor > 0, yPrimary = yPrimary / ctFactor; end
                         if effectiveSpacing ~= 0
                             if wfLogMode
-                                yPrimary = yPrimary * effectiveSpacing^(wfGroupIdx(di) - 1);
+                                yPrimary = yPrimary * effectiveSpacing^(wfGroupIdx(si) - 1);
                             else
-                                yPrimary = yPrimary + (wfGroupIdx(di) - 1) * effectiveSpacing;
+                                yPrimary = yPrimary + (wfGroupIdx(si) - 1) * effectiveSpacing;
                             end
                         end
                         if isdatetime(xVecPrimary)
-                            good = ~isnat(xVecPrimary) & ~isnan(yPrimary);
+                            good = ~isnat(xVecPrimary) & ~isnan(yPrimary) & displayMask;
                         else
-                            good = ~isnan(xVecPrimary) & ~isnan(yPrimary);
+                            good = ~isnan(xVecPrimary) & ~isnan(yPrimary) & displayMask;
                         end
                         dispName = guiTernary(hasCorrData, [baseLabel, ' (corr)'], baseLabel);
                         if isfield(ds,'legendName') && ~isempty(ds.legendName)
@@ -8358,11 +8966,30 @@ function varargout = dataImportGUI()
                     end
                 end
 
+                % ── Show masked points as faded gray dots ────────────────
+                if any(~displayMask)
+                    for km = 1:nY
+                        idxM = find(strcmp(primaryD.labels, ySel{km}), 1);
+                        if isempty(idxM), continue; end
+                        yM = primaryD.values(:, idxM);
+                        if ctFactor > 0, yM = yM / ctFactor; end
+                        masked = ~displayMask & ~isnan(double(xVecPrimary)) & ~isnan(yM);
+                        if any(masked)
+                            plot(targetAx, xVecPrimary(masked), yM(masked), '.', ...
+                                'Color', [0.55 0.55 0.55], ...
+                                'MarkerSize', 4, ...
+                                'HitTest', 'off', ...
+                                'HandleVisibility', 'off', ...
+                                'Tag', 'GUIMaskedPoints');
+                        end
+                    end
+                end
+
                 % ── Right-axis (Y2) channels ──────────────────────────────
                 if hasY2
                     yyaxis(targetAx, 'right');
                     for k2 = 1:nY2
-                        colorIdx2  = nDS*nY + (di-1)*nY2 + k2;
+                        colorIdx2  = nDS*nY + (si-1)*nY2 + k2;
                         baseColor2 = guiTernary(~isempty(dsColorROverride), dsColorROverride, colors(colorIdx2, :));
 
                         idx2 = find(strcmp(d.labels, y2Sel{k2}), 1);
@@ -8373,9 +9000,9 @@ function varargout = dataImportGUI()
                         if ctFactor > 0, yY2 = yY2 / ctFactor; end
 
                         if isdatetime(xVecPrimary)
-                            good2 = ~isnat(xVecPrimary) & ~isnan(yY2);
+                            good2 = ~isnat(xVecPrimary) & ~isnan(yY2) & displayMask;
                         else
-                            good2 = ~isnan(xVecPrimary) & ~isnan(yY2);
+                            good2 = ~isnan(xVecPrimary) & ~isnan(yY2) & displayMask;
                         end
 
                         dispName2 = [baseLabel2, '  [R]'];
@@ -8591,7 +9218,7 @@ function varargout = dataImportGUI()
                     titleStr = [titleStr, '  [corrected]'];
                 end
             else
-                titleStr = sprintf('%d datasets loaded  (active: [%d])', ...
+                titleStr = sprintf('%d datasets selected  (active: [%d])', ...
                     nDS, appData.activeIdx);
             end
             % Title: custom override takes priority over auto-generated title
@@ -9002,6 +9629,12 @@ function varargout = dataImportGUI()
             % the displayed numbers and label text in-place.
             applyAxisPrefix(targetAx, 'x', appData.axisPrefixX);
             applyAxisPrefix(targetAx, 'y', appData.axisPrefixY);
+
+            % ── Restore fringe thickness markers after redraw ────────────
+            if targetAx == ax && appData.fringeClickCount == 2 && ...
+               all(~isnan(appData.fringeQ))
+                recreateFringeMarkers();
+            end
 
         catch ME
             fprintf(2, '\n[dataImportGUI] Plot error: %s\n', ME.message);
@@ -9788,6 +10421,9 @@ function varargout = dataImportGUI()
             case 'z'
                 if hasCtrl, onUndoCorrections([], []); end
 
+            case 'm'
+                if hasCtrl, onUnmaskAll([], []); end
+
             case 'e'
                 if hasCtrl, onSaveCSV([], []); end
 
@@ -10378,7 +11014,8 @@ function varargout = dataImportGUI()
                 idx2     = find(strcmp(primaryD.labels, ySel{1}), 1);
                 if isempty(idx2), continue; end
                 yVals = primaryD.values(:, idx2);
-                yVals = yVals(yVals > 0 & ~isnan(yVals));
+                dm2 = buildDisplayMask(ds2);
+                yVals = yVals(yVals > 0 & ~isnan(yVals) & dm2);
                 if numel(yVals) < 2, continue; end
                 r = log10(max(yVals)) - log10(min(yVals));
                 if r > maxLogRange, maxLogRange = r; end
@@ -10395,7 +11032,8 @@ function varargout = dataImportGUI()
                 idx2     = find(strcmp(primaryD.labels, ySel{1}), 1);
                 if isempty(idx2), continue; end
                 yVals = primaryD.values(:, idx2);
-                yVals = yVals(~isnan(yVals));
+                dm2 = buildDisplayMask(ds2);
+                yVals = yVals(~isnan(yVals) & dm2);
                 if numel(yVals) < 2, continue; end
                 r = max(yVals) - min(yVals);
                 if r > maxRange, maxRange = r; end
@@ -10920,6 +11558,7 @@ function ds = buildDs(fp, data, parserName)
     ds.fieldUnit     = 'Oe (raw)';   % target field unit
     ds.unitSystem    = 'CGS';        % 'CGS' or 'SI' — quick-set toggle
     ds.refLines       = {};       % Cell array of structs: {orientation, value, color, style}
+    ds.mask            = true(size(data.time));  % logical; true = included, false = masked
 end
 
 

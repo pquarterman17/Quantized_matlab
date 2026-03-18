@@ -504,6 +504,52 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  16. Data masking: mask region + unmask all
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 16: Data masking (mask region + unmask all) ══\n');
+try
+    api = launchHeadless();
+    cleanupApi = onCleanup(@() api.close());
+
+    % Load XRD file
+    api.addFiles({XRDML_F});
+    drawnow;
+
+    datasets = api.getDatasets();
+    nOriginal = numel(datasets{1}.data.time);
+    fprintf('  Total points: %d\n', nOriginal);
+
+    % Mask a region in the middle of the data
+    xAll = double(datasets{1}.data.time);
+    xMid = (min(xAll) + max(xAll)) / 2;
+    xSpan = (max(xAll) - min(xAll)) * 0.1;  % mask 10% of x-range
+    yAll = datasets{1}.data.values(:,1);
+    api.maskRegion(xMid - xSpan, xMid + xSpan, min(yAll), max(yAll));
+    drawnow;
+
+    % Verify mask was applied
+    datasets = api.getDatasets();
+    nMasked = sum(~datasets{1}.mask);
+    assert(nMasked > 0, 'Expected some masked points');
+    assert(nMasked < nOriginal, 'Expected partial mask, not all points');
+    fprintf('  Masked points: %d (%.1f%%)\n', nMasked, 100*nMasked/nOriginal);
+
+    % Unmask all
+    api.unmaskAll();
+    drawnow;
+    datasets = api.getDatasets();
+    nMaskedAfter = sum(~datasets{1}.mask);
+    assert(nMaskedAfter == 0, 'Expected zero masked points after unmask');
+    fprintf('  After unmask: %d masked\n', nMaskedAfter);
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  SUMMARY
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n%s\n', repmat(char(9552), 1, 72));
