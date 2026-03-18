@@ -10,6 +10,10 @@
 %   Run standalone:  cd tests; run test_gui_harness
 %   Run from root:   run tests/test_gui_harness
 %
+%   Uses a SINGLE GUI instance for all tests except 11/12 (session reload),
+%   calling api.reset() between tests to clear state. Tests 11 and 12 launch
+%   a temporary second instance only for the session reload phase.
+%
 %   Each test prints PASS / FAIL. Cleanup is automatic via onCleanup.
 
 clear; clc;
@@ -34,13 +38,18 @@ passed = 0;
 failed = 0;
 
 % ════════════════════════════════════════════════════════════════════════
+%  Launch single shared GUI instance
+% ════════════════════════════════════════════════════════════════════════
+api = dataImportGUI();
+api.fig.Visible = 'off';
+drawnow;
+cleanupApi = onCleanup(@() api.close());
+
+% ════════════════════════════════════════════════════════════════════════
 %  1. GUI launches with valid API
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 1: GUI launches with valid API ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() api.close());
-
     % Verify API struct has all expected fields
     assert(isstruct(api), 'API must be a struct');
     assert(isfield(api, 'fig'), 'missing field: fig');
@@ -64,10 +73,9 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 2: Load XRDML file ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() api.close());
-
+    api.reset();
     api.addFiles({XRDML_F});
+    drawnow;
 
     datasets = api.getDatasets();
     assert(isscalar(datasets), sprintf('expected 1 dataset, got %d', numel(datasets)));
@@ -92,10 +100,9 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 3: Load QD VSM file ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() api.close());
-
+    api.reset();
     api.addFiles({VSM_F});
+    drawnow;
 
     datasets = api.getDatasets();
     assert(isscalar(datasets), sprintf('expected 1 dataset, got %d', numel(datasets)));
@@ -118,10 +125,9 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 4: Load multiple files ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() api.close());
-
+    api.reset();
     api.addFiles({XRDML_F, VSM_F});
+    drawnow;
 
     datasets = api.getDatasets();
     assert(numel(datasets) == 2, sprintf('expected 2 datasets, got %d', numel(datasets)));
@@ -145,10 +151,9 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 5: X offset correction ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() api.close());
-
+    api.reset();
     api.addFiles({XRDML_F});
+    drawnow;
 
     % Set X offset
     api.setCorrections(0.1, 0, 0, 0);
@@ -183,10 +188,9 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 6: Y offset correction ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() api.close());
-
+    api.reset();
     api.addFiles({XRDML_F});
+    drawnow;
 
     % Set Y offset
     api.setCorrections(0, 1.5, 0, 0);
@@ -220,10 +224,9 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 7: Undo corrections ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() api.close());
-
+    api.reset();
     api.addFiles({XRDML_F});
+    drawnow;
 
     % Apply corrections
     api.setCorrections(0, 2.0, 0, 0);
@@ -255,10 +258,9 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 8: Apply corrections to all datasets ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() api.close());
-
+    api.reset();
     api.addFiles({XRDML_F, VSM_F});
+    drawnow;
 
     % Set active to first, apply correction
     api.setActiveIdx(1);
@@ -289,10 +291,9 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 9: Auto-detect peaks (XRD) ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() api.close());
-
+    api.reset();
     api.addFiles({XRDML_F});
+    drawnow;
 
     api.autoPeaks();
 
@@ -316,10 +317,9 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 10: Fit peaks ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() api.close());
-
+    api.reset();
     api.addFiles({XRDML_F});
+    drawnow;
 
     api.autoPeaks();
     api.fig.Visible = 'on'; drawnow;   % fitPeaks requires visible figure
@@ -349,25 +349,24 @@ end
 
 % ════════════════════════════════════════════════════════════════════════
 %  11. Session save/load round-trip
+%  Uses shared GUI to save; launches a SECOND instance only for reload.
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 11: Session save/load round-trip ══\n');
 try
-    api1 = launchHeadless();
+    api.reset();
+    api.addFiles({XRDML_F});
+    drawnow;
+    api.setActiveIdx(1);
+    api.setCorrections(0, 3.0, 0, 0);
+    api.applyCorrections();
 
-    % Load file, apply correction
-    api1.addFiles({XRDML_F});
-    api1.setActiveIdx(1);
-    api1.setCorrections(0, 3.0, 0, 0);
-    api1.applyCorrections();
-
-    % Save session
+    % Save session from the shared instance
     sessionFile = fullfile(tmpDir, 'test11_session.mat');
-    api1.saveSession(sessionFile);
-    api1.close();
+    api.saveSession(sessionFile);
 
-    % Reload in new GUI
+    % Reload into a fresh second GUI instance
     api2 = launchHeadless();
-    cleanupApi = onCleanup(@() api2.close());
+    cleanupApi2 = onCleanup(@() safeClose(api2));
 
     api2.loadSession(sessionFile);
 
@@ -384,6 +383,8 @@ try
     fprintf('  Y offset restored: %.1f\n', ds.yOff);
     fprintf('  PASS\n');
     passed = passed + 1;
+
+    safeClose(api2);
 catch ME
     fprintf('  FAIL: %s\n', ME.message);
     failed = failed + 1;
@@ -391,22 +392,22 @@ end
 
 % ════════════════════════════════════════════════════════════════════════
 %  12. Session round-trip with peaks
+%  Uses shared GUI to save; launches a SECOND instance only for reload.
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 12: Session save/load with peaks ══\n');
 try
-    api1 = launchHeadless();
+    api.reset();
+    api.addFiles({XRDML_F});
+    drawnow;
+    api.autoPeaks();
 
-    api1.addFiles({XRDML_F});
-    api1.autoPeaks();
-
-    % Save session
+    % Save session from the shared instance
     sessionFile = fullfile(tmpDir, 'test12_peaks_session.mat');
-    api1.saveSession(sessionFile);
-    api1.close();
+    api.saveSession(sessionFile);
 
-    % Reload
+    % Reload into a fresh second GUI instance
     api2 = launchHeadless();
-    cleanupApi = onCleanup(@() api2.close());
+    cleanupApi2 = onCleanup(@() safeClose(api2));
 
     api2.loadSession(sessionFile);
 
@@ -416,6 +417,8 @@ try
     fprintf('  Peaks restored: %d\n', numel(peaks));
     fprintf('  PASS\n');
     passed = passed + 1;
+
+    safeClose(api2);
 catch ME
     fprintf('  FAIL: %s\n', ME.message);
     failed = failed + 1;
@@ -426,8 +429,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 13: Session load with invalid file ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() api.close());
+    api.reset();
 
     % Create invalid session file (missing savedDatasets field)
     badSessionFile = fullfile(tmpDir, 'bad_session.mat');
@@ -457,10 +459,9 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 14: Dataset visibility toggle ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() api.close());
-
+    api.reset();
     api.addFiles({XRDML_F, VSM_F});
+    drawnow;
 
     api.setDatasetVisible(1, false);
 
@@ -482,8 +483,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 15: Load non-existent file (graceful handling) ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() api.close());
+    api.reset();
 
     % Try to load non-existent file
     try
@@ -508,8 +508,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 16: Data masking (mask region + unmask all) ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() api.close());
+    api.reset();
 
     % Load XRD file
     api.addFiles({XRDML_F});
@@ -566,7 +565,15 @@ end
 % ════════════════════════════════════════════════════════════════════════
 function api = launchHeadless()
 %LAUNCHHEADLESS  Start dataImportGUI with the figure hidden.
+%   Used only for the session reload phase of tests 11 and 12, where a
+%   fresh GUI instance is required to verify that saved state loads
+%   correctly into a clean environment.
     api = dataImportGUI();
     api.fig.Visible = 'off';
     drawnow;
+end
+
+function safeClose(a)
+%SAFECLOSE  Close GUI figure, ignoring errors if already closed.
+    try a.close(); catch, end
 end

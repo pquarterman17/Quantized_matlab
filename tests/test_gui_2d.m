@@ -45,14 +45,18 @@ end
 passed = 0;
 failed = 0;
 
+% ── Launch single headless GUI instance ──────────────────────────────────
+api = dataImportGUI();
+api.fig.Visible = 'off';
+drawnow;
+C = onCleanup(@() api.close());
+
 % ════════════════════════════════════════════════════════════════════════
 %  TEST 1 — Load 2D file: is2DActive returns true
 % ════════════════════════════════════════════════════════════════════════
 fprintf('══ TEST 1: Load 2D file → is2DActive() == true ══\n');
+api.reset();
 try
-    api = launchHeadless();
-    C   = onCleanup(@() api.close());
-
     api.addFiles({FILE_2D});
     drawnow;
 
@@ -84,13 +88,11 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 2: Load 1D XRDML file → is2DActive() == false ══\n');
 FILE_1D = fullfile(ROOT, '+test_datasets', 'XRDML', 'La2NiO4_1.xrdml');
+api.reset();
 if ~isfile(FILE_1D)
     fprintf('  SKIP – La2NiO4 file not found.\n');
 else
     try
-        api = launchHeadless();
-        C   = onCleanup(@() api.close());
-
         api.addFiles({FILE_1D});
         drawnow;
 
@@ -114,10 +116,8 @@ end
 %   without error (draw2DMap throws on any rendering failure) and that the
 %   ddMap2DType value is actually updated.
 fprintf('\n══ TEST 3: Switching 2D plot type (Heatmap / Contour / Filled Contour) ══\n');
+api.reset();
 try
-    api = launchHeadless();
-    C   = onCleanup(@() api.close());
-
     api.addFiles({FILE_2D});
     drawnow;
 
@@ -141,10 +141,8 @@ end
 %  TEST 4 — Horizontal line-cut (Shift+click simulation)
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 4: Horizontal line-cut (fixed Omega → I vs 2Theta) ══\n');
+api.reset();
 try
-    api = launchHeadless();
-    C   = onCleanup(@() api.close());
-
     api.addFiles({FILE_2D});
     drawnow;
 
@@ -188,10 +186,8 @@ end
 %  TEST 5 — Vertical line-cut (Ctrl+click simulation)
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 5: Vertical line-cut (fixed 2Theta → I vs Omega) ══\n');
+api.reset();
 try
-    api = launchHeadless();
-    C   = onCleanup(@() api.close());
-
     api.addFiles({FILE_2D});
     drawnow;
 
@@ -228,10 +224,8 @@ end
 %  TEST 6 — Multiple cuts accumulate as independent datasets
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 6: Multiple line-cuts accumulate as separate datasets ══\n');
+api.reset();
 try
-    api = launchHeadless();
-    C   = onCleanup(@() api.close());
-
     api.addFiles({FILE_2D});
     drawnow;
 
@@ -270,14 +264,4 @@ fprintf('%s\n\n', repmat(char(9552), 1, 52));
 
 if failed > 0
     error('test_gui_2d:failures', '%d test(s) failed.', failed);
-end
-
-% ════════════════════════════════════════════════════════════════════════
-%  Local functions  (must appear after all script code)
-% ════════════════════════════════════════════════════════════════════════
-function api = launchHeadless()
-%LAUNCHHEADLESS  Start dataImportGUI with the figure hidden.
-    api = dataImportGUI();
-    api.fig.Visible = 'off';
-    drawnow;
 end

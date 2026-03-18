@@ -91,6 +91,8 @@ function varargout = emViewerGUI()
     appData.imgHandle      = [];   % handle to the imagesc graphics object
     appData.overlays   = struct( ...
         'scalebar',     [], ...      % struct with .bar and .label handles from addScaleBar
+        'scalebarL',    [], ...      % compare-mode left scale bar
+        'scalebarR',    [], ...      % compare-mode right scale bar
         'lines',        {{}}, ...   % cell array of line graphics handles
         'clickMarkers', {{}}, ...   % cell array of click-marker graphics handles
         'distLabels',   {{}}, ...   % cell array of text graphics handles
@@ -367,8 +369,8 @@ function varargout = emViewerGUI()
     exportPanel = uipanel(listGL, 'Title', 'Export & Files', 'FontSize', 10);
     exportPanel.Layout.Row = 2;
 
-    exportGL = uigridlayout(exportPanel, [7 3], ...
-        'RowHeight', {22, 22, 22, 22, 2, 22, 22}, ...
+    exportGL = uigridlayout(exportPanel, [8 3], ...
+        'RowHeight', {22, 22, 22, 22, 22, 2, 22, 22}, ...
         'ColumnWidth', {'1x', '1x', '1x'}, ...
         'Padding', [3 2 3 2], ...
         'RowSpacing', 2, ...
@@ -408,54 +410,63 @@ function varargout = emViewerGUI()
         'Tooltip', 'Export all loaded images with current contrast to a folder');
     btnBatchExport.Layout.Row = 2; btnBatchExport.Layout.Column = [1 3];
 
-    % Row 3: Session Save / Load (full width each half)
+    % Row 3: Create GIF (full width)
+    btnCreateGIF = uibutton(exportGL, 'Text', 'Create GIF...', ...
+        'ButtonPushedFcn', @onCreateGIF, ...
+        'BackgroundColor', BTN_EXPORT, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Combine selected images into an animated GIF with optional scale bar');
+    btnCreateGIF.Layout.Row = 3; btnCreateGIF.Layout.Column = [1 3];
+
+    % Row 4: Session Save / Load (full width each half)
     btnSessionSave = uibutton(exportGL, 'Text', 'Save .mat', ...
         'ButtonPushedFcn', @onSessionSave, ...
         'BackgroundColor', BTN_EXPORT, ...
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Save images, contrast, overlays, annotations to .mat session');
-    btnSessionSave.Layout.Row = 3; btnSessionSave.Layout.Column = [1 2];
+    btnSessionSave.Layout.Row = 4; btnSessionSave.Layout.Column = [1 2];
 
     btnSessionLoad = uibutton(exportGL, 'Text', 'Load', ...
         'ButtonPushedFcn', @onSessionLoad, ...
         'BackgroundColor', BTN_EXPORT, ...
         'FontColor', BTN_FG, ...
         'Tooltip', 'Restore a previously saved session');
-    btnSessionLoad.Layout.Row = 3; btnSessionLoad.Layout.Column = 3;
+    btnSessionLoad.Layout.Row = 4; btnSessionLoad.Layout.Column = 3;
 
-    % Row 4: DPI dropdown + label
+    % Row 5: DPI dropdown + label
     lblDPI = uilabel(exportGL, 'Text', 'DPI:', 'FontSize', 10);
-    lblDPI.Layout.Row = 4; lblDPI.Layout.Column = 1;
+    lblDPI.Layout.Row = 5; lblDPI.Layout.Column = 1;
     ddExportDPI = uidropdown(exportGL, ...
         'Items', {'72', '150', '300', '600'}, ...
         'ItemsData', [72, 150, 300, 600], ...
         'Value', 300, ...
         'Tooltip', 'DPI for overlay and clipboard exports');
-    ddExportDPI.Layout.Row = 4; ddExportDPI.Layout.Column = [2 3];
+    ddExportDPI.Layout.Row = 5; ddExportDPI.Layout.Column = [2 3];
 
-    % Row 5: separator
+    % Row 6: separator
 
-    % Row 6: Rename header label
+    % Row 7: Rename header label
     lblRename = uilabel(exportGL, 'Text', 'Rename', ...
         'FontWeight', 'bold', 'FontSize', 10, ...
         'FontColor', [0.15 0.15 0.15]);
-    lblRename.Layout.Row = 6; lblRename.Layout.Column = 1;
+    lblRename.Layout.Row = 7; lblRename.Layout.Column = 1;
 
-    % Row 6: base name field (shares row with label)
+    % Row 7: base name field (shares row with label)
     efRenameBase = uieditfield(exportGL, 'text', ...
         'Placeholder', 'base_name', ...
         'Tooltip', 'Base name for rename — files become name_001, _002, etc.');
-    efRenameBase.Layout.Row = 6; efRenameBase.Layout.Column = [2 3];
+    efRenameBase.Layout.Row = 7; efRenameBase.Layout.Column = [2 3];
 
-    % Row 7: Rename All / Rename Selected
+    % Row 8: Rename All / Rename Selected
     btnBatchRename = uibutton(exportGL, 'Text', 'All', ...
         'ButtonPushedFcn', @onBatchRename, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Rename all loaded files: base_001, _002, etc.');
-    btnBatchRename.Layout.Row = 7; btnBatchRename.Layout.Column = 1;
+    btnBatchRename.Layout.Row = 8; btnBatchRename.Layout.Column = 1;
 
     btnRenameSelected = uibutton(exportGL, 'Text', 'Selected', ...
         'ButtonPushedFcn', @onRenameSelected, ...
@@ -463,7 +474,7 @@ function varargout = emViewerGUI()
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Rename only selected file(s) with sequential numbering');
-    btnRenameSelected.Layout.Row = 7; btnRenameSelected.Layout.Column = [2 3];
+    btnRenameSelected.Layout.Row = 8; btnRenameSelected.Layout.Column = [2 3];
 
     % ── Col 2: Image display axes ────────────────────────────────────────
     axPanel = uipanel(mainGL, 'Title', '', 'BorderType', 'none');
@@ -1816,6 +1827,7 @@ function varargout = emViewerGUI()
         btnColorOverlay.Enable  = onOff(numel(appData.images) >= 2);
         btnExportOverlays.Enable = 'on';
         btnBatchExport.Enable   = onOff(numel(appData.images) >= 1);
+        btnCreateGIF.Enable     = onOff(numel(appData.images) >= 2);
         btnCopyClipboard.Enable = 'on';
         cbColorbar.Enable       = 'on';
         cbMinimap.Enable        = 'on';
@@ -1924,6 +1936,7 @@ function varargout = emViewerGUI()
         btnColorOverlay.Enable   = 'off';
         btnExportOverlays.Enable = 'off';
         btnBatchExport.Enable    = 'off';
+        btnCreateGIF.Enable      = 'off';
         btnCopyClipboard.Enable  = 'off';
         cbColorbar.Enable        = 'off';
         cbColorbar.Value         = false;
@@ -3221,11 +3234,6 @@ function varargout = emViewerGUI()
     % ════════════════════════════════════════════════════════════════════
     function rebuildScaleBar()
         deleteScaleBar();
-        if appData.activeIdx < 1
-            return;
-        end
-
-        imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
 
         % Read current settings from controls
         if isequal(btnScaleBarColor.FontColor, [1 1 1])
@@ -3235,12 +3243,35 @@ function varargout = emViewerGUI()
         end
         fontSize = spnScaleBarFont.Value;
 
-        hBar = imaging.addScaleBar(ax, imgInfo.pixelSize, imgInfo.pixelUnit, ...
-            'Color', barColor, 'FontSize', fontSize);
-        appData.overlays.scalebar = hBar;
-
-        % Make scale bar draggable
-        makeScaleBarDraggable(hBar);
+        if appData.compareMode
+            % Add scale bars to both compare axes
+            for panelChar = ['L', 'R']
+                if panelChar == 'L'
+                    tgtAx = axL;  idx = appData.compareIdxL;
+                else
+                    tgtAx = axR;  idx = appData.compareIdxR;
+                end
+                if isempty(tgtAx) || ~isvalid(tgtAx), continue; end
+                if idx < 1 || idx > numel(appData.images), continue; end
+                imgI = appData.images{idx}.metadata.parserSpecific.imageData;
+                if ~imgI.calibrated, continue; end
+                hB = imaging.addScaleBar(tgtAx, imgI.pixelSize, imgI.pixelUnit, ...
+                    'Color', barColor, 'FontSize', fontSize);
+                makeScaleBarDraggable(hB);
+                if panelChar == 'L'
+                    appData.overlays.scalebarL = hB;
+                else
+                    appData.overlays.scalebarR = hB;
+                end
+            end
+        else
+            if appData.activeIdx < 1, return; end
+            imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
+            hBar = imaging.addScaleBar(ax, imgInfo.pixelSize, imgInfo.pixelUnit, ...
+                'Color', barColor, 'FontSize', fontSize);
+            appData.overlays.scalebar = hBar;
+            makeScaleBarDraggable(hBar);
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3667,11 +3698,15 @@ function varargout = emViewerGUI()
 
         % Disable measurement/processing buttons (they operate on single ax)
         setToolsEnabled('off');
-        setStatus('Compare mode — Tab to switch panel, arrows to scroll');
+        setStatus('Compare mode — click or Tab to switch panel, arrows to scroll');
     end
 
     function exitCompareMode()
         appData.compareMode = false;
+
+        % Clean up compare scale bars (handles destroyed with axes)
+        appData.overlays.scalebarL = [];
+        appData.overlays.scalebarR = [];
 
         % Destroy compare layout
         if ~isempty(compareGL) && isvalid(compareGL)
@@ -3791,6 +3826,54 @@ function varargout = emViewerGUI()
         [~, fname, fext] = fileparts(dataStruct.metadata.source);
         title(targetAx, sprintf('[%d] %s%s', idx, fname, fext), ...
             'Interpreter', 'none', 'FontSize', 10);
+
+        % Click on either panel to make it the active one
+        clickCb = @(~,~) onCompareAxesClick(panel);
+        targetAx.ButtonDownFcn = clickCb;
+        % Also set on the image object so clicks on pixels register
+        imgObj = findobj(targetAx, 'Type', 'image');
+        if ~isempty(imgObj)
+            imgObj(1).ButtonDownFcn = clickCb;
+        end
+
+        % Rebuild scale bar on this panel if checkbox is on
+        if cbScaleBar.Value
+            rebuildCompareScaleBar(panel, idx);
+        end
+    end
+
+    function rebuildCompareScaleBar(panel, idx)
+    %REBUILDCOMPARESCALEBAR  Add scale bar to one compare panel.
+        if panel == 'L'
+            tgtAx = axL;  sbField = 'scalebarL';
+        else
+            tgtAx = axR;  sbField = 'scalebarR';
+        end
+        % Delete existing for this panel
+        deleteScaleBarHandle(appData.overlays.(sbField));
+        appData.overlays.(sbField) = [];
+        if isempty(tgtAx) || ~isvalid(tgtAx), return; end
+        if idx < 1 || idx > numel(appData.images), return; end
+        imgI = appData.images{idx}.metadata.parserSpecific.imageData;
+        if ~imgI.calibrated, return; end
+        if isequal(btnScaleBarColor.FontColor, [1 1 1])
+            barColor = [1 1 1];
+        else
+            barColor = [0 0 0];
+        end
+        hB = imaging.addScaleBar(tgtAx, imgI.pixelSize, imgI.pixelUnit, ...
+            'Color', barColor, 'FontSize', spnScaleBarFont.Value);
+        makeScaleBarDraggable(hB);
+        appData.overlays.(sbField) = hB;
+    end
+
+    function onCompareAxesClick(panel)
+    %ONCOMPAREAXESCLICK  Switch active panel when user clicks on an image.
+        if ~appData.compareMode, return; end
+        if appData.compareActivePanel ~= panel
+            appData.compareActivePanel = panel;
+            updateCompareHighlight();
+        end
     end
 
     function syncCompareZoom(sourceAx, targetAx2)
@@ -3813,14 +3896,14 @@ function varargout = emViewerGUI()
             axL.LineWidth = 2;
             axR.XColor = inactiveBorder; axR.YColor = inactiveBorder;
             axR.LineWidth = 0.5;
-            setStatus(sprintf('Compare: LEFT [%d] active — Tab to switch, arrows to scroll', ...
+            setStatus(sprintf('Compare: LEFT [%d] active — click or Tab to switch, arrows to scroll', ...
                 appData.compareIdxL));
         else
             axR.XColor = OVERLAY_COLOR; axR.YColor = OVERLAY_COLOR;
             axR.LineWidth = 2;
             axL.XColor = inactiveBorder; axL.YColor = inactiveBorder;
             axL.LineWidth = 0.5;
-            setStatus(sprintf('Compare: RIGHT [%d] active — Tab to switch, arrows to scroll', ...
+            setStatus(sprintf('Compare: RIGHT [%d] active — click or Tab to switch, arrows to scroll', ...
                 appData.compareIdxR));
         end
     end
@@ -3855,6 +3938,7 @@ function varargout = emViewerGUI()
         btnColorOverlay.Enable   = state;
         btnExportOverlays.Enable = state;
         btnBatchExport.Enable    = state;
+        btnCreateGIF.Enable      = state;
         btnCopyClipboard.Enable  = state;
         cbMinimap.Enable         = state;
         cbPixelInspector.Enable  = state;
@@ -3874,9 +3958,6 @@ function varargout = emViewerGUI()
         btnPlaceAnnot.Enable   = state;
         btnClearAnnot.Enable   = state;
         btnAnnotColor.Enable   = state;
-        cbScaleBar.Enable      = state;
-        btnScaleBarColor.Enable = state;
-        spnScaleBarFont.Enable = state;
         cbColorbar.Enable      = state;
         % Phase 3 buttons
         btnDSpacing.Enable      = state;
@@ -4733,16 +4814,21 @@ function varargout = emViewerGUI()
     %  HELPER: deleteScaleBar — Remove scale bar graphics handles if present
     % ════════════════════════════════════════════════════════════════════
     function deleteScaleBar()
-        sb = appData.overlays.scalebar;
-        if ~isempty(sb) && isstruct(sb)
-            if isfield(sb, 'bar') && isvalid(sb.bar)
-                delete(sb.bar);
-            end
-            if isfield(sb, 'label') && isvalid(sb.label)
-                delete(sb.label);
-            end
-        end
+        % Delete single-view scale bar
+        deleteScaleBarHandle(appData.overlays.scalebar);
         appData.overlays.scalebar = [];
+        % Delete compare-mode scale bars
+        deleteScaleBarHandle(appData.overlays.scalebarL);
+        appData.overlays.scalebarL = [];
+        deleteScaleBarHandle(appData.overlays.scalebarR);
+        appData.overlays.scalebarR = [];
+    end
+
+    function deleteScaleBarHandle(sb)
+        if ~isempty(sb) && isstruct(sb)
+            if isfield(sb, 'bar') && isvalid(sb.bar), delete(sb.bar); end
+            if isfield(sb, 'label') && isvalid(sb.label), delete(sb.label); end
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4755,24 +4841,27 @@ function varargout = emViewerGUI()
 
         if ~isstruct(hBar), return; end
 
+        % Determine which axes this scale bar lives on
         if isfield(hBar, 'bar') && isvalid(hBar.bar)
-            hBar.bar.ButtonDownFcn = @(~,~) startScaleBarDrag();
+            dragAx = ancestor(hBar.bar, 'axes');
+            hBar.bar.ButtonDownFcn = @(~,~) startScaleBarDrag(hBar, dragAx);
         end
         if isfield(hBar, 'label') && isvalid(hBar.label)
-            hBar.label.ButtonDownFcn = @(~,~) startScaleBarDrag();
+            dragAx = ancestor(hBar.label, 'axes');
+            hBar.label.ButtonDownFcn = @(~,~) startScaleBarDrag(hBar, dragAx);
         end
     end
 
-    function startScaleBarDrag()
-        sb = appData.overlays.scalebar;
+    function startScaleBarDrag(sb, dragAx)
         if isempty(sb) || ~isstruct(sb), return; end
+        if isempty(dragAx) || ~isvalid(dragAx), return; end
 
         % Current bar position: [x y w h]
         barPos  = sb.bar.Position;
         labelPt = [sb.label.Position(1), sb.label.Position(2)];
 
         % Get click location in data coords
-        cp = ax.CurrentPoint;
+        cp = dragAx.CurrentPoint;
         startX = cp(1,1);
         startY = cp(1,2);
 
@@ -4784,7 +4873,7 @@ function varargout = emViewerGUI()
         fig.WindowButtonUpFcn    = @dragRelease;
 
         function dragMotion(~, ~)
-            cp2 = ax.CurrentPoint;
+            cp2 = dragAx.CurrentPoint;
             dx = cp2(1,1) - startX;
             dy = cp2(1,2) - startY;
 
@@ -6346,6 +6435,301 @@ function varargout = emViewerGUI()
         fig.Pointer = 'arrow';
         setStatus(sprintf('Batch exported %d / %d images to %s', ...
             nExported, numel(appData.images), outDir));
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onCreateGIF — Combine images into an animated GIF
+    % ════════════════════════════════════════════════════════════════════
+    function onCreateGIF(~, ~)
+        if numel(appData.images) < 2, return; end
+
+        % ── Build options dialog ──────────────────────────────────────
+        nImg = numel(appData.images);
+        names = cell(1, nImg);
+        for ni = 1:nImg
+            [~, names{ni}] = fileparts(appData.images{ni}.metadata.source);
+        end
+
+        dlg = uifigure('Name', 'Create Animated GIF', ...
+            'Position', [200 200 400 370], ...
+            'Resize', 'off', ...
+            'WindowStyle', 'modal');
+        dlgGL = uigridlayout(dlg, [8 2], ...
+            'RowHeight', {22, 120, 22, 22, 22, 22, 10, 28}, ...
+            'ColumnWidth', {120, '1x'}, ...
+            'Padding', [10 10 10 10], ...
+            'RowSpacing', 6);
+
+        % Row 1: Label
+        uilabel(dlgGL, 'Text', 'Select images:', 'FontWeight', 'bold', ...
+            'FontSize', 11).Layout.Row = 1;
+
+        % Row 2: Image list (multi-select)
+        lbGIFImages = uilistbox(dlgGL, ...
+            'Items', names, ...
+            'ItemsData', 1:nImg, ...
+            'Multiselect', 'on', ...
+            'Value', 1:nImg);
+        lbGIFImages.Layout.Row = 2;
+        lbGIFImages.Layout.Column = [1 2];
+
+        % Row 3: Frame delay
+        uilabel(dlgGL, 'Text', 'Frame delay (s):', ...
+            'HorizontalAlignment', 'right').Layout.Row = 3;
+        efDelay = uieditfield(dlgGL, 'numeric', ...
+            'Value', 0.5, 'Limits', [0.02 10], ...
+            'Tooltip', 'Seconds per frame (0.02 – 10)');
+        efDelay.Layout.Row = 3; efDelay.Layout.Column = 2;
+
+        % Row 4: Loop count
+        uilabel(dlgGL, 'Text', 'Loop:', ...
+            'HorizontalAlignment', 'right').Layout.Row = 4;
+        ddLoop = uidropdown(dlgGL, ...
+            'Items', {'Infinite', '1', '2', '3', '5', '10'}, ...
+            'ItemsData', {Inf, 1, 2, 3, 5, 10}, ...
+            'Value', Inf, ...
+            'Tooltip', 'Number of times the GIF loops');
+        ddLoop.Layout.Row = 4; ddLoop.Layout.Column = 2;
+
+        % Row 5: Include scale bar
+        cbScaleBarGIF = uicheckbox(dlgGL, ...
+            'Text', 'Include scale bar', ...
+            'Value', true, ...
+            'Tooltip', 'Add a scale bar at same position on every frame');
+        cbScaleBarGIF.Layout.Row = 5;
+        cbScaleBarGIF.Layout.Column = [1 2];
+
+        % Row 6: Scale bar color
+        uilabel(dlgGL, 'Text', 'Bar color:', ...
+            'HorizontalAlignment', 'right').Layout.Row = 6;
+        ddBarColor = uidropdown(dlgGL, ...
+            'Items', {'White', 'Black'}, ...
+            'Value', 'White', ...
+            'Tooltip', 'Scale bar and label color');
+        ddBarColor.Layout.Row = 6; ddBarColor.Layout.Column = 2;
+
+        % Row 7: spacer
+
+        % Row 8: Create / Cancel buttons
+        btnGo = uibutton(dlgGL, 'Text', 'Create GIF', ...
+            'BackgroundColor', [0.20 0.55 0.35], ...
+            'FontColor', [1 1 1]);
+        btnGo.Layout.Row = 8; btnGo.Layout.Column = 1;
+
+        btnCancel = uibutton(dlgGL, 'Text', 'Cancel', ...
+            'BackgroundColor', [0.4 0.4 0.4], ...
+            'FontColor', [1 1 1], ...
+            'ButtonPushedFcn', @(~,~) close(dlg));
+        btnCancel.Layout.Row = 8; btnCancel.Layout.Column = 2;
+
+        btnGo.ButtonPushedFcn = @(~,~) doCreateGIF(dlg, lbGIFImages, ...
+            efDelay, ddLoop, cbScaleBarGIF, ddBarColor);
+    end
+
+    function doCreateGIF(dlg, lbImages, efDelay, ddLoop, cbBar, ddBarColor)
+    %DOCREATEGIF  Build and save the animated GIF from selected images.
+        selIdx = lbImages.Value;
+        if isempty(selIdx) || ~iscell(selIdx) && isscalar(selIdx) && selIdx < 1
+            uialert(dlg, 'Select at least 2 images.', 'GIF Error');
+            return;
+        end
+        if ~iscell(selIdx), selIdx = {selIdx}; end
+        idxList = [selIdx{:}];
+        if numel(idxList) < 2
+            uialert(dlg, 'Select at least 2 images.', 'GIF Error');
+            return;
+        end
+
+        delay     = efDelay.Value;
+        loopCount = ddLoop.Value;
+        addBar    = cbBar.Value;
+        barColor  = [1 1 1];
+        if strcmp(ddBarColor.Value, 'Black'), barColor = [0 0 0]; end
+
+        % Loop count for GIF: Inf→0 (infinite), N→N-1 (GIF spec: 0=infinite, N=play N+1 times)
+        if isinf(loopCount)
+            gifLoop = 0;
+        else
+            gifLoop = max(0, loopCount - 1);
+        end
+
+        close(dlg);
+
+        % Ask for save path
+        startPath = appData.lastDir;
+        if isempty(startPath), startPath = pwd; end
+        [saveName, saveDir] = uiputfile( ...
+            {'*.gif', 'Animated GIF (*.gif)'}, ...
+            'Save Animated GIF', fullfile(startPath, 'animation.gif'));
+        if isequal(saveName, 0), return; end
+        outPath = fullfile(saveDir, saveName);
+
+        fig.Pointer = 'watch'; drawnow;
+        setStatus('Creating GIF...');
+
+        try
+            % ── Determine target dimensions (largest image) ──────────
+            maxH = 0; maxW = 0;
+            for qi = 1:numel(idxList)
+                imgInfo = appData.images{idxList(qi)}.metadata.parserSpecific.imageData;
+                maxH = max(maxH, imgInfo.height);
+                maxW = max(maxW, imgInfo.width);
+            end
+
+            % ── Determine shared scale bar parameters ────────────────
+            % Use the first calibrated image to compute bar length;
+            % if none are calibrated, skip scale bar.
+            barLenPx = 0;  barLenPhys = 0;  barUnit = '';
+            if addBar
+                for qi = 1:numel(idxList)
+                    imgInfo = appData.images{idxList(qi)}.metadata.parserSpecific.imageData;
+                    if imgInfo.calibrated
+                        pxSz = imgInfo.pixelSize;
+                        barUnit = imgInfo.pixelUnit;
+                        targetPhys = maxW * pxSz / 5;
+                        niceLens = [1 2 5 10 20 50 100 200 500 1000];
+                        [~, bestIdx] = min(abs(niceLens - targetPhys));
+                        barLenPhys = niceLens(bestIdx);
+                        barLenPx   = barLenPhys / pxSz;
+                        break;
+                    end
+                end
+                if barLenPx == 0
+                    addBar = false;  % no calibrated image found
+                end
+            end
+
+            % ── Build frames ─────────────────────────────────────────
+            cmapName = ddColormap.Value;
+            cmap256 = getCmapByName(cmapName);
+
+            for qi = 1:numel(idxList)
+                imgInfo = appData.images{idxList(qi)}.metadata.parserSpecific.imageData;
+                px = double(imgInfo.pixels);
+                if imgInfo.numChannels == 3
+                    px = 0.299*px(:,:,1) + 0.587*px(:,:,2) + 0.114*px(:,:,3);
+                end
+
+                % Per-image auto-contrast
+                lo = percentileNoToolbox(px(:), 2);
+                hi = percentileNoToolbox(px(:), 98);
+                if lo >= hi, lo = min(px(:)); hi = max(px(:)); end
+                if hi <= lo, hi = lo + 1; end
+                dispPx = (px - lo) / (hi - lo);
+                dispPx = max(0, min(1, dispPx));
+
+                % Pad to target dimensions (centre the image)
+                [curH, curW] = size(dispPx);
+                if curH ~= maxH || curW ~= maxW
+                    padded = zeros(maxH, maxW);
+                    offY = floor((maxH - curH) / 2) + 1;
+                    offX = floor((maxW - curW) / 2) + 1;
+                    padded(offY:offY+curH-1, offX:offX+curW-1) = dispPx;
+                    dispPx = padded;
+                end
+
+                % Map [0,1] grayscale through colormap → RGB uint8
+                idxImg = max(1, min(256, round(dispPx * 255) + 1));
+                rgbFrame = uint8(reshape(cmap256(idxImg(:), :), [maxH, maxW, 3]) * 255);
+
+                % Draw scale bar directly on the RGB frame
+                if addBar
+                    barH   = max(2, round(maxH * 0.02));
+                    margin = round(barLenPx * 0.3);
+                    bx1 = maxW - margin - round(barLenPx) + 1;
+                    bx2 = maxW - margin;
+                    by1 = maxH - margin - barH + 1;
+                    by2 = maxH - margin;
+
+                    % Clamp to image bounds
+                    bx1 = max(1, bx1); bx2 = min(maxW, bx2);
+                    by1 = max(1, by1); by2 = min(maxH, by2);
+
+                    barRGB = uint8(barColor * 255);
+                    rgbFrame(by1:by2, bx1:bx2, 1) = barRGB(1);
+                    rgbFrame(by1:by2, bx1:bx2, 2) = barRGB(2);
+                    rgbFrame(by1:by2, bx1:bx2, 3) = barRGB(3);
+
+                    % Render label text via temporary figure
+                    if barLenPhys == round(barLenPhys)
+                        lblStr = sprintf('%d %s', round(barLenPhys), barUnit);
+                    else
+                        lblStr = sprintf('%.2g %s', barLenPhys, barUnit);
+                    end
+                    rgbFrame = burnTextOnFrame(rgbFrame, lblStr, ...
+                        round((bx1 + bx2) / 2), by1, barColor);
+                end
+
+                % Quantise RGB to 256-colour indexed image
+                [idxFrame, cmap] = rgb2ind(rgbFrame, 256, 'nodither');
+
+                % Write frame to GIF
+                if qi == 1
+                    imwrite(idxFrame, cmap, outPath, 'gif', ...
+                        'LoopCount', gifLoop, 'DelayTime', delay);
+                else
+                    imwrite(idxFrame, cmap, outPath, 'gif', ...
+                        'WriteMode', 'append', 'DelayTime', delay);
+                end
+
+                setStatus(sprintf('Creating GIF... frame %d / %d', qi, numel(idxList)));
+                drawnow;
+            end
+
+            fig.Pointer = 'arrow';
+            setStatus(sprintf('GIF saved: %s (%d frames)', saveName, numel(idxList)));
+        catch ME
+            fig.Pointer = 'arrow';
+            setStatus(sprintf('GIF export failed: %s', ME.message));
+            uialert(fig, sprintf('GIF creation failed:\n%s', ME.message), ...
+                'Error', 'Icon', 'error');
+        end
+    end
+
+    function rgb = burnTextOnFrame(rgb, str, cx, topY, color)
+    %BURNTEXTONFRAME  Render text onto an RGB image using a temporary figure.
+    %   cx   — horizontal centre pixel
+    %   topY — pixel row just above the bar (text placed above)
+        [fH, fW, ~] = size(rgb);
+        tmpFig = figure('Visible', 'off', 'Color', 'k', ...
+            'Units', 'pixels', 'Position', [0 0 fW fH], ...
+            'MenuBar', 'none', 'ToolBar', 'none');
+        tmpAx = axes(tmpFig, 'Units', 'pixels', 'Position', [0 0 fW fH], ...
+            'XLim', [0.5 fW+0.5], 'YLim', [0.5 fH+0.5], 'YDir', 'reverse', ...
+            'Visible', 'off', 'Color', 'none');
+        image(tmpAx, 'CData', rgb, 'XData', [1 fW], 'YData', [1 fH]);
+        fontSize = max(8, round(fH * 0.025));
+        text(tmpAx, cx, topY - round(fH*0.005), str, ...
+            'Color', color, 'FontSize', fontSize, ...
+            'HorizontalAlignment', 'center', ...
+            'VerticalAlignment', 'bottom', ...
+            'FontWeight', 'bold');
+        drawnow;
+        frame = getframe(tmpAx);
+        close(tmpFig);
+        rgb = frame.cdata;
+        % Resize back if getframe returned different dimensions
+        if size(rgb,1) ~= fH || size(rgb,2) ~= fW
+            rgb = imresize(rgb, [fH fW]);
+        end
+    end
+
+    function cmap = getCmapByName(name)
+    %GETCMAPBYNAME  Return a 256×3 colormap matrix for a given name.
+        switch lower(name)
+            case 'viridis'
+                cmap = generateViridis(256);
+            case 'plasma'
+                cmap = generatePlasma(256);
+            case 'inferno'
+                cmap = generateInferno(256);
+            otherwise
+                try
+                    cmap = feval(name, 256);
+                catch
+                    cmap = parula(256);
+                end
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════

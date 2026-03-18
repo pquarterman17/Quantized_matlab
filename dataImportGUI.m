@@ -107,6 +107,7 @@ function varargout = dataImportGUI()
 %   api.setQSpace(tf)          — enable/disable Q-space axes on 2D map and replot
 %   api.setContourLevels(n)    — set number of contour levels for Contour plot types
 %   api.setColormap(name)      — set active colormap by name and replot
+%   api.setMap2DColormap(name) — set 2D map color scale (e.g. 'parula','viridis','plasma')
 %
 %   Headless usage (e.g. in test_gui_harness.m):
 %     api = dataImportGUI();
@@ -376,8 +377,8 @@ function varargout = dataImportGUI()
     fileListPanel.Layout.Row = 1; fileListPanel.Layout.Column = 1;
 
     % Stacked vertically: Add | Remove | Filter | Merge | Listbox
-    tbGL = uigridlayout(fileListPanel,[8 2], ...
-        'RowHeight',    {22,22,22,22,22,22,22,180}, ...
+    tbGL = uigridlayout(fileListPanel,[7 2], ...
+        'RowHeight',    {22,22,22,22,22,22,180}, ...
         'ColumnWidth',  {'1x','1x'}, ...
         'Padding',      [0 0 0 0], ...
         'RowSpacing',   2, ...
@@ -442,21 +443,13 @@ function varargout = dataImportGUI()
         'Tooltip','Show keyboard shortcuts');
     btnShortcuts.Layout.Row = 6; btnShortcuts.Layout.Column = 2;
 
-    btnLaunchEM = uibutton(tbGL, 'Text', 'EM Viewer', ...
-        'ButtonPushedFcn', @(~,~) emViewerGUI(), ...
-        'BackgroundColor', BTN_TOOL, ...
-        'FontColor', BTN_FG, ...
-        'FontSize', 10, ...
-        'Tooltip', 'Launch the electron microscopy image viewer');
-    btnLaunchEM.Layout.Row = 7; btnLaunchEM.Layout.Column = [1 2];
-
     lbDatasets = uilistbox(tbGL, ...
         'Items',     {'(no files loaded — click  Add File(s)...  to begin)'}, ...
         'ItemsData', {0}, ...
         'Multiselect','on', ...
         'ValueChangedFcn',@onSelectDataset, ...
         'Tooltip','Loaded datasets — click to make active; Ctrl+click to select multiple; right-click to remove');
-    lbDatasets.Layout.Row = 8; lbDatasets.Layout.Column = [1 2];
+    lbDatasets.Layout.Row = 7; lbDatasets.Layout.Column = [1 2];
 
     % Context menu for dataset list (right-click) — #12 expanded
     % uicontextmenu on uifigure components requires R2023b+; guard for older versions.
@@ -495,7 +488,7 @@ function varargout = dataImportGUI()
     ctrlPanel.Layout.Column = 2;
 
     ctrlGL = uigridlayout(ctrlPanel,[8 1], ...
-        'RowHeight', {24,100,80,56,66,22,22,20}, ...
+        'RowHeight', {24,100,80,80,66,22,22,20}, ...
         'Padding',   [4 4 4 4], ...
         'RowSpacing', 2);
 
@@ -525,10 +518,10 @@ function varargout = dataImportGUI()
         'ValueChangedFcn',@(~,~) onPlot([],[]));
     lbY2.Layout.Row = 2; lbY2.Layout.Column = 1;
 
-    % Plot-style buttons (row 7) — three uibutton objects in a nested grid.
-    styleGL = uigridlayout(ctrlGL,[3 4], ...
-        'Padding',[0 0 0 0],'ColumnSpacing',2,'RowSpacing',1, ...
-        'ColumnWidth',{'1x','1x','1x','1x'},'RowHeight',{18,18,'1x'});
+    % Plot-style buttons (row 4) — colormap, theme, then 2×2 style buttons.
+    styleGL = uigridlayout(ctrlGL,[4 4], ...
+        'Padding',[0 0 0 0],'ColumnSpacing',2,'RowSpacing',2, ...
+        'ColumnWidth',{'1x','1x','1x','1x'},'RowHeight',{18,18,20,20});
     styleGL.Layout.Row = 4;
 
     % Row 1: Colormap label + selector
@@ -554,25 +547,24 @@ function varargout = dataImportGUI()
         'ValueChangedFcn', @onThemeChanged);
     ddTheme.Layout.Row = 2; ddTheme.Layout.Column = [2 4];
 
-    % Row 3: Style buttons
+    % Rows 3-4: Style buttons (2 per row)
     btnStyleLine = uibutton(styleGL,'Text','Line', ...
         'ButtonPushedFcn',@(~,~) onStylePick('Line'), ...
         'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG);
-    btnStyleLine.Layout.Row = 3; btnStyleLine.Layout.Column = 1;
+    btnStyleLine.Layout.Row = 3; btnStyleLine.Layout.Column = [1 2];
 
     btnStyleScatter = uibutton(styleGL,'Text','Scatter', ...
         'ButtonPushedFcn',@(~,~) onStylePick('Scatter'));
-    btnStyleScatter.Layout.Row = 3; btnStyleScatter.Layout.Column = 2;
+    btnStyleScatter.Layout.Row = 3; btnStyleScatter.Layout.Column = [3 4];
 
-    btnStyleLineMarkers = uibutton(styleGL,'Text','Line+Pts', ...
+    btnStyleLineMarkers = uibutton(styleGL,'Text','Line + Markers', ...
         'ButtonPushedFcn',@(~,~) onStylePick('Line+Pts'));
-    btnStyleLineMarkers.Layout.Row = 3; btnStyleLineMarkers.Layout.Column = 3;
+    btnStyleLineMarkers.Layout.Row = 4; btnStyleLineMarkers.Layout.Column = [1 2];
 
-    btnStyleErrorBand = uibutton(styleGL,'Text','Err Band', ...
+    btnStyleErrorBand = uibutton(styleGL,'Text','Error Band', ...
         'ButtonPushedFcn',@(~,~) onStylePick('ErrorBand'), ...
-        'FontSize', 9, ...
         'Tooltip','Plot with shaded error bands (auto-detects error columns)');
-    btnStyleErrorBand.Layout.Row = 3; btnStyleErrorBand.Layout.Column = 4;
+    btnStyleErrorBand.Layout.Row = 4; btnStyleErrorBand.Layout.Column = [3 4];
 
     % Row 5: Axis scale dropdowns (3 rows: X, Left Y, Right Y)
     scaleGL = uigridlayout(ctrlGL,[3 2], ...
@@ -1945,8 +1937,8 @@ function varargout = dataImportGUI()
     map2DPanel.Layout.Row = 1; map2DPanel.Layout.Column = 3;
     map2DPanel.Visible = 'off';   % shown only when a 2D area-detector dataset is active
 
-    map2DGL = uigridlayout(map2DPanel,[6 2], ...
-        'RowHeight',    {20, 20, 20, 22, 18, '1x'}, ...
+    map2DGL = uigridlayout(map2DPanel,[7 2], ...
+        'RowHeight',    {20, 20, 20, 20, 22, 18, '1x'}, ...
         'ColumnWidth',  {85, '1x'}, ...
         'Padding',      [4 4 4 4], ...
         'RowSpacing',   3, ...
@@ -1979,25 +1971,35 @@ function varargout = dataImportGUI()
                     'Shift+click / Ctrl+click line-cuts use Q-space coordinates.']);
     cbMap2DQSpace.Layout.Row = 3; cbMap2DQSpace.Layout.Column = [1 2];
 
+    lblMap2DCmap = uilabel(map2DGL,'Text','Color scale:','FontSize',10,'HorizontalAlignment','right');
+    lblMap2DCmap.Layout.Row = 4; lblMap2DCmap.Layout.Column = 1;
+    MAP2D_CMAPS = {'parula','viridis','plasma','inferno','hot','jet','turbo','gray','bone','copper'};
+    ddMap2DCmap = uidropdown(map2DGL, ...
+        'Items',           MAP2D_CMAPS, ...
+        'Value',           'parula', ...
+        'Tooltip',         'Colormap for 2D heatmap / contour display', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    ddMap2DCmap.Layout.Row = 4; ddMap2DCmap.Layout.Column = 2;
+
     btnPoleFigure = uibutton(map2DGL,'Text','Pole Figure...', ...
         'ButtonPushedFcn',@onPoleFigure, ...
         'BackgroundColor',[0.30 0.45 0.55], ...
         'FontColor',[1 1 1], ...
         'Tooltip','Open a polar plot of integrated intensity at a chosen 2θ position');
-    btnPoleFigure.Layout.Row = 4; btnPoleFigure.Layout.Column = [1 2];
+    btnPoleFigure.Layout.Row = 5; btnPoleFigure.Layout.Column = [1 2];
 
     lblMap2DInfo = uilabel(map2DGL,'Text','', ...
         'FontSize', 9, ...
         'FontColor', [0.4 0.4 0.4], ...
         'HorizontalAlignment', 'center', ...
         'WordWrap', 'on');
-    lblMap2DInfo.Layout.Row = 5; lblMap2DInfo.Layout.Column = [1 2];
+    lblMap2DInfo.Layout.Row = 6; lblMap2DInfo.Layout.Column = [1 2];
 
     lblMap2DHint = uilabel(map2DGL,'Text','Shift+click: H-cut  |  Ctrl+click: V-cut', ...
         'FontSize', 8, ...
         'FontColor', [0.55 0.55 0.55], ...
         'HorizontalAlignment', 'center');
-    lblMap2DHint.Layout.Row = 6; lblMap2DHint.Layout.Column = [1 2];
+    lblMap2DHint.Layout.Row = 7; lblMap2DHint.Layout.Column = [1 2];
 
     % ── Drag-and-drop: register every major surface as a drop target (R2023a+) ──
     % In uifigure the CEF renderer consumes drag events at whichever child
@@ -2055,10 +2057,12 @@ function varargout = dataImportGUI()
     api.setQSpace           = @setQSpaceDirect;
     api.setContourLevels    = @setContourLevelsDirect;
     api.setColormap         = @setColormapDirect;
+    api.setMap2DColormap    = @setMap2DColormapDirect;
     api.maskRegion          = @maskRegionDirect;
     api.unmaskAll           = @() onUnmaskAll([],[]);
     api.fringeThickness     = @fringeThicknessDirect;
     api.clearFringe         = @clearFringeMarkers;
+    api.reset               = @resetGUIDirect;
 
     % ════════════════════════════════════════════════════════════════════
     %  NESTED CALLBACKS  (share appData + all control handles via closure)
@@ -2426,6 +2430,14 @@ function varargout = dataImportGUI()
         drawnow;
     end
 
+    function setMap2DColormapDirect(name)
+    %SETMAP2DCOLORMAPDIRECT  Set the 2D map color scale by name and replot.
+    %   name: one of the items in ddMap2DCmap (e.g. 'parula', 'viridis', 'plasma')
+        ddMap2DCmap.Value = name;
+        onPlot([],[]);
+        drawnow;
+    end
+
     function maskRegionDirect(xMin, xMax, yMin, yMax)
     %MASKREGIONDIRECT  Programmatic masking for testing.
     %   api.maskRegion(xMin, xMax, yMin, yMax) masks data points in the box.
@@ -2449,6 +2461,56 @@ function varargout = dataImportGUI()
         result.thickness_nm = result.thickness_A / 10;
         % Place markers and annotation
         recreateFringeMarkers();
+    end
+
+    function resetGUIDirect()
+    %RESETGUIDIRECT  Clear all datasets and reset GUI to initial state.
+    %  Used by automated tests to reuse a single GUI instance.
+        appData.datasets  = {};
+        appData.activeIdx = 0;
+        appData.style     = 'Line';
+        appData.peakPickMode      = false;
+        appData.fringeClickCount  = 0;
+        appData.fringeQ           = [];
+        appData.fringeMarkers     = {};
+        appData.fringeAnnotation  = [];
+        appData.fringeDragIdx     = 0;
+        appData.maskStartPt       = [];
+        appData.maskRectPatch     = [];
+
+        % Reset correction widgets
+        efXOffset.Value      = 0;
+        efYOffset.Value      = 0;
+        efBGSlope.Value      = 0;
+        efBGIntercept.Value  = 0;
+        ddBGOrder.Value      = 'Linear';
+        cbSmooth.Value       = false;
+        efXTrimMin.Value     = '';
+        efXTrimMax.Value     = '';
+        ddNormalize.Value    = 'None';
+        ddMap2DCmap.Value    = 'parula';
+
+        % Reset axis dropdowns and listboxes
+        ddX.Items = {'(load file first)'};
+        lbY.Items = {'(load file first)'};
+        lbY2.Items = {'(none)'};
+        lbY2.Value = {'(none)'};
+        lbDatasets.Items     = {};
+        lbDatasets.ItemsData = {};
+
+        % Reset axis limit fields
+        efXMin.Value = '';  efXMax.Value = '';
+        efYMin.Value = '';  efYMax.Value = '';
+
+        % Clear plot
+        if ~isempty(ax) && isvalid(ax)
+            delete(ax.Children);
+            cla(ax);
+            title(ax, '');
+        end
+
+        cancelInteractions();
+        clearFringeMarkers();
     end
 
     function onSelectDataset(~,~)
@@ -9721,12 +9783,10 @@ function varargout = dataImportGUI()
             I = log10(max(I, 1e-9));
         end
 
-        % Per-axes colormap — handle custom palettes and the 'lines' special case
-        cmapName = ddColormap.Value;
+        % Per-axes colormap — use the dedicated 2D color scale dropdown
+        cmapName = ddMap2DCmap.Value;
         try
             switch lower(cmapName)
-                case {'lines (matlab default)', 'lines'}
-                    colormap(targetAx, parula(256));   % lines is discrete, not suitable for maps
                 case 'viridis'
                     colormap(targetAx, generateViridis(256));
                 case 'plasma'
@@ -10643,6 +10703,7 @@ function varargout = dataImportGUI()
         savedStyle     = appData.style;
         savedLastDir   = appData.lastDir;
         savedColormap  = ddColormap.Value;
+        savedMap2DCmap = ddMap2DCmap.Value;
         savedXSel      = ddX.Value;
         savedYSel      = ensureCell(lbY.Value);
         savedY2Sel     = ensureCell(lbY2.Value);
@@ -10657,7 +10718,8 @@ function varargout = dataImportGUI()
             save(outPath, 'savedDatasets', 'savedActiveIdx', ...
                           'savedBgFile', 'savedBgDataset', ...
                           'savedStyle', 'savedLastDir', ...
-                          'savedColormap', 'savedXSel', ...
+                          'savedColormap', 'savedMap2DCmap', ...
+                          'savedXSel', ...
                           'savedYSel', 'savedY2Sel', ...
                           'savedLogX', 'savedLogY', ...
                           'savedBGInterp', ...
@@ -10756,6 +10818,9 @@ function varargout = dataImportGUI()
         % Restore UI settings
         if isfield(S,'savedColormap') && ismember(S.savedColormap, ddColormap.Items)
             ddColormap.Value = S.savedColormap;
+        end
+        if isfield(S,'savedMap2DCmap') && ismember(S.savedMap2DCmap, ddMap2DCmap.Items)
+            ddMap2DCmap.Value = S.savedMap2DCmap;
         end
         if isfield(S,'savedLogX'), if S.savedLogX, ddScaleX.Value = 'Log'; else, ddScaleX.Value = 'Linear'; end, end
         if isfield(S,'savedLogY'), if S.savedLogY, ddScaleY.Value = 'Log'; else, ddScaleY.Value = 'Linear'; end, end

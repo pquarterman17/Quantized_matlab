@@ -42,6 +42,14 @@ if ~isfile(FILE_2D)
     fprintf('Generated: %s\n', FILE_2D);
 end
 
+% ════════════════════════════════════════════════════════════════════════
+%  Single GUI instance — shared across all tests
+% ════════════════════════════════════════════════════════════════════════
+api = dataImportGUI();
+api.fig.Visible = 'off';
+drawnow;
+C = onCleanup(@() api.close());
+
 passed = 0;
 failed = 0;
 
@@ -50,9 +58,7 @@ failed = 0;
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 1 (4.1): Load 2D file — parser fields and axis info ══\n');
 try
-    api = launchHeadless();
-    C   = onCleanup(@() api.close());
-
+    api.reset();
     api.addFiles({FILE_2D});
     drawnow;
 
@@ -96,9 +102,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 2 (4.2): Plot type switching ══\n');
 try
-    api = launchHeadless();
-    C   = onCleanup(@() api.close());
-
+    api.reset();
     api.addFiles({FILE_2D});
     drawnow;
     assert(api.is2DActive(), 'is2DActive() should be true');
@@ -121,9 +125,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 3 (4.3): Contour level control ══\n');
 try
-    api = launchHeadless();
-    C   = onCleanup(@() api.close());
-
+    api.reset();
     api.addFiles({FILE_2D});
     drawnow;
     assert(api.is2DActive(), 'is2DActive() should be true');
@@ -155,9 +157,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 4 (4.4): Q-space toggle ══\n');
 try
-    api = launchHeadless();
-    C   = onCleanup(@() api.close());
-
+    api.reset();
     api.addFiles({FILE_2D});
     drawnow;
     assert(api.is2DActive(), 'is2DActive() should be true');
@@ -191,9 +191,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 5 (4.7): Q-space line cuts — xColumnName ══\n');
 try
-    api = launchHeadless();
-    C   = onCleanup(@() api.close());
-
+    api.reset();
     api.addFiles({FILE_2D});
     drawnow;
     assert(api.is2DActive(), 'is2DActive() should be true');
@@ -237,9 +235,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 6 (4.8): Colormap switching ══\n');
 try
-    api = launchHeadless();
-    C   = onCleanup(@() api.close());
-
+    api.reset();
     api.addFiles({FILE_2D});
     drawnow;
     assert(api.is2DActive(), 'is2DActive() should be true');
@@ -266,8 +262,7 @@ if ~isfile(FILE_1D)
     passed = passed + 1;
 else
     try
-        api = launchHeadless();
-        C   = onCleanup(@() api.close());
+        api.reset();
 
         % Load 2D first, then 1D
         api.addFiles({FILE_2D, FILE_1D});
@@ -318,14 +313,4 @@ fprintf('%s\n\n', repmat(char(9552), 1, 60));
 
 if failed > 0
     error('test_gui_phase4:failures', '%d test(s) failed.', failed);
-end
-
-% ════════════════════════════════════════════════════════════════════════
-%  Local functions (must appear after all script code)
-% ════════════════════════════════════════════════════════════════════════
-function api = launchHeadless()
-%LAUNCHHEADLESS  Start dataImportGUI with the figure hidden.
-    api = dataImportGUI();
-    api.fig.Visible = 'off';
-    drawnow;
 end
