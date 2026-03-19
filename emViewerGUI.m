@@ -14,7 +14,7 @@ function varargout = emViewerGUI()
 %   intensity readout, zoom controls, and a metadata inspector.
 %
 %   The GUI follows the same monolithic-function architecture as
-%   dataImportGUI.m: all mutable state lives in the appData struct, all
+%   DataPlotter.m: all mutable state lives in the appData struct, all
 %   callbacks are nested functions sharing closure over appData and widget
 %   handles, and a programmatic API struct is returned when called with an
 %   output argument.
@@ -77,7 +77,7 @@ function varargout = emViewerGUI()
 % ── See Also ──────────────────────────────────────────────────────────────
 %
 %   parser.importTIFF, parser.importRawImage, parser.importAuto,
-%   dataImportGUI, test_em_gui_harness
+%   DataPlotter, test_em_gui_harness
 
     % ════════════════════════════════════════════════════════════════════
     %  SHARED APPLICATION STATE

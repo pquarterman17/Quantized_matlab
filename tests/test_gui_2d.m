@@ -46,7 +46,7 @@ passed = 0;
 failed = 0;
 
 % ── Launch single headless GUI instance ──────────────────────────────────
-api = dataImportGUI();
+api = DataPlotter();
 api.fig.Visible = 'off';
 drawnow;
 C = onCleanup(@() api.close());

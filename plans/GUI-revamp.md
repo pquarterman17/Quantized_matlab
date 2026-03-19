@@ -2,7 +2,7 @@
 
 ## Context
 
-The Analysis & Corrections panels in `dataImportGUI.m` have grown organically to 20 rows (~570px), overflowing on 1080p displays (~450px available). Controls lack visual grouping, the primary "Apply" action is buried mid-panel, labels truncate in narrow columns, and button colors are inconsistent. This plan addresses these issues in 5 discrete phases.
+The Analysis & Corrections panels in `DataPlotter.m` have grown organically to 20 rows (~570px), overflowing on 1080p displays (~450px available). Controls lack visual grouping, the primary "Apply" action is buried mid-panel, labels truncate in narrow columns, and button colors are inconsistent. This plan addresses these issues in 5 discrete phases.
 
 **Target resolutions:** 1080p (primary) and 1440p
 **User workflow context:** Live Preview is typically ON; BG file subtraction is uncommon; correction style switching is rare; W-H Plot / Refine Lattice are advanced/secondary features.
@@ -40,7 +40,7 @@ Update `onPanelResizeMove()` (~line 8999-9053):
 | `h_row23` | `max(200, ...)` | `max(MIN_ANALYSIS_H, ...)` |
 
 ### Files
-- `dataImportGUI.m`: lines ~269 (constants), ~8999-9053 (`onPanelResizeMove`)
+- `DataPlotter.m`: lines ~269 (constants), ~8999-9053 (`onPanelResizeMove`)
 
 ### Testing
 - Drag all panel borders to extremes; verify they stop at minimums
@@ -197,7 +197,7 @@ ROW_APPLY        = 17;   ROW_ACTIONS  = 18;
 - Collapsible section state respected when switching datasets
 
 ### Files
-- `dataImportGUI.m`: lines ~635-930 (corrGL definition), ~2764-3009 (`applyParserAnalysisConfig`), ~2596-2750 (`updateControlsForActiveDataset`), ~926 (live preview), scattered button definitions
+- `DataPlotter.m`: lines ~635-930 (corrGL definition), ~2764-3009 (`applyParserAnalysisConfig`), ~2596-2750 (`updateControlsForActiveDataset`), ~926 (live preview), scattered button definitions
 
 ### Testing
 - `runAllTests(Group="gui")` — must pass
@@ -256,7 +256,7 @@ end
 Called from: `cbLivePreview` callback, GUI init, `updateControlsForActiveDataset()`.
 
 ### Files
-- `dataImportGUI.m`: lines ~300 (palette), ~714-1383 (button definitions), ~830-843 (font colors), ~5532 (`markCorrectionsDirty`)
+- `DataPlotter.m`: lines ~300 (palette), ~714-1383 (button definitions), ~830-843 (font colors), ~5532 (`markCorrectionsDirty`)
 
 ### Testing
 - Visual inspection: buttons should have consistent color meaning
@@ -297,7 +297,7 @@ Make rows 18-22 collapsible (default collapsed):
 - Saves ~120px when collapsed
 
 ### Files
-- `dataImportGUI.m`: lines ~939 (axLimGL creation), ~1046-1197 (appearance widgets), ~1203-1383 (saveGL), ~9226 (`toggleY2Appearance`)
+- `DataPlotter.m`: lines ~939 (axLimGL creation), ~1046-1197 (appearance widgets), ~1203-1383 (saveGL), ~9226 (`toggleY2Appearance`)
 
 ### Testing
 - Verify axis limits and appearance controls render correctly with separator
@@ -341,7 +341,7 @@ end
 `applyParserAnalysisConfig()` already controls visibility of these buttons per mode. The collapse toggle is additive — if a button is `Visible='off'` due to mode, collapsing the section has no visible effect (the row is 0-height anyway when not in XRD mode).
 
 ### Files
-- `dataImportGUI.m`: lines ~1405 (peakBtnGL), ~1471 (button definitions), new toggle function
+- `DataPlotter.m`: lines ~1405 (peakBtnGL), ~1471 (button definitions), new toggle function
 
 ### Testing
 - Load XRD file; verify primary peak buttons visible, advanced hidden

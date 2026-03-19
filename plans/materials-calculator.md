@@ -36,13 +36,13 @@ All three standalone GUIs follow the same monolithic-function architecture:
 |------|-------|---------|
 | `xrdConvertGUI.m` | ~700 | Simplest. Single `function`, closure state via `appData` struct, nested callbacks. State stored in `fig.UserData`. |
 | `emViewerGUI.m` | ~6000+ | `function varargout = emViewerGUI()`. State in `appData` (closure variable, not UserData). Nested grid layouts. Returns `api` struct when `nargout > 0`. Semantic button color palette. |
-| `dataImportGUI.m` | ~11000+ | Same as emViewerGUI pattern. Largest GUI. Sub-dialogs (FFT thickness, lattice refinement, Williamson-Hall) are nested functions launching their own `uifigure`. |
+| `DataPlotter.m` | ~11000+ | Same as emViewerGUI pattern. Largest GUI. Sub-dialogs (FFT thickness, lattice refinement, Williamson-Hall) are nested functions launching their own `uifigure`. |
 
 **Key pattern details:**
 
 1. **State management:** `appData` is a plain struct held in function closure.
    Nested callbacks read/write it directly. No classes, no global state.
-   (emViewerGUI.m line 85-119, dataImportGUI.m line 120-136)
+   (emViewerGUI.m line 85-119, DataPlotter.m line 120-136)
 
 2. **API struct for testing:** When called with an output argument, GUIs
    return an `api` struct of function handles sharing the same closure.
@@ -173,7 +173,7 @@ thin_film_toolkit_matlab/
 │   └── test_materials_calc_gui.m   # [Phase 3] Headless GUI API tests
 ```
 
-#### Phase 4: X-ray/Neutron integration (into dataImportGUI)
+#### Phase 4: X-ray/Neutron integration (into DataPlotter)
 
 ```
 ├── +calc/
@@ -549,7 +549,7 @@ For convenience, cubic/tetragonal/hexagonal cases: when `b`, `c`, `alpha`,
 
 ### Module: `calc.xrayNeutron`
 
-> **Note:** Integrated into `dataImportGUI` as sub-dialogs (SLD calculator,
+> **Note:** Integrated into `DataPlotter` as sub-dialogs (SLD calculator,
 > Q-to-2theta converter) rather than `materialsCalcGUI` tabs. See Phase 4.
 
 | Function | Inputs | Output |
@@ -1279,7 +1279,7 @@ parenthesized expressions are needed later, the tokenizer can be extended.
 
 **Rationale:** All three existing GUIs are single-file. Consistency with the
 codebase matters more than theoretical separation. The file will be
-~1500-2000 lines — smaller than dataImportGUI (~11000) or emViewerGUI
+~1500-2000 lines — smaller than DataPlotter (~11000) or emViewerGUI
 (~6000). With 6 tabs, this is comfortably within single-file scope. The
 heavy logic lives in `+calc/`. If the file exceeds ~2500 lines,
 tab-builder functions can be extracted to `+calc/gui/` helpers (one
@@ -1381,7 +1381,7 @@ stretch goal — document as unsupported initially.
    is strictly additive. If desired later, `convertUnits` can be refactored
    to delegate to `calc.unitConvert` internally.
 
-2. **`dataImportGUI.m`** — Phase 4 adds `calc.xrayNeutron` sub-dialogs (SLD
+2. **`DataPlotter.m`** — Phase 4 adds `calc.xrayNeutron` sub-dialogs (SLD
    calculator, Q-to-2theta converter) integrated directly into the data GUI
    where the measurement data lives. An optional toolbar button can launch
    `materialsCalcGUI` (like the existing "Batch Convert" button launches
@@ -1395,7 +1395,7 @@ stretch goal — document as unsupported initially.
    `"calcgui"` (GUI tests).
 
 5. **Common wavelengths** — the GUI stores a wavelength preset dropdown
-   (Cu Ka1, Mo Ka1, etc.). The same values are used in `dataImportGUI`
+   (Cu Ka1, Mo Ka1, etc.). The same values are used in `DataPlotter`
    (XRD analysis). Extract to `calc.constants()` so both GUIs share the
    same source of truth.
 
@@ -1460,7 +1460,7 @@ the most frequently used calculations.
 ### Phase 4: X-ray/Neutron integration (4 steps)
 
 **Purpose:** Add scattering and diffraction calculations. These integrate
-into dataImportGUI (where the data lives) rather than the standalone
+into DataPlotter (where the data lives) rather than the standalone
 calculator.
 
 - [ ] Create `+calc/+xrayNeutron/` — braggLaw, qToTwoTheta, twoThetaToQ,
@@ -1468,7 +1468,7 @@ calculator.
    weightToAtomicPercent, atomicToWeightPercent, balanceReaction,
    coDepositionRatio.
 - [ ] Add SLD calculator and Q-to-2theta converter as sub-dialog or panel in
-   dataImportGUI.
+   DataPlotter.
 - [ ] Create `tests/test_calc_xrayneutron.m`.
 - [ ] Update `CLAUDE.md` and `runAllTests.m` with all new modules and test
    groups.
@@ -1884,7 +1884,7 @@ end
 
 This matrix can be passed directly to `utilities.parrattRefl(Q, layers)` for
 reflectivity simulation, or used as the starting model in the XRR fitting
-dialog (`onFitReflectivity` in `dataImportGUI.m`).
+dialog (`onFitReflectivity` in `DataPlotter.m`).
 
 #### SLD Profile Computation
 
@@ -1913,7 +1913,7 @@ fringes) that would appear in an XRR measurement:
 ```
 
 These predicted positions can be overlaid on actual FFT data in the
-dataImportGUI reflectivity FFT dialog.
+DataPlotter reflectivity FFT dialog.
 
 #### Computed Properties
 

@@ -7,15 +7,15 @@
 
 ## Overview
 
-A new standalone GUI (`emViewerGUI.m`) for viewing and analysing electron microscopy images. Supports TIFF, headerless RAW, and Gatan DM3 formats. Follows the existing toolbox architecture: parsers return the unified data struct, image-specific utilities live in a new `+imaging` package, and the GUI is a monolithic uifigure with nested functions (same pattern as `dataImportGUI.m` and `xrdConvertGUI.m`).
+A new standalone GUI (`emViewerGUI.m`) for viewing and analysing electron microscopy images. Supports TIFF, headerless RAW, and Gatan DM3 formats. Follows the existing toolbox architecture: parsers return the unified data struct, image-specific utilities live in a new `+imaging` package, and the GUI is a monolithic uifigure with nested functions (same pattern as `DataPlotter.m` and `xrdConvertGUI.m`).
 
 ---
 
 ## Architecture Decisions
 
-### 1. Separate GUI (not integrated into dataImportGUI)
+### 1. Separate GUI (not integrated into DataPlotter)
 
-The interaction model for raster images (pan/zoom/contrast/measurement) is fundamentally different from curve plotting with corrections and peak fitting. Adding it to `dataImportGUI.m` (already 11,500+ lines) would push it past 15,000 lines and mix incompatible workflows. A standalone `emViewerGUI.m` follows the established pattern of purpose-specific GUIs.
+The interaction model for raster images (pan/zoom/contrast/measurement) is fundamentally different from curve plotting with corrections and peak fitting. Adding it to `DataPlotter.m` (already 11,500+ lines) would push it past 15,000 lines and mix incompatible workflows. A standalone `emViewerGUI.m` follows the established pattern of purpose-specific GUIs.
 
 ### 2. Image data struct — extend the 2D pattern
 
@@ -119,7 +119,7 @@ Image processing functions that have no meaning for 1D data go in `+imaging/`, n
 |------|--------|
 | `resolveParser.m` | Add `.tif`/`.tiff`/`.dm3` cases; disambiguate `.raw` via magic bytes |
 | `runAllTests.m` | Add `em` and `emgui` test groups |
-| `dataImportGUI.m` | Optional "Launch EM Viewer" button (3 lines) |
+| `DataPlotter.m` | Optional "Launch EM Viewer" button (3 lines) |
 | `CLAUDE.md` | Document new parsers, `+imaging` package, `emViewerGUI` |
 
 ---
@@ -259,7 +259,7 @@ api.close()                       % close figure
 | 7a | Batch thumbnail generation | Phase 2h, 1 | code-implementer |
 | 7b | GUI tests (`test_em_gui_harness.m`) | Phase 3-6 | bug-hunter |
 | 7c | `CLAUDE.md` documentation update | All | code-implementer |
-| 7d | "Launch EM Viewer" button in `dataImportGUI.m` | Phase 3 | code-implementer |
+| 7d | "Launch EM Viewer" button in `DataPlotter.m` | Phase 3 | code-implementer |
 | 7e | Session save/load | Phase 3-6 | ux-frontend-expert |
 
 ---
@@ -320,7 +320,7 @@ Naive nested-loop on 4096x4096 with 5x5 window = 16M comparisons × 25. Could ta
 
 - **DM3/DM4 parser** — once real test files are available
 - **Multi-channel support** — channel selector, false-color compositing for EDS maps
-- **Line profile → dataImportGUI** — export profile as standard struct for correction/peak-fitting
+- **Line profile → DataPlotter** — export profile as standard struct for correction/peak-fitting
 - **Annotation tools** — text labels, arrows, region-of-interest
 - **Image registration** — align stack frames (drift correction)
 - **Session save/load** — persist loaded image list and contrast settings across sessions (Phase 7e, deferred)
@@ -350,7 +350,7 @@ Naive nested-loop on 4096x4096 with 5x5 window = 16M comparisons × 25. Could ta
 | `tests/test_imaging_utils.m` | Complete — unit tests for all +imaging functions |
 | `tests/test_em_gui_harness.m` | Complete — 12 headless API tests |
 | `runAllTests.m` | Updated — `em` and `emgui` groups added |
-| `dataImportGUI.m` | Updated — "EM Viewer" button in dataset toolbar |
+| `DataPlotter.m` | Updated — "EM Viewer" button in dataset toolbar |
 | `CLAUDE.md` | Updated — full documentation for EM Viewer |
 
 ### Deferred

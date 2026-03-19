@@ -9,7 +9,7 @@ Scientific data analysis toolbox for processing and visualizing magnetometry and
 ```
 thin_film_toolkit_matlab/
 ├── setupToolbox.m          # Entry point — adds toolbox root to MATLAB path
-├── dataImportGUI.m         # Interactive uifigure GUI: browse, preview, correct, peaks, export
+├── DataPlotter.m         # Interactive uifigure GUI: browse, preview, correct, peaks, export
 ├── xrdConvertGUI.m         # Standalone batch XRD file converter GUI
 ├── emViewerGUI.m           # Standalone electron microscopy image viewer (TIFF/RAW/DM3/DM4)
 ├── runAllTests.m           # Master test runner; groups: parser/batch/xrd2d/gui/em/emgui/all
@@ -216,7 +216,7 @@ origD = data.metadata.parserSpecific.originalDepths;
 origC = data.metadata.parserSpecific.originalConcentrations;
 
 % Or use the GUI: load a CSV, switch ddCorrStyle to "SIMS Depth Profile"
-dataImportGUI
+DataPlotter
 ```
 
 ### Neutron reflectometry (NCNR)
@@ -253,7 +253,7 @@ smI    = utilities.smoothData(data.values, 'Window', 9); % Gaussian smooth
 
 ### Interactive GUI
 ```matlab
-dataImportGUI   % browse, preview, apply corrections, find/fit peaks, export CSV
+DataPlotter   % browse, preview, apply corrections, find/fit peaks, export CSV
 ```
 
 ### EM Image Viewer
@@ -319,7 +319,7 @@ thumb = imaging.generateThumbnail(img.pixels, MaxSize=256);
 runAllTests                     % all suites (~2 min including GUI tests)
 runAllTests(Group="parser")     % fast parser smoke tests only (no GUI, ~5 s)
 runAllTests(Group="xrd2d")      % 2D area-detector parser + edge cases
-runAllTests(Group="gui")        % headless dataImportGUI API tests
+runAllTests(Group="gui")        % headless DataPlotter API tests
 runAllTests(Group="sims")       % SIMS depth profile parser tests
 runAllTests(Group="batch")      % batchImport / batchConvertXRD integration
 runAllTests(Group="em")         % EM image parsers + imaging utilities (no GUI, fast)
@@ -352,11 +352,21 @@ run tests/test_em_gui_harness     % EM Viewer GUI API (requires display)
 
 ## GUI Notes
 
-### dataImportGUI
+### DataPlotter
 - `cla()` alone does not remove graphics objects with `HandleVisibility='off'` (peak markers).
   Use `delete(ax.Children)` before `cla()` to clear all children.
 - Each dataset in `appData.datasets` stores its own axis limits (`ds.axLims`) so zoom
   levels are restored when switching between loaded files.
+- **Peak Analysis window** (`peakFig`) is a separate `uifigure` containing the peak table, fitting
+  controls, export buttons, and advanced crystallography tools. It opens automatically after peak
+  detection (`onAutoPeak`) or on the first manual peak add. The "Peaks..." button in the corrections
+  panel opens it on demand. Closing the window just hides it (`Visible='off'`); peaks and markers
+  on the main axes are unaffected. Peak detection buttons (Auto Find, Add Peak, Click-Remove)
+  remain in the corrections panel since they interact with the main axes.
+  - `appData.peakMode` tracks the current mode: `'xrd'`, `'reflectometry'`, or `'none'`.
+  - `configurePeakWindowForMode(mode)` shows/hides mode-specific buttons in the peak window.
+  - `showPeakWindow()` refreshes the table and brings the window to front.
+  - The main GUI's `analysisGL` column 3 is now width 0 by default (only used for `map2DPanel` in 2D mode).
 
 ### emViewerGUI
 - Image pipeline: `rawPixels` → `filteredPixels` (after filters) → `displayImg` ([0,1] after contrast).

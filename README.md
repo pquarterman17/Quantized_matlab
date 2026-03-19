@@ -33,7 +33,7 @@ setupToolbox
 data = parser.importAuto('sample.dat');
 
 % Launch the interactive GUI
-dataImportGUI
+DataPlotter
 
 % Batch-convert a folder of XRD files to CSV
 results = scripts.batchConvertXRD('xrd_data/', OutputDir='csv_out/');

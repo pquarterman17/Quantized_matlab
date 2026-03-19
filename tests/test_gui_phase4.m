@@ -45,7 +45,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 %  Single GUI instance — shared across all tests
 % ════════════════════════════════════════════════════════════════════════
-api = dataImportGUI();
+api = DataPlotter();
 api.fig.Visible = 'off';
 drawnow;
 C = onCleanup(@() api.close());

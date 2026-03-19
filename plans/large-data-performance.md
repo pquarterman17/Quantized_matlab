@@ -11,8 +11,8 @@ Generated 2026-03-14. Focuses on large 2D XRDML files (100+ MB) from modern area
 | `fileread()` loads entire XML into RAM | `importXRDML.m:139` | ~200 MB string (UTF-16) |
 | Array growth via `[]` concatenation | `importXRDML.m:308+` | O(N²) copy overhead |
 | Eager `meshgrid` for Qx/Qz | `importXRDML.m:496` | 2× intensity matrix size (~32 MB per 1000×1024) |
-| Redundant `meshgrid` in `draw2DMap` | `dataImportGUI.m:7611` | Re-allocated every replot |
-| `corrData = d` full struct copy | `dataImportGUI.m:5062` | Doubles all 2D matrices in memory |
+| Redundant `meshgrid` in `draw2DMap` | `DataPlotter.m:7611` | Re-allocated every replot |
+| `corrData = d` full struct copy | `DataPlotter.m:5062` | Doubles all 2D matrices in memory |
 | No memory monitoring | Everywhere | Silent OOM crash risk |
 
 ---
@@ -26,7 +26,7 @@ Generated 2026-03-14. Focuses on large 2D XRDML files (100+ MB) from modern area
 ~2 lines. At top of `onApplyCorrections`, early-return for 2D datasets — corrections
 are already disabled in the UI for them, so the full struct copy is pure waste.
 
-**Touches:** `dataImportGUI.m` (`onApplyCorrections`, ~line 5051).
+**Touches:** `DataPlotter.m` (`onApplyCorrections`, ~line 5051).
 
 **Done 2026-03-14.** Added `if is2DDataset(ds), return; end` after fetching the active
 dataset. Verified by `test_gui_2d` (6/6 pass).
@@ -38,7 +38,7 @@ dataset. Verified by `test_gui_2d` (6/6 pass).
 ~10 lines. `imagesc` only needs vectors, not grids. Gate the `meshgrid` call behind
 `if useQSpace` and only compute for Contour/Filled Contour modes that actually need it.
 
-**Touches:** `dataImportGUI.m` (`draw2DMap`, ~line 7662).
+**Touches:** `DataPlotter.m` (`draw2DMap`, ~line 7662).
 
 **Done 2026-03-14.** Angle-space branch now sets `Xmat=[]; Ymat=[];` and defers
 `meshgrid` to the Contour/Filled Contour cases only. Heatmap (the common path) uses
@@ -61,7 +61,7 @@ Add `map2D.hasQSpaceData = true/false` flag so code can check capability without
 triggering allocation. Idempotent: if `Qx`/`Qz` already exist, return immediately.
 
 **Touches:** New `+parser/computeQSpace.m`, `+parser/importXRDML.m` (remove lines 496–504),
-`dataImportGUI.m` (`draw2DMap`, `extract2DLineCut`).
+`DataPlotter.m` (`draw2DMap`, `extract2DLineCut`).
 
 ---
 
@@ -107,7 +107,7 @@ path as fallback for files < 20 MB, so existing small-file behavior is unchanged
 update `CData` instead of `cla` + recreate. Avoids re-uploading vertex data to the
 renderer.
 
-**Touches:** `dataImportGUI.m` (`draw2DMap`).
+**Touches:** `DataPlotter.m` (`draw2DMap`).
 
 ---
 
@@ -117,7 +117,7 @@ renderer.
 before rendering. Show "Displaying at 50% resolution (2000×1024 original)" in
 `lblMap2DInfo`. No dependency on Image Processing Toolbox — uses simple striding.
 
-**Touches:** `dataImportGUI.m` (`draw2DMap`, `lblMap2DInfo`).
+**Touches:** `DataPlotter.m` (`draw2DMap`, `lblMap2DInfo`).
 
 ---
 
@@ -128,7 +128,7 @@ before rendering. Show "Displaying at 50% resolution (2000×1024 original)" in
 ~10 lines. In `loadFilePaths`, check `dir(fp).bytes`. If > 50 MB, show a confirmation
 dialog with estimated memory requirement. Allow user to cancel or proceed.
 
-**Touches:** `dataImportGUI.m` (`loadFilePaths`, ~line 1621).
+**Touches:** `DataPlotter.m` (`loadFilePaths`, ~line 1621).
 
 ---
 
@@ -137,7 +137,7 @@ dialog with estimated memory requirement. Allow user to cancel or proceed.
 ~20 lines. Status label showing "~XX MB loaded" by summing `numel(matrix) * 8` across
 all datasets. Display in GUI toolbar or status area.
 
-**Touches:** `dataImportGUI.m` (new label + update logic in `rebuildDatasetList`).
+**Touches:** `DataPlotter.m` (new label + update logic in `rebuildDatasetList`).
 
 ---
 
@@ -146,7 +146,7 @@ all datasets. Display in GUI toolbar or status area.
 ~30 lines. Context menu or button that strips `map2D` from a dataset, keeping only the
 1D integrated profile. Lets users reclaim memory after extracting line-cuts.
 
-**Touches:** `dataImportGUI.m` (new button/callback in 2D panel).
+**Touches:** `DataPlotter.m` (new button/callback in 2D panel).
 
 ---
 

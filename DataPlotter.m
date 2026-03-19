@@ -1,10 +1,10 @@
-function varargout = dataImportGUI()
-%DATAIMPORTGUI  Browse, import and preview data files using the +parser toolkit.
+function varargout = DataPlotter()
+%DATAPLOTTER  Browse, import and preview data files using the +parser toolkit.
 %
 % ── Syntax ────────────────────────────────────────────────────────────────
 %
-%   dataImportGUI()
-%   api = dataImportGUI()
+%   DataPlotter()
+%   api = DataPlotter()
 %
 % ── Supported File Formats ────────────────────────────────────────────────
 %
@@ -80,7 +80,7 @@ function varargout = dataImportGUI()
 %
 % ── Programmatic API ──────────────────────────────────────────────────────
 %
-%   api = dataImportGUI() returns a struct of function handles for
+%   api = DataPlotter() returns a struct of function handles for
 %   automated testing and scripting.  All handles share the same closure
 %   as the GUI, so they see live appData.
 %
@@ -110,7 +110,7 @@ function varargout = dataImportGUI()
 %   api.setMap2DColormap(name) — set 2D map color scale (e.g. 'parula','viridis','plasma')
 %
 %   Headless usage (e.g. in test_gui_harness.m):
-%     api = dataImportGUI();
+%     api = DataPlotter();
 %     api.fig.Visible = 'off';
 %     api.addFiles({'/path/to/scan.xrdml'});
 %     api.autoPeaks();
@@ -273,7 +273,8 @@ function varargout = dataImportGUI()
     appData.fitCurveColor     = [0.85 0.20 0.00];   % default warm red-orange
     appData.kFactor           = 0.9;                % Scherrer shape factor K (0.9 spherical default)
     appData.instBroadening_deg = 0;                 % Instrument broadening FWHM (°); 0 = uncorrected
-    appData.panelResizeDir    = '';   % '' | 'h_row12' | 'v_col12' | 'v_col23' | 'v_col34'
+    appData.peakMode          = 'none';  % 'xrd' | 'reflectometry' | 'none'
+    appData.panelResizeDir    = '';   % '' | 'h_row12' | 'v_col12'
     appData.panelResizeStart  = [];   % [mousePixX, mousePixY] at resize drag start
     appData.panelResizeOrig   = [];   % panel dimension (px) at resize drag start
     appData.corrPanelWidth    = 320;  % user-resized corrections column width (px)
@@ -282,10 +283,9 @@ function varargout = dataImportGUI()
     % ── Minimum panel dimensions for drag-resize ──
     appData.MIN_CORR_W     = 280;   % corrections panel minimum width (px)
     appData.MIN_AXLIM_W    = 180;   % axes & appearance panel minimum width
-    appData.MIN_PEAK_W     = 200;   % peak analysis panel minimum width
-    appData.MIN_SAVE_W     = 120;   % save/export panel minimum width
+    % (MIN_SAVE_W removed — save panel is now in rootGL row 3, not analysisGL)
     appData.MIN_PREVIEW_H  = 150;   % preview row (rootGL row 1) minimum height
-    appData.MIN_ANALYSIS_H = 250;   % analysis row (rootGL row 2) minimum height
+    appData.MIN_ANALYSIS_H = 180;   % analysis row (rootGL row 2) minimum height
     appData.listDragSrcIdx    = 0;    % source row being dragged in lbDatasets (0 = none)
     appData.listDragActive    = false; % true once mouse has moved > threshold after listbox down
     appData.listDragStartPt   = [];   % [x y] fig-pixel position at listbox mouse-down
@@ -356,8 +356,8 @@ function varargout = dataImportGUI()
     % Root grid  (2 rows × 1 col: content row 1, analysis row 2)
     % Row 1 holds file-list | controls | preview side-by-side (contentGL).
     % Row 2 (analysis) is resizable via the h_row12 drag border.
-    rootGL = uigridlayout(fig,[3 1], ...
-        'RowHeight',    {'1x','1x',16}, ...  % 50/50 split: preview and analysis equal
+    rootGL = uigridlayout(fig,[4 1], ...
+        'RowHeight',    {'1x', 220, 110, 16}, ...  % preview | analysis | save strip | status
         'ColumnWidth',  {'1x'}, ...
         'Padding',      [6 6 6 6], ...
         'RowSpacing',   4, ...
@@ -701,19 +701,19 @@ function varargout = dataImportGUI()
         'Tag',                'GUICursorReadout', ...
         'Visible',            'off');
 
-    % ── Status bar (row 3 of rootGL) ──────────────────────────────────────
+    % ── Status bar (row 4 of rootGL) ──────────────────────────────────────
     lblStatusBar = uilabel(rootGL, 'Text', 'Ready', ...
         'FontSize', 9, 'FontColor', [0.5 0.5 0.5], ...
         'HorizontalAlignment', 'left');
-    lblStatusBar.Layout.Row = 3; lblStatusBar.Layout.Column = 1;
+    lblStatusBar.Layout.Row = 4; lblStatusBar.Layout.Column = 1;
 
     % ── Analysis & Corrections panel (row 2, full width, scrollable) ──────
     analysisPanel = uipanel(rootGL,'Title','Analysis & Corrections','FontSize',11, ...
         'Scrollable','on');
     analysisPanel.Layout.Row = 2; analysisPanel.Layout.Column = 1;
 
-    analysisGL = uigridlayout(analysisPanel,[1 4], ...
-        'ColumnWidth', {320, 200, '7x', '3x'}, ...
+    analysisGL = uigridlayout(analysisPanel,[1 3], ...
+        'ColumnWidth', {320, '1x', 0}, ...
         'RowHeight',   {'1x'}, ...
         'Padding',     [4 4 4 4], ...
         'ColumnSpacing', 6, ...
@@ -905,13 +905,21 @@ function varargout = dataImportGUI()
         'Visible','off');
     btnManualPeak.Layout.Row = CROW.TOOLS; btnManualPeak.Layout.Column = 4;
 
-    btnRemovePeakClick = uibutton(corrGL,'Text','Click-Remove', ...
+    btnRemovePeakClick = uibutton(corrGL,'Text','Click-Rm', ...
         'ButtonPushedFcn',@onRemovePeakClickMode, ...
         'BackgroundColor',BTN_DANGER,'FontColor',BTN_FG, ...
         'FontSize', 9, ...
         'Tooltip','Click on a peak marker in the plot to remove it (click button again to finish)', ...
         'Visible','off');
-    btnRemovePeakClick.Layout.Row = CROW.BGORDER; btnRemovePeakClick.Layout.Column = [3 4];
+    btnRemovePeakClick.Layout.Row = CROW.BGORDER; btnRemovePeakClick.Layout.Column = 3;
+
+    btnPeakWindow = uibutton(corrGL,'Text','Peaks...', ...
+        'ButtonPushedFcn', @(~,~) showPeakWindow(), ...
+        'BackgroundColor', BTN_ACCENT, 'FontColor', BTN_FG, ...
+        'FontSize', 9, ...
+        'Tooltip', 'Open the Peak Analysis window (table, fitting, export)', ...
+        'Visible','off');
+    btnPeakWindow.Layout.Row = CROW.BGORDER; btnPeakWindow.Layout.Column = 4;
 
     % Row 7: Section header — Processing (uibutton for click support)
     lblSecProc = uibutton(corrGL, 'Text', [char(9660) ' Processing'], ...
@@ -1216,362 +1224,333 @@ function varargout = dataImportGUI()
     lblRegionStats.Layout.Row = CROW.SEC_BGFILE; lblRegionStats.Layout.Column = [2 4];
 
     % ── Axes & Appearance sub-panel (middle column) ──────────────────────
-    % Combined panel: rows 1-5 axis limits, rows 6-11 appearance controls.
-    % All limit fields are text-type: blank = auto-scale, any number = manual.
-    % str2double('') == NaN, so blank naturally means "do not apply".
-    axLimPanel = uipanel(analysisGL,'Title','Axes & Appearance','FontSize',11, ...
+    % Ultra-compact 5-row layout:
+    %   Row 1: X limits (label + min/max/step)
+    %   Row 2: Y limits (label + min/max/step)  —  Y2 row hidden below
+    %   Row 3: Y2 limits (hidden, RowHeight=0 until Y2 active)
+    %   Row 4: Auto Scale + Reset + Legend checkbox + Color dropdown
+    %   Row 5: Title + labels + format + ref lines (collapsible, default hidden)
+    axLimPanel = uipanel(analysisGL,'Title','Axes','FontSize',11, ...
         'Scrollable','on');
     axLimPanel.Layout.Row = 1; axLimPanel.Layout.Column = 2;
 
-    axLimGL = uigridlayout(axLimPanel,[13 4], ...
-        'RowHeight',    {18,22,22,0,22, 14, 22,22,22,22,22,22, 22}, ...
-        'ColumnWidth',  {44,'1x','1x','1x'}, ...
-        'Padding',      [4 4 4 4], ...
+    axLimGL = uigridlayout(axLimPanel,[5 6], ...
+        'RowHeight',    {22, 22, 0, 22, 0}, ...
+        'ColumnWidth',  {24,'1x','1x','1x', 24, '1x'}, ...
+        'Padding',      [4 2 4 2], ...
         'RowSpacing',   2, ...
         'ColumnSpacing', 3);
 
-    % Row 1: column header labels (Min | Max | Step)
-    lblAxHdrMin  = uilabel(axLimGL,'Text','Min', 'FontSize',9,'HorizontalAlignment','center');
-    lblAxHdrMin.Layout.Row  = 1; lblAxHdrMin.Layout.Column  = 2;
-    lblAxHdrMax  = uilabel(axLimGL,'Text','Max', 'FontSize',9,'HorizontalAlignment','center');
-    lblAxHdrMax.Layout.Row  = 1; lblAxHdrMax.Layout.Column  = 3;
-    lblAxHdrStep = uilabel(axLimGL,'Text','Step','FontSize',9,'HorizontalAlignment','center');
-    lblAxHdrStep.Layout.Row = 1; lblAxHdrStep.Layout.Column = 4;
+    % ── Row 1: X limits ──────────────────────────────────────────────
+    AXLIM_BG = [0.17 0.17 0.17];
+    AXLIM_FG = [0.92 0.92 0.92];
 
-    % Row 2: X axis
-    lblXLim = uilabel(axLimGL,'Text','X:','HorizontalAlignment','right');
-    lblXLim.Layout.Row = 2; lblXLim.Layout.Column = 1;
+    lblXLim = uilabel(axLimGL,'Text','X:','HorizontalAlignment','right','FontSize',10);
+    lblXLim.Layout.Row = 1; lblXLim.Layout.Column = 1;
 
-    AXLIM_BG = [0.17 0.17 0.17];   % dark field background matching GUI theme
-    AXLIM_FG = [0.92 0.92 0.92];   % light text for readability on dark background
     efXMin = uieditfield(axLimGL,'text','Value','', ...
-        'Placeholder','auto', ...
-        'Tooltip','X axis minimum — blank = auto-scale', ...
+        'Placeholder','min', 'Tooltip','X axis minimum — blank = auto', ...
         'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, ...
         'ValueChangedFcn',@(~,~) onPlot([],[]));
-    efXMin.Layout.Row = 2; efXMin.Layout.Column = 2;
+    efXMin.Layout.Row = 1; efXMin.Layout.Column = 2;
 
     efXMax = uieditfield(axLimGL,'text','Value','', ...
-        'Placeholder','auto', ...
-        'Tooltip','X axis maximum — blank = auto-scale', ...
+        'Placeholder','max', 'Tooltip','X axis maximum — blank = auto', ...
         'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, ...
         'ValueChangedFcn',@(~,~) onPlot([],[]));
-    efXMax.Layout.Row = 2; efXMax.Layout.Column = 3;
+    efXMax.Layout.Row = 1; efXMax.Layout.Column = 3;
 
     efXStep = uieditfield(axLimGL,'text','Value','', ...
-        'Placeholder','auto', ...
-        'Tooltip','X axis major tick spacing — blank = auto ticks', ...
+        'Placeholder','step', 'Tooltip','X axis tick spacing — blank = auto', ...
         'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, ...
         'ValueChangedFcn',@(~,~) onPlot([],[]));
-    efXStep.Layout.Row = 2; efXStep.Layout.Column = 4;
+    efXStep.Layout.Row = 1; efXStep.Layout.Column = 4;
 
-    % Row 3: Y axis
-    lblYLim = uilabel(axLimGL,'Text','Y:','HorizontalAlignment','right');
-    lblYLim.Layout.Row = 3; lblYLim.Layout.Column = 1;
+    % X-row right side: X tick format dropdown
+    lblFmtX = uilabel(axLimGL,'Text','fmt','FontSize',8,'HorizontalAlignment','right', ...
+        'FontColor',[0.55 0.55 0.55]);
+    lblFmtX.Layout.Row = 1; lblFmtX.Layout.Column = 5;
+    ddXFmt = uidropdown(axLimGL, 'Items', TICKFMT_NAMES, 'ItemsData', TICKFMT_DATA, ...
+        'Value', '', 'FontSize', 9, 'Tooltip', 'X-axis tick label notation', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    ddXFmt.Layout.Row = 1; ddXFmt.Layout.Column = 6;
+
+    % ── Row 2: Y limits ──────────────────────────────────────────────
+    lblYLim = uilabel(axLimGL,'Text','Y:','HorizontalAlignment','right','FontSize',10);
+    lblYLim.Layout.Row = 2; lblYLim.Layout.Column = 1;
 
     efYMin = uieditfield(axLimGL,'text','Value','', ...
-        'Placeholder','auto', ...
-        'Tooltip','Y axis minimum — blank = auto-scale', ...
+        'Placeholder','min', 'Tooltip','Y axis minimum — blank = auto', ...
         'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, ...
         'ValueChangedFcn',@(~,~) onPlot([],[]));
-    efYMin.Layout.Row = 3; efYMin.Layout.Column = 2;
+    efYMin.Layout.Row = 2; efYMin.Layout.Column = 2;
 
     efYMax = uieditfield(axLimGL,'text','Value','', ...
-        'Placeholder','auto', ...
-        'Tooltip','Y axis maximum — blank = auto-scale', ...
+        'Placeholder','max', 'Tooltip','Y axis maximum — blank = auto', ...
         'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, ...
         'ValueChangedFcn',@(~,~) onPlot([],[]));
-    efYMax.Layout.Row = 3; efYMax.Layout.Column = 3;
+    efYMax.Layout.Row = 2; efYMax.Layout.Column = 3;
 
     efYStep = uieditfield(axLimGL,'text','Value','', ...
-        'Placeholder','auto', ...
-        'Tooltip','Y axis major tick spacing — blank = auto ticks', ...
+        'Placeholder','step', 'Tooltip','Y axis tick spacing — blank = auto', ...
         'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, ...
         'ValueChangedFcn',@(~,~) onPlot([],[]));
-    efYStep.Layout.Row = 3; efYStep.Layout.Column = 4;
+    efYStep.Layout.Row = 2; efYStep.Layout.Column = 4;
 
-    % Row 4: right Y-axis limits — hidden (RowHeight=0) until Y2 channel is selected
-    lblY2Lim = uilabel(axLimGL,'Text','Y2:','HorizontalAlignment','right');
-    lblY2Lim.Layout.Row = 4; lblY2Lim.Layout.Column = 1;
+    % Y-row right side: Y tick format dropdown
+    lblFmtY = uilabel(axLimGL,'Text','fmt','FontSize',8,'HorizontalAlignment','right', ...
+        'FontColor',[0.55 0.55 0.55]);
+    lblFmtY.Layout.Row = 2; lblFmtY.Layout.Column = 5;
+    ddYFmt = uidropdown(axLimGL, 'Items', YTICKFMT_NAMES, 'ItemsData', YTICKFMT_DATA, ...
+        'Value', '__exp0', 'FontSize', 9, 'Tooltip', 'Left Y-axis tick label notation', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    ddYFmt.Layout.Row = 2; ddYFmt.Layout.Column = 6;
+
+    % ── Row 3: Y2 limits (hidden until Y2 active) ────────────────────
+    lblY2Lim = uilabel(axLimGL,'Text','Y2:','HorizontalAlignment','right','FontSize',10);
+    lblY2Lim.Layout.Row = 3; lblY2Lim.Layout.Column = 1;
 
     efY2Min = uieditfield(axLimGL,'text','Value','', ...
-        'Placeholder','auto', ...
-        'Tooltip','Right Y-axis minimum — blank = auto-scale', ...
+        'Placeholder','min', 'Tooltip','Right Y-axis minimum — blank = auto', ...
         'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, ...
         'ValueChangedFcn',@(~,~) onPlot([],[]));
-    efY2Min.Layout.Row = 4; efY2Min.Layout.Column = 2;
+    efY2Min.Layout.Row = 3; efY2Min.Layout.Column = 2;
 
     efY2Max = uieditfield(axLimGL,'text','Value','', ...
-        'Placeholder','auto', ...
-        'Tooltip','Right Y-axis maximum — blank = auto-scale', ...
+        'Placeholder','max', 'Tooltip','Right Y-axis maximum — blank = auto', ...
         'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, ...
         'ValueChangedFcn',@(~,~) onPlot([],[]));
-    efY2Max.Layout.Row = 4; efY2Max.Layout.Column = 3;
+    efY2Max.Layout.Row = 3; efY2Max.Layout.Column = 3;
 
     efY2Step = uieditfield(axLimGL,'text','Value','', ...
-        'Placeholder','auto', ...
-        'Tooltip','Right Y-axis major tick spacing — blank = auto ticks', ...
+        'Placeholder','step', 'Tooltip','Right Y-axis tick spacing — blank = auto', ...
         'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, ...
         'ValueChangedFcn',@(~,~) onPlot([],[]));
-    efY2Step.Layout.Row = 4; efY2Step.Layout.Column = 4;
+    efY2Step.Layout.Row = 3; efY2Step.Layout.Column = 4;
 
-    % Row 5: Auto Scale (smart) + Clear All (reset)
-    btnSmartScale = uibutton(axLimGL,'Text','Auto Scale', ...
-        'ButtonPushedFcn',@onSmartScale, ...
-        'Tooltip','Auto-detect linear/log scale and set reasonable axis limits from the data');
-    btnSmartScale.Layout.Row = 5; btnSmartScale.Layout.Column = [1 2];
+    lblFmtR = uilabel(axLimGL,'Text','fmt','FontSize',8,'HorizontalAlignment','right', ...
+        'FontColor',[0.55 0.55 0.55]);
+    lblFmtR.Layout.Row = 3; lblFmtR.Layout.Column = 5;
+    ddY2Fmt = uidropdown(axLimGL, 'Items', YTICKFMT_NAMES, 'ItemsData', YTICKFMT_DATA, ...
+        'Value', '', 'FontSize', 9, 'Tooltip', 'Right Y-axis tick label notation', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    ddY2Fmt.Layout.Row = 3; ddY2Fmt.Layout.Column = 6;
 
-    btnAutoLimits = uibutton(axLimGL,'Text','Reset Limits', ...
-        'ButtonPushedFcn',@onAutoLimits, ...
+    % ── Row 4: Action buttons + legend + color ───────────────────────
+    btnSmartScale = uibutton(axLimGL,'Text','Auto', ...
+        'ButtonPushedFcn',@onSmartScale, 'FontSize', 9, ...
+        'Tooltip','Auto-detect linear/log scale and set reasonable axis limits');
+    btnSmartScale.Layout.Row = 4; btnSmartScale.Layout.Column = 1;
+
+    btnAutoLimits = uibutton(axLimGL,'Text','Reset', ...
+        'ButtonPushedFcn',@onAutoLimits, 'FontSize', 9, ...
         'Tooltip','Clear all manual axis limits and reset to auto-scale');
-    btnAutoLimits.Layout.Row = 5; btnAutoLimits.Layout.Column = [3 4];
+    btnAutoLimits.Layout.Row = 4; btnAutoLimits.Layout.Column = 2;
 
-    % ── Appearance separator (row 6) ─────────────────────────────────
-    lblAxAppearance = uilabel(axLimGL, 'Text', 'Appearance', ...
-        'FontSize', 9, 'FontWeight', 'bold', ...
-        'FontColor', [0.55 0.55 0.55], ...
-        'HorizontalAlignment', 'left');
-    lblAxAppearance.Layout.Row = 6; lblAxAppearance.Layout.Column = [1 4];
-
-    % ── Appearance controls (rows 7-12) ───────────────────────────────
-    % Row 7: Color (L spans 2-3 normally; R in col 4 when Y2 active)
-    lblApColor = uilabel(axLimGL,'Text','Color:','FontSize',10,'HorizontalAlignment','right');
-    lblApColor.Layout.Row = 7; lblApColor.Layout.Column = 1;
-
-    ddDatasetColor = uidropdown(axLimGL, ...
-        'Items',     DS_COLOR_NAMES, ...
-        'ItemsData', DS_COLOR_RGBS, ...
-        'Value',     [], ...
-        'Enable',    'off', ...
-        'Tooltip',   'Override line colour for left-axis channels ("Auto" uses the palette)', ...
-        'ValueChangedFcn', @onDatasetColorChanged);
-    ddDatasetColor.Layout.Row = 7; ddDatasetColor.Layout.Column = [2 4];
-
-    ddDatasetColorR = uidropdown(axLimGL, ...
-        'Items',     DS_COLOR_NAMES, ...
-        'ItemsData', DS_COLOR_RGBS, ...
-        'Value',     [], ...
-        'Enable',    'off', ...
-        'Visible',   'off', ...
-        'Tooltip',   'Override line colour for right-axis channels ("Auto" uses the palette)', ...
-        'ValueChangedFcn', @onDatasetColorRChanged);
-    ddDatasetColorR.Layout.Row = 7; ddDatasetColorR.Layout.Column = 4;
-
-    % Row 8: Legend name
-    lblApLegend = uilabel(axLimGL,'Text','Legend:','FontSize',10,'HorizontalAlignment','right');
-    lblApLegend.Layout.Row = 8; lblApLegend.Layout.Column = 1;
-
-    efLegendName = uieditfield(axLimGL,'text','Value','', ...
-        'Enable',          'off', ...
-        'Placeholder',     'auto (channel name)', ...
-        'Tooltip',         'Override the legend label for left-axis channels — blank = auto', ...
-        'ValueChangedFcn', @onLegendNameChanged);
-    efLegendName.Layout.Row = 8; efLegendName.Layout.Column = [2 4];
-
-    efLegendNameR = uieditfield(axLimGL,'text','Value','', ...
-        'Enable',          'off', ...
-        'Visible',         'off', ...
-        'Placeholder',     'auto', ...
-        'Tooltip',         'Override the legend label for right-axis channels — blank = auto', ...
-        'ValueChangedFcn', @onLegendNameRChanged);
-    efLegendNameR.Layout.Row = 8; efLegendNameR.Layout.Column = 4;
-
-    % Row 9: X label (spans all value columns — only one X axis)
-    lblApXLabel = uilabel(axLimGL,'Text','X Label:','FontSize',10,'HorizontalAlignment','right');
-    lblApXLabel.Layout.Row = 9; lblApXLabel.Layout.Column = 1;
-
-    efCustomXLabel = uieditfield(axLimGL,'text','Value','', ...
-        'Placeholder',     'auto (from data)', ...
-        'Tooltip',         'Override the X-axis label — blank = auto', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    efCustomXLabel.Layout.Row = 9; efCustomXLabel.Layout.Column = [2 4];
-
-    % Row 10: Y label (left and right independently)
-    lblApYLabel = uilabel(axLimGL,'Text','Y Label:','FontSize',10,'HorizontalAlignment','right');
-    lblApYLabel.Layout.Row = 10; lblApYLabel.Layout.Column = 1;
-
-    efCustomYLabel = uieditfield(axLimGL,'text','Value','', ...
-        'Placeholder',     'auto (from data)', ...
-        'Tooltip',         'Override the left Y-axis label — blank = auto', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    efCustomYLabel.Layout.Row = 10; efCustomYLabel.Layout.Column = [2 4];
-
-    efCustomY2Label = uieditfield(axLimGL,'text','Value','', ...
-        'Visible',         'off', ...
-        'Placeholder',     'auto', ...
-        'Tooltip',         'Override the right Y-axis label — blank = auto', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    efCustomY2Label.Layout.Row = 10; efCustomY2Label.Layout.Column = 4;
-
-    % Row 11: Title (spans all value columns)
-    lblApTitle = uilabel(axLimGL,'Text','Title:','FontSize',10,'HorizontalAlignment','right');
-    lblApTitle.Layout.Row = 11; lblApTitle.Layout.Column = 1;
-
-    efCustomTitle = uieditfield(axLimGL,'text','Value','', ...
-        'Placeholder',     'auto (from filename)', ...
-        'Tooltip',         'Override the plot title — blank = auto', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    efCustomTitle.Layout.Row = 11; efCustomTitle.Layout.Column = [2 4];
-
-    % Row 12: Tick-label notation — X and Y1 always visible; R (Y2) hidden until active.
-    % A nested 1×6 grid packs [X: dd | Y: dd | R: dd] into the three value columns.
-    % Cols 5-6 (the R label + dropdown) start at width 0 and are revealed with Y2.
-    lblApFmt = uilabel(axLimGL,'Text','Format:','FontSize',10,'HorizontalAlignment','right');
-    lblApFmt.Layout.Row = 12; lblApFmt.Layout.Column = 1;
-
-    fmtGL = uigridlayout(axLimGL, [1 6], ...
-        'Padding', [0 0 0 0], 'RowSpacing', 0, 'ColumnSpacing', 2, ...
-        'ColumnWidth', {16, '1x', 16, '1x', 0, 0});
-    fmtGL.Layout.Row = 12; fmtGL.Layout.Column = [2 4];
-
-    lblFmtX = uilabel(fmtGL,'Text','X','FontSize',9,'HorizontalAlignment','right');
-    lblFmtX.Layout.Column = 1;
-    ddXFmt = uidropdown(fmtGL, 'Items', TICKFMT_NAMES, 'ItemsData', TICKFMT_DATA, ...
-        'Value', '', 'FontSize', 10, 'Tooltip', 'X-axis tick label notation', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    ddXFmt.Layout.Column = 2;
-
-    lblFmtY = uilabel(fmtGL,'Text','Y','FontSize',9,'HorizontalAlignment','right');
-    lblFmtY.Layout.Column = 3;
-    ddYFmt = uidropdown(fmtGL, 'Items', YTICKFMT_NAMES, 'ItemsData', YTICKFMT_DATA, ...
-        'Value', '__exp0', 'FontSize', 10, 'Tooltip', 'Left Y-axis tick label notation', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    ddYFmt.Layout.Column = 4;
-
-    lblFmtR = uilabel(fmtGL,'Text','R','FontSize',9,'HorizontalAlignment','right');
-    lblFmtR.Layout.Column = 5;
-    ddY2Fmt = uidropdown(fmtGL, 'Items', YTICKFMT_NAMES, 'ItemsData', YTICKFMT_DATA, ...
-        'Value', '', 'FontSize', 10, 'Tooltip', 'Right Y-axis tick label notation', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    ddY2Fmt.Layout.Column = 6;
-
-    % Row 13: Legend toggle (#1) + Reference lines (#11)
     cbShowLegend = uicheckbox(axLimGL, ...
-        'Text',    'Legend', ...
-        'Value',   true, ...
+        'Text', 'Legend', 'Value', true, 'FontSize', 9, ...
         'Tooltip', 'Show/hide the plot legend', ...
         'ValueChangedFcn', @(~,~) onPlot([],[]));
-    cbShowLegend.Layout.Row = 13; cbShowLegend.Layout.Column = 1;
+    cbShowLegend.Layout.Row = 4; cbShowLegend.Layout.Column = 3;
 
-    btnAddHLine = uibutton(axLimGL,'Text','+ H Line', ...
-        'ButtonPushedFcn', @onAddHRefLine, ...
-        'FontSize', 9, ...
+    ddDatasetColor = uidropdown(axLimGL, ...
+        'Items', DS_COLOR_NAMES, 'ItemsData', DS_COLOR_RGBS, ...
+        'Value', [], 'Enable', 'off', ...
+        'Tooltip', 'Override line colour ("Auto" uses the palette)', ...
+        'ValueChangedFcn', @onDatasetColorChanged);
+    ddDatasetColor.Layout.Row = 4; ddDatasetColor.Layout.Column = [4 6];
+
+    ddDatasetColorR = uidropdown(axLimGL, ...
+        'Items', DS_COLOR_NAMES, 'ItemsData', DS_COLOR_RGBS, ...
+        'Value', [], 'Enable', 'off', 'Visible', 'off', ...
+        'Tooltip', 'Override right-axis line colour', ...
+        'ValueChangedFcn', @onDatasetColorRChanged);
+    ddDatasetColorR.Layout.Row = 4; ddDatasetColorR.Layout.Column = 6;
+
+    % ── Row 5: Appearance extras (collapsible — default hidden) ──────
+    % Contains: title, labels, legend name, ref lines — all in a nested grid
+    AXLIM_ADV_ROW = 5;
+    AXLIM_ADV_HEIGHT = 90;
+    appData.sectionCollapsed.axAppearance = true;
+
+    axAdvGL = uigridlayout(axLimGL, [4 6], ...
+        'RowHeight', {20, 20, 20, 20}, ...
+        'ColumnWidth', {32, '1x', 32, '1x', '1x', '1x'}, ...
+        'Padding', [0 0 0 0], 'RowSpacing', 2, 'ColumnSpacing', 2);
+    axAdvGL.Layout.Row = 5; axAdvGL.Layout.Column = [1 6];
+
+    % Adv row 1: Title field + legend name
+    lblApTitle = uilabel(axAdvGL,'Text','Title:','FontSize',9,'HorizontalAlignment','right');
+    lblApTitle.Layout.Row = 1; lblApTitle.Layout.Column = 1;
+    efCustomTitle = uieditfield(axAdvGL,'text','Value','', ...
+        'Placeholder','auto', 'Tooltip','Override the plot title — blank = auto', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    efCustomTitle.Layout.Row = 1; efCustomTitle.Layout.Column = [2 4];
+    lblApLegend = uilabel(axAdvGL,'Text','Leg:','FontSize',9,'HorizontalAlignment','right');
+    lblApLegend.Layout.Row = 1; lblApLegend.Layout.Column = 5;
+    efLegendName = uieditfield(axAdvGL,'text','Value','', ...
+        'Enable','off', 'Placeholder','auto', ...
+        'Tooltip','Override the legend label — blank = auto', ...
+        'ValueChangedFcn', @onLegendNameChanged);
+    efLegendName.Layout.Row = 1; efLegendName.Layout.Column = 6;
+    efLegendNameR = uieditfield(axAdvGL,'text','Value','', ...
+        'Enable','off', 'Visible','off', 'Placeholder','auto', ...
+        'Tooltip','Override right-axis legend label', ...
+        'ValueChangedFcn', @onLegendNameRChanged);
+    efLegendNameR.Layout.Row = 1; efLegendNameR.Layout.Column = 6;
+
+    % Adv row 2: X label + Y label
+    lblApXLabel = uilabel(axAdvGL,'Text','X lbl:','FontSize',9,'HorizontalAlignment','right');
+    lblApXLabel.Layout.Row = 2; lblApXLabel.Layout.Column = 1;
+    efCustomXLabel = uieditfield(axAdvGL,'text','Value','', ...
+        'Placeholder','auto', 'Tooltip','Override X-axis label — blank = auto', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    efCustomXLabel.Layout.Row = 2; efCustomXLabel.Layout.Column = [2 3];
+    lblApYLabel = uilabel(axAdvGL,'Text','Y lbl:','FontSize',9,'HorizontalAlignment','right');
+    lblApYLabel.Layout.Row = 2; lblApYLabel.Layout.Column = 4;
+    efCustomYLabel = uieditfield(axAdvGL,'text','Value','', ...
+        'Placeholder','auto', 'Tooltip','Override left Y-axis label — blank = auto', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    efCustomYLabel.Layout.Row = 2; efCustomYLabel.Layout.Column = [5 6];
+    efCustomY2Label = uieditfield(axAdvGL,'text','Value','', ...
+        'Visible','off', 'Placeholder','auto', ...
+        'Tooltip','Override right Y-axis label — blank = auto', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    efCustomY2Label.Layout.Row = 2; efCustomY2Label.Layout.Column = 6;
+
+    % Adv row 3: Reference lines
+    btnAddHLine = uibutton(axAdvGL,'Text','+ H Line', ...
+        'ButtonPushedFcn', @onAddHRefLine, 'FontSize', 9, ...
         'Tooltip', 'Add a horizontal reference line at a specified Y value');
-    btnAddHLine.Layout.Row = 13; btnAddHLine.Layout.Column = 2;
-
-    btnAddVLine = uibutton(axLimGL,'Text','+ V Line', ...
-        'ButtonPushedFcn', @onAddVRefLine, ...
-        'FontSize', 9, ...
+    btnAddHLine.Layout.Row = 3; btnAddHLine.Layout.Column = [1 2];
+    btnAddVLine = uibutton(axAdvGL,'Text','+ V Line', ...
+        'ButtonPushedFcn', @onAddVRefLine, 'FontSize', 9, ...
         'Tooltip', 'Add a vertical reference line at a specified X value');
-    btnAddVLine.Layout.Row = 13; btnAddVLine.Layout.Column = 3;
-
-    btnClearRefLines = uibutton(axLimGL,'Text','Clear', ...
-        'ButtonPushedFcn', @onClearRefLines, ...
-        'FontSize', 9, ...
+    btnAddVLine.Layout.Row = 3; btnAddVLine.Layout.Column = [3 4];
+    btnClearRefLines = uibutton(axAdvGL,'Text','Clear Lines', ...
+        'ButtonPushedFcn', @onClearRefLines, 'FontSize', 9, ...
         'Tooltip', 'Remove all reference lines');
-    btnClearRefLines.Layout.Row = 13; btnClearRefLines.Layout.Column = 4;
+    btnClearRefLines.Layout.Row = 3; btnClearRefLines.Layout.Column = [5 6];
 
-    % ── Save / Export sub-panel (right column) ─────────────────────────────
-    savePanel = uipanel(analysisGL,'Title','Save / Export','FontSize',11, ...
+    % Adv row 4: More... toggle to show/hide this section (placed last)
+
+
+    % "More..." toggle in row 4 to expand/collapse appearance extras (row 5)
+    btnAxMore = uibutton(axLimGL, 'Text', [char(9654) ' More'], ...
+        'FontSize', 8, 'FontColor', [0.55 0.55 0.55], ...
+        'BackgroundColor', axLimGL.BackgroundColor, ...
+        'HorizontalAlignment', 'left', ...
+        'ButtonPushedFcn', @(~,~) onToggleAxAppearance());
+    btnAxMore.Layout.Row = 4; btnAxMore.Layout.Column = [5 6];
+
+    % ── Save / Export strip (rootGL row 3 — horizontal toolbar) ────────────
+    savePanel = uipanel(rootGL,'Title','Save / Export','FontSize',10, ...
         'Scrollable','on');
-    savePanel.Layout.Row = 1; savePanel.Layout.Column = 4;
+    savePanel.Layout.Row = 3; savePanel.Layout.Column = 1;
 
-    saveGL = uigridlayout(savePanel,[19 2], ...
-        'RowHeight',    {12,0,26,24,24, 12,24,26,24, 12,24, 20,0, 20,0,0,0,0,0}, ...
-        'ColumnWidth',  {'1x','1x'}, ...
-        'Padding',      [4 4 4 4], ...
-        'RowSpacing',   2, ...
-        'ColumnSpacing', 3);
+    saveGL = uigridlayout(savePanel,[1 4], ...
+        'ColumnWidth', {'1x','1x','1x','1x'}, ...
+        'RowHeight',   {'1x'}, ...
+        'Padding',     [4 2 4 2], ...
+        'ColumnSpacing', 8);
 
-    % ── Data Export (rows 1-5) ──────────────────────────────────────────
-    lblSaveHdrData = uilabel(saveGL, 'Text', 'Data Export', ...
+    % Hidden path field — still functional, read/written by callbacks
+    efSavePath = uieditfield(saveGL,'Value','','Visible','off', ...
+        'Placeholder','(auto-set on dataset load or Apply)', ...
+        'Tooltip','Output CSV file path');
+
+    % ── Group 1: Data Export ──────────────────────────────────────────
+    saveDataGL = uigridlayout(saveGL, [4 2], ...
+        'RowHeight', {12, 24, 24, 24}, 'ColumnWidth', {'1x','1x'}, ...
+        'Padding', [0 0 0 0], 'RowSpacing', 2, 'ColumnSpacing', 3);
+    saveDataGL.Layout.Row = 1; saveDataGL.Layout.Column = 1;
+
+    lblSaveHdrData = uilabel(saveDataGL, 'Text', 'Data Export', ...
         'FontSize', 9, 'FontColor', [0.55 0.55 0.55], ...
         'FontAngle', 'italic', 'HorizontalAlignment', 'left');
     lblSaveHdrData.Layout.Row = 1; lblSaveHdrData.Layout.Column = [1 2];
 
-    % Hidden path field — still functional, read/written by callbacks
-    efSavePath = uieditfield(saveGL,'Value','', ...
-        'Placeholder','(auto-set on dataset load or Apply)', ...
-        'Tooltip','Output CSV file path — auto-filled on load/Apply, or browse to choose');
-    efSavePath.Layout.Row = 2; efSavePath.Layout.Column = [1 2];
-
-    ddExportFormat = uidropdown(saveGL, ...
+    ddExportFormat = uidropdown(saveDataGL, ...
         'Items',   {'Standard CSV', 'Origin ASCII'}, ...
         'Value',   'Standard CSV', ...
         'Tooltip', 'CSV format: Standard (single header) or Origin (Long Name / Units / Designation rows)');
-    ddExportFormat.Layout.Row = 3; ddExportFormat.Layout.Column = 1;
+    ddExportFormat.Layout.Row = 2; ddExportFormat.Layout.Column = 1;
 
-    btnSaveBrowse = uibutton(saveGL,'Text','Browse...', ...
+    btnSaveBrowse = uibutton(saveDataGL,'Text','Browse...', ...
         'ButtonPushedFcn',@onSaveBrowse, ...
         'Tooltip','Choose output file location');
-    btnSaveBrowse.Layout.Row = 3; btnSaveBrowse.Layout.Column = 2;
+    btnSaveBrowse.Layout.Row = 2; btnSaveBrowse.Layout.Column = 2;
 
-    btnSave = uibutton(saveGL,'Text','Save CSV', ...
+    btnSave = uibutton(saveDataGL,'Text','Save CSV', ...
         'ButtonPushedFcn',@onSaveCSV, ...
         'BackgroundColor',BTN_EXPORT, ...
         'FontColor',BTN_FG,'FontWeight','bold', ...
         'Tooltip','Write data to CSV (raw or corrected; consolidated for neutron data)');
-    btnSave.Layout.Row = 4; btnSave.Layout.Column = 1;
+    btnSave.Layout.Row = 3; btnSave.Layout.Column = 1;
 
-    btnBatchExport = uibutton(saveGL,'Text','Batch All', ...
+    btnBatchExport = uibutton(saveDataGL,'Text','Batch All', ...
         'ButtonPushedFcn',@onBatchExportCSV, ...
         'BackgroundColor',BTN_EXPORT, ...
         'FontColor',BTN_FG, ...
         'Tooltip','Export all loaded datasets to separate CSV files (one per dataset)');
-    btnBatchExport.Layout.Row = 4; btnBatchExport.Layout.Column = 2;
+    btnBatchExport.Layout.Row = 3; btnBatchExport.Layout.Column = 2;
 
-    btnCopyDataClip = uibutton(saveGL,'Text','Copy Data', ...
+    btnCopyDataClip = uibutton(saveDataGL,'Text','Copy Data', ...
         'ButtonPushedFcn', @onCopyDataToClipboard, ...
         'BackgroundColor', BTN_EXPORT, ...
         'FontColor', BTN_FG, ...
         'Tooltip', 'Copy selected datasets as tab-delimited text to clipboard (Origin-ready)');
-    btnCopyDataClip.Layout.Row = 5; btnCopyDataClip.Layout.Column = 1;
+    btnCopyDataClip.Layout.Row = 4; btnCopyDataClip.Layout.Column = 1;
 
-    btnExportHDF5 = uibutton(saveGL,'Text','HDF5...', ...
+    btnExportHDF5 = uibutton(saveDataGL,'Text','HDF5...', ...
         'ButtonPushedFcn',@onExportHDF5, ...
         'BackgroundColor',BTN_EXTERNAL, ...
         'FontColor',BTN_FG, ...
         'Tooltip','Export data, corrections, and peaks to a self-describing HDF5 file (.h5)');
-    btnExportHDF5.Layout.Row = 5; btnExportHDF5.Layout.Column = 2;
+    btnExportHDF5.Layout.Row = 4; btnExportHDF5.Layout.Column = 2;
 
-    % ── Figure Export (rows 6-8) ────────────────────────────────────────
-    lblSaveHdrFig = uilabel(saveGL, 'Text', 'Figure Export', ...
+    % ── Group 2: Figure Export ────────────────────────────────────────
+    saveFigGL = uigridlayout(saveGL, [4 2], ...
+        'RowHeight', {12, 24, 24, 24}, 'ColumnWidth', {'1x','1x'}, ...
+        'Padding', [0 0 0 0], 'RowSpacing', 2, 'ColumnSpacing', 3);
+    saveFigGL.Layout.Row = 1; saveFigGL.Layout.Column = 2;
+
+    lblSaveHdrFig = uilabel(saveFigGL, 'Text', 'Figure Export', ...
         'FontSize', 9, 'FontColor', [0.55 0.55 0.55], ...
         'FontAngle', 'italic', 'HorizontalAlignment', 'left');
-    lblSaveHdrFig.Layout.Row = 6; lblSaveHdrFig.Layout.Column = [1 2];
+    lblSaveHdrFig.Layout.Row = 1; lblSaveHdrFig.Layout.Column = [1 2];
 
-    btnExportFig = uibutton(saveGL,'Text','To Figure', ...
+    btnExportFig = uibutton(saveFigGL,'Text','To Figure', ...
         'ButtonPushedFcn',@onExportFigure, ...
         'BackgroundColor',BTN_SECONDARY, ...
         'FontColor',BTN_FG, ...
-        'Tooltip','Open a new figure window with the current plot (full MATLAB toolbar — ideal for publication-quality editing)');
-    btnExportFig.Layout.Row = 7; btnExportFig.Layout.Column = 1;
+        'Tooltip','Open a new figure window with the current plot (full MATLAB toolbar)');
+    btnExportFig.Layout.Row = 2; btnExportFig.Layout.Column = 1;
 
-    btnCopyClip = uibutton(saveGL,'Text','Copy Plot', ...
+    btnCopyClip = uibutton(saveFigGL,'Text','Copy Plot', ...
         'ButtonPushedFcn',@onCopyToClipboard, ...
         'BackgroundColor',BTN_SECONDARY, ...
         'FontColor',BTN_FG, ...
-        'Tooltip','Copy the current plot as an image to the system clipboard (Windows only)  [Ctrl+C]');
-    btnCopyClip.Layout.Row = 7; btnCopyClip.Layout.Column = 2;
+        'Tooltip','Copy the current plot as an image to the system clipboard  [Ctrl+C]');
+    btnCopyClip.Layout.Row = 2; btnCopyClip.Layout.Column = 2;
 
-    ddFigFormat = uidropdown(saveGL, ...
+    ddFigFormat = uidropdown(saveFigGL, ...
         'Items',   {'PNG (300 dpi)', 'PDF (vector)', 'SVG (vector)', 'TIFF (300 dpi)', 'MATLAB .fig'}, ...
         'Value',   'PNG (300 dpi)', ...
         'Tooltip', 'Output file format for publication-quality figure save');
-    ddFigFormat.Layout.Row = 8; ddFigFormat.Layout.Column = 1;
+    ddFigFormat.Layout.Row = 3; ddFigFormat.Layout.Column = 1;
 
-    btnSaveFig = uibutton(saveGL,'Text','Save Figure', ...
+    btnSaveFig = uibutton(saveFigGL,'Text','Save Figure', ...
         'ButtonPushedFcn',@onSaveFigure, ...
         'BackgroundColor',BTN_SECONDARY, ...
         'FontColor',BTN_FG, ...
         'Tooltip','Save the current plot to an image or vector file via exportgraphics');
-    btnSaveFig.Layout.Row = 8; btnSaveFig.Layout.Column = 2;
+    btnSaveFig.Layout.Row = 3; btnSaveFig.Layout.Column = 2;
 
-    % Row 9: Figure dimensions for export (W × H inches)
-    figDimGL = uigridlayout(saveGL, [1 4], ...
+    figDimGL = uigridlayout(saveFigGL, [1 4], ...
         'Padding', [0 0 0 0], 'ColumnSpacing', 3, ...
         'ColumnWidth', {50, '1x', 14, '1x'});
-    figDimGL.Layout.Row = 9; figDimGL.Layout.Column = [1 2];
+    figDimGL.Layout.Row = 4; figDimGL.Layout.Column = [1 2];
 
     uilabel(figDimGL, 'Text', 'Size (in):', 'FontSize', 9, ...
         'HorizontalAlignment', 'right');
@@ -1587,111 +1566,107 @@ function varargout = dataImportGUI()
         'Limits', [1 30], 'Tooltip', 'Export figure height (inches)');
     efFigHeight.Layout.Column = 4;
 
-    % ── Session (rows 10-11) ────────────────────────────────────────────
-    lblSaveHdrSession = uilabel(saveGL, 'Text', 'Session', ...
+    % ── Group 3: Session + Origin ─────────────────────────────────────
+    saveSessionGL = uigridlayout(saveGL, [4 2], ...
+        'RowHeight', {12, 24, 12, 24}, 'ColumnWidth', {'1x','1x'}, ...
+        'Padding', [0 0 0 0], 'RowSpacing', 2, 'ColumnSpacing', 3);
+    saveSessionGL.Layout.Row = 1; saveSessionGL.Layout.Column = 3;
+
+    lblSaveHdrSession = uilabel(saveSessionGL, 'Text', 'Session', ...
         'FontSize', 9, 'FontColor', [0.55 0.55 0.55], ...
         'FontAngle', 'italic', 'HorizontalAlignment', 'left');
-    lblSaveHdrSession.Layout.Row = 10; lblSaveHdrSession.Layout.Column = [1 2];
+    lblSaveHdrSession.Layout.Row = 1; lblSaveHdrSession.Layout.Column = [1 2];
 
-    btnSaveSession = uibutton(saveGL,'Text','Save Session...', ...
+    btnSaveSession = uibutton(saveSessionGL,'Text','Save Session...', ...
         'ButtonPushedFcn',@onSaveSession, ...
         'BackgroundColor',BTN_SESSION, ...
         'FontColor',BTN_FG, ...
         'Tooltip','Save all loaded datasets, corrections, and peaks to a .mat session file  [Ctrl+S]');
-    btnSaveSession.Layout.Row = 11; btnSaveSession.Layout.Column = 1;
+    btnSaveSession.Layout.Row = 2; btnSaveSession.Layout.Column = 1;
 
-    btnLoadSession = uibutton(saveGL,'Text','Load Session...', ...
+    btnLoadSession = uibutton(saveSessionGL,'Text','Load Session...', ...
         'ButtonPushedFcn',@onLoadSession, ...
         'BackgroundColor',BTN_SESSION, ...
         'FontColor',BTN_FG, ...
         'Tooltip','Restore a previously saved session from a .mat file');
-    btnLoadSession.Layout.Row = 11; btnLoadSession.Layout.Column = 2;
+    btnLoadSession.Layout.Row = 2; btnLoadSession.Layout.Column = 2;
 
-    % ── Origin / Excel (row 12-13, collapsible — default collapsed) ────
-    SAVE_ORIGIN_ROWS = 13;
-    SAVE_ORIGIN_HEIGHTS = 28;
-    lblSaveHdrOrigin = uibutton(saveGL, 'Text', [char(9654) ' Origin / Excel'], ...
+    lblSaveHdrOrigin = uilabel(saveSessionGL, 'Text', 'Origin / Excel', ...
         'FontSize', 9, 'FontColor', [0.55 0.55 0.55], ...
-        'BackgroundColor', saveGL.BackgroundColor, ...
-        'HorizontalAlignment', 'left', ...
-        'ButtonPushedFcn', @(~,~) onToggleSaveOrigin());
-    lblSaveHdrOrigin.Layout.Row = 12; lblSaveHdrOrigin.Layout.Column = [1 2];
+        'FontAngle', 'italic', 'HorizontalAlignment', 'left');
+    lblSaveHdrOrigin.Layout.Row = 3; lblSaveHdrOrigin.Layout.Column = [1 2];
 
-    btnSendOrigin = uibutton(saveGL,'Text','Send to Origin', ...
+    btnSendOrigin = uibutton(saveSessionGL,'Text','Send to Origin', ...
         'ButtonPushedFcn', @onSendToOrigin, ...
         'BackgroundColor', BTN_EXTERNAL, ...
         'FontColor', BTN_FG, ...
         'Tooltip', 'Send data to OriginPro via COM automation (falls back to clipboard copy)');
-    btnSendOrigin.Layout.Row = 13; btnSendOrigin.Layout.Column = 1;
+    btnSendOrigin.Layout.Row = 4; btnSendOrigin.Layout.Column = 1;
 
-    btnExportOriginScript = uibutton(saveGL,'Text','Origin Script', ...
+    btnExportOriginScript = uibutton(saveSessionGL,'Text','Origin Script', ...
         'ButtonPushedFcn', @onExportOriginScript, ...
         'BackgroundColor', BTN_EXTERNAL, ...
         'FontColor', BTN_FG, ...
         'Tooltip', 'Write a LabTalk (.ogs) script + CSV that Origin can import directly');
-    btnExportOriginScript.Layout.Row = 13; btnExportOriginScript.Layout.Column = 2;
+    btnExportOriginScript.Layout.Row = 4; btnExportOriginScript.Layout.Column = 2;
 
-    % ── Tools (rows 14-19, collapsible — default collapsed) ─────────────
-    SAVE_TOOLS_ROWS = [15 16 17 18 19];
-    SAVE_TOOLS_HEIGHTS = [28 28 28 28 26];
-    lblSaveHdrTools = uibutton(saveGL, 'Text', [char(9654) ' Tools'], ...
+    % ── Group 4: Tools ────────────────────────────────────────────────
+    saveToolsGL = uigridlayout(saveGL, [4 2], ...
+        'RowHeight', {12, 24, 24, 24}, 'ColumnWidth', {'1x','1x'}, ...
+        'Padding', [0 0 0 0], 'RowSpacing', 2, 'ColumnSpacing', 3);
+    saveToolsGL.Layout.Row = 1; saveToolsGL.Layout.Column = 4;
+
+    lblSaveHdrTools = uilabel(saveToolsGL, 'Text', 'Tools', ...
         'FontSize', 9, 'FontColor', [0.55 0.55 0.55], ...
-        'BackgroundColor', saveGL.BackgroundColor, ...
-        'HorizontalAlignment', 'left', ...
-        'ButtonPushedFcn', @(~,~) onToggleSaveTools());
-    lblSaveHdrTools.Layout.Row = 14; lblSaveHdrTools.Layout.Column = [1 2];
-    % Collapse by default
-    for kr = 1:numel(SAVE_TOOLS_ROWS)
-        saveGL.RowHeight{SAVE_TOOLS_ROWS(kr)} = 0;
-    end
+        'FontAngle', 'italic', 'HorizontalAlignment', 'left');
+    lblSaveHdrTools.Layout.Row = 1; lblSaveHdrTools.Layout.Column = [1 2];
 
-    btnBatchConvertXRD = uibutton(saveGL,'Text','Batch Convert XRD', ...
+    btnBatchConvertXRD = uibutton(saveToolsGL,'Text','Batch XRD', ...
         'ButtonPushedFcn', @onBatchConvertXRD, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Tooltip', 'Open batch XRD file converter (XRDML, Rigaku, Bruker)');
-    btnBatchConvertXRD.Layout.Row = 15; btnBatchConvertXRD.Layout.Column = [1 2];
+    btnBatchConvertXRD.Layout.Row = 2; btnBatchConvertXRD.Layout.Column = 1;
 
-    btnResample = uibutton(saveGL,'Text','Resample Dataset...', ...
+    btnResample = uibutton(saveToolsGL,'Text','Resample...', ...
         'ButtonPushedFcn', @onResampleDataset, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Tooltip', 'Resample the active dataset to a uniform x-grid (linear interpolation)');
-    btnResample.Layout.Row = 16; btnResample.Layout.Column = [1 2];
+    btnResample.Layout.Row = 2; btnResample.Layout.Column = 2;
 
-    btnColumnCalc = uibutton(saveGL,'Text','Column Calculator...', ...
+    btnColumnCalc = uibutton(saveToolsGL,'Text','Col. Calc...', ...
         'ButtonPushedFcn', @onColumnCalculator, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Tooltip', 'Create a new Y column from expressions using existing columns (e.g. C1./C2)');
-    btnColumnCalc.Layout.Row = 17; btnColumnCalc.Layout.Column = [1 2];
+    btnColumnCalc.Layout.Row = 3; btnColumnCalc.Layout.Column = 1;
 
-    btnInset = uibutton(saveGL,'Text','Create Inset Plot...', ...
+    btnInset = uibutton(saveToolsGL,'Text','Inset Plot...', ...
         'ButtonPushedFcn', @onCreateInset, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Tooltip', 'Create an inset axes showing a zoomed region of the current plot');
-    btnInset.Layout.Row = 18; btnInset.Layout.Column = [1 2];
+    btnInset.Layout.Row = 3; btnInset.Layout.Column = 2;
 
-    btnLayoutSettings = uibutton(saveGL,'Text','Layout Settings...', ...
+    btnLayoutSettings = uibutton(saveToolsGL,'Text','Layout...', ...
         'ButtonPushedFcn', @onOpenLayoutSettings, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Tooltip', 'Open the Layout Settings window to configure panel sizes and figure dimensions');
-    btnLayoutSettings.Layout.Row = 19; btnLayoutSettings.Layout.Column = [1 2];
+    btnLayoutSettings.Layout.Row = 4; btnLayoutSettings.Layout.Column = [1 2];
 
-    % ── Peak Analysis sub-panel (row 2, full width) ───────────────────────
-    % Always visible; XRD buttons in corrGL activate it contextually.
-    peakPanel = uipanel(analysisGL,'Title','Peak Analysis','FontSize',11, ...
-        'Scrollable','on');
-    peakPanel.Layout.Row = 1; peakPanel.Layout.Column = 3;
+    % ── Peak Analysis window (separate uifigure) ──────────────────────────
+    % The peak table + controls live in their own window, opened on demand.
+    peakFig = uifigure('Name', 'Peak Analysis', 'Visible', 'off', ...
+        'Position', [200 150 580 620], ...
+        'CloseRequestFcn', @(~,~) set(peakFig, 'Visible', 'off'));
 
-    peakGL = uigridlayout(peakPanel,[1 2], ...
-        'ColumnWidth', {'1x',280}, ...
-        'Padding',     [4 4 4 4], ...
-        'ColumnSpacing', 6);
+    peakRootGL = uigridlayout(peakFig, [3 1], ...
+        'RowHeight', {'1x', 340, 24}, ...
+        'Padding', [6 6 6 6], 'RowSpacing', 4);
 
-    peakTable = uitable(peakGL, ...
+    peakTable = uitable(peakRootGL, ...
         'ColumnName',     {'#','Center (°)','d (Å)','Size (nm)','FWHM (°)','Height','Area',char(951),'Status'}, ...
         'ColumnWidth',    {22, 82, 70, 70, 68, 65, 65, 38, 55}, ...
         'Data',           {}, ...
@@ -1699,16 +1674,16 @@ function varargout = dataImportGUI()
         'ColumnEditable', [false false false false false false false false false], ...
         'CellSelectionCallback', @onPeakTableSelect, ...
         'Tooltip','Detected peaks — select a row to highlight it on the plot');
-    peakTable.Layout.Column = 1;
+    peakTable.Layout.Row = 1;
 
     % Peak buttons — 2-column layout: fitting/actions on left, export/settings on right
-    peakBtnGL = uigridlayout(peakGL,[10 2], ...
+    peakBtnGL = uigridlayout(peakRootGL, [10 2], ...
         'RowHeight',    {24,22,22,22,22,22,0, 18, 0, 96}, ...
         'ColumnWidth',  {'1x','1x'}, ...
         'Padding',      [0 0 0 0], ...
         'RowSpacing',   2, ...
         'ColumnSpacing', 4);
-    peakBtnGL.Layout.Column = 2;
+    peakBtnGL.Layout.Row = 2;
 
     % Row 1: Fit model dropdown (spans both columns)
     ddFitModel = uidropdown(peakBtnGL, ...
@@ -1918,7 +1893,15 @@ function varargout = dataImportGUI()
         'ValueChangedFcn', @onToggleShowBG);
     chkShowBG.Layout.Row = 4; chkShowBG.Layout.Column = [1 2];
 
-    % ── 2D Map controls (col 3, overlaps peakPanel — toggled by is2DDataset) ──
+    % Row 3 of peakRootGL: help label
+    lblPeakHelp = uilabel(peakRootGL, ...
+        'Text', ['Select model ' char(8594) ' Fit Peaks.  Use Add Peak (main window) to click on the plot.  ' ...
+                 'Close this window to hide; peaks stay on plot.'], ...
+        'FontSize', 9, 'FontColor', [0.55 0.55 0.55], ...
+        'HorizontalAlignment', 'center');
+    lblPeakHelp.Layout.Row = 3;
+
+    % ── 2D Map controls (col 3 of analysisGL — visible only for 2D data) ──
     map2DPanel = uipanel(analysisGL,'Title','2D Map View','FontSize',11, ...
         'Scrollable','on');
     map2DPanel.Layout.Row = 1; map2DPanel.Layout.Column = 3;
@@ -1994,7 +1977,7 @@ function varargout = dataImportGUI()
     % Registering each panel/listbox/axes individually ensures that a file
     % dropped anywhere in the window is caught.
     dropSurfaces = {ctrlPanel, axPanel, ax, analysisPanel, ...
-                    corrPanel, axLimPanel, savePanel, peakPanel, lbDatasets};
+                    corrPanel, axLimPanel, savePanel, lbDatasets};
     for surf_i = 1:numel(dropSurfaces)
         try
             dropSurfaces{surf_i}.AllowDrop = true;   % R2024a+: must opt-in before DropFcn fires
@@ -2036,6 +2019,8 @@ function varargout = dataImportGUI()
     api.fitPeaks            = @() onFitPeaks([],[]);
     api.getPeaks            = @getPeaksDirect;
     api.setDatasetVisible   = @setDatasetVisibleDirect;
+    api.showPeakWindow      = @showPeakWindow;
+    api.peakFig             = peakFig;
     api.close               = @() close(fig);
     % 2D map API (used by test_gui_2d.m / test_gui_phase4.m)
     api.is2DActive          = @is2DActiveDirect;
@@ -2122,7 +2107,7 @@ function varargout = dataImportGUI()
             loadFilePaths(valid);
 
         catch ME
-            fprintf(2, '[dataImportGUI] DropFcn error: %s\n', ME.message);
+            fprintf(2, '[DataPlotter] DropFcn error: %s\n', ME.message);
             for si = 1:numel(ME.stack)
                 fprintf(2, '  at %s (line %d)\n', ME.stack(si).name, ME.stack(si).line);
             end
@@ -2216,7 +2201,7 @@ function varargout = dataImportGUI()
                         appData.datasets{end+1} = ds;
                         nLoaded = nLoaded + 1;
                     catch ME
-                        fprintf(2, '\n[dataImportGUI] Import error (%s [%s]): %s\n', ...
+                        fprintf(2, '\n[DataPlotter] Import error (%s [%s]): %s\n', ...
                             fnBase, shName, ME.message);
                         logGUIError('Import error', sprintf('%s [%s]  %s', fnBase, shName, ME.message), ME);
                         uialert(fig, sprintf('%s [%s]\n\n%s', fnBase, shName, ME.message), ...
@@ -2233,7 +2218,7 @@ function varargout = dataImportGUI()
                 appData.datasets{end+1} = ds;
                 nLoaded = nLoaded + 1;
             catch ME
-                fprintf(2, '\n[dataImportGUI] Import error (%s): %s\n', fnBase, ME.message);
+                fprintf(2, '\n[DataPlotter] Import error (%s): %s\n', fnBase, ME.message);
                 for si = 1:numel(ME.stack)
                     fprintf(2, '  at %s  (line %d)\n', ME.stack(si).name, ME.stack(si).line);
                 end
@@ -2278,7 +2263,7 @@ function varargout = dataImportGUI()
 
         % Guard against accidental overwrite (#22)
         if isfile(outPath)
-            warning('dataImportGUI:sessionOverwrite', ...
+            warning('DataPlotter:sessionOverwrite', ...
                 'Overwriting existing session file: %s', outPath);
         end
 
@@ -2321,7 +2306,7 @@ function varargout = dataImportGUI()
         nLegacy = sum(cellfun(@(ds) ...
             ~isfield(ds.data.metadata, 'parserVersion'), appData.datasets));
         if nLegacy > 0
-            warning('dataImportGUI:legacySession', ...
+            warning('DataPlotter:legacySession', ...
                 '%d dataset(s) lack parserVersion; re-import files to attach version metadata.', ...
                 nLegacy);
         end
@@ -2532,6 +2517,10 @@ function varargout = dataImportGUI()
 
         cancelInteractions();
         clearFringeMarkers();
+
+        % Hide peak window and clear its table
+        if isvalid(peakFig), peakFig.Visible = 'off'; end
+        peakTable.Data = {};
     end
 
     function onSelectDataset(~,~)
@@ -3069,7 +3058,7 @@ function varargout = dataImportGUI()
         % Reset peak-remove click mode
         if appData.peakRemoveMode
             appData.peakRemoveMode = false;
-            btnRemovePeakClick.Text            = 'Remove Peak';
+            btnRemovePeakClick.Text            = 'Click-Rm';
             btnRemovePeakClick.BackgroundColor = BTN_DANGER;
         end
         btnRemovePeakClick.Enable = 'on';
@@ -3197,9 +3186,7 @@ function varargout = dataImportGUI()
 
         % Show Y2 rows/columns only when a right-axis channel is active
         y2Active = ~all(strcmp(ensureCell(lbY2.Value), '(none)'));
-        axLimGL.RowHeight{4}  = 22 * y2Active;
-        fmtGL.ColumnWidth{5}  = guiTernary(y2Active, 20,   0);
-        fmtGL.ColumnWidth{6}  = guiTernary(y2Active, '1x', 0);
+        axLimGL.RowHeight{3}  = 22 * y2Active;
         toggleY2Appearance(y2Active);
 
         [fp2, fn2, ~] = fileparts(ds.filepath);
@@ -3290,18 +3277,11 @@ function varargout = dataImportGUI()
                 btnAutoPeak.Visible        = 'on';
                 btnManualPeak.Visible      = 'on';
                 btnRemovePeakClick.Visible = 'on';
-                % Peak analysis panel — visible for XRD
-                peakPanel.Visible          = 'on';
-                peakPanel.Title            = 'Peak Analysis';
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, appData.axLimPanelWidth, '4x', '3x'};
-                % Restore all XRD peak buttons
-                for hh = {ddFitModel, btnFitPeaks, btnFitAllPeaks, btnClearPeaks, ...
-                          btnRemovePeak, btnSavePeaks, btnExportPeakXLSX, chkShowFit, ...
-                          btnFitColor, btnWHPlot, btnFFTThickness, btnRefineLattice, btnReflFFT}
-                    hh{1}.Visible = 'on'; %#ok<FXSET>
-                end
-                btnFringeThick.Visible = 'off';
-                peakBtnGL.RowHeight{7} = 0;
+                btnPeakWindow.Visible      = 'on';
+                % Peak window mode — XRD
+                appData.peakMode = 'xrd';
+                configurePeakWindowForMode('xrd');
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0};
                 % Hide asymmetry; respect BG file collapse state
                 corrGL.RowHeight{CROW.BGFILE}  = bgFileH;
                 corrGL.RowHeight{CROW.BGSUBTR} = bgFileH;
@@ -3345,8 +3325,9 @@ function varargout = dataImportGUI()
                 btnAutoPeak.Visible        = 'off';
                 btnManualPeak.Visible      = 'off';
                 btnRemovePeakClick.Visible = 'off';
-                peakPanel.Visible          = 'off';
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '7x', 0, '3x'};
+                btnPeakWindow.Visible      = 'off';
+                appData.peakMode = 'none';
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0};
                 % Hide asymmetry; respect BG file collapse state; show mag section
                 corrGL.RowHeight{CROW.BGFILE}  = bgFileH;
                 corrGL.RowHeight{CROW.BGSUBTR} = bgFileH;
@@ -3375,18 +3356,12 @@ function varargout = dataImportGUI()
                 btnAutoPeak.Visible        = 'off';
                 btnManualPeak.Visible      = 'off';
                 btnRemovePeakClick.Visible = 'off';
+                btnPeakWindow.Visible      = 'off';
                 btnApply.Tooltip = 'Apply Q offset / R scale, trim, and normalization to all polarizations from the same measurement';
-                peakPanel.Visible          = 'on';
-                peakPanel.Title            = 'Reflectivity Analysis';
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, appData.axLimPanelWidth, '4x', '3x'};
-                for hh = {ddFitModel, btnFitPeaks, btnFitAllPeaks, btnClearPeaks, ...
-                          btnRemovePeak, btnSavePeaks, btnExportPeakXLSX, chkShowFit, ...
-                          btnFitColor, btnWHPlot, btnFFTThickness, btnRefineLattice}
-                    hh{1}.Visible = 'off'; %#ok<FXSET>
-                end
-                btnReflFFT.Visible = 'on';
-                btnFringeThick.Visible = 'on';
-                peakBtnGL.RowHeight{7} = 22;
+                % Peak window mode — reflectometry
+                appData.peakMode = 'reflectometry';
+                configurePeakWindowForMode('reflectometry');
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0};
                 % Hide BG file rows; show asymmetry rows
                 corrGL.RowHeight{CROW.BGFILE}  = 0;
                 corrGL.RowHeight{CROW.BGSUBTR} = 0;
@@ -3421,8 +3396,9 @@ function varargout = dataImportGUI()
                 btnAutoPeak.Visible        = 'off';
                 btnManualPeak.Visible      = 'off';
                 btnRemovePeakClick.Visible = 'off';
-                peakPanel.Visible          = 'off';
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '7x', 0, '3x'};
+                btnPeakWindow.Visible      = 'off';
+                appData.peakMode = 'none';
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0};
                 % Hide asymmetry; respect BG file collapse state
                 corrGL.RowHeight{CROW.BGFILE}  = bgFileH;
                 corrGL.RowHeight{CROW.BGSUBTR} = bgFileH;
@@ -3454,8 +3430,9 @@ function varargout = dataImportGUI()
                 btnAutoPeak.Visible        = 'off';
                 btnManualPeak.Visible      = 'off';
                 btnRemovePeakClick.Visible = 'off';
-                peakPanel.Visible          = 'off';
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '7x', 0, '3x'};
+                btnPeakWindow.Visible      = 'off';
+                appData.peakMode = 'none';
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0};
                 % Hide asymmetry; respect BG file collapse state
                 corrGL.RowHeight{CROW.BGFILE}  = bgFileH;
                 corrGL.RowHeight{CROW.BGSUBTR} = bgFileH;
@@ -3465,16 +3442,20 @@ function varargout = dataImportGUI()
                 showMagSection(false);
         end
 
+        % ── Hide peak window when switching to a non-peak mode ───────────
+        if strcmp(appData.peakMode, 'none') && isvalid(peakFig)
+            peakFig.Visible = 'off';
+        end
+
         % ── 2D area-detector override (applied after the switch) ─────────
-        % When the active dataset contains a 2D map, hide the peak panel and
+        % When the active dataset contains a 2D map, hide the peak/map and
         % corrections (not meaningful for raw intensity maps) and show the
         % map2D controls instead.
         is2D_active = appData.activeIdx >= 1 && ~isempty(appData.datasets) && ...
                       is2DDataset(appData.datasets{appData.activeIdx});
         if is2D_active
-            peakPanel.Visible  = 'off';
             map2DPanel.Visible = 'on';
-            analysisGL.ColumnWidth = {appData.corrPanelWidth, appData.axLimPanelWidth, '4x', '3x'};
+            analysisGL.ColumnWidth = {appData.corrPanelWidth, '1x', '2x'};
             % Disable all corrections — not meaningful for raw 2D maps
             for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
                       btnApply, btnReset, btnApplyAll, btnUndo, ...
@@ -3488,6 +3469,8 @@ function varargout = dataImportGUI()
             btnAutoPeak.Visible        = 'off';
             btnManualPeak.Visible      = 'off';
             btnRemovePeakClick.Visible = 'off';
+            btnPeakWindow.Visible      = 'off';
+            if isvalid(peakFig), peakFig.Visible = 'off'; end
             analysisPanel.Title = 'Analysis  —  XRD 2D Map';
         else
             map2DPanel.Visible = 'off';
@@ -3538,7 +3521,7 @@ function varargout = dataImportGUI()
                     onPlot([],[]);
                     return;  % updateControls already calls applyParserAnalysisConfig
                 catch ME
-                    warning('dataImportGUI:simsReimport', ...
+                    warning('DataPlotter:simsReimport', ...
                         'SIMS reimport failed: %s', ME.message);
                 end
             end
@@ -3570,37 +3553,16 @@ function varargout = dataImportGUI()
         end
     end
 
-    function onToggleSaveTools()
-    %ONTOGGLESAVETOOLS  Toggle the collapsible "Tools" section in the save panel.
-        collapsed = ~appData.sectionCollapsed.saveTools;
-        appData.sectionCollapsed.saveTools = collapsed;
+    function onToggleAxAppearance()
+    %ONTOGGLEAXAPPEARANCE  Toggle the appearance extras row in axLimGL.
+        collapsed = ~appData.sectionCollapsed.axAppearance;
+        appData.sectionCollapsed.axAppearance = collapsed;
         if collapsed
-            lblSaveHdrTools.Text = [char(9654) ' Tools'];  % ▶
-            for k = 1:numel(SAVE_TOOLS_ROWS)
-                saveGL.RowHeight{SAVE_TOOLS_ROWS(k)} = 0;
-            end
+            btnAxMore.Text = [char(9654) ' More'];  % ▶
+            axLimGL.RowHeight{AXLIM_ADV_ROW} = 0;
         else
-            lblSaveHdrTools.Text = [char(9660) ' Tools'];  % ▼
-            for k = 1:numel(SAVE_TOOLS_ROWS)
-                saveGL.RowHeight{SAVE_TOOLS_ROWS(k)} = SAVE_TOOLS_HEIGHTS(k);
-            end
-        end
-    end
-
-    function onToggleSaveOrigin()
-    %ONTOGGLESAVEORIGIN  Toggle the collapsible "Origin / Excel" section.
-        collapsed = ~appData.sectionCollapsed.originExcel;
-        appData.sectionCollapsed.originExcel = collapsed;
-        if collapsed
-            lblSaveHdrOrigin.Text = [char(9654) ' Origin / Excel'];  % ▶
-            for k = 1:numel(SAVE_ORIGIN_ROWS)
-                saveGL.RowHeight{SAVE_ORIGIN_ROWS(k)} = 0;
-            end
-        else
-            lblSaveHdrOrigin.Text = [char(9660) ' Origin / Excel'];  % ▼
-            for k = 1:numel(SAVE_ORIGIN_ROWS)
-                saveGL.RowHeight{SAVE_ORIGIN_ROWS(k)} = SAVE_ORIGIN_HEIGHTS(k);
-            end
+            btnAxMore.Text = [char(9660) ' More'];  % ▼
+            axLimGL.RowHeight{AXLIM_ADV_ROW} = AXLIM_ADV_HEIGHT;
         end
     end
 
@@ -3781,6 +3743,48 @@ function varargout = dataImportGUI()
             setStatus(sprintf('Auto BG+Offset applied to %d dataset(s).', numel(corrections)));
         else
             setStatus('Auto BG+Offset applied.');
+        end
+    end
+
+    function showPeakWindow()
+    %SHOWPEAKWINDOW  Open (or bring to front) the Peak Analysis window.
+        if ~isvalid(peakFig)
+            return;  % figure was deleted — should not happen in normal use
+        end
+        refreshPeakTable();
+        peakFig.Visible = 'on';
+        figure(peakFig);  % bring to front
+    end
+
+    function configurePeakWindowForMode(mode)
+    %CONFIGUREPEAKWINDOWFORMODE  Show/hide mode-specific buttons in the peak window.
+    %  mode: 'xrd', 'reflectometry', or 'none'
+        switch mode
+            case 'xrd'
+                peakFig.Name = 'Peak Analysis';
+                % Restore all XRD peak buttons
+                for hh = {ddFitModel, btnFitPeaks, btnFitAllPeaks, btnClearPeaks, ...
+                          btnRemovePeak, btnSavePeaks, btnExportPeakXLSX, chkShowFit, ...
+                          btnFitColor, btnWHPlot, btnFFTThickness, btnRefineLattice, btnReflFFT, ...
+                          btnCopyPeaksClip, btnMorePeak, btnMatchPhases}
+                    hh{1}.Visible = 'on'; %#ok<FXSET>
+                end
+                btnFringeThick.Visible = 'off';
+                peakBtnGL.RowHeight{7} = 0;
+            case 'reflectometry'
+                peakFig.Name = 'Reflectivity Analysis';
+                for hh = {ddFitModel, btnFitPeaks, btnFitAllPeaks, btnClearPeaks, ...
+                          btnRemovePeak, btnSavePeaks, btnExportPeakXLSX, chkShowFit, ...
+                          btnFitColor, btnWHPlot, btnFFTThickness, btnRefineLattice, ...
+                          btnCopyPeaksClip, btnMorePeak, btnMatchPhases}
+                    hh{1}.Visible = 'off'; %#ok<FXSET>
+                end
+                btnReflFFT.Visible = 'on';
+                btnFringeThick.Visible = 'on';
+                peakBtnGL.RowHeight{7} = 22;
+            otherwise
+                % 'none' — hide the window entirely
+                if isvalid(peakFig), peakFig.Visible = 'off'; end
         end
     end
 
@@ -3986,6 +3990,7 @@ function varargout = dataImportGUI()
         appData.datasets{appData.activeIdx} = ds;
         refreshPeakTable();
         onPlot([],[]);
+        showPeakWindow();
     end
 
     % ── Manual peak add (click mode) ─────────────────────────────────────
@@ -4083,6 +4088,8 @@ function varargout = dataImportGUI()
 
         refreshPeakTable();
         onPlot([],[]);
+        % Auto-open peak window on first peak
+        if numel(ds.peaks) == 1, showPeakWindow(); end
         % Stay in pick mode — user presses button again to stop
     end
 
@@ -8037,7 +8044,7 @@ function varargout = dataImportGUI()
             end
             uialert(fig, sprintf('Saved:\n%s', fp), 'Saved');
         catch ME
-            fprintf(2, '\n[dataImportGUI] Save error: %s\n', ME.message);
+            fprintf(2, '\n[DataPlotter] Save error: %s\n', ME.message);
             for si = 1:numel(ME.stack)
                 fprintf(2, '  at %s  (line %d)\n', ME.stack(si).name, ME.stack(si).line);
             end
@@ -8659,7 +8666,7 @@ function varargout = dataImportGUI()
                 'Peaks',        ds.peaks);
             uialert(fig, sprintf('Saved:\n%s', outPath), 'HDF5 Exported');
         catch ME
-            fprintf(2, '\n[dataImportGUI] HDF5 export error: %s\n', ME.message);
+            fprintf(2, '\n[DataPlotter] HDF5 export error: %s\n', ME.message);
             for si = 1:numel(ME.stack)
                 fprintf(2, '  at %s  (line %d)\n', ME.stack(si).name, ME.stack(si).line);
             end
@@ -9608,9 +9615,7 @@ function varargout = dataImportGUI()
             % ── Right Y-axis (Y2) limits ───────────────────────────────────
             % Toggle row visibility when drawing to the main GUI axes.
             if targetAx == ax
-                axLimGL.RowHeight{4} = 22 * hasY2;
-                fmtGL.ColumnWidth{5} = guiTernary(hasY2, 20,   0);
-                fmtGL.ColumnWidth{6} = guiTernary(hasY2, '1x', 0);
+                axLimGL.RowHeight{3} = 22 * hasY2;
                 toggleY2Appearance(hasY2);
             end
             if hasY2
@@ -9962,7 +9967,7 @@ function varargout = dataImportGUI()
             end
 
         catch ME
-            fprintf(2, '\n[dataImportGUI] Plot error: %s\n', ME.message);
+            fprintf(2, '\n[DataPlotter] Plot error: %s\n', ME.message);
             for si = 1:numel(ME.stack)
                 fprintf(2, '  at %s  (line %d)\n', ME.stack(si).name, ME.stack(si).line);
             end
@@ -10191,7 +10196,7 @@ function varargout = dataImportGUI()
         newDs.legendName  = cutLabel;
         appData.datasets{end+1} = newDs;
         rebuildDatasetList(numel(appData.datasets));
-        fprintf('[dataImportGUI] Line-cut added: %s — %s\n', [fn fext], cutLabel);
+        fprintf('[DataPlotter] Line-cut added: %s — %s\n', [fn fext], cutLabel);
     end
 
     function onSmartScale(~,~)
@@ -10474,7 +10479,7 @@ function varargout = dataImportGUI()
         dir = detectResizeBorder();
         appData.panelResizeDir = dir;
         if     strcmp(dir, 'h_row12'), fig.Pointer = 'top';
-        elseif strcmp(dir, 'v_col12') || strcmp(dir, 'v_col23') || strcmp(dir, 'v_col34')
+        elseif strcmp(dir, 'v_col12')
                                                                    fig.Pointer = 'left';
         else,                                                      fig.Pointer = 'arrow';
         end
@@ -10696,11 +10701,11 @@ function varargout = dataImportGUI()
         if changed
             fig.Position = pos;
         end
-        % 50/50 split by default; on very short windows protect the preview.
+        % On very short windows protect the preview; otherwise let analysis flex.
         if pos(4) < 700
-            rootGL.RowHeight = {'3x','2x',16};
+            rootGL.RowHeight = {'3x', '2x', 110, 16};
         else
-            rootGL.RowHeight = {'1x','1x',16};
+            rootGL.RowHeight = {'1x', 220, 110, 16};
         end
 
         % ── Adapt content columns for narrow windows ──
@@ -10717,10 +10722,9 @@ function varargout = dataImportGUI()
         % (Wide windows keep whatever width the user or prefs last set.)
 
         % ── Adapt analysis columns for narrow windows ──
-        defCorrW  = LAYOUT_DEFAULTS.corrPanelW;
-        defAxLimW = LAYOUT_DEFAULTS.axLimPanelW;
+        defCorrW = LAYOUT_DEFAULTS.corrPanelW;
         if figW < 900
-            analysisGL.ColumnWidth = {min(260, defCorrW), min(170, defAxLimW), '7x', '3x'};
+            analysisGL.ColumnWidth = {min(260, defCorrW), '1x', 0};
         end
 
         fig.SizeChangedFcn = @onFigSizeChanged;
@@ -10736,6 +10740,8 @@ function varargout = dataImportGUI()
             end
             appData.animTimer = [];
         end
+        % Close the peak analysis window if it exists
+        if isvalid(peakFig), delete(peakFig); end
         delete(fig);
     end
 
@@ -11068,7 +11074,7 @@ function varargout = dataImportGUI()
         nLegacy = sum(cellfun(@(ds) ...
             ~isfield(ds.data.metadata, 'parserVersion'), appData.datasets));
         if nLegacy > 0
-            warning('dataImportGUI:legacySession', ...
+            warning('DataPlotter:legacySession', ...
                 ['%d dataset(s) in this session were imported before parser versioning was introduced.\n' ...
                  'Data should load correctly; re-import files to attach version metadata.'], nLegacy);
         end
@@ -11157,8 +11163,6 @@ function varargout = dataImportGUI()
     %  resizable panel border.  Returns:
     %    'h_row12' — horizontal border between content row (1) and analysis row (2)
     %    'v_col12' — vertical border between corrections col (1) and axis-limits col (2)
-    %    'v_col23' — vertical border between axis-limits col (2) and peak col (3)  [XRD only]
-    %    'v_col34' — vertical border between peak col (3) and save col (4)         [XRD only]
     %    ''        — not near any known border
         SNAP_PX = 5;
         dir = '';
@@ -11183,33 +11187,6 @@ function varargout = dataImportGUI()
                     dir = 'v_col12'; return;
                 end
 
-                if strcmp(peakPanel.Visible, 'on')
-                    % v_col23: right edge of axis-limits panel (XRD mode)
-                    alPos   = getpixelposition(axLimPanel, true);
-                    borderX = alPos(1) + alPos(3);
-                    if abs(mp(1) - borderX) <= SNAP_PX
-                        dir = 'v_col23'; return;
-                    end
-
-                    % v_col34: right edge of peak-analysis panel (XRD mode)
-                    pkPos   = getpixelposition(peakPanel, true);
-                    borderX = pkPos(1) + pkPos(3);
-                    if abs(mp(1) - borderX) <= SNAP_PX
-                        dir = 'v_col34'; return;
-                    end
-                else
-                    % v_col23: gap between axis-limits and save panels (non-XRD).
-                    % Column 3 is hidden (width=0) but ColumnSpacing creates a
-                    % ~20px gap.  Detect anywhere in that gap.
-                    alPos = getpixelposition(axLimPanel, true);
-                    spPos = getpixelposition(savePanel, true);
-                    rightOfAL = alPos(1) + alPos(3);
-                    leftOfSP  = spPos(1);
-                    if mp(1) >= rightOfAL - SNAP_PX && mp(1) <= leftOfSP + SNAP_PX
-                        dir = 'v_col23'; return;
-                    end
-                end
-
             end
         catch
             % getpixelposition may throw on some MATLAB versions — silently skip
@@ -11227,7 +11204,7 @@ function varargout = dataImportGUI()
                 appData.panelResizeOrig = aPos(4);
             catch
                 rh = rootGL.RowHeight;
-                appData.panelResizeOrig = guiTernary(isnumeric(rh{2}), rh{2}, 400);
+                appData.panelResizeOrig = guiTernary(isnumeric(rh{2}), rh{2}, 300);
             end
         elseif strcmp(appData.panelResizeDir, 'v_col12')
             % Snapshot the current corrections panel width (px)
@@ -11236,33 +11213,6 @@ function varargout = dataImportGUI()
                 appData.panelResizeOrig = cPos(3);
             catch
                 appData.panelResizeOrig = appData.corrPanelWidth;
-            end
-        elseif strcmp(appData.panelResizeDir, 'v_col23')
-            if strcmp(peakPanel.Visible, 'on')
-                % XRD mode: snapshot the current axis-limits panel width (px)
-                try
-                    alPos = getpixelposition(axLimPanel, true);
-                    appData.panelResizeOrig = alPos(3);
-                catch
-                    appData.panelResizeOrig = appData.axLimPanelWidth;
-                end
-            else
-                % Non-XRD mode: snapshot the save panel width (col 4)
-                try
-                    spPos = getpixelposition(savePanel, true);
-                    appData.panelResizeOrig = spPos(3);
-                catch
-                    cw = analysisGL.ColumnWidth;
-                    appData.panelResizeOrig = guiTernary(isnumeric(cw{4}), cw{4}, 120);
-                end
-            end
-        elseif strcmp(appData.panelResizeDir, 'v_col34')
-            % Snapshot the current peak-analysis panel width (px)
-            try
-                pkPos = getpixelposition(peakPanel, true);
-                appData.panelResizeOrig = pkPos(3);
-            catch
-                appData.panelResizeOrig = 300;
             end
         end
         fig.WindowButtonMotionFcn = @onPanelResizeMove;
@@ -11278,12 +11228,13 @@ function varargout = dataImportGUI()
             % Mouse moves up (mp(2) increases) → analysis panel gets taller
             delta_y = mp(2) - appData.panelResizeStart(2);
             figH    = fig.Position(4);
-            % Available px after padding + 2 RowSpacing gaps + status bar
-            %   rootGL: Padding [6 6 6 6] → 12 px;  2 RowSpacing gaps of 4 → 8 px;  status bar 16 px
-            availH  = figH - 12 - 8 - 16;
+            % Available px after padding + RowSpacing gaps + save strip + status bar
+            %   rootGL: Padding [6 6 6 6] → 12 px;  3 RowSpacing gaps of 4 → 12 px;
+            %   save strip 110 px;  status bar 16 px
+            availH  = figH - 12 - 12 - 110 - 16;
             newH    = round(appData.panelResizeOrig + delta_y);
             newH    = max(appData.MIN_ANALYSIS_H, min(newH, availH - appData.MIN_PREVIEW_H));
-            rootGL.RowHeight = {'1x', newH, 16};
+            rootGL.RowHeight = {'1x', newH, 110, 16};
 
         elseif strcmp(appData.panelResizeDir, 'v_col12')
             % Mouse moves right → corrections panel gets wider
@@ -11293,35 +11244,6 @@ function varargout = dataImportGUI()
             appData.corrPanelWidth = newW;
             cw    = analysisGL.ColumnWidth;
             cw{1} = newW;
-            analysisGL.ColumnWidth = cw;
-
-        elseif strcmp(appData.panelResizeDir, 'v_col23')
-            delta_x = mp(1) - appData.panelResizeStart(1);
-            if strcmp(peakPanel.Visible, 'on')
-                % XRD mode: mouse moves right → axis-limits panel gets wider
-                newW    = round(appData.panelResizeOrig + delta_x);
-                newW    = max(appData.MIN_AXLIM_W, min(newW, 500));
-                appData.axLimPanelWidth = newW;
-                cw    = analysisGL.ColumnWidth;
-                cw{2} = newW;
-                analysisGL.ColumnWidth = cw;
-            else
-                % Non-XRD mode: resize save panel (col 4); col 2 stays '1x'
-                % Drag left → save panel wider; drag right → save panel narrower
-                newW    = round(appData.panelResizeOrig - delta_x);
-                newW    = max(appData.MIN_SAVE_W, min(newW, 400));
-                cw    = analysisGL.ColumnWidth;
-                cw{4} = newW;
-                analysisGL.ColumnWidth = cw;
-            end
-
-        elseif strcmp(appData.panelResizeDir, 'v_col34')
-            % Mouse moves right → peak-analysis panel gets wider
-            delta_x = mp(1) - appData.panelResizeStart(1);
-            newW    = round(appData.panelResizeOrig + delta_x);
-            newW    = max(appData.MIN_PEAK_W, min(newW, 700));
-            cw    = analysisGL.ColumnWidth;
-            cw{3} = newW;
             analysisGL.ColumnWidth = cw;
         end
     end
@@ -11835,7 +11757,7 @@ function varargout = dataImportGUI()
         varargout{1} = api;
     end
 
-end  % dataImportGUI
+end  % DataPlotter
 
 
 % ════════════════════════════════════════════════════════════════════════
@@ -12002,7 +11924,7 @@ function [data, parserName] = guiImport(fp)
             data = parser.importPPMS(fp, 'YAxis', 'all');
 
         otherwise
-            error('dataImportGUI:unknownExt', ...
+            error('DataPlotter:unknownExt', ...
                 ['No parser for extension "%s" (resolved as "%s").\n' ...
                  'Supported: .raw, .xrdml, .brml, .xlsx/.xls/.xlsm/.xlsb/.ods, ' ...
                  '.csv/.tsv/.txt, .refl, .pnr, .datA/B/C/D, .dat'], ...

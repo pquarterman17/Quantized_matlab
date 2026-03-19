@@ -8,9 +8,9 @@ Convert multiple XRD data files (XRDML, Rigaku, Bruker) to CSV or Origin ASCII f
 
 ### GUI Method (Easiest)
 
-**From the main dataImportGUI:**
+**From the main DataPlotter:**
 ```matlab
-dataImportGUI()
+DataPlotter()
 ```
 1. Click the **"Batch Convert XRD"** button (green-gold, bottom of the Save panel)
 2. Select a folder containing XRD files
@@ -18,7 +18,7 @@ dataImportGUI()
 4. Set output format and options
 5. Click **Convert**
 
-**Standalone (without opening dataImportGUI):**
+**Standalone (without opening DataPlotter):**
 ```matlab
 xrdConvertGUI()
 ```

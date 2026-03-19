@@ -14,10 +14,10 @@ re-exploring the codebase.
   `.units`, `.metadata`.
 - Read `CLAUDE.md` at the repo root for full conventions and structure.
 
-### Key file: `dataImportGUI.m`
+### Key file: `DataPlotter.m`
 - ~11,000-line single-file uifigure GUI.
 - All analysis dialogs (FFT thickness, reflectivity FFT, Williamson-Hall,
-  lattice refinement) are **nested functions** inside `dataImportGUI.m`,
+  lattice refinement) are **nested functions** inside `DataPlotter.m`,
   each launching their own `uifigure` popup with `uigridlayout`.
 - The new "Fit R(Q)" dialog should follow the same pattern.
 
@@ -49,7 +49,7 @@ The GUI switches UI visibility based on the parser used:
 The enable/disable arrays to update are at lines ~3155–3158 (XRD) and
 ~3237–3242 (neutron).
 
-### Existing helper functions (bottom of dataImportGUI.m)
+### Existing helper functions (bottom of DataPlotter.m)
 | Function | Line | Purpose |
 |----------|------|---------|
 | `guiTernary(cond, a, b)` | ~11095 | Inline ternary: returns `a` if cond, else `b` |
@@ -110,7 +110,7 @@ Follow this same pattern for reflectivity fitting.
 
 ## Goal
 
-Add a simple reflectivity fitting capability to `dataImportGUI.m` that lets users
+Add a simple reflectivity fitting capability to `DataPlotter.m` that lets users
 define a layer stack (substrate / films / ambient), compute a model reflectivity
 curve via Parratt recursion, overlay it on measured data, and refine layer
 parameters with least-squares fitting. Inspired by the NIST reflectometry
@@ -450,10 +450,10 @@ ds.reflFit.background = bkg;
 | `+utilities/parrattRefl.m` | Pure function: Parratt recursion → R(Q) |
 | `+utilities/sldProfile.m` | Pure function: stack → SLD vs depth |
 | `+utilities/reflSLDPresets.m` | Function returning the SLD lookup table |
-| `dataImportGUI.m` | New `onFitReflectivity` nested function + dialog |
+| `DataPlotter.m` | New `onFitReflectivity` nested function + dialog |
 
 No new GUI files — the reflectivity fit dialog is a nested function inside
-`dataImportGUI.m`, same pattern as `onFFTThickness` and `onReflectivityFFT`.
+`DataPlotter.m`, same pattern as `onFFTThickness` and `onReflectivityFFT`.
 
 ---
 
@@ -469,7 +469,7 @@ No new GUI files — the reflectivity fit dialog is a nested function inside
   - Known thin film: compare to refl1d output
 
 ### Phase 2: GUI dialog (simulate only)
-- [ ] Button + enable/disable logic in dataImportGUI
+- [ ] Button + enable/disable logic in DataPlotter
 - [ ] Dialog layout: layer table, SLD profile, R(Q) overlay
 - [ ] Material preset dropdown
 - [ ] Add/remove/reorder layers

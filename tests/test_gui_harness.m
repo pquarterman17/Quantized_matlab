@@ -1,4 +1,4 @@
-%TEST_GUI_HARNESS  Automated test harness for dataImportGUI programmatic API.
+%TEST_GUI_HARNESS  Automated test harness for DataPlotter programmatic API.
 %
 %   Tests the GUI through its programmatic API interface:
 %   - File loading and navigation
@@ -40,7 +40,7 @@ failed = 0;
 % ════════════════════════════════════════════════════════════════════════
 %  Launch single shared GUI instance
 % ════════════════════════════════════════════════════════════════════════
-api = dataImportGUI();
+api = DataPlotter();
 api.fig.Visible = 'off';
 drawnow;
 cleanupApi = onCleanup(@() api.close());
@@ -549,6 +549,70 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  17. Peak window opens on auto-detect and has expected API fields
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 17: Peak window opens on auto-detect ══\n');
+try
+    api.reset();
+    api.addFiles({XRDML_F});
+    drawnow;
+
+    % Peak window should exist but be hidden before any peaks
+    assert(isfield(api, 'peakFig'), 'missing api.peakFig field');
+    assert(isfield(api, 'showPeakWindow'), 'missing api.showPeakWindow field');
+    assert(isvalid(api.peakFig), 'peakFig is not valid');
+    assert(strcmp(api.peakFig.Visible, 'off'), 'peakFig should be hidden before peak detection');
+
+    % Auto-detect peaks — should auto-open peak window
+    api.autoPeaks();
+    drawnow;
+
+    assert(strcmp(api.peakFig.Visible, 'on'), 'peakFig should be visible after auto-detect');
+    fprintf('  Peak window visible after autoPeaks: yes\n');
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  18. Peak window close hides but preserves peaks on main axes
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 18: Peak window close hides but preserves peaks ══\n');
+try
+    api.reset();
+    api.addFiles({XRDML_F});
+    drawnow;
+
+    api.autoPeaks();
+    drawnow;
+    assert(strcmp(api.peakFig.Visible, 'on'), 'peakFig should be visible');
+
+    % Close the peak window (should hide, not delete)
+    api.peakFig.Visible = 'off';
+    drawnow;
+
+    % Peaks should still be in dataset
+    peaks = api.getPeaks();
+    assert(~isempty(peaks), 'peaks should still exist after closing peak window');
+    fprintf('  Peaks after window close: %d\n', numel(peaks));
+
+    % Re-open via API
+    api.showPeakWindow();
+    drawnow;
+    assert(strcmp(api.peakFig.Visible, 'on'), 'peakFig should reopen via showPeakWindow');
+    fprintf('  Peak window reopened: yes\n');
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  SUMMARY
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n%s\n', repmat(char(9552), 1, 72));
@@ -564,11 +628,11 @@ end
 %  Local functions  (must appear after all script code)
 % ════════════════════════════════════════════════════════════════════════
 function api = launchHeadless()
-%LAUNCHHEADLESS  Start dataImportGUI with the figure hidden.
+%LAUNCHHEADLESS  Start DataPlotter with the figure hidden.
 %   Used only for the session reload phase of tests 11 and 12, where a
 %   fresh GUI instance is required to verify that saved state loads
 %   correctly into a clean environment.
-    api = dataImportGUI();
+    api = DataPlotter();
     api.fig.Visible = 'off';
     drawnow;
 end

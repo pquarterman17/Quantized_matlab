@@ -5,7 +5,7 @@ Only items not yet completed are listed here.
 
 ---
 
-## dataImportGUI Features
+## DataPlotter Features
 
 ### ~~Dataset comparison / difference plots~~ — DONE
 Implemented via "Dataset Math..." button (`onDatasetMath`). Supports `D1 - D2`, `D1 / D2`,
@@ -22,13 +22,13 @@ marks with phase labels on the plot. Adjustable d-spacing tolerance.
 API. "Stop Recording" writes `.m` file. "Run Macro" replays it. Enables batch
 correction pipelines without clicking through the GUI.
 
-**Touches:** `dataImportGUI.m` (record toggle + script generation), API completeness.
+**Touches:** `DataPlotter.m` (record toggle + script generation), API completeness.
 
 ### GUI space optimization
 Boxes with few buttons take disproportionate visual space, forcing feature-dense boxes
 to be cramped or cut off. Audit and optimize button/box sizes for readability.
 
-**Touches:** `dataImportGUI.m` (layout grid row heights, button placement).
+**Touches:** `DataPlotter.m` (layout grid row heights, button placement).
 
 ---
 

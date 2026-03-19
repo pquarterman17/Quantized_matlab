@@ -220,7 +220,7 @@ setupToolbox  % Adds +parser to path
 - `NCNR_PARSER_VERIFICATION_REPORT.md` — Full technical report
 - `+parser/importNCNRDat.m` — Source code
 - `+parser/importAuto.m` — Auto-detection and dispatch
-- `dataImportGUI` — Interactive import GUI (can use importNCNRDat indirectly)
+- `DataPlotter` — Interactive import GUI (can use importNCNRDat indirectly)
 
 ---
 

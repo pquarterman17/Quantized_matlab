@@ -15,7 +15,7 @@
 %       cd G:\Onedrive\Coding\git\thin_film_toolkit_matlab
 %       run examples/example_rsm
 %
-%   See also parser.importXRDML, dataImportGUI
+%   See also parser.importXRDML, DataPlotter
 
 clear; clc;
 
