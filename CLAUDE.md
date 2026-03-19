@@ -75,7 +75,8 @@ thin_film_toolkit_matlab/
 │   └── pseudoVoigt.m       # Pseudo-Voigt peak shape function (eta-weighted Gaussian+Lorentzian)
 └── +scripts/
     ├── batchImport.m       # Walk a directory, call importAuto on each supported file
-    └── batchConvertXRD.m   # Batch-convert XRD files (.xrdml/.raw/.brml) to CSV via writeXRDcsv
+    ├── batchConvertXRD.m   # Batch-convert XRD files (.xrdml/.raw/.brml) to CSV via writeXRDcsv
+    └── quickPlot.m        # Auto-detect & plot one or more data files (type-aware defaults)
 ```
 
 ## Supported Data Formats
@@ -255,6 +256,43 @@ smI    = utilities.smoothData(data.values, 'Window', 9); % Gaussian smooth
 ```matlab
 DataPlotter   % browse, preview, apply corrections, find/fit peaks, export CSV
 ```
+
+### Quick Plot (command-line)
+```matlab
+% Single file — auto-detects data type, labels axes, picks scale
+scripts.quickPlot('scan.xrdml')
+
+% Overlay multiple files with normalization
+scripts.quickPlot({'vsm1.dat', 'vsm2.dat'}, 'Normalize', true)
+
+% Subplots layout with log Y
+scripts.quickPlot({'a.dat', 'b.dat'}, 'Layout', 'subplots', 'LogY', true)
+
+% Save to file
+scripts.quickPlot('refl.refl', 'SaveAs', 'reflectivity.pdf')
+```
+
+Type-aware defaults: XRD → 2θ/Intensity, Magnetometry → Field/Moment (or Temp), Reflectometry → Q/R (log), SIMS → Depth/Concentration.
+
+Options: `LogY`, `Normalize`, `SaveAs`, `Title`, `XLabel`, `YLabel`, `Layout` ('overlay'|'subplots'), `Theme`.
+
+### Advanced Figure Builder (GUI)
+Launched from DataPlotter → Tools → **Figures...** button. Opens a popup with 8 figure types:
+
+| Type | Description |
+|------|-------------|
+| Multi-Panel | NxM grid with per-panel datasets/channels, row/col span, dual Y axis |
+| Quick Grid | One dataset per cell, auto-tiled |
+| Waterfall | Stacked offset traces with right-edge labels |
+| Overlay + Residual | Two-panel: overlay + A-B difference |
+| Normalized Overlay | Peak/range/z-score/area normalization with optional X alignment |
+| Before / After | Side-by-side raw vs corrected |
+| Parameter Evolution | Track peak metrics across datasets |
+| Broken Axis | Split X with gap and diagonal break marks |
+
+Global options: journal templates (APS/Nature/ACS), error style (bars/band), grayscale mode (line-style + marker cycling), font, dimensions.
+
+Post-generation toolbar on every output figure: H/V reference lines, shaded regions, text/arrow annotations, peak labels, inset zoom.
 
 ### EM Image Viewer
 ```matlab

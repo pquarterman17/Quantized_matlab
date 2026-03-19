@@ -353,11 +353,12 @@ function varargout = DataPlotter()
     YTICKFMT_NAMES = {'Auto', 'Scientific', 'Fixed 4dp', 'Fixed 2dp', 'Integer', 'Exp = 0'};
     YTICKFMT_DATA  = {'',     '%.2e',       '%.4f',      '%.2f',      '%d',      '__exp0'};
 
-    % Root grid  (2 rows × 1 col: content row 1, analysis row 2)
+    % Root grid  (3 rows × 1 col: content | analysis+save | status)
     % Row 1 holds file-list | controls | preview side-by-side (contentGL).
-    % Row 2 (analysis) is resizable via the h_row12 drag border.
-    rootGL = uigridlayout(fig,[4 1], ...
-        'RowHeight',    {'1x', 220, 110, 16}, ...  % preview | analysis | save strip | status
+    % Row 2 holds corrections | axes | save/export side-by-side.
+    % Both content rows split height ~50/50.
+    rootGL = uigridlayout(fig,[3 1], ...
+        'RowHeight',    {'1x', '1x', 16}, ...  % preview | analysis+save | status
         'ColumnWidth',  {'1x'}, ...
         'Padding',      [6 6 6 6], ...
         'RowSpacing',   4, ...
@@ -701,19 +702,19 @@ function varargout = DataPlotter()
         'Tag',                'GUICursorReadout', ...
         'Visible',            'off');
 
-    % ── Status bar (row 4 of rootGL) ──────────────────────────────────────
+    % ── Status bar (row 3 of rootGL) ──────────────────────────────────────
     lblStatusBar = uilabel(rootGL, 'Text', 'Ready', ...
         'FontSize', 9, 'FontColor', [0.5 0.5 0.5], ...
         'HorizontalAlignment', 'left');
-    lblStatusBar.Layout.Row = 4; lblStatusBar.Layout.Column = 1;
+    lblStatusBar.Layout.Row = 3; lblStatusBar.Layout.Column = 1;
 
     % ── Analysis & Corrections panel (row 2, full width, scrollable) ──────
     analysisPanel = uipanel(rootGL,'Title','Analysis & Corrections','FontSize',11, ...
         'Scrollable','on');
     analysisPanel.Layout.Row = 2; analysisPanel.Layout.Column = 1;
 
-    analysisGL = uigridlayout(analysisPanel,[1 3], ...
-        'ColumnWidth', {320, '1x', 0}, ...
+    analysisGL = uigridlayout(analysisPanel,[1 4], ...
+        'ColumnWidth', {320, '1x', 210, 0}, ...
         'RowHeight',   {'1x'}, ...
         'Padding',     [4 4 4 4], ...
         'ColumnSpacing', 6, ...
@@ -1443,218 +1444,226 @@ function varargout = DataPlotter()
         'ButtonPushedFcn', @(~,~) onToggleAxAppearance());
     btnAxMore.Layout.Row = 4; btnAxMore.Layout.Column = [5 6];
 
-    % ── Save / Export strip (rootGL row 3 — horizontal toolbar) ────────────
-    savePanel = uipanel(rootGL,'Title','Save / Export','FontSize',10, ...
+    % ── Save / Export panel (analysisGL col 3 — vertical, collapsible) ─────
+    savePanel = uipanel(analysisGL,'Title','Save / Export','FontSize',10, ...
         'Scrollable','on');
-    savePanel.Layout.Row = 3; savePanel.Layout.Column = 1;
+    savePanel.Layout.Row = 1; savePanel.Layout.Column = 3;
 
-    saveGL = uigridlayout(savePanel,[1 4], ...
-        'ColumnWidth', {'1x','1x','1x','1x'}, ...
-        'RowHeight',   {'1x'}, ...
-        'Padding',     [4 2 4 2], ...
-        'ColumnSpacing', 8);
+    % Vertical stacked layout with collapsible section headers
+    % Rows: [hdrData, dataContent, hdrFig, figContent, hdrSession, sessionContent, hdrTools, toolsContent]
+    SAVE_SEC_H = 20;    % header row height
+    SAVE_ROW_H = 78;    % content block height (3 rows of 24 + spacing)
+    saveGL = uigridlayout(savePanel,[8 1], ...
+        'RowHeight', {SAVE_SEC_H, SAVE_ROW_H, SAVE_SEC_H, 0, SAVE_SEC_H, 0, SAVE_SEC_H, 0}, ...
+        'ColumnWidth', {'1x'}, ...
+        'Padding',     [2 2 2 2], ...
+        'RowSpacing',  1);
 
-    % Hidden path field — still functional, read/written by callbacks
-    efSavePath = uieditfield(saveGL,'Value','','Visible','off', ...
+    % Hidden path field — parented to fig (invisible), only read/written by callbacks
+    efSavePath = uieditfield(fig,'Value','','Visible','off', ...
         'Placeholder','(auto-set on dataset load or Apply)', ...
         'Tooltip','Output CSV file path');
 
-    % ── Group 1: Data Export ──────────────────────────────────────────
-    saveDataGL = uigridlayout(saveGL, [4 2], ...
-        'RowHeight', {12, 24, 24, 24}, 'ColumnWidth', {'1x','1x'}, ...
-        'Padding', [0 0 0 0], 'RowSpacing', 2, 'ColumnSpacing', 3);
-    saveDataGL.Layout.Row = 1; saveDataGL.Layout.Column = 1;
+    % Section collapse state
+    appData.saveSectionRows = struct( ...
+        'dataExport', 2, 'figExport', 4, 'session', 6, 'tools', 8);
+    appData.saveSectionHeights = struct( ...
+        'dataExport', SAVE_ROW_H, 'figExport', SAVE_ROW_H, ...
+        'session', SAVE_ROW_H, 'tools', SAVE_ROW_H);
 
-    lblSaveHdrData = uilabel(saveDataGL, 'Text', 'Data Export', ...
-        'FontSize', 9, 'FontColor', [0.55 0.55 0.55], ...
-        'FontAngle', 'italic', 'HorizontalAlignment', 'left');
-    lblSaveHdrData.Layout.Row = 1; lblSaveHdrData.Layout.Column = [1 2];
+    % ── Header: Data Export (open by default) ────────────────────────
+    btnSaveHdrData = uibutton(saveGL,'Text',[char(9660) ' Data Export'], ...
+        'FontSize',9,'FontWeight','bold','HorizontalAlignment','left', ...
+        'BackgroundColor',[0.18 0.18 0.18],'FontColor',[0.85 0.85 0.85], ...
+        'ButtonPushedFcn', @(~,~) toggleSaveSection('dataExport','Data Export'));
+    btnSaveHdrData.Layout.Row = 1;
+
+    saveDataGL = uigridlayout(saveGL, [3 2], ...
+        'RowHeight', {24, 24, 24}, 'ColumnWidth', {'1x','1x'}, ...
+        'Padding', [0 0 0 0], 'RowSpacing', 2, 'ColumnSpacing', 3);
+    saveDataGL.Layout.Row = 2;
 
     ddExportFormat = uidropdown(saveDataGL, ...
         'Items',   {'Standard CSV', 'Origin ASCII'}, ...
         'Value',   'Standard CSV', ...
-        'Tooltip', 'CSV format: Standard (single header) or Origin (Long Name / Units / Designation rows)');
-    ddExportFormat.Layout.Row = 2; ddExportFormat.Layout.Column = 1;
+        'Tooltip', 'CSV format: Standard or Origin ASCII');
+    ddExportFormat.Layout.Row = 1; ddExportFormat.Layout.Column = 1;
 
     btnSaveBrowse = uibutton(saveDataGL,'Text','Browse...', ...
         'ButtonPushedFcn',@onSaveBrowse, ...
         'Tooltip','Choose output file location');
-    btnSaveBrowse.Layout.Row = 2; btnSaveBrowse.Layout.Column = 2;
+    btnSaveBrowse.Layout.Row = 1; btnSaveBrowse.Layout.Column = 2;
 
     btnSave = uibutton(saveDataGL,'Text','Save CSV', ...
         'ButtonPushedFcn',@onSaveCSV, ...
         'BackgroundColor',BTN_EXPORT, ...
         'FontColor',BTN_FG,'FontWeight','bold', ...
-        'Tooltip','Write data to CSV (raw or corrected; consolidated for neutron data)');
-    btnSave.Layout.Row = 3; btnSave.Layout.Column = 1;
+        'Tooltip','Write data to CSV');
+    btnSave.Layout.Row = 2; btnSave.Layout.Column = 1;
 
     btnBatchExport = uibutton(saveDataGL,'Text','Batch All', ...
         'ButtonPushedFcn',@onBatchExportCSV, ...
         'BackgroundColor',BTN_EXPORT, ...
         'FontColor',BTN_FG, ...
-        'Tooltip','Export all loaded datasets to separate CSV files (one per dataset)');
-    btnBatchExport.Layout.Row = 3; btnBatchExport.Layout.Column = 2;
+        'Tooltip','Export all datasets to separate CSV files');
+    btnBatchExport.Layout.Row = 2; btnBatchExport.Layout.Column = 2;
 
     btnCopyDataClip = uibutton(saveDataGL,'Text','Copy Data', ...
         'ButtonPushedFcn', @onCopyDataToClipboard, ...
         'BackgroundColor', BTN_EXPORT, ...
         'FontColor', BTN_FG, ...
-        'Tooltip', 'Copy selected datasets as tab-delimited text to clipboard (Origin-ready)');
-    btnCopyDataClip.Layout.Row = 4; btnCopyDataClip.Layout.Column = 1;
+        'Tooltip', 'Copy to clipboard (tab-delimited)');
+    btnCopyDataClip.Layout.Row = 3; btnCopyDataClip.Layout.Column = 1;
 
     btnExportHDF5 = uibutton(saveDataGL,'Text','HDF5...', ...
         'ButtonPushedFcn',@onExportHDF5, ...
         'BackgroundColor',BTN_EXTERNAL, ...
         'FontColor',BTN_FG, ...
-        'Tooltip','Export data, corrections, and peaks to a self-describing HDF5 file (.h5)');
-    btnExportHDF5.Layout.Row = 4; btnExportHDF5.Layout.Column = 2;
+        'Tooltip','Export to HDF5 (.h5)');
+    btnExportHDF5.Layout.Row = 3; btnExportHDF5.Layout.Column = 2;
 
-    % ── Group 2: Figure Export ────────────────────────────────────────
-    saveFigGL = uigridlayout(saveGL, [4 2], ...
-        'RowHeight', {12, 24, 24, 24}, 'ColumnWidth', {'1x','1x'}, ...
+    % ── Header: Figure Export (collapsed by default) ─────────────────
+    btnSaveHdrFig = uibutton(saveGL,'Text',[char(9654) ' Figure Export'], ...
+        'FontSize',9,'FontWeight','bold','HorizontalAlignment','left', ...
+        'BackgroundColor',[0.18 0.18 0.18],'FontColor',[0.85 0.85 0.85], ...
+        'ButtonPushedFcn', @(~,~) toggleSaveSection('figExport','Figure Export'));
+    btnSaveHdrFig.Layout.Row = 3;
+
+    saveFigGL = uigridlayout(saveGL, [3 2], ...
+        'RowHeight', {24, 24, 24}, 'ColumnWidth', {'1x','1x'}, ...
         'Padding', [0 0 0 0], 'RowSpacing', 2, 'ColumnSpacing', 3);
-    saveFigGL.Layout.Row = 1; saveFigGL.Layout.Column = 2;
-
-    lblSaveHdrFig = uilabel(saveFigGL, 'Text', 'Figure Export', ...
-        'FontSize', 9, 'FontColor', [0.55 0.55 0.55], ...
-        'FontAngle', 'italic', 'HorizontalAlignment', 'left');
-    lblSaveHdrFig.Layout.Row = 1; lblSaveHdrFig.Layout.Column = [1 2];
+    saveFigGL.Layout.Row = 4;
 
     btnExportFig = uibutton(saveFigGL,'Text','To Figure', ...
         'ButtonPushedFcn',@onExportFigure, ...
         'BackgroundColor',BTN_SECONDARY, ...
         'FontColor',BTN_FG, ...
-        'Tooltip','Open a new figure window with the current plot (full MATLAB toolbar)');
-    btnExportFig.Layout.Row = 2; btnExportFig.Layout.Column = 1;
+        'Tooltip','Open in new figure window');
+    btnExportFig.Layout.Row = 1; btnExportFig.Layout.Column = 1;
 
     btnCopyClip = uibutton(saveFigGL,'Text','Copy Plot', ...
         'ButtonPushedFcn',@onCopyToClipboard, ...
         'BackgroundColor',BTN_SECONDARY, ...
         'FontColor',BTN_FG, ...
-        'Tooltip','Copy the current plot as an image to the system clipboard  [Ctrl+C]');
-    btnCopyClip.Layout.Row = 2; btnCopyClip.Layout.Column = 2;
+        'Tooltip','Copy plot to clipboard [Ctrl+C]');
+    btnCopyClip.Layout.Row = 1; btnCopyClip.Layout.Column = 2;
 
     ddFigFormat = uidropdown(saveFigGL, ...
         'Items',   {'PNG (300 dpi)', 'PDF (vector)', 'SVG (vector)', 'TIFF (300 dpi)', 'MATLAB .fig'}, ...
         'Value',   'PNG (300 dpi)', ...
-        'Tooltip', 'Output file format for publication-quality figure save');
-    ddFigFormat.Layout.Row = 3; ddFigFormat.Layout.Column = 1;
+        'Tooltip', 'Output format');
+    ddFigFormat.Layout.Row = 2; ddFigFormat.Layout.Column = 1;
 
     btnSaveFig = uibutton(saveFigGL,'Text','Save Figure', ...
         'ButtonPushedFcn',@onSaveFigure, ...
         'BackgroundColor',BTN_SECONDARY, ...
         'FontColor',BTN_FG, ...
-        'Tooltip','Save the current plot to an image or vector file via exportgraphics');
-    btnSaveFig.Layout.Row = 3; btnSaveFig.Layout.Column = 2;
+        'Tooltip','Save figure to file');
+    btnSaveFig.Layout.Row = 2; btnSaveFig.Layout.Column = 2;
 
     figDimGL = uigridlayout(saveFigGL, [1 4], ...
-        'Padding', [0 0 0 0], 'ColumnSpacing', 3, ...
-        'ColumnWidth', {50, '1x', 14, '1x'});
-    figDimGL.Layout.Row = 4; figDimGL.Layout.Column = [1 2];
+        'Padding', [0 0 0 0], 'ColumnSpacing', 2, ...
+        'ColumnWidth', {40, '1x', 12, '1x'});
+    figDimGL.Layout.Row = 3; figDimGL.Layout.Column = [1 2];
 
-    uilabel(figDimGL, 'Text', 'Size (in):', 'FontSize', 9, ...
+    uilabel(figDimGL, 'Text', 'Size:', 'FontSize', 8, ...
         'HorizontalAlignment', 'right');
-
     efFigWidth = uieditfield(figDimGL, 'numeric', 'Value', 7, ...
-        'Limits', [1 30], 'Tooltip', 'Export figure width (inches)');
+        'Limits', [1 30], 'Tooltip', 'Width (in)');
     efFigWidth.Layout.Column = 2;
-
-    uilabel(figDimGL, 'Text', char(215), 'FontSize', 10, ...
+    uilabel(figDimGL, 'Text', char(215), 'FontSize', 9, ...
         'HorizontalAlignment', 'center');
-
     efFigHeight = uieditfield(figDimGL, 'numeric', 'Value', 5, ...
-        'Limits', [1 30], 'Tooltip', 'Export figure height (inches)');
+        'Limits', [1 30], 'Tooltip', 'Height (in)');
     efFigHeight.Layout.Column = 4;
 
-    % ── Group 3: Session + Origin ─────────────────────────────────────
-    saveSessionGL = uigridlayout(saveGL, [4 2], ...
-        'RowHeight', {12, 24, 12, 24}, 'ColumnWidth', {'1x','1x'}, ...
+    % ── Header: Session (collapsed by default) ───────────────────────
+    btnSaveHdrSession = uibutton(saveGL,'Text',[char(9654) ' Session'], ...
+        'FontSize',9,'FontWeight','bold','HorizontalAlignment','left', ...
+        'BackgroundColor',[0.18 0.18 0.18],'FontColor',[0.85 0.85 0.85], ...
+        'ButtonPushedFcn', @(~,~) toggleSaveSection('session','Session'));
+    btnSaveHdrSession.Layout.Row = 5;
+
+    saveSessionGL = uigridlayout(saveGL, [3 2], ...
+        'RowHeight', {24, 24, 24}, 'ColumnWidth', {'1x','1x'}, ...
         'Padding', [0 0 0 0], 'RowSpacing', 2, 'ColumnSpacing', 3);
-    saveSessionGL.Layout.Row = 1; saveSessionGL.Layout.Column = 3;
+    saveSessionGL.Layout.Row = 6;
 
-    lblSaveHdrSession = uilabel(saveSessionGL, 'Text', 'Session', ...
-        'FontSize', 9, 'FontColor', [0.55 0.55 0.55], ...
-        'FontAngle', 'italic', 'HorizontalAlignment', 'left');
-    lblSaveHdrSession.Layout.Row = 1; lblSaveHdrSession.Layout.Column = [1 2];
-
-    btnSaveSession = uibutton(saveSessionGL,'Text','Save Session...', ...
+    btnSaveSession = uibutton(saveSessionGL,'Text','Save...', ...
         'ButtonPushedFcn',@onSaveSession, ...
         'BackgroundColor',BTN_SESSION, ...
         'FontColor',BTN_FG, ...
-        'Tooltip','Save all loaded datasets, corrections, and peaks to a .mat session file  [Ctrl+S]');
-    btnSaveSession.Layout.Row = 2; btnSaveSession.Layout.Column = 1;
+        'Tooltip','Save session (.mat) [Ctrl+S]');
+    btnSaveSession.Layout.Row = 1; btnSaveSession.Layout.Column = 1;
 
-    btnLoadSession = uibutton(saveSessionGL,'Text','Load Session...', ...
+    btnLoadSession = uibutton(saveSessionGL,'Text','Load...', ...
         'ButtonPushedFcn',@onLoadSession, ...
         'BackgroundColor',BTN_SESSION, ...
         'FontColor',BTN_FG, ...
-        'Tooltip','Restore a previously saved session from a .mat file');
-    btnLoadSession.Layout.Row = 2; btnLoadSession.Layout.Column = 2;
-
-    lblSaveHdrOrigin = uilabel(saveSessionGL, 'Text', 'Origin / Excel', ...
-        'FontSize', 9, 'FontColor', [0.55 0.55 0.55], ...
-        'FontAngle', 'italic', 'HorizontalAlignment', 'left');
-    lblSaveHdrOrigin.Layout.Row = 3; lblSaveHdrOrigin.Layout.Column = [1 2];
+        'Tooltip','Load session (.mat)');
+    btnLoadSession.Layout.Row = 1; btnLoadSession.Layout.Column = 2;
 
     btnSendOrigin = uibutton(saveSessionGL,'Text','Send to Origin', ...
         'ButtonPushedFcn', @onSendToOrigin, ...
         'BackgroundColor', BTN_EXTERNAL, ...
         'FontColor', BTN_FG, ...
-        'Tooltip', 'Send data to OriginPro via COM automation (falls back to clipboard copy)');
-    btnSendOrigin.Layout.Row = 4; btnSendOrigin.Layout.Column = 1;
+        'Tooltip', 'Send data to OriginPro via COM');
+    btnSendOrigin.Layout.Row = 2; btnSendOrigin.Layout.Column = 1;
 
     btnExportOriginScript = uibutton(saveSessionGL,'Text','Origin Script', ...
         'ButtonPushedFcn', @onExportOriginScript, ...
         'BackgroundColor', BTN_EXTERNAL, ...
         'FontColor', BTN_FG, ...
-        'Tooltip', 'Write a LabTalk (.ogs) script + CSV that Origin can import directly');
-    btnExportOriginScript.Layout.Row = 4; btnExportOriginScript.Layout.Column = 2;
+        'Tooltip', 'Write LabTalk .ogs + CSV');
+    btnExportOriginScript.Layout.Row = 2; btnExportOriginScript.Layout.Column = 2;
 
-    % ── Group 4: Tools ────────────────────────────────────────────────
-    saveToolsGL = uigridlayout(saveGL, [4 2], ...
-        'RowHeight', {12, 24, 24, 24}, 'ColumnWidth', {'1x','1x'}, ...
+    % ── Header: Tools (collapsed by default) ─────────────────────────
+    btnSaveHdrTools = uibutton(saveGL,'Text',[char(9654) ' Tools'], ...
+        'FontSize',9,'FontWeight','bold','HorizontalAlignment','left', ...
+        'BackgroundColor',[0.18 0.18 0.18],'FontColor',[0.85 0.85 0.85], ...
+        'ButtonPushedFcn', @(~,~) toggleSaveSection('tools','Tools'));
+    btnSaveHdrTools.Layout.Row = 7;
+
+    saveToolsGL = uigridlayout(saveGL, [3 2], ...
+        'RowHeight', {24, 24, 24}, 'ColumnWidth', {'1x','1x'}, ...
         'Padding', [0 0 0 0], 'RowSpacing', 2, 'ColumnSpacing', 3);
-    saveToolsGL.Layout.Row = 1; saveToolsGL.Layout.Column = 4;
-
-    lblSaveHdrTools = uilabel(saveToolsGL, 'Text', 'Tools', ...
-        'FontSize', 9, 'FontColor', [0.55 0.55 0.55], ...
-        'FontAngle', 'italic', 'HorizontalAlignment', 'left');
-    lblSaveHdrTools.Layout.Row = 1; lblSaveHdrTools.Layout.Column = [1 2];
+    saveToolsGL.Layout.Row = 8;
 
     btnBatchConvertXRD = uibutton(saveToolsGL,'Text','Batch XRD', ...
         'ButtonPushedFcn', @onBatchConvertXRD, ...
-        'BackgroundColor', BTN_TOOL, ...
-        'FontColor', BTN_FG, ...
-        'Tooltip', 'Open batch XRD file converter (XRDML, Rigaku, Bruker)');
-    btnBatchConvertXRD.Layout.Row = 2; btnBatchConvertXRD.Layout.Column = 1;
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Batch XRD converter');
+    btnBatchConvertXRD.Layout.Row = 1; btnBatchConvertXRD.Layout.Column = 1;
 
     btnResample = uibutton(saveToolsGL,'Text','Resample...', ...
         'ButtonPushedFcn', @onResampleDataset, ...
-        'BackgroundColor', BTN_TOOL, ...
-        'FontColor', BTN_FG, ...
-        'Tooltip', 'Resample the active dataset to a uniform x-grid (linear interpolation)');
-    btnResample.Layout.Row = 2; btnResample.Layout.Column = 2;
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Resample to uniform x-grid');
+    btnResample.Layout.Row = 1; btnResample.Layout.Column = 2;
 
     btnColumnCalc = uibutton(saveToolsGL,'Text','Col. Calc...', ...
         'ButtonPushedFcn', @onColumnCalculator, ...
-        'BackgroundColor', BTN_TOOL, ...
-        'FontColor', BTN_FG, ...
-        'Tooltip', 'Create a new Y column from expressions using existing columns (e.g. C1./C2)');
-    btnColumnCalc.Layout.Row = 3; btnColumnCalc.Layout.Column = 1;
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Column calculator');
+    btnColumnCalc.Layout.Row = 2; btnColumnCalc.Layout.Column = 1;
 
     btnInset = uibutton(saveToolsGL,'Text','Inset Plot...', ...
         'ButtonPushedFcn', @onCreateInset, ...
-        'BackgroundColor', BTN_TOOL, ...
-        'FontColor', BTN_FG, ...
-        'Tooltip', 'Create an inset axes showing a zoomed region of the current plot');
-    btnInset.Layout.Row = 3; btnInset.Layout.Column = 2;
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Create inset zoom');
+    btnInset.Layout.Row = 2; btnInset.Layout.Column = 2;
 
     btnLayoutSettings = uibutton(saveToolsGL,'Text','Layout...', ...
         'ButtonPushedFcn', @onOpenLayoutSettings, ...
-        'BackgroundColor', BTN_TOOL, ...
-        'FontColor', BTN_FG, ...
-        'Tooltip', 'Open the Layout Settings window to configure panel sizes and figure dimensions');
-    btnLayoutSettings.Layout.Row = 4; btnLayoutSettings.Layout.Column = [1 2];
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Layout settings');
+    btnLayoutSettings.Layout.Row = 3; btnLayoutSettings.Layout.Column = 1;
+
+    btnAdvFigure = uibutton(saveToolsGL,'Text','Figures...', ...
+        'ButtonPushedFcn', @onAdvancedFigureBuilder, ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Advanced Figure Builder');
+    btnAdvFigure.Layout.Row = 3; btnAdvFigure.Layout.Column = 2;
 
     % ── Peak Analysis window (separate uifigure) ──────────────────────────
     % The peak table + controls live in their own window, opened on demand.
@@ -1904,7 +1913,7 @@ function varargout = DataPlotter()
     % ── 2D Map controls (col 3 of analysisGL — visible only for 2D data) ──
     map2DPanel = uipanel(analysisGL,'Title','2D Map View','FontSize',11, ...
         'Scrollable','on');
-    map2DPanel.Layout.Row = 1; map2DPanel.Layout.Column = 3;
+    map2DPanel.Layout.Row = 1; map2DPanel.Layout.Column = 4;
     map2DPanel.Visible = 'off';   % shown only when a 2D area-detector dataset is active
 
     map2DGL = uigridlayout(map2DPanel,[7 2], ...
@@ -3281,7 +3290,7 @@ function varargout = DataPlotter()
                 % Peak window mode — XRD
                 appData.peakMode = 'xrd';
                 configurePeakWindowForMode('xrd');
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0};
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 210, 0};
                 % Hide asymmetry; respect BG file collapse state
                 corrGL.RowHeight{CROW.BGFILE}  = bgFileH;
                 corrGL.RowHeight{CROW.BGSUBTR} = bgFileH;
@@ -3327,7 +3336,7 @@ function varargout = DataPlotter()
                 btnRemovePeakClick.Visible = 'off';
                 btnPeakWindow.Visible      = 'off';
                 appData.peakMode = 'none';
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0};
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 210, 0};
                 % Hide asymmetry; respect BG file collapse state; show mag section
                 corrGL.RowHeight{CROW.BGFILE}  = bgFileH;
                 corrGL.RowHeight{CROW.BGSUBTR} = bgFileH;
@@ -3361,7 +3370,7 @@ function varargout = DataPlotter()
                 % Peak window mode — reflectometry
                 appData.peakMode = 'reflectometry';
                 configurePeakWindowForMode('reflectometry');
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0};
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 210, 0};
                 % Hide BG file rows; show asymmetry rows
                 corrGL.RowHeight{CROW.BGFILE}  = 0;
                 corrGL.RowHeight{CROW.BGSUBTR} = 0;
@@ -3398,7 +3407,7 @@ function varargout = DataPlotter()
                 btnRemovePeakClick.Visible = 'off';
                 btnPeakWindow.Visible      = 'off';
                 appData.peakMode = 'none';
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0};
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 210, 0};
                 % Hide asymmetry; respect BG file collapse state
                 corrGL.RowHeight{CROW.BGFILE}  = bgFileH;
                 corrGL.RowHeight{CROW.BGSUBTR} = bgFileH;
@@ -3432,7 +3441,7 @@ function varargout = DataPlotter()
                 btnRemovePeakClick.Visible = 'off';
                 btnPeakWindow.Visible      = 'off';
                 appData.peakMode = 'none';
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0};
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 210, 0};
                 % Hide asymmetry; respect BG file collapse state
                 corrGL.RowHeight{CROW.BGFILE}  = bgFileH;
                 corrGL.RowHeight{CROW.BGSUBTR} = bgFileH;
@@ -3455,7 +3464,7 @@ function varargout = DataPlotter()
                       is2DDataset(appData.datasets{appData.activeIdx});
         if is2D_active
             map2DPanel.Visible = 'on';
-            analysisGL.ColumnWidth = {appData.corrPanelWidth, '1x', '2x'};
+            analysisGL.ColumnWidth = {appData.corrPanelWidth, '1x', 0, '2x'};
             % Disable all corrections — not meaningful for raw 2D maps
             for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
                       btnApply, btnReset, btnApplyAll, btnUndo, ...
@@ -3564,6 +3573,25 @@ function varargout = DataPlotter()
             btnAxMore.Text = [char(9660) ' More'];  % ▼
             axLimGL.RowHeight{AXLIM_ADV_ROW} = AXLIM_ADV_HEIGHT;
         end
+    end
+
+    function toggleSaveSection(sectionName, sectionTitle)
+    %TOGGLESAVESECTION  Toggle a collapsible section in the Save/Export panel.
+        hdrMap = struct('dataExport', btnSaveHdrData, 'figExport', btnSaveHdrFig, ...
+                        'session', btnSaveHdrSession, 'tools', btnSaveHdrTools);
+        contentRow = appData.saveSectionRows.(sectionName);
+        headerBtn  = hdrMap.(sectionName);
+        rh = saveGL.RowHeight;
+        if rh{contentRow} > 0
+            % Collapse
+            rh{contentRow} = 0;
+            headerBtn.Text = [char(9654) ' ' sectionTitle];
+        else
+            % Expand
+            rh{contentRow} = appData.saveSectionHeights.(sectionName);
+            headerBtn.Text = [char(9660) ' ' sectionTitle];
+        end
+        saveGL.RowHeight = rh;
     end
 
     function showMagSection(visible)
@@ -10703,9 +10731,9 @@ function varargout = DataPlotter()
         end
         % On very short windows protect the preview; otherwise let analysis flex.
         if pos(4) < 700
-            rootGL.RowHeight = {'3x', '2x', 110, 16};
+            rootGL.RowHeight = {'3x', '2x', 16};
         else
-            rootGL.RowHeight = {'1x', 220, 110, 16};
+            rootGL.RowHeight = {'1x', '1x', 16};
         end
 
         % ── Adapt content columns for narrow windows ──
@@ -10724,7 +10752,9 @@ function varargout = DataPlotter()
         % ── Adapt analysis columns for narrow windows ──
         defCorrW = LAYOUT_DEFAULTS.corrPanelW;
         if figW < 900
-            analysisGL.ColumnWidth = {min(260, defCorrW), '1x', 0};
+            analysisGL.ColumnWidth = {min(260, defCorrW), '1x', 0, 0};
+        elseif figW < 1100
+            analysisGL.ColumnWidth = {min(280, defCorrW), '1x', 180, 0};
         end
 
         fig.SizeChangedFcn = @onFigSizeChanged;
@@ -11228,13 +11258,13 @@ function varargout = DataPlotter()
             % Mouse moves up (mp(2) increases) → analysis panel gets taller
             delta_y = mp(2) - appData.panelResizeStart(2);
             figH    = fig.Position(4);
-            % Available px after padding + RowSpacing gaps + save strip + status bar
-            %   rootGL: Padding [6 6 6 6] → 12 px;  3 RowSpacing gaps of 4 → 12 px;
-            %   save strip 110 px;  status bar 16 px
-            availH  = figH - 12 - 12 - 110 - 16;
+            % Available px after padding + RowSpacing gaps + status bar
+            %   rootGL: Padding [6 6 6 6] → 12 px;  2 RowSpacing gaps of 4 → 8 px;
+            %   status bar 16 px
+            availH  = figH - 12 - 8 - 16;
             newH    = round(appData.panelResizeOrig + delta_y);
             newH    = max(appData.MIN_ANALYSIS_H, min(newH, availH - appData.MIN_PREVIEW_H));
-            rootGL.RowHeight = {'1x', newH, 110, 16};
+            rootGL.RowHeight = {'1x', newH, 16};
 
         elseif strcmp(appData.panelResizeDir, 'v_col12')
             % Mouse moves right → corrections panel gets wider
@@ -11753,6 +11783,1960 @@ function varargout = DataPlotter()
         appData.insetAx = insetAx;
     end
 
+    % ── Advanced Figure Builder ────────────────────────────────────────
+
+    function onAdvancedFigureBuilder(~,~)
+    %ONADVANCEDFIGUREBUILDER  Open the Advanced Figure Builder popup.
+    %  Supports figure types: Multi-Panel, Waterfall, Overlay+Residual,
+    %  Before/After.  Global options: journal templates, error style,
+    %  figure dimensions, line style.
+
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig,'Load at least one file first.','No data'); return;
+        end
+        nDS = numel(appData.datasets);
+
+        % Build display names for all loaded datasets
+        dsNames = cell(1, nDS);
+        for ii = 1:nDS
+            dsTmp = appData.datasets{ii};
+            [~, fn, fx] = fileparts(dsTmp.filepath);
+            dsNames{ii} = [fn, fx];
+        end
+
+        % Collect all Y labels from all datasets
+        allYLabels = {};
+        for ii = 1:nDS
+            allYLabels = [allYLabels, appData.datasets{ii}.data.labels]; %#ok<AGROW>
+        end
+        allYLabels = unique(allYLabels, 'stable');
+
+        % ── Builder uifigure ────────────────────────────────────────────
+        bFig = uifigure('Name','Advanced Figure Builder', ...
+            'Position',[250 120 700 600], 'Resize','off');
+
+        bRootGL = uigridlayout(bFig, [4 1], ...
+            'RowHeight', {28, '1x', 70, 36}, ...
+            'Padding', [10 10 10 10], 'RowSpacing', 6);
+
+        % ════════════════════════════════════════════════════════════════
+        %  Row 1: Figure type selector
+        % ════════════════════════════════════════════════════════════════
+        typeGL = uigridlayout(bRootGL, [1 3], ...
+            'ColumnWidth', {90, 200, '1x'}, ...
+            'Padding', [0 0 0 0], 'ColumnSpacing', 6);
+        typeGL.Layout.Row = 1;
+
+        uilabel(typeGL,'Text','Figure type:','FontSize',11, ...
+            'FontWeight','bold','HorizontalAlignment','right');
+        ddFigType = uidropdown(typeGL, ...
+            'Items', {'Multi-Panel','Quick Grid','Waterfall','Overlay + Residual','Normalized Overlay','Before / After','Parameter Evolution','Broken Axis'}, ...
+            'Value', 'Multi-Panel', ...
+            'ValueChangedFcn', @onTypeChanged);
+        uilabel(typeGL,'Text','');  % spacer
+
+        % ════════════════════════════════════════════════════════════════
+        %  Row 2: Dynamic config area (swapped per type)
+        % ════════════════════════════════════════════════════════════════
+        configPanel = uipanel(bRootGL,'Title','Configuration', ...
+            'Scrollable','on','FontSize',10);
+        configPanel.Layout.Row = 2;
+
+        % ════════════════════════════════════════════════════════════════
+        %  Row 3: Global options
+        % ════════════════════════════════════════════════════════════════
+        globalPanel = uipanel(bRootGL,'Title','Global Options','FontSize',9);
+        globalPanel.Layout.Row = 3;
+
+        gGL = uigridlayout(globalPanel, [2 8], ...
+            'RowHeight', {22, 22}, ...
+            'ColumnWidth', {70, 120, 60, 50, 60, 50, 80, '1x'}, ...
+            'Padding', [4 2 4 2], 'RowSpacing', 2, 'ColumnSpacing', 6);
+
+        % Row 1: template, error style, line style
+        uilabel(gGL,'Text','Template:','HorizontalAlignment','right','FontSize',9);
+        ddTemplate = uidropdown(gGL, ...
+            'Items', {'None','APS (Phys Rev)','Nature','ACS','Custom'}, ...
+            'Value', 'None', ...
+            'ValueChangedFcn', @onTemplateChanged, ...
+            'FontSize', 9);
+
+        uilabel(gGL,'Text','Errors:','HorizontalAlignment','right','FontSize',9);
+        ddErrorStyle = uidropdown(gGL, ...
+            'Items', {'None','Error Bars','Error Band'}, ...
+            'Value', 'None', 'FontSize', 9);
+
+        uilabel(gGL,'Text','Style:','HorizontalAlignment','right','FontSize',9);
+        ddBStyle = uidropdown(gGL, ...
+            'Items', {'Line','Scatter','Line+Pts'}, ...
+            'Value', 'Line', 'FontSize', 9);
+
+        cbGrayscale = uicheckbox(gGL,'Text','Grayscale','Value',false,'FontSize',9);
+        uilabel(gGL,'Text','');
+
+        % Row 2: dimensions, font
+        uilabel(gGL,'Text','Width (in):','HorizontalAlignment','right','FontSize',9);
+        spBFigW = uispinner(gGL,'Value',7,'Limits',[2 20],'Step',0.5,'FontSize',9);
+
+        uilabel(gGL,'Text','Height:','HorizontalAlignment','right','FontSize',9);
+        spBFigH = uispinner(gGL,'Value',5,'Limits',[2 24],'Step',0.5,'FontSize',9);
+
+        uilabel(gGL,'Text','Font (pt):','HorizontalAlignment','right','FontSize',9);
+        spFont = uispinner(gGL,'Value',10,'Limits',[6 24],'Step',1,'FontSize',9);
+
+        uilabel(gGL,'Text','Font:','HorizontalAlignment','right','FontSize',9);
+        ddFontName = uidropdown(gGL, ...
+            'Items', {'Helvetica','Arial','Times New Roman','CMU Serif','Courier'}, ...
+            'Value', 'Helvetica', 'FontSize', 9);
+
+        % ════════════════════════════════════════════════════════════════
+        %  Row 4: Buttons
+        % ════════════════════════════════════════════════════════════════
+        botGL = uigridlayout(bRootGL, [1 3], ...
+            'ColumnWidth', {'1x', 110, 90}, ...
+            'Padding', [0 0 0 0], 'ColumnSpacing', 8);
+        botGL.Layout.Row = 4;
+
+        uilabel(botGL,'Text','');
+        uibutton(botGL,'Text','Generate', ...
+            'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
+            'FontWeight','bold', ...
+            'ButtonPushedFcn', @onBuildGenerate);
+        uibutton(botGL,'Text','Cancel', ...
+            'ButtonPushedFcn', @(~,~) delete(bFig));
+
+        % ════════════════════════════════════════════════════════════════
+        %  Per-type widget storage
+        % ════════════════════════════════════════════════════════════════
+        mpWidgets = struct();   % multi-panel
+        qgWidgets = struct();   % quick grid
+        wfWidgets = struct();   % waterfall
+        orWidgets = struct();   % overlay+residual
+        baWidgets = struct();   % before/after
+        noWidgets = struct();   % normalized overlay
+        peWidgets = struct();   % parameter evolution
+        brWidgets = struct();   % broken axis
+
+        % Initial population
+        onTypeChanged([], []);
+
+        % ────────────────────────────────────────────────────────────────
+        %  Template presets
+        % ────────────────────────────────────────────────────────────────
+        function onTemplateChanged(~,~)
+            tmpl = ddTemplate.Value;
+            switch tmpl
+                case 'APS (Phys Rev)'
+                    spBFigW.Value = 3.375; spBFigH.Value = 2.8;
+                    spFont.Value = 8; ddFontName.Value = 'Times New Roman';
+                case 'Nature'
+                    spBFigW.Value = 3.5; spBFigH.Value = 2.8;
+                    spFont.Value = 7; ddFontName.Value = 'Helvetica';
+                case 'ACS'
+                    spBFigW.Value = 3.25; spBFigH.Value = 2.5;
+                    spFont.Value = 8; ddFontName.Value = 'Helvetica';
+                otherwise
+                    % None / Custom — leave as-is
+            end
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  Type switching — rebuild config area
+        % ────────────────────────────────────────────────────────────────
+        function onTypeChanged(~,~)
+            delete(configPanel.Children);
+            figType = ddFigType.Value;
+            switch figType
+                case 'Multi-Panel'
+                    buildMultiPanelConfig();
+                case 'Quick Grid'
+                    buildQuickGridConfig();
+                case 'Waterfall'
+                    buildWaterfallConfig();
+                case 'Overlay + Residual'
+                    buildOverlayResidualConfig();
+                case 'Normalized Overlay'
+                    buildNormOverlayConfig();
+                case 'Before / After'
+                    buildBeforeAfterConfig();
+                case 'Parameter Evolution'
+                    buildParamEvolConfig();
+                case 'Broken Axis'
+                    buildBrokenAxisConfig();
+            end
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  CONFIG: Multi-Panel
+        % ────────────────────────────────────────────────────────────────
+        function buildMultiPanelConfig()
+            gl = uigridlayout(configPanel, [2 1], ...
+                'RowHeight', {28, '1x'}, ...
+                'Padding', [4 4 4 4], 'RowSpacing', 4);
+
+            % Top row: grid size + sharing
+            topG = uigridlayout(gl, [1 6], ...
+                'ColumnWidth', {55, 45, 65, 45, 100, 100}, ...
+                'Padding', [0 0 0 0], 'ColumnSpacing', 4);
+            topG.Layout.Row = 1;
+
+            uilabel(topG,'Text','Rows:','HorizontalAlignment','right','FontSize',9);
+            mpWidgets.spRows = uispinner(topG,'Value',2,'Limits',[1 8],'Step',1, ...
+                'FontSize',9,'ValueChangedFcn',@(~,~) mpRebuild());
+            uilabel(topG,'Text','Columns:','HorizontalAlignment','right','FontSize',9);
+            mpWidgets.spCols = uispinner(topG,'Value',1,'Limits',[1 4],'Step',1, ...
+                'FontSize',9,'ValueChangedFcn',@(~,~) mpRebuild());
+            mpWidgets.cbShareX = uicheckbox(topG,'Text','Share X axis','Value',true,'FontSize',9);
+            mpWidgets.cbShareY = uicheckbox(topG,'Text','Share Y scale','Value',false,'FontSize',9);
+
+            % Panel cards container
+            mpWidgets.scrollGL = uigridlayout(gl, [1 1], ...
+                'Padding', [0 0 0 0]);
+            mpWidgets.scrollGL.Layout.Row = 2;
+            mpWidgets.panelCards = {};
+            mpRebuild();
+        end
+
+        function mpRebuild()
+            nR = mpWidgets.spRows.Value;
+            nC = mpWidgets.spCols.Value;
+            nPanels = nR * nC;
+            delete(mpWidgets.scrollGL.Children);
+
+            container = uigridlayout(mpWidgets.scrollGL, [nPanels 1], ...
+                'RowHeight', repmat({120}, 1, nPanels), ...
+                'Padding', [2 2 2 2], 'RowSpacing', 4);
+
+            mpWidgets.panelCards = cell(1, nPanels);
+            for pi = 1:nPanels
+                [r, c] = ind2sub([nR, nC], pi);
+                pp = uipanel(container, 'Title', ...
+                    sprintf('Panel %d  (R%d C%d)', pi, r, c), 'FontSize', 9);
+                pp.Layout.Row = pi;
+
+                pGL = uigridlayout(pp, [5 6], ...
+                    'RowHeight', {22, 22, 22, 22, 22}, ...
+                    'ColumnWidth', {'1x','1x','1x','1x','1x','1x'}, ...
+                    'Padding', [4 2 4 2], 'RowSpacing', 2, 'ColumnSpacing', 3);
+
+                % Datasets (col 1-2, rows 1-3)
+                lb = uilistbox(pGL,'Items', dsNames, 'ItemsData', 1:nDS, ...
+                    'Multiselect','on','Value', min(1, nDS), 'FontSize', 9);
+                lb.Layout.Row = [1 3]; lb.Layout.Column = [1 2];
+
+                % Y left (col 3-4, rows 1-2)
+                uilabel(pGL,'Text','Y (left):','FontSize',7,'FontAngle','italic');
+                lbY = uilistbox(pGL,'Items', allYLabels, 'Multiselect','on', ...
+                    'Value', allYLabels(1:min(1,numel(allYLabels))), 'FontSize', 9);
+                lbY.Layout.Row = [1 2]; lbY.Layout.Column = [3 4];
+
+                % Y2 right (col 5-6, rows 1-2)
+                uilabel(pGL,'Text','Y2 (right):','FontSize',7,'FontAngle','italic');
+                y2Items = [{'(none)'}, allYLabels];
+                lbY2 = uilistbox(pGL,'Items', y2Items, 'Multiselect','on', ...
+                    'Value', {'(none)'}, 'FontSize', 9);
+                lbY2.Layout.Row = [1 2]; lbY2.Layout.Column = [5 6];
+
+                % Row 3: options
+                cbL = uicheckbox(pGL,'Text','Log Y','Value',false,'FontSize',9);
+                cbL.Layout.Row = 3; cbL.Layout.Column = 3;
+
+                efT = uieditfield(pGL,'Value','','Placeholder','Panel title','FontSize',9);
+                efT.Layout.Row = 3; efT.Layout.Column = [4 6];
+
+                % Row 4: row/column span
+                uilabel(pGL,'Text','Row span:','FontSize',8,'HorizontalAlignment','right');
+                spRS = uispinner(pGL,'Value',1,'Limits',[1 nR],'Step',1,'FontSize',8);
+                spRS.Layout.Row = 4; spRS.Layout.Column = 2;
+
+                uilabel(pGL,'Text','Col span:','FontSize',8,'HorizontalAlignment','right');
+                spCS = uispinner(pGL,'Value',1,'Limits',[1 nC],'Step',1,'FontSize',8);
+                spCS.Layout.Row = 4; spCS.Layout.Column = 4;
+
+                mpWidgets.panelCards{pi} = struct('lbDS',lb,'lbY',lbY,'lbY2',lbY2, ...
+                    'cbLog',cbL,'efTitle',efT,'spRowSpan',spRS,'spColSpan',spCS);
+            end
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  CONFIG: Waterfall
+        % ────────────────────────────────────────────────────────────────
+        function buildWaterfallConfig()
+            gl = uigridlayout(configPanel, [5 4], ...
+                'RowHeight', {22, '1x', 22, 22, 22}, ...
+                'ColumnWidth', {90, '1x', 90, '1x'}, ...
+                'Padding', [8 8 8 8], 'RowSpacing', 4, 'ColumnSpacing', 6);
+
+            uilabel(gl,'Text','Datasets:','FontSize',9,'FontWeight','bold');
+            uilabel(gl,'Text','');
+            uilabel(gl,'Text','Y Channel:','FontSize',9,'FontWeight','bold');
+            uilabel(gl,'Text','');
+
+            wfWidgets.lbDS = uilistbox(gl,'Items', dsNames, 'ItemsData', 1:nDS, ...
+                'Multiselect','on','Value', 1:nDS, 'FontSize', 9);
+            wfWidgets.lbDS.Layout.Row = 2; wfWidgets.lbDS.Layout.Column = [1 2];
+
+            wfWidgets.lbY = uilistbox(gl,'Items', allYLabels, 'Multiselect','off', ...
+                'Value', allYLabels{1}, 'FontSize', 9);
+            wfWidgets.lbY.Layout.Row = 2; wfWidgets.lbY.Layout.Column = [3 4];
+
+            % Spacing
+            uilabel(gl,'Text','Spacing:','HorizontalAlignment','right','FontSize',9);
+            wfWidgets.efSpacing = uieditfield(gl,'Value','auto', ...
+                'Placeholder','auto or number','FontSize',9, ...
+                'Tooltip','Vertical offset between traces (auto = 0.8 × median range)');
+
+            uilabel(gl,'Text','Direction:','HorizontalAlignment','right','FontSize',9);
+            wfWidgets.ddDir = uidropdown(gl, ...
+                'Items', {'Bottom to Top','Top to Bottom'}, ...
+                'Value', 'Bottom to Top', 'FontSize', 9);
+
+            % Options
+            wfWidgets.cbLogMode = uicheckbox(gl,'Text','Log-mode (multiplicative offset)', ...
+                'Value', false, 'FontSize', 9);
+            wfWidgets.cbLogMode.Layout.Row = 4; wfWidgets.cbLogMode.Layout.Column = [1 2];
+
+            wfWidgets.cbEdgeLabels = uicheckbox(gl,'Text','Right-edge trace labels', ...
+                'Value', true, 'FontSize', 9);
+            wfWidgets.cbEdgeLabels.Layout.Row = 4; wfWidgets.cbEdgeLabels.Layout.Column = [3 4];
+
+            wfWidgets.cbLogY = uicheckbox(gl,'Text','Log Y axis','Value',false,'FontSize',9);
+            wfWidgets.cbLogY.Layout.Row = 5; wfWidgets.cbLogY.Layout.Column = [1 2];
+
+            uilabel(gl,'Text','Title:','HorizontalAlignment','right','FontSize',9);
+            wfWidgets.efTitle = uieditfield(gl,'Value','','Placeholder','Figure title','FontSize',9);
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  CONFIG: Overlay + Residual
+        % ────────────────────────────────────────────────────────────────
+        function buildOverlayResidualConfig()
+            gl = uigridlayout(configPanel, [6 4], ...
+                'RowHeight', {22, 22, 22, 22, 22, 22}, ...
+                'ColumnWidth', {90, '1x', 90, '1x'}, ...
+                'Padding', [8 8 8 8], 'RowSpacing', 6, 'ColumnSpacing', 6);
+
+            uilabel(gl,'Text','Dataset A:','HorizontalAlignment','right','FontSize',9);
+            orWidgets.ddA = uidropdown(gl,'Items', dsNames, 'ItemsData', 1:nDS, ...
+                'Value', 1, 'FontSize', 9);
+
+            uilabel(gl,'Text','Dataset B:','HorizontalAlignment','right','FontSize',9);
+            orWidgets.ddB = uidropdown(gl,'Items', dsNames, 'ItemsData', 1:nDS, ...
+                'Value', min(2, nDS), 'FontSize', 9);
+
+            uilabel(gl,'Text','Y Channel:','HorizontalAlignment','right','FontSize',9);
+            orWidgets.ddY = uidropdown(gl,'Items', allYLabels, ...
+                'Value', allYLabels{1}, 'FontSize', 9);
+
+            uilabel(gl,'Text','Residual:','HorizontalAlignment','right','FontSize',9);
+            orWidgets.ddResidMode = uidropdown(gl, ...
+                'Items', {'A - B (absolute)','(A - B) / A  (%)'}, ...
+                'Value', 'A - B (absolute)', 'FontSize', 9);
+
+            orWidgets.cbLogOverlay = uicheckbox(gl,'Text','Log Y (overlay panel)', ...
+                'Value', false, 'FontSize', 9);
+            orWidgets.cbLogOverlay.Layout.Row = 4; orWidgets.cbLogOverlay.Layout.Column = [1 2];
+
+            uilabel(gl,'Text','Height ratio:','HorizontalAlignment','right','FontSize',9);
+            orWidgets.ddRatio = uidropdown(gl, ...
+                'Items', {'3:1','2:1','1:1'}, ...
+                'Value', '3:1', 'FontSize', 9);
+
+            uilabel(gl,'Text','Title:','HorizontalAlignment','right','FontSize',9);
+            orWidgets.efTitle = uieditfield(gl,'Value','','Placeholder','Figure title','FontSize',9);
+            orWidgets.efTitle.Layout.Column = [2 4];
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  CONFIG: Normalized Overlay
+        % ────────────────────────────────────────────────────────────────
+        function buildNormOverlayConfig()
+            gl = uigridlayout(configPanel, [5 4], ...
+                'RowHeight', {22, '1x', 22, 22, 22}, ...
+                'ColumnWidth', {90, '1x', 90, '1x'}, ...
+                'Padding', [8 8 8 8], 'RowSpacing', 4, 'ColumnSpacing', 6);
+
+            uilabel(gl,'Text','Datasets:','FontSize',9,'FontWeight','bold');
+            uilabel(gl,'Text','');
+            uilabel(gl,'Text','Y Channel:','FontSize',9,'FontWeight','bold');
+            uilabel(gl,'Text','');
+
+            noWidgets.lbDS = uilistbox(gl,'Items', dsNames, 'ItemsData', 1:nDS, ...
+                'Multiselect','on','Value', 1:min(nDS,4), 'FontSize', 9);
+            noWidgets.lbDS.Layout.Row = 2; noWidgets.lbDS.Layout.Column = [1 2];
+
+            noWidgets.lbY = uilistbox(gl,'Items', allYLabels, 'Multiselect','off', ...
+                'Value', allYLabels{1}, 'FontSize', 9);
+            noWidgets.lbY.Layout.Row = 2; noWidgets.lbY.Layout.Column = [3 4];
+
+            uilabel(gl,'Text','Normalize:','HorizontalAlignment','right','FontSize',9);
+            noWidgets.ddNormMethod = uidropdown(gl, ...
+                'Items', {'Peak (0-1)','Range (0-1)','Z-score','Area'}, ...
+                'Value', 'Peak (0-1)', 'FontSize', 9);
+
+            uilabel(gl,'Text','X align:','HorizontalAlignment','right','FontSize',9);
+            noWidgets.ddAlign = uidropdown(gl, ...
+                'Items', {'None','Peak center','X offset'}, ...
+                'Value', 'None', 'FontSize', 9);
+
+            noWidgets.cbLogY = uicheckbox(gl,'Text','Log Y','Value',false,'FontSize',9);
+            noWidgets.cbLogY.Layout.Row = 4; noWidgets.cbLogY.Layout.Column = 1;
+
+            noWidgets.cbLegend = uicheckbox(gl,'Text','Show legend','Value',true,'FontSize',9);
+            noWidgets.cbLegend.Layout.Row = 4; noWidgets.cbLegend.Layout.Column = [3 4];
+
+            uilabel(gl,'Text','Title:','HorizontalAlignment','right','FontSize',9);
+            noWidgets.efTitle = uieditfield(gl,'Value','','Placeholder','Figure title','FontSize',9);
+            noWidgets.efTitle.Layout.Column = [2 4];
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  GENERATE: Normalized Overlay
+        % ────────────────────────────────────────────────────────────────
+        function generateNormOverlay()
+            dsIdx = ensureCellNum(noWidgets.lbDS.Value);
+            yName = noWidgets.lbY.Value;
+            normMethod = noWidgets.ddNormMethod.Value;
+            alignMode  = noWidgets.ddAlign.Value;
+
+            if isempty(dsIdx)
+                uialert(bFig,'Select at least one dataset.','No data'); return;
+            end
+
+            fmtOpts = getFormatOpts();
+            ls = localLineSpec(ddBStyle.Value);
+
+            outFig = figure('Name','Normalized Overlay','NumberTitle','off', ...
+                'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
+            tAx = axes(outFig);
+            hold(tAx, 'on'); box(tAx, 'on'); grid(tAx, 'on');
+            tAx.FontSize = fmtOpts.fontSize;
+            tAx.FontName = fmtOpts.fontName;
+            tAx.TickDir  = 'in';
+
+            nTraces = numel(dsIdx);
+            if fmtOpts.grayscale
+                clrs = repmat(linspace(0, 0.7, nTraces)', 1, 3);
+            else
+                clrs = getColorsFromMap('lines (MATLAB default)', nTraces);
+            end
+
+            GS_STYLES  = {'-', '--', ':', '-.'};
+            GS_MARKERS = {'o', 's', '^', 'd', 'v', '>', '<', 'p'};
+
+            xLbl = ''; yLbl = 'Normalised';
+
+            for si = 1:nTraces
+                di = dsIdx(si);
+                if di < 1 || di > nDS, continue; end
+                d = getPlotData(di);
+                idx = find(strcmp(d.labels, yName), 1);
+                if isempty(idx), continue; end
+
+                xVec = d.time;
+                yVec = d.values(:, idx);
+                good = ~isnan(xVec) & ~isnan(yVec);
+                if isdatetime(xVec), good = ~isnat(xVec) & ~isnan(yVec); end
+                xVec = xVec(good); yVec = yVec(good);
+
+                if isempty(xLbl)
+                    xLbl = guiLabel(guiXName(d.metadata), guiXUnit(d.metadata));
+                end
+
+                % Normalize
+                switch normMethod
+                    case 'Peak (0-1)'
+                        yVec = yVec / max(abs(yVec));
+                    case 'Range (0-1)'
+                        mn = min(yVec); mx = max(yVec);
+                        if mx > mn, yVec = (yVec - mn) / (mx - mn); end
+                    case 'Z-score'
+                        m = mean(yVec); s = std(yVec);
+                        if s > 0, yVec = (yVec - m) / s; end
+                        yLbl = 'Z-score';
+                    case 'Area'
+                        a = trapz(double(xVec), yVec);
+                        if a ~= 0, yVec = yVec / a; end
+                        yLbl = 'Area-normalised';
+                end
+
+                % Alignment
+                switch alignMode
+                    case 'Peak center'
+                        [~, pkIdx] = max(yVec);
+                        xVec = xVec - xVec(pkIdx);
+                        xLbl = [xLbl, ' (aligned)'];  %#ok — only first pass appends
+                    case 'X offset'
+                        xVec = xVec - xVec(1);
+                end
+
+                baseColor = clrs(si, :);
+                plotLS = ls;
+                if fmtOpts.grayscale
+                    gsStyle  = GS_STYLES{mod(si-1, numel(GS_STYLES)) + 1};
+                    gsMarker = GS_MARKERS{mod(si-1, numel(GS_MARKERS)) + 1};
+                    plotLS = {'LineStyle', gsStyle, 'Marker', gsMarker, 'MarkerSize', 4};
+                end
+
+                plot(tAx, xVec, yVec, plotLS{:}, ...
+                    'Color', baseColor, ...
+                    'LineWidth', fmtOpts.lineWidth, ...
+                    'DisplayName', dsNames{di});
+            end
+
+            if noWidgets.cbLogY.Value, tAx.YScale = 'log'; end
+            xlabel(tAx, xLbl, 'FontSize', fmtOpts.fontSize);
+            ylabel(tAx, yLbl, 'FontSize', fmtOpts.fontSize);
+
+            if noWidgets.cbLegend.Value && nTraces > 1
+                legend(tAx, 'Interpreter','none','FontSize', max(fmtOpts.fontSize-2,6), 'Location','best');
+            end
+
+            ttl = noWidgets.efTitle.Value;
+            if ~isempty(ttl)
+                title(tAx, ttl, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
+            end
+
+            addRefLineTools(outFig);
+            figure(outFig);
+            delete(bFig);
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  CONFIG: Before / After
+        % ────────────────────────────────────────────────────────────────
+        function buildBeforeAfterConfig()
+            gl = uigridlayout(configPanel, [4 4], ...
+                'RowHeight', {22, 22, 22, 22}, ...
+                'ColumnWidth', {90, '1x', 90, '1x'}, ...
+                'Padding', [8 8 8 8], 'RowSpacing', 6, 'ColumnSpacing', 6);
+
+            uilabel(gl,'Text','Dataset:','HorizontalAlignment','right','FontSize',9);
+            baWidgets.ddDS = uidropdown(gl,'Items', dsNames, 'ItemsData', 1:nDS, ...
+                'Value', appData.activeIdx, 'FontSize', 9);
+            baWidgets.ddDS.Layout.Column = [2 4];
+
+            uilabel(gl,'Text','Y Channel:','HorizontalAlignment','right','FontSize',9);
+            baWidgets.lbY = uilistbox(gl,'Items', allYLabels, 'Multiselect','on', ...
+                'Value', allYLabels(1:min(1,numel(allYLabels))), 'FontSize', 9);
+            baWidgets.lbY.Layout.Row = [2 3]; baWidgets.lbY.Layout.Column = [2 4];
+
+            baWidgets.cbLogY = uicheckbox(gl,'Text','Log Y','Value',false,'FontSize',9);
+            baWidgets.cbLogY.Layout.Row = 4; baWidgets.cbLogY.Layout.Column = 2;
+
+            baWidgets.cbLinkY = uicheckbox(gl,'Text','Link Y scale','Value',true,'FontSize',9);
+            baWidgets.cbLinkY.Layout.Row = 4; baWidgets.cbLinkY.Layout.Column = 3;
+        end
+
+        % ════════════════════════════════════════════════════════════════
+        %  GENERATE — dispatch to per-type builder
+        % ════════════════════════════════════════════════════════════════
+        function onBuildGenerate(~,~)
+            figType = ddFigType.Value;
+            switch figType
+                case 'Multi-Panel',         generateMultiPanel();
+                case 'Quick Grid',          generateQuickGrid();
+                case 'Waterfall',           generateWaterfall();
+                case 'Overlay + Residual',  generateOverlayResidual();
+                case 'Normalized Overlay',  generateNormOverlay();
+                case 'Before / After',      generateBeforeAfter();
+                case 'Parameter Evolution', generateParamEvol();
+                case 'Broken Axis',         generateBrokenAxis();
+            end
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  GENERATE: Multi-Panel
+        % ────────────────────────────────────────────────────────────────
+        function generateMultiPanel()
+            nR = mpWidgets.spRows.Value;
+            nC = mpWidgets.spCols.Value;
+            nPanels = nR * nC;
+            shareX = mpWidgets.cbShareX.Value;
+            shareY = mpWidgets.cbShareY.Value;
+            [outFig, tlo] = makeOutFig(nR, nC, shareX);
+
+            ls = localLineSpec(ddBStyle.Value);
+            fmtOpts = getFormatOpts();
+
+            % Track which tiles are occupied (for span support)
+            occupied = false(nR, nC);
+            axList = gobjects(0);
+
+            for pi = 1:nPanels
+                pw = mpWidgets.panelCards{pi};
+                [r, c] = ind2sub([nR, nC], pi);
+
+                % Skip tiles already occupied by a previous span
+                if occupied(r, c), continue; end
+
+                rSpan = min(pw.spRowSpan.Value, nR - r + 1);
+                cSpan = min(pw.spColSpan.Value, nC - c + 1);
+
+                % Mark spanned tiles as occupied
+                occupied(r:r+rSpan-1, c:c+cSpan-1) = true;
+
+                dsIdx = ensureCellNum(pw.lbDS.Value);
+                selY  = ensureCellStr(pw.lbY.Value);
+
+                % Y2 (right axis) channels
+                selY2Raw = ensureCellStr(pw.lbY2.Value);
+                selY2 = selY2Raw(~strcmp(selY2Raw, '(none)'));
+                hasY2 = ~isempty(selY2);
+
+                tAx = nexttile(tlo, pi, [rSpan cSpan]);
+                setupAx(tAx);
+                axList(end+1) = tAx; %#ok<AGROW>
+
+                [ci, xLbl, yLbl] = plotTraces(tAx, dsIdx, selY, ls, fmtOpts);
+
+                % Right Y-axis
+                if hasY2
+                    yyaxis(tAx, 'right');
+                    hold(tAx, 'on');
+                    [~, ~, y2Lbl] = plotTraces(tAx, dsIdx, selY2, ls, fmtOpts);
+                    ylabel(tAx, y2Lbl, 'FontSize', fmtOpts.fontSize);
+                    yyaxis(tAx, 'left');
+                end
+
+                if pw.cbLog.Value, tAx.YScale = 'log'; end
+
+                % Only show X label on bottom-most row of this panel's span
+                if shareX && (r + rSpan - 1) < nR
+                    xlabel(tAx, '');
+                else
+                    xlabel(tAx, xLbl, 'FontSize', fmtOpts.fontSize);
+                end
+                ylabel(tAx, yLbl, 'FontSize', fmtOpts.fontSize);
+
+                ttl = pw.efTitle.Value;
+                if ~isempty(ttl)
+                    title(tAx, ttl, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
+                end
+                if ci > 1 || hasY2
+                    legend(tAx, 'Interpreter','none','FontSize', max(fmtOpts.fontSize-2,6), 'Location','best');
+                end
+            end
+
+            linkIfNeeded(axList, shareX, shareY);
+            addRefLineTools(outFig);
+            figure(outFig);
+            delete(bFig);
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  GENERATE: Waterfall
+        % ────────────────────────────────────────────────────────────────
+        function generateWaterfall()
+            dsIdx = ensureCellNum(wfWidgets.lbDS.Value);
+            yName = wfWidgets.lbY.Value;
+            if isempty(dsIdx), uialert(bFig,'Select at least one dataset.','No data'); return; end
+
+            [outFig, tlo] = makeOutFig(1, 1, false);
+            tAx = nexttile(tlo);
+            setupAx(tAx);
+            fmtOpts = getFormatOpts();
+            ls = localLineSpec(ddBStyle.Value);
+
+            logMode   = wfWidgets.cbLogMode.Value;
+            edgeLabel = wfWidgets.cbEdgeLabels.Value;
+            reverse   = strcmp(wfWidgets.ddDir.Value, 'Top to Bottom');
+
+            % Compute auto spacing
+            spStr = strtrim(wfWidgets.efSpacing.Value);
+            manualSp = str2double(spStr);
+
+            % Gather Y ranges for auto-spacing
+            yRanges = [];
+            for si = 1:numel(dsIdx)
+                di = dsIdx(si);
+                if di < 1 || di > nDS, continue; end
+                d = getPlotData(di);
+                idx = find(strcmp(d.labels, yName), 1);
+                if isempty(idx), continue; end
+                col = d.values(:, idx);
+                col = col(~isnan(col));
+                if ~isempty(col)
+                    yRanges(end+1) = max(col) - min(col); %#ok<AGROW>
+                end
+            end
+            if isnan(manualSp) || strcmpi(spStr, 'auto')
+                if isempty(yRanges)
+                    spacing = 1;
+                else
+                    spacing = 0.8 * median(yRanges);
+                end
+            else
+                spacing = manualSp;
+            end
+
+            nColors = max(numel(dsIdx), 1);
+            if cbGrayscale.Value
+                colors = repmat(linspace(0, 0.7, nColors)', 1, 3);
+            else
+                colors = getColorsFromMap('lines (MATLAB default)', nColors);
+            end
+
+            traceOrder = 1:numel(dsIdx);
+            if reverse, traceOrder = flip(traceOrder); end
+
+            xLbl = ''; yLbl = '';
+            xMax = -inf;
+
+            for ti = 1:numel(traceOrder)
+                si = traceOrder(ti);
+                di = dsIdx(si);
+                if di < 1 || di > nDS, continue; end
+                d = getPlotData(di);
+                idx = find(strcmp(d.labels, yName), 1);
+                if isempty(idx), continue; end
+
+                xVec = d.time;
+                yVec = d.values(:, idx);
+
+                if isempty(xLbl)
+                    xLbl = guiLabel(guiXName(d.metadata), guiXUnit(d.metadata));
+                end
+                if isempty(yLbl) && idx <= numel(d.units)
+                    yLbl = guiLabel(yName, d.units{idx});
+                end
+
+                % Apply offset
+                wfOffset = si - 1;
+                if logMode
+                    yVec = yVec * spacing^wfOffset;
+                else
+                    yVec = yVec + wfOffset * spacing;
+                end
+
+                good = ~isnan(xVec) & ~isnan(yVec);
+                if isdatetime(xVec), good = ~isnat(xVec) & ~isnan(yVec); end
+
+                plot(tAx, xVec(good), yVec(good), ls{:}, ...
+                    'Color', colors(si, :), ...
+                    'LineWidth', fmtOpts.lineWidth, ...
+                    'DisplayName', dsNames{di});
+
+                % Edge label
+                if edgeLabel
+                    xGood = xVec(good);
+                    yGood = yVec(good);
+                    if ~isempty(xGood)
+                        xEnd = xGood(end);
+                        yEnd = yGood(end);
+                        if xEnd > xMax, xMax = xEnd; end
+                        text(tAx, double(xEnd), double(yEnd), ['  ' dsNames{di}], ...
+                            'FontSize', max(fmtOpts.fontSize-2, 6), ...
+                            'Color', colors(si,:), ...
+                            'Interpreter', 'none', ...
+                            'VerticalAlignment', 'middle', ...
+                            'Clipping', 'on');
+                    end
+                end
+            end
+
+            if wfWidgets.cbLogY.Value, tAx.YScale = 'log'; end
+            xlabel(tAx, xLbl, 'FontSize', fmtOpts.fontSize);
+            ylabel(tAx, yLbl, 'FontSize', fmtOpts.fontSize);
+            ttl = wfWidgets.efTitle.Value;
+            if ~isempty(ttl)
+                title(tAx, ttl, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
+            end
+
+            % Expand X limits for edge labels
+            if edgeLabel && xMax > -inf
+                xl = tAx.XLim;
+                tAx.XLim(2) = xl(2) + 0.15 * (xl(2) - xl(1));
+            end
+
+            addRefLineTools(outFig);
+            figure(outFig);
+            delete(bFig);
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  GENERATE: Overlay + Residual
+        % ────────────────────────────────────────────────────────────────
+        function generateOverlayResidual()
+            idxA = orWidgets.ddA.Value;
+            idxB = orWidgets.ddB.Value;
+            yName = orWidgets.ddY.Value;
+
+            if idxA == idxB
+                uialert(bFig,'Select two different datasets.','Same dataset'); return;
+            end
+
+            dA = getPlotData(idxA);
+            dB = getPlotData(idxB);
+            ciA = find(strcmp(dA.labels, yName), 1);
+            ciB = find(strcmp(dB.labels, yName), 1);
+            if isempty(ciA) || isempty(ciB)
+                uialert(bFig, sprintf('Channel "%s" not found in both datasets.', yName), 'Missing channel');
+                return;
+            end
+
+            xA = dA.time; yA = dA.values(:, ciA);
+            xB = dB.time; yB = dB.values(:, ciB);
+
+            % Interpolate B onto A's X grid
+            goodA = ~isnan(xA) & ~isnan(yA);
+            goodB = ~isnan(xB) & ~isnan(yB);
+            xCommon = xA(goodA);
+            yAc = yA(goodA);
+            yBi = interp1(double(xB(goodB)), yB(goodB), double(xCommon), 'linear', NaN);
+
+            % Residual
+            residMode = orWidgets.ddResidMode.Value;
+            if contains(residMode, '%')
+                resid = (yAc - yBi) ./ yAc * 100;
+                residLabel = 'Residual (%)';
+            else
+                resid = yAc - yBi;
+                residLabel = 'A - B';
+            end
+
+            % Height ratio
+            ratioStr = orWidgets.ddRatio.Value;
+            switch ratioStr
+                case '3:1', heights = [3 1];
+                case '2:1', heights = [2 1];
+                otherwise,  heights = [1 1];
+            end
+
+            fmtOpts = getFormatOpts();
+            ls = localLineSpec(ddBStyle.Value);
+
+            outFig = figure('Name','Overlay + Residual','NumberTitle','off', ...
+                'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
+            tlo = tiledlayout(outFig, 2, 1, ...
+                'TileSpacing','compact','Padding','compact');
+            tlo.TileIndexing = 'columnmajor';
+
+            % — Top panel: overlay
+            ax1 = nexttile(tlo); setupAx(ax1);
+            plot(ax1, xCommon, yAc, ls{:}, 'Color', [0.12 0.47 0.71], ...
+                'LineWidth', fmtOpts.lineWidth, 'DisplayName', dsNames{idxA});
+            plot(ax1, xCommon, yBi, ls{:}, 'Color', [0.84 0.15 0.16], ...
+                'LineWidth', fmtOpts.lineWidth, 'DisplayName', dsNames{idxB});
+
+            if orWidgets.cbLogOverlay.Value, ax1.YScale = 'log'; end
+            yLbl = guiLabel(yName, dA.units{ciA});
+            ylabel(ax1, yLbl, 'FontSize', fmtOpts.fontSize);
+            legend(ax1, 'Interpreter','none','FontSize', max(fmtOpts.fontSize-2,6), 'Location','best');
+
+            ttl = orWidgets.efTitle.Value;
+            if ~isempty(ttl)
+                title(ax1, ttl, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
+            end
+
+            % — Bottom panel: residual
+            ax2 = nexttile(tlo); setupAx(ax2);
+            plot(ax2, xCommon, resid, ls{:}, 'Color', [0.3 0.3 0.3], ...
+                'LineWidth', fmtOpts.lineWidth);
+            yline(ax2, 0, '--', 'Color', [0.6 0.6 0.6], 'LineWidth', 0.75);
+
+            xLbl = guiLabel(guiXName(dA.metadata), guiXUnit(dA.metadata));
+            xlabel(ax2, xLbl, 'FontSize', fmtOpts.fontSize);
+            ylabel(ax2, residLabel, 'FontSize', fmtOpts.fontSize);
+
+            linkaxes([ax1, ax2], 'x');
+
+            % Adjust height ratio via TileSpan workaround — set InnerPosition
+            try
+                totalH = heights(1) + heights(2);
+                ax1.InnerPosition(4) = ax1.InnerPosition(4) * heights(1) / totalH * 1.6;
+            catch
+                % tiledlayout manages sizing — skip if InnerPosition not settable
+            end
+
+            addRefLineTools(outFig);
+            figure(outFig);
+            delete(bFig);
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  GENERATE: Before / After
+        % ────────────────────────────────────────────────────────────────
+        function generateBeforeAfter()
+            dsIdx = baWidgets.ddDS.Value;
+            ds = appData.datasets{dsIdx};
+            if isempty(ds.corrData)
+                uialert(bFig, 'No corrections applied to this dataset. Apply corrections first.', ...
+                    'No corrected data');
+                return;
+            end
+
+            selY = ensureCellStr(baWidgets.lbY.Value);
+            fmtOpts = getFormatOpts();
+            ls = localLineSpec(ddBStyle.Value);
+
+            outFig = figure('Name','Before / After Corrections','NumberTitle','off', ...
+                'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
+            tlo = tiledlayout(outFig, 1, 2, ...
+                'TileSpacing','compact','Padding','compact');
+
+            dRaw  = ds.data;
+            dCorr = ds.corrData;
+            nColors = max(numel(selY), 1);
+            colors = getColorsFromMap('lines (MATLAB default)', nColors);
+
+            panelAxes = gobjects(1, 2);
+
+            for side = 1:2
+                tAx = nexttile(tlo, side);
+                setupAx(tAx);
+                panelAxes(side) = tAx;
+
+                d = dRaw;
+                panelTitle = 'Raw';
+                if side == 2
+                    d = dCorr;
+                    panelTitle = 'Corrected';
+                end
+
+                for ki = 1:numel(selY)
+                    idx = find(strcmp(d.labels, selY{ki}), 1);
+                    if isempty(idx), continue; end
+
+                    xVec = d.time;
+                    yVec = d.values(:, idx);
+                    good = ~isnan(xVec) & ~isnan(yVec);
+                    if isdatetime(xVec), good = ~isnat(xVec) & ~isnan(yVec); end
+
+                    dName = selY{ki};
+                    if numel(selY) > 1
+                        dName = guiLabel(selY{ki}, d.units{min(idx, numel(d.units))});
+                    end
+
+                    plot(tAx, xVec(good), yVec(good), ls{:}, ...
+                        'Color', colors(ki,:), ...
+                        'LineWidth', fmtOpts.lineWidth, ...
+                        'DisplayName', dName);
+                end
+
+                if baWidgets.cbLogY.Value, tAx.YScale = 'log'; end
+
+                xLbl = guiLabel(guiXName(d.metadata), guiXUnit(d.metadata));
+                yLbl = '';
+                if ~isempty(selY)
+                    ci1 = find(strcmp(d.labels, selY{1}), 1);
+                    if ~isempty(ci1) && ci1 <= numel(d.units)
+                        yLbl = guiLabel(selY{1}, d.units{ci1});
+                    end
+                end
+
+                xlabel(tAx, xLbl, 'FontSize', fmtOpts.fontSize);
+                if side == 1
+                    ylabel(tAx, yLbl, 'FontSize', fmtOpts.fontSize);
+                end
+                title(tAx, panelTitle, 'FontSize', fmtOpts.fontSize+1);
+
+                if numel(selY) > 1
+                    legend(tAx,'Interpreter','none','FontSize',max(fmtOpts.fontSize-2,6),'Location','best');
+                end
+            end
+
+            % Link axes
+            linkaxes(panelAxes, 'x');
+            if baWidgets.cbLinkY.Value
+                linkaxes(panelAxes, 'xy');
+            end
+
+            addRefLineTools(outFig);
+            figure(outFig);
+            delete(bFig);
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  CONFIG: Parameter Evolution
+        % ────────────────────────────────────────────────────────────────
+        function buildParamEvolConfig()
+            gl = uigridlayout(configPanel, [5 4], ...
+                'RowHeight', {22, '1x', 22, 22, 22}, ...
+                'ColumnWidth', {90, '1x', 90, '1x'}, ...
+                'Padding', [8 8 8 8], 'RowSpacing', 4, 'ColumnSpacing', 6);
+
+            uilabel(gl,'Text','Datasets:','FontSize',9,'FontWeight','bold');
+            uilabel(gl,'Text','');
+            uilabel(gl,'Text','(multi-select)','FontSize',8,'FontAngle','italic');
+            uilabel(gl,'Text','');
+
+            peWidgets.lbDS = uilistbox(gl,'Items', dsNames, 'ItemsData', 1:nDS, ...
+                'Multiselect','on','Value', 1:nDS, 'FontSize', 9);
+            peWidgets.lbDS.Layout.Row = 2; peWidgets.lbDS.Layout.Column = [1 2];
+
+            % Info label
+            uilabel(gl,'Text', ...
+                sprintf('Peaks detected on %d/%d datasets.', ...
+                    sum(cellfun(@(d) ~isempty(d.peaks), appData.datasets)), nDS), ...
+                'FontSize', 8, 'FontAngle', 'italic');
+
+            uilabel(gl,'Text','');
+
+            % X axis mode
+            uilabel(gl,'Text','X axis:','HorizontalAlignment','right','FontSize',9);
+            peWidgets.ddXMode = uidropdown(gl, ...
+                'Items', {'File index','Temperature (K)','Field (Oe)'}, ...
+                'Value', 'File index', 'FontSize', 9);
+
+            % Y metric
+            uilabel(gl,'Text','Y metric:','HorizontalAlignment','right','FontSize',9);
+            peWidgets.ddYMetric = uidropdown(gl, ...
+                'Items', {'Peak center','Peak FWHM','Peak area','Peak height','Integrated Y'}, ...
+                'Value', 'Peak center', 'FontSize', 9);
+
+            % Options
+            peWidgets.cbConnect = uicheckbox(gl,'Text','Connect points','Value',true,'FontSize',9);
+            peWidgets.cbConnect.Layout.Row = 4; peWidgets.cbConnect.Layout.Column = [1 2];
+
+            uilabel(gl,'Text','Peak #:','HorizontalAlignment','right','FontSize',9);
+            peWidgets.spPeakIdx = uispinner(gl,'Value',1,'Limits',[1 20],'Step',1,'FontSize',9, ...
+                'Tooltip','Which peak to track (by index in peak list, sorted by center position)');
+
+            uilabel(gl,'Text','Title:','HorizontalAlignment','right','FontSize',9);
+            peWidgets.efTitle = uieditfield(gl,'Value','','Placeholder','Figure title','FontSize',9);
+            peWidgets.efTitle.Layout.Column = [2 4];
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  CONFIG: Broken Axis
+        % ────────────────────────────────────────────────────────────────
+        function buildBrokenAxisConfig()
+            gl = uigridlayout(configPanel, [5 4], ...
+                'RowHeight', {22, 22, 22, 22, 22}, ...
+                'ColumnWidth', {90, '1x', 90, '1x'}, ...
+                'Padding', [8 8 8 8], 'RowSpacing', 6, 'ColumnSpacing', 6);
+
+            uilabel(gl,'Text','Dataset:','HorizontalAlignment','right','FontSize',9);
+            brWidgets.ddDS = uidropdown(gl,'Items', dsNames, 'ItemsData', 1:nDS, ...
+                'Value', appData.activeIdx, 'FontSize', 9);
+            brWidgets.ddDS.Layout.Column = [2 4];
+
+            uilabel(gl,'Text','Y Channel:','HorizontalAlignment','right','FontSize',9);
+            brWidgets.ddY = uidropdown(gl,'Items', allYLabels, ...
+                'Value', allYLabels{1}, 'FontSize', 9);
+
+            uilabel(gl,'Text','');  uilabel(gl,'Text','');
+
+            % Gap range
+            uilabel(gl,'Text','Gap X min:','HorizontalAlignment','right','FontSize',9);
+            brWidgets.efGapLo = uieditfield(gl,'Value','','Placeholder','e.g. 30','FontSize',9);
+
+            uilabel(gl,'Text','Gap X max:','HorizontalAlignment','right','FontSize',9);
+            brWidgets.efGapHi = uieditfield(gl,'Value','','Placeholder','e.g. 50','FontSize',9);
+
+            % Options
+            brWidgets.cbLogY = uicheckbox(gl,'Text','Log Y','Value',false,'FontSize',9);
+            brWidgets.cbLogY.Layout.Row = 4; brWidgets.cbLogY.Layout.Column = 1;
+
+            uilabel(gl,'Text','Width ratio:','HorizontalAlignment','right','FontSize',9);
+            brWidgets.ddRatio = uidropdown(gl, ...
+                'Items', {'Proportional','1:1','2:1','1:2'}, ...
+                'Value', 'Proportional', 'FontSize', 9);
+
+            uilabel(gl,'Text','Title:','HorizontalAlignment','right','FontSize',9);
+            brWidgets.efTitle = uieditfield(gl,'Value','','Placeholder','Figure title','FontSize',9);
+            brWidgets.efTitle.Layout.Column = [2 4];
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  GENERATE: Parameter Evolution
+        % ────────────────────────────────────────────────────────────────
+        function generateParamEvol()
+            dsIdx   = ensureCellNum(peWidgets.lbDS.Value);
+            xMode   = peWidgets.ddXMode.Value;
+            yMetric = peWidgets.ddYMetric.Value;
+            peakIdx = peWidgets.spPeakIdx.Value;
+            connect = peWidgets.cbConnect.Value;
+
+            if isempty(dsIdx)
+                uialert(bFig,'Select at least one dataset.','No data'); return;
+            end
+
+            fmtOpts = getFormatOpts();
+
+            xVals = NaN(1, numel(dsIdx));
+            yVals = NaN(1, numel(dsIdx));
+            labels = cell(1, numel(dsIdx));
+
+            for si = 1:numel(dsIdx)
+                di = dsIdx(si);
+                ds = appData.datasets{di};
+                d  = getPlotData(di);
+                labels{si} = dsNames{di};
+
+                % X value
+                switch xMode
+                    case 'File index'
+                        xVals(si) = si;
+                    case 'Temperature (K)'
+                        xVals(si) = extractMetaField(d.metadata, {'temperature','temp','Temperature'});
+                    case 'Field (Oe)'
+                        xVals(si) = extractMetaField(d.metadata, {'field','magneticField','Field'});
+                end
+
+                % Y value
+                switch yMetric
+                    case 'Integrated Y'
+                        % Sum of first Y channel
+                        if ~isempty(d.values)
+                            col = d.values(:, 1);
+                            yVals(si) = trapz(d.time(~isnan(col)), col(~isnan(col)));
+                        end
+                    otherwise
+                        % Peak-based metrics
+                        if isempty(ds.peaks) || numel(ds.peaks) < peakIdx
+                            continue;
+                        end
+                        % Sort peaks by center
+                        centers = [ds.peaks.center];
+                        [~, sortIdx] = sort(centers);
+                        pk = ds.peaks(sortIdx(peakIdx));
+
+                        switch yMetric
+                            case 'Peak center', yVals(si) = pk.center;
+                            case 'Peak FWHM',   yVals(si) = pk.fwhm;
+                            case 'Peak area',   yVals(si) = pk.area;
+                            case 'Peak height', yVals(si) = pk.height;
+                        end
+                end
+            end
+
+            % Plot
+            outFig = figure('Name','Parameter Evolution','NumberTitle','off', ...
+                'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
+            tAx = axes(outFig);
+            hold(tAx, 'on'); box(tAx, 'on'); grid(tAx, 'on');
+            tAx.FontSize = fmtOpts.fontSize;
+            tAx.FontName = fmtOpts.fontName;
+            tAx.TickDir  = 'in';
+
+            valid = ~isnan(xVals) & ~isnan(yVals);
+            if connect
+                plot(tAx, xVals(valid), yVals(valid), '-o', ...
+                    'Color', [0.12 0.47 0.71], ...
+                    'MarkerFaceColor', [0.12 0.47 0.71], ...
+                    'MarkerSize', 6, 'LineWidth', 1.5);
+            else
+                scatter(tAx, xVals(valid), yVals(valid), 50, ...
+                    [0.12 0.47 0.71], 'filled');
+            end
+
+            % Label points with filenames if few enough
+            if sum(valid) <= 15 && strcmp(xMode, 'File index')
+                validIdx = find(valid);
+                for vi = 1:numel(validIdx)
+                    text(tAx, xVals(validIdx(vi)), yVals(validIdx(vi)), ...
+                        ['  ' labels{validIdx(vi)}], ...
+                        'FontSize', max(fmtOpts.fontSize-3, 6), ...
+                        'Interpreter', 'none', 'Rotation', 20);
+                end
+            end
+
+            % Axis labels
+            xlabel(tAx, xMode, 'FontSize', fmtOpts.fontSize);
+            ylabel(tAx, yMetric, 'FontSize', fmtOpts.fontSize);
+
+            ttl = peWidgets.efTitle.Value;
+            if ~isempty(ttl)
+                title(tAx, ttl, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
+            end
+
+            addRefLineTools(outFig);
+            figure(outFig);
+            delete(bFig);
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  GENERATE: Broken Axis
+        % ────────────────────────────────────────────────────────────────
+        function generateBrokenAxis()
+            di    = brWidgets.ddDS.Value;
+            yName = brWidgets.ddY.Value;
+            gapLo = str2double(brWidgets.efGapLo.Value);
+            gapHi = str2double(brWidgets.efGapHi.Value);
+            logY  = brWidgets.cbLogY.Value;
+
+            if isnan(gapLo) || isnan(gapHi) || gapLo >= gapHi
+                uialert(bFig, 'Enter valid Gap X min < Gap X max.', 'Invalid gap'); return;
+            end
+
+            d = getPlotData(di);
+            idx = find(strcmp(d.labels, yName), 1);
+            if isempty(idx)
+                uialert(bFig, sprintf('Channel "%s" not found.', yName), 'Missing channel'); return;
+            end
+
+            xAll = d.time;
+            yAll = d.values(:, idx);
+            good = ~isnan(xAll) & ~isnan(yAll);
+            xAll = xAll(good); yAll = yAll(good);
+
+            % Split data into left and right segments
+            leftMask  = xAll < gapLo;
+            rightMask = xAll > gapHi;
+
+            if ~any(leftMask) || ~any(rightMask)
+                uialert(bFig, 'Gap range leaves no data on one side.', 'Empty segment'); return;
+            end
+
+            xLeft = xAll(leftMask);  yLeft = yAll(leftMask);
+            xRight = xAll(rightMask); yRight = yAll(rightMask);
+
+            % Width ratio
+            ratioStr = brWidgets.ddRatio.Value;
+            switch ratioStr
+                case 'Proportional'
+                    rangeL = max(xLeft) - min(xLeft);
+                    rangeR = max(xRight) - min(xRight);
+                    wRatio = [rangeL rangeR];
+                case '1:1', wRatio = [1 1];
+                case '2:1', wRatio = [2 1];
+                case '1:2', wRatio = [1 2];
+                otherwise,  wRatio = [1 1];
+            end
+            wFrac = wRatio / sum(wRatio);
+
+            fmtOpts = getFormatOpts();
+            ls = localLineSpec(ddBStyle.Value);
+
+            outFig = figure('Name','Broken Axis','NumberTitle','off', ...
+                'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
+
+            % Create two axes side by side with a small gap
+            gap  = 0.03;  % normalized gap width for break marks
+            left_w  = (1 - gap) * wFrac(1) * 0.75;
+            right_w = (1 - gap) * wFrac(2) * 0.75;
+            left_x  = 0.12;
+            right_x = left_x + left_w + gap;
+
+            ax1 = axes(outFig, 'Position', [left_x  0.15 left_w  0.75]);
+            ax2 = axes(outFig, 'Position', [right_x 0.15 right_w 0.75]);
+
+            % Plot left segment
+            hold(ax1, 'on'); box(ax1, 'on'); grid(ax1, 'on');
+            plot(ax1, xLeft, yLeft, ls{:}, 'Color', [0.12 0.47 0.71], ...
+                'LineWidth', fmtOpts.lineWidth);
+            ax1.FontSize = fmtOpts.fontSize;
+            ax1.FontName = fmtOpts.fontName;
+            ax1.TickDir  = 'in';
+            ax1.XLim = [min(xLeft) max(xLeft)];
+
+            % Plot right segment
+            hold(ax2, 'on'); box(ax2, 'on'); grid(ax2, 'on');
+            plot(ax2, xRight, yRight, ls{:}, 'Color', [0.12 0.47 0.71], ...
+                'LineWidth', fmtOpts.lineWidth);
+            ax2.FontSize = fmtOpts.fontSize;
+            ax2.FontName = fmtOpts.fontName;
+            ax2.TickDir  = 'in';
+            ax2.XLim = [min(xRight) max(xRight)];
+            ax2.YTickLabel = {};  % suppress Y labels on right axes
+
+            % Link Y axes
+            linkaxes([ax1, ax2], 'y');
+
+            if logY
+                ax1.YScale = 'log'; ax2.YScale = 'log';
+            end
+
+            % Labels
+            xLbl = guiLabel(guiXName(d.metadata), guiXUnit(d.metadata));
+            yLbl = guiLabel(yName, d.units{min(idx, numel(d.units))});
+            xlabel(ax1, xLbl, 'FontSize', fmtOpts.fontSize);
+            xlabel(ax2, xLbl, 'FontSize', fmtOpts.fontSize);
+            ylabel(ax1, yLbl, 'FontSize', fmtOpts.fontSize);
+
+            ttl = brWidgets.efTitle.Value;
+            if ~isempty(ttl)
+                title(ax1, ttl, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
+            end
+
+            % Draw diagonal break marks on both axes
+            drawBreakMarks(ax1, 'right');
+            drawBreakMarks(ax2, 'left');
+
+            addRefLineTools(outFig);
+            figure(outFig);
+            delete(bFig);
+        end
+
+        function val = extractMetaField(meta, fieldNames)
+        %EXTRACTMETAFIELD  Try to extract a numeric value from metadata by field name.
+            val = NaN;
+            for fi = 1:numel(fieldNames)
+                if isfield(meta, fieldNames{fi})
+                    v = meta.(fieldNames{fi});
+                    if isnumeric(v) && isscalar(v)
+                        val = v; return;
+                    elseif ischar(v) || isstring(v)
+                        val = str2double(v);
+                        if ~isnan(val), return; end
+                    end
+                end
+            end
+            % Also check parserSpecific
+            if isfield(meta, 'parserSpecific')
+                ps = meta.parserSpecific;
+                for fi = 1:numel(fieldNames)
+                    if isfield(ps, fieldNames{fi})
+                        v = ps.(fieldNames{fi});
+                        if isnumeric(v) && isscalar(v)
+                            val = v; return;
+                        end
+                    end
+                end
+            end
+        end
+
+        function drawBreakMarks(targetAx, side)
+        %DRAWBREAKMARKS  Draw diagonal break marks on the specified side of an axes.
+            yl = targetAx.YLim;
+            yMid = mean(yl);
+            ySpan = diff(yl) * 0.02;
+
+            if strcmp(side, 'right')
+                xl = targetAx.XLim;
+                xPos = xl(2);
+                dx = diff(xl) * 0.015;
+            else
+                xl = targetAx.XLim;
+                xPos = xl(1);
+                dx = diff(xl) * 0.015;
+            end
+
+            % Draw two small diagonal lines at the break
+            line(targetAx, [xPos-dx xPos+dx], [yMid-ySpan*2 yMid-ySpan*0.5], ...
+                'Color', 'k', 'LineWidth', 1.5, 'Clipping', 'off', ...
+                'HandleVisibility', 'off');
+            line(targetAx, [xPos-dx xPos+dx], [yMid+ySpan*0.5 yMid+ySpan*2], ...
+                'Color', 'k', 'LineWidth', 1.5, 'Clipping', 'off', ...
+                'HandleVisibility', 'off');
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  CONFIG: Quick Grid
+        % ────────────────────────────────────────────────────────────────
+        function buildQuickGridConfig()
+            gl = uigridlayout(configPanel, [5 4], ...
+                'RowHeight', {22, '1x', 22, 22, 22}, ...
+                'ColumnWidth', {90, '1x', 90, '1x'}, ...
+                'Padding', [8 8 8 8], 'RowSpacing', 4, 'ColumnSpacing', 6);
+
+            % Row 1: instructions
+            uilabel(gl,'Text','Select datasets — each gets its own panel:', ...
+                'FontSize',9,'FontAngle','italic');
+            uilabel(gl,'Text',''); uilabel(gl,'Text','');
+            uilabel(gl,'Text','Y Channel:','FontSize',9,'FontWeight','bold');
+
+            % Row 2: dataset multi-select + Y channel
+            qgWidgets.lbDS = uilistbox(gl,'Items', dsNames, 'ItemsData', 1:nDS, ...
+                'Multiselect','on','Value', 1:min(nDS,4), 'FontSize', 9);
+            qgWidgets.lbDS.Layout.Row = 2; qgWidgets.lbDS.Layout.Column = [1 2];
+
+            qgWidgets.lbY = uilistbox(gl,'Items', allYLabels, 'Multiselect','on', ...
+                'Value', allYLabels(1:min(1,numel(allYLabels))), 'FontSize', 9);
+            qgWidgets.lbY.Layout.Row = 2; qgWidgets.lbY.Layout.Column = [3 4];
+
+            % Row 3: rows/cols
+            uilabel(gl,'Text','Rows:','HorizontalAlignment','right','FontSize',9);
+            qgWidgets.spRows = uispinner(gl,'Value',2,'Limits',[1 8],'Step',1,'FontSize',9);
+
+            uilabel(gl,'Text','Columns:','HorizontalAlignment','right','FontSize',9);
+            qgWidgets.spCols = uispinner(gl,'Value',2,'Limits',[1 8],'Step',1,'FontSize',9);
+
+            % Row 4: share options
+            qgWidgets.cbShareX = uicheckbox(gl,'Text','Share X axis','Value',true,'FontSize',9);
+            qgWidgets.cbShareX.Layout.Row = 4; qgWidgets.cbShareX.Layout.Column = [1 2];
+
+            qgWidgets.cbShareY = uicheckbox(gl,'Text','Share Y scale','Value',false,'FontSize',9);
+            qgWidgets.cbShareY.Layout.Row = 4; qgWidgets.cbShareY.Layout.Column = [3 4];
+
+            % Row 5: log Y, auto-fill mode
+            qgWidgets.cbLogY = uicheckbox(gl,'Text','Log Y','Value',false,'FontSize',9);
+            qgWidgets.cbLogY.Layout.Row = 5; qgWidgets.cbLogY.Layout.Column = 1;
+
+            uilabel(gl,'Text','Titles:','HorizontalAlignment','right','FontSize',9);
+            qgWidgets.ddTitleMode = uidropdown(gl, ...
+                'Items', {'Filename','None','Channel name'}, ...
+                'Value', 'Filename', 'FontSize', 9);
+
+            uilabel(gl,'Text','Empty cells:','HorizontalAlignment','right','FontSize',9);
+            qgWidgets.ddEmpty = uidropdown(gl, ...
+                'Items', {'Leave blank','Hide axes'}, ...
+                'Value', 'Leave blank', 'FontSize', 9);
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  GENERATE: Quick Grid
+        % ────────────────────────────────────────────────────────────────
+        function generateQuickGrid()
+            dsIdx = ensureCellNum(qgWidgets.lbDS.Value);
+            selY  = ensureCellStr(qgWidgets.lbY.Value);
+            nR    = qgWidgets.spRows.Value;
+            nC    = qgWidgets.spCols.Value;
+            shareX = qgWidgets.cbShareX.Value;
+            shareY = qgWidgets.cbShareY.Value;
+            logY   = qgWidgets.cbLogY.Value;
+            titleMode = qgWidgets.ddTitleMode.Value;
+            emptyMode = qgWidgets.ddEmpty.Value;
+
+            nPanels = nR * nC;
+            nSel    = numel(dsIdx);
+
+            if nSel == 0
+                uialert(bFig,'Select at least one dataset.','No data'); return;
+            end
+
+            [outFig, tlo] = makeOutFig(nR, nC, shareX);
+            fmtOpts = getFormatOpts();
+            ls = localLineSpec(ddBStyle.Value);
+
+            allAxes = gobjects(1, nPanels);
+
+            for pi = 1:nPanels
+                tAx = nexttile(tlo, pi);
+
+                % If more panels than datasets, handle empty cells
+                if pi > nSel
+                    if strcmp(emptyMode, 'Hide axes')
+                        tAx.Visible = 'off';
+                    end
+                    allAxes(pi) = tAx;
+                    continue;
+                end
+
+                setupAx(tAx);
+                allAxes(pi) = tAx;
+
+                di = dsIdx(pi);
+                d  = getPlotData(di);
+                xVec = d.time;
+                xLbl = guiLabel(guiXName(d.metadata), guiXUnit(d.metadata));
+
+                nTraces = max(numel(selY), 1);
+                if fmtOpts.grayscale
+                    clrs = repmat(linspace(0, 0.7, nTraces)', 1, 3);
+                else
+                    clrs = getColorsFromMap('lines (MATLAB default)', nTraces);
+                end
+
+                yLbl = '';
+                for ki = 1:numel(selY)
+                    yName = selY{ki};
+                    idx = find(strcmp(d.labels, yName), 1);
+                    if isempty(idx), continue; end
+
+                    yVec = d.values(:, idx);
+                    good = ~isnan(xVec) & ~isnan(yVec);
+                    if isdatetime(xVec), good = ~isnat(xVec) & ~isnan(yVec); end
+
+                    if isempty(yLbl) && idx <= numel(d.units)
+                        yLbl = guiLabel(yName, d.units{idx});
+                    end
+
+                    dName = yName;
+
+                    % Error handling
+                    errIdx = findErrorColumn(d.labels, yName);
+                    if ~isempty(errIdx) && ~strcmp(fmtOpts.errorStyle, 'None')
+                        yErr = d.values(:, errIdx);
+                        yErrG = yErr(good);
+                        xG = xVec(good); yG = yVec(good);
+
+                        if strcmp(fmtOpts.errorStyle, 'Error Band')
+                            fill(tAx, [xG; flipud(xG)], ...
+                                [yG + yErrG; flipud(yG - yErrG)], ...
+                                clrs(ki,:), 'FaceAlpha', 0.2, ...
+                                'EdgeColor', 'none', 'HandleVisibility', 'off');
+                            plot(tAx, xG, yG, ls{:}, ...
+                                'Color', clrs(ki,:), ...
+                                'LineWidth', fmtOpts.lineWidth, ...
+                                'DisplayName', dName);
+                        else
+                            errorbar(tAx, xG, yG, yErrG, ...
+                                'Color', clrs(ki,:), ...
+                                'LineWidth', max(fmtOpts.lineWidth-0.5, 0.75), ...
+                                'CapSize', 3, 'DisplayName', dName);
+                        end
+                    else
+                        plot(tAx, xVec(good), yVec(good), ls{:}, ...
+                            'Color', clrs(ki,:), ...
+                            'LineWidth', fmtOpts.lineWidth, ...
+                            'DisplayName', dName);
+                    end
+                end
+
+                if logY, tAx.YScale = 'log'; end
+
+                % Labels — suppress X on non-bottom rows when sharing
+                [panelRow, ~] = ind2sub([nR, nC], pi);
+                if shareX && panelRow < nR
+                    xlabel(tAx, '');
+                else
+                    xlabel(tAx, xLbl, 'FontSize', fmtOpts.fontSize);
+                end
+
+                % Suppress Y on non-left columns when sharing
+                [~, panelCol] = ind2sub([nR, nC], pi);
+                if shareY && panelCol > 1
+                    ylabel(tAx, '');
+                else
+                    ylabel(tAx, yLbl, 'FontSize', fmtOpts.fontSize);
+                end
+
+                % Title
+                switch titleMode
+                    case 'Filename'
+                        title(tAx, dsNames{di}, 'FontSize', fmtOpts.fontSize, 'Interpreter', 'none');
+                    case 'Channel name'
+                        if ~isempty(selY)
+                            title(tAx, strjoin(selY, ', '), 'FontSize', fmtOpts.fontSize, 'Interpreter', 'none');
+                        end
+                    % 'None' — no title
+                end
+
+                % Legend only if multiple Y channels
+                if numel(selY) > 1
+                    legend(tAx,'Interpreter','none','FontSize',max(fmtOpts.fontSize-2,6),'Location','best');
+                end
+            end
+
+            linkIfNeeded(allAxes(1:min(nSel,nPanels)), shareX, shareY);
+            addRefLineTools(outFig);
+            figure(outFig);
+            delete(bFig);
+        end
+
+        % ════════════════════════════════════════════════════════════════
+        %  Shared helpers (nested inside the builder)
+        % ════════════════════════════════════════════════════════════════
+
+        function d = getPlotData(dsIdx)
+        %GETPLOTDATA  Return corrected data if available, else raw.
+            ds = appData.datasets{dsIdx};
+            if ~isempty(ds.corrData)
+                d = ds.corrData;
+            else
+                d = ds.data;
+            end
+        end
+
+        function fmtOpts = getFormatOpts()
+        %GETFORMATOPTS  Gather global formatting options into a struct.
+            fmtOpts.fontSize  = spFont.Value;
+            fmtOpts.fontName  = ddFontName.Value;
+            fmtOpts.lineWidth = 1.5;
+            fmtOpts.grayscale = cbGrayscale.Value;
+            fmtOpts.errorStyle = ddErrorStyle.Value;
+        end
+
+        function [outFig, tlo] = makeOutFig(nR, nC, shareX)
+        %MAKEOUTFIG  Create a figure + tiledlayout with the global dimensions.
+            outFig = figure('Name','Figure','NumberTitle','off', ...
+                'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
+            spacing = 'loose';
+            if shareX, spacing = 'compact'; end
+            tlo = tiledlayout(outFig, nR, nC, ...
+                'TileSpacing', spacing, 'Padding', 'compact');
+        end
+
+        function setupAx(tAx)
+        %SETUPAX  Apply consistent base styling to an axes.
+            hold(tAx, 'on'); box(tAx, 'on'); grid(tAx, 'on');
+            fmtOpts = getFormatOpts();
+            tAx.FontSize = fmtOpts.fontSize;
+            tAx.FontName = fmtOpts.fontName;
+            tAx.TickDir  = 'in';
+        end
+
+        function [ci, xLbl, yLbl] = plotTraces(tAx, dsIdx, selY, ls, fmtOpts)
+        %PLOTTRACES  Plot dataset/channel pairs into an axes. Returns trace count + labels.
+            nTraces = max(numel(dsIdx) * numel(selY), 1);
+            if fmtOpts.grayscale
+                clrs = repmat(linspace(0, 0.7, nTraces)', 1, 3);
+            else
+                clrs = getColorsFromMap('lines (MATLAB default)', nTraces);
+            end
+
+            % Grayscale: cycle line styles and marker shapes for distinguishability
+            GS_STYLES  = {'-', '--', ':', '-.'};
+            GS_MARKERS = {'o', 's', '^', 'd', 'v', '>', '<', 'p'};
+
+            ci = 0; xLbl = ''; yLbl = '';
+
+            for si = 1:numel(dsIdx)
+                di = dsIdx(si);
+                if di < 1 || di > nDS, continue; end
+                d = getPlotData(di);
+                xVec = d.time;
+                if isempty(xLbl)
+                    xLbl = guiLabel(guiXName(d.metadata), guiXUnit(d.metadata));
+                end
+
+                fileSuffix = '';
+                if numel(dsIdx) > 1
+                    fileSuffix = sprintf('  (%s)', dsNames{di});
+                end
+
+                for ki = 1:numel(selY)
+                    yName = selY{ki};
+                    idx = find(strcmp(d.labels, yName), 1);
+                    if isempty(idx), continue; end
+
+                    ci = ci + 1;
+                    yVec = d.values(:, idx);
+                    dName = [yName, fileSuffix];
+
+                    if isempty(yLbl) && idx <= numel(d.units)
+                        yLbl = guiLabel(yName, d.units{idx});
+                    end
+
+                    good = ~isnan(xVec) & ~isnan(yVec);
+                    if isdatetime(xVec), good = ~isnat(xVec) & ~isnan(yVec); end
+
+                    baseColor = clrs(min(ci, size(clrs,1)), :);
+
+                    % Build line spec — override with grayscale variation
+                    plotLS = ls;
+                    if fmtOpts.grayscale
+                        gsStyle  = GS_STYLES{mod(ci-1, numel(GS_STYLES)) + 1};
+                        gsMarker = GS_MARKERS{mod(ci-1, numel(GS_MARKERS)) + 1};
+                        plotLS = {'LineStyle', gsStyle, 'Marker', gsMarker, 'MarkerSize', 4};
+                    end
+
+                    % Error handling
+                    errIdx = findErrorColumn(d.labels, yName);
+                    if ~isempty(errIdx) && ~strcmp(fmtOpts.errorStyle, 'None')
+                        yErr = d.values(:, errIdx);
+                        yErrG = yErr(good);
+                        xG = xVec(good); yG = yVec(good);
+
+                        if strcmp(fmtOpts.errorStyle, 'Error Band')
+                            fill(tAx, [xG; flipud(xG)], ...
+                                [yG + yErrG; flipud(yG - yErrG)], ...
+                                baseColor, 'FaceAlpha', 0.2, ...
+                                'EdgeColor', 'none', ...
+                                'HandleVisibility', 'off');
+                            plot(tAx, xG, yG, plotLS{:}, ...
+                                'Color', baseColor, ...
+                                'LineWidth', fmtOpts.lineWidth, ...
+                                'DisplayName', dName);
+                        else  % Error Bars
+                            errorbar(tAx, xG, yG, yErrG, ...
+                                'Color', baseColor, ...
+                                'LineWidth', max(fmtOpts.lineWidth - 0.5, 0.75), ...
+                                'CapSize', 3, ...
+                                'DisplayName', dName);
+                        end
+                    else
+                        plot(tAx, xVec(good), yVec(good), plotLS{:}, ...
+                            'Color', baseColor, ...
+                            'LineWidth', fmtOpts.lineWidth, ...
+                            'DisplayName', dName);
+                    end
+                end
+            end
+        end
+
+        function linkIfNeeded(allAxes, shareX, shareY)
+        %LINKIFNEEDED  Link axes array for shared X/Y.
+            validAx = allAxes(isvalid(allAxes));
+            if numel(validAx) < 2, return; end
+            if shareX && shareY
+                linkaxes(validAx, 'xy');
+            elseif shareX
+                linkaxes(validAx, 'x');
+            elseif shareY
+                linkaxes(validAx, 'y');
+            end
+        end
+
+        function v = ensureCellNum(val)
+        %ENSURECELLNUM  Normalise listbox value to numeric vector.
+            if ~iscell(val), val = {val}; end
+            v = cell2mat(val);
+        end
+
+        function v = ensureCellStr(val)
+        %ENSURECELLSTR  Normalise listbox value to cell array of char.
+            if ischar(val), v = {val};
+            elseif isstring(val), v = cellstr(val);
+            elseif iscell(val), v = val;
+            else, v = {char(val)};
+            end
+        end
+
+        function addRefLineTools(outFig)
+        %ADDREFLINETOOLS  Add reference-line, region, annotation, and peak-label buttons.
+            tb = findall(outFig, 'Type', 'uitoolbar');
+            if isempty(tb)
+                tb = uitoolbar(outFig);
+            else
+                tb = tb(1);
+            end
+
+            uipushtool(tb, 'Tooltip', 'Add H reference line', ...
+                'ClickedCallback', @(~,~) addHRefLine(outFig));
+            uipushtool(tb, 'Tooltip', 'Add V reference line', ...
+                'ClickedCallback', @(~,~) addVRefLine(outFig));
+            uipushtool(tb, 'Tooltip', 'Add shaded region', ...
+                'ClickedCallback', @(~,~) addShadedRegion(outFig));
+            uipushtool(tb, 'Tooltip', 'Add text annotation', ...
+                'ClickedCallback', @(~,~) addTextAnnotation(outFig));
+            uipushtool(tb, 'Tooltip', 'Add arrow annotation', ...
+                'ClickedCallback', @(~,~) addArrowAnnotation(outFig));
+            uipushtool(tb, 'Tooltip', 'Add peak labels from active dataset', ...
+                'ClickedCallback', @(~,~) addPeakLabels(outFig));
+            uipushtool(tb, 'Tooltip', 'Add inset zoom', ...
+                'ClickedCallback', @(~,~) addInsetZoom(outFig));
+        end
+
+        function addHRefLine(outFig)
+        %ADDHREFLINE  Prompt for Y value and add horizontal reference line.
+            answer = inputdlg({'Y value:', 'Label (optional):'}, 'H Reference Line', [1 40], {'0',''});
+            if isempty(answer), return; end
+            yVal = str2double(answer{1});
+            if isnan(yVal), return; end
+            lbl = strtrim(answer{2});
+            tAx = gca(outFig);
+            if isempty(lbl)
+                yline(tAx, yVal, '--', 'Color', [0.5 0.5 0.5], 'LineWidth', 0.75, ...
+                    'HandleVisibility', 'off');
+            else
+                yline(tAx, yVal, '--', lbl, 'Color', [0.5 0.5 0.5], 'LineWidth', 0.75, ...
+                    'LabelHorizontalAlignment', 'left', 'HandleVisibility', 'off');
+            end
+        end
+
+        function addVRefLine(outFig)
+        %ADDVREFLINE  Prompt for X value and add vertical reference line.
+            answer = inputdlg({'X value:', 'Label (optional):'}, 'V Reference Line', [1 40], {'0',''});
+            if isempty(answer), return; end
+            xVal = str2double(answer{1});
+            if isnan(xVal), return; end
+            lbl = strtrim(answer{2});
+            tAx = gca(outFig);
+            if isempty(lbl)
+                xline(tAx, xVal, '--', 'Color', [0.5 0.5 0.5], 'LineWidth', 0.75, ...
+                    'HandleVisibility', 'off');
+            else
+                xline(tAx, xVal, '--', lbl, 'Color', [0.5 0.5 0.5], 'LineWidth', 0.75, ...
+                    'LabelHorizontalAlignment', 'right', 'HandleVisibility', 'off');
+            end
+        end
+
+        function addShadedRegion(outFig)
+        %ADDSHADEDREGION  Prompt for X range and shade that region.
+            answer = inputdlg({'X min:', 'X max:', 'Label (optional):', 'Color (r/g/b/y/c):'}, ...
+                'Shaded Region', [1 40], {'','','','b'});
+            if isempty(answer), return; end
+            x1 = str2double(answer{1}); x2 = str2double(answer{2});
+            if isnan(x1) || isnan(x2), return; end
+            lbl = strtrim(answer{3});
+            colorChar = lower(strtrim(answer{4}));
+
+            colorMap = struct('r',[1 0.2 0.2],'g',[0.2 0.8 0.2],'b',[0.2 0.4 0.9], ...
+                'y',[0.9 0.8 0.2],'c',[0.2 0.7 0.8]);
+            if isfield(colorMap, colorChar)
+                c = colorMap.(colorChar);
+            else
+                c = [0.2 0.4 0.9];
+            end
+
+            tAx = gca(outFig);
+            yl = tAx.YLim;
+            patch(tAx, [x1 x2 x2 x1], [yl(1) yl(1) yl(2) yl(2)], c, ...
+                'FaceAlpha', 0.12, 'EdgeColor', 'none', ...
+                'HandleVisibility', 'off');
+            if ~isempty(lbl)
+                text(tAx, (x1+x2)/2, yl(2), lbl, ...
+                    'HorizontalAlignment', 'center', ...
+                    'VerticalAlignment', 'top', ...
+                    'FontSize', 8, 'Color', c * 0.7);
+            end
+        end
+
+        function addTextAnnotation(outFig)
+        %ADDTEXTANNOTATION  Prompt for text and position, place on active axes.
+            answer = inputdlg({'Text:', 'X position:', 'Y position:', 'Font size:'}, ...
+                'Text Annotation', [1 40], {'Label', '', '', '10'});
+            if isempty(answer), return; end
+            txt = answer{1};
+            xPos = str2double(answer{2});
+            yPos = str2double(answer{3});
+            fSz  = str2double(answer{4});
+            if isnan(fSz), fSz = 10; end
+
+            tAx = gca(outFig);
+            if isnan(xPos) || isnan(yPos)
+                % Place at center of axes if no position given
+                xl = tAx.XLim; yl = tAx.YLim;
+                xPos = mean(xl); yPos = mean(yl);
+            end
+            text(tAx, xPos, yPos, txt, ...
+                'FontSize', fSz, 'HorizontalAlignment', 'center', ...
+                'BackgroundColor', 'w', 'EdgeColor', [0.5 0.5 0.5], ...
+                'Margin', 2, 'HandleVisibility', 'off');
+        end
+
+        function addArrowAnnotation(outFig)
+        %ADDARROWANNOTATION  Prompt for arrow endpoints and label, then draw.
+            answer = inputdlg({'Label:', 'Arrow X start:', 'Arrow Y start:', ...
+                'Arrow X end (tip):', 'Arrow Y end (tip):'}, ...
+                'Arrow Annotation', [1 40], {'', '', '', '', ''});
+            if isempty(answer), return; end
+            lbl = answer{1};
+            x1 = str2double(answer{2}); y1 = str2double(answer{3});
+            x2 = str2double(answer{4}); y2 = str2double(answer{5});
+            if any(isnan([x1 y1 x2 y2])), return; end
+
+            % Convert data coords to normalized figure coords
+            tAx = gca(outFig);
+            % Get axes position in normalized figure units
+            axPos = getpixelposition(tAx, true);
+            figPos = getpixelposition(outFig);
+            % Map data → pixels → normalized
+            xPix1 = axPos(1) + (x1 - tAx.XLim(1)) / diff(tAx.XLim) * axPos(3);
+            yPix1 = axPos(2) + (y1 - tAx.YLim(1)) / diff(tAx.YLim) * axPos(4);
+            xPix2 = axPos(1) + (x2 - tAx.XLim(1)) / diff(tAx.XLim) * axPos(3);
+            yPix2 = axPos(2) + (y2 - tAx.YLim(1)) / diff(tAx.YLim) * axPos(4);
+
+            xNorm = [xPix1 xPix2] / figPos(3);
+            yNorm = [yPix1 yPix2] / figPos(4);
+
+            if isempty(lbl)
+                annotation(outFig, 'arrow', xNorm, yNorm, 'Color', [0.3 0.3 0.3]);
+            else
+                annotation(outFig, 'textarrow', xNorm, yNorm, ...
+                    'String', lbl, 'FontSize', 9, 'Color', [0.3 0.3 0.3]);
+            end
+        end
+
+        function addPeakLabels(~)
+        %ADDPEAKLABELS  Read peaks from the active dataset and label them on the plot.
+            if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+            ds = appData.datasets{appData.activeIdx};
+            if isempty(ds.peaks)
+                msgbox('No peaks detected on the active dataset. Run peak detection first.', ...
+                    'No Peaks', 'warn');
+                return;
+            end
+
+            % Choose label mode
+            answer = inputdlg({'Label mode (center / fwhm / hkl):'}, ...
+                'Peak Labels', [1 40], {'center'});
+            if isempty(answer), return; end
+            mode = lower(strtrim(answer{1}));
+
+            tAx = gca;
+            yl = tAx.YLim;
+            yRange = diff(yl);
+            peaks = ds.peaks;
+
+            for pk = 1:numel(peaks)
+                xc = peaks(pk).center;
+                yc = peaks(pk).height;
+
+                switch mode
+                    case 'fwhm'
+                        lbl = sprintf('%.2f\n(%.3f)', xc, peaks(pk).fwhm);
+                    case 'hkl'
+                        if isfield(peaks(pk), 'hkl') && ~isempty(peaks(pk).hkl)
+                            lbl = peaks(pk).hkl;
+                        else
+                            lbl = sprintf('%.2f', xc);
+                        end
+                    otherwise  % 'center'
+                        lbl = sprintf('%.2f', xc);
+                end
+
+                % Smart vertical offset: stagger odd/even peaks
+                if mod(pk, 2) == 0
+                    yOff = yRange * 0.06;
+                else
+                    yOff = yRange * 0.03;
+                end
+
+                % Marker
+                plot(tAx, xc, yc, 'v', 'MarkerSize', 6, ...
+                    'MarkerFaceColor', [0.8 0.2 0.2], ...
+                    'MarkerEdgeColor', 'none', ...
+                    'HandleVisibility', 'off', ...
+                    'Tag', 'FigBuilderPeakMarker');
+
+                % Label
+                text(tAx, xc, yc + yOff, lbl, ...
+                    'FontSize', 7, 'HorizontalAlignment', 'center', ...
+                    'VerticalAlignment', 'bottom', ...
+                    'Color', [0.6 0.1 0.1], ...
+                    'HandleVisibility', 'off', ...
+                    'Tag', 'FigBuilderPeakLabel');
+            end
+        end
+
+        function addInsetZoom(outFig)
+        %ADDINSETZOOM  Create an inset axes showing a zoomed region of the active panel.
+            tAx = gca(outFig);
+            xl = tAx.XLim; yl = tAx.YLim;
+            answer = inputdlg( ...
+                {'X min:', 'X max:', 'Y min:', 'Y max:', 'Inset position (tl/tr/bl/br):'}, ...
+                'Inset Zoom', [1 40], ...
+                {num2str(xl(1)), num2str(xl(2)), num2str(yl(1)), num2str(yl(2)), 'tr'});
+            if isempty(answer), return; end
+            xLo = str2double(answer{1}); xHi = str2double(answer{2});
+            yLo = str2double(answer{3}); yHi = str2double(answer{4});
+            posStr = lower(strtrim(answer{5}));
+            if any(isnan([xLo xHi yLo yHi])), return; end
+
+            % Determine inset position (normalized within axes)
+            axPos = tAx.Position;  % [x y w h] in normalized figure units
+            inW = axPos(3) * 0.35;
+            inH = axPos(4) * 0.35;
+            pad = 0.02;
+            switch posStr
+                case 'tl'
+                    inPos = [axPos(1)+pad, axPos(2)+axPos(4)-inH-pad, inW, inH];
+                case 'bl'
+                    inPos = [axPos(1)+pad, axPos(2)+pad, inW, inH];
+                case 'br'
+                    inPos = [axPos(1)+axPos(3)-inW-pad, axPos(2)+pad, inW, inH];
+                otherwise  % 'tr'
+                    inPos = [axPos(1)+axPos(3)-inW-pad, axPos(2)+axPos(4)-inH-pad, inW, inH];
+            end
+
+            % Create inset axes and copy data from main axes
+            inAx = axes(outFig, 'Position', inPos);
+            box(inAx, 'on'); grid(inAx, 'on');
+            inAx.FontSize = max(tAx.FontSize - 2, 6);
+            hold(inAx, 'on');
+
+            % Copy line objects from the main axes
+            lineObjs = findobj(tAx, 'Type', 'line');
+            for li = 1:numel(lineObjs)
+                lo = lineObjs(li);
+                plot(inAx, lo.XData, lo.YData, ...
+                    'Color', lo.Color, ...
+                    'LineStyle', lo.LineStyle, ...
+                    'LineWidth', lo.LineWidth, ...
+                    'Marker', lo.Marker, ...
+                    'MarkerSize', lo.MarkerSize, ...
+                    'HandleVisibility', 'off');
+            end
+
+            inAx.XLim = [xLo xHi];
+            inAx.YLim = [yLo yHi];
+            inAx.YScale = tAx.YScale;
+            legend(inAx, 'off');
+
+            % Draw a rectangle on the main axes indicating the zoomed region
+            patch(tAx, [xLo xHi xHi xLo], [yLo yLo yHi yHi], 'k', ...
+                'FaceAlpha', 0, 'EdgeColor', [0.5 0.5 0.5], ...
+                'LineStyle', '--', 'LineWidth', 0.75, ...
+                'HandleVisibility', 'off');
+        end
+
+    end  % onAdvancedFigureBuilder
+
     if nargout > 0
         varargout{1} = api;
     end
@@ -12039,6 +14023,19 @@ end
 
 function v = guiTernary(cond, a, b)
     if cond, v = a; else, v = b; end
+end
+
+
+function ls = localLineSpec(style)
+%LOCALLINESPEC  Return line-spec cell for multi-panel plot style.
+    switch style
+        case 'Scatter'
+            ls = {'LineStyle','none','Marker','o','MarkerSize',5};
+        case 'Line+Pts'
+            ls = {'LineStyle','-','Marker','o','MarkerSize',4};
+        otherwise
+            ls = {'LineStyle','-'};
+    end
 end
 
 % Helper: convert NaN ↔ empty string for text-based trim fields

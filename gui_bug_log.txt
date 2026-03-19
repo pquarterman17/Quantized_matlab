@@ -501,3 +501,157 @@ Stack:
   run  (line 112)
   runSuite  (line 135)
   runAllTests  (line 93)
+
+====================================================================
+[2026-03-19 09:16:15]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 12174)
+  DataPlotter/loadFilePaths  (line 2223)
+  DataPlotter/addFilesDirect  (line 2262)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 135)
+  runAllTests  (line 93)
+
+====================================================================
+[2026-03-19 09:30:40]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 12856)
+  DataPlotter/loadFilePaths  (line 2223)
+  DataPlotter/addFilesDirect  (line 2262)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 135)
+  runAllTests  (line 93)
+
+====================================================================
+[2026-03-19 09:37:22]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13054)
+  DataPlotter/loadFilePaths  (line 2223)
+  DataPlotter/addFilesDirect  (line 2262)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 135)
+  runAllTests  (line 93)
+
+====================================================================
+[2026-03-19 09:49:47]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13589)
+  DataPlotter/loadFilePaths  (line 2223)
+  DataPlotter/addFilesDirect  (line 2262)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 135)
+  runAllTests  (line 93)
+
+====================================================================
+[2026-03-19 09:58:24]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13836)
+  DataPlotter/loadFilePaths  (line 2223)
+  DataPlotter/addFilesDirect  (line 2262)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 135)
+  runAllTests  (line 93)
+
+====================================================================
+[2026-03-19 10:00:26]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13836)
+  DataPlotter/loadFilePaths  (line 2223)
+  DataPlotter/addFilesDirect  (line 2262)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 135)
+  runAllTests  (line 93)
+
+====================================================================
+[2026-03-19 10:10:57]  Plot error
+Message: Invalid or deleted object.
+Identifier: MATLAB:class:InvalidHandle
+Stack:
+  AbstractStateComponent.get.Value  (line 159)
+  DataPlotter/drawToAxes  (line 8855)
+  DataPlotter/onPlot  (line 8764)
+  @(~,~)onPlot([],[])  (line 1184)
+
+====================================================================
+[2026-03-19 10:10:59]  Plot error
+Message: Invalid or deleted object.
+Identifier: MATLAB:class:InvalidHandle
+Stack:
+  AbstractStateComponent.get.Value  (line 159)
+  DataPlotter/drawToAxes  (line 8856)
+  DataPlotter/onPlot  (line 8765)
+  @(~,~)onPlot([],[])  (line 1185)
+
+====================================================================
+[2026-03-19 10:11:30]  Plot error
+Message: Invalid or deleted object.
+Identifier: MATLAB:class:InvalidHandle
+Stack:
+  AbstractStateComponent.get.Value  (line 159)
+  DataPlotter/drawToAxes  (line 8856)
+  DataPlotter/onPlot  (line 8765)
+  DataPlotter/onSetAxisPrefixFromMenu  (line 10299)
+  @(src,~)onSetAxisPrefixFromMenu(src,'y')  (line 651)
+
+====================================================================
+[2026-03-19 10:11:34]  Plot error
+Message: Invalid or deleted object.
+Identifier: MATLAB:class:InvalidHandle
+Stack:
+  AbstractStateComponent.get.Value  (line 159)
+  DataPlotter/drawToAxes  (line 8856)
+  DataPlotter/onPlot  (line 8765)
+  DataPlotter/onContextToggle  (line 10307)
+  @(~,~)onContextToggle('logX')  (line 656)
+
+====================================================================
+[2026-03-19 10:14:40]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13859)
+  DataPlotter/loadFilePaths  (line 2225)
+  DataPlotter/addFilesDirect  (line 2264)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 135)
+  runAllTests  (line 93)
+
+====================================================================
+[2026-03-19 10:19:13]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13859)
+  DataPlotter/loadFilePaths  (line 2225)
+  DataPlotter/addFilesDirect  (line 2264)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 135)
+  runAllTests  (line 93)
