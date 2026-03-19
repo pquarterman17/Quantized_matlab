@@ -8734,6 +8734,27 @@ function varargout = dataImportGUI()
                 end
             end
 
+            % SIMS waterfall: offset by element (channel), not by dataset.
+            %   Single file:  each selected element gets its own offset tier.
+            %   Multiple files: group by file — all elements in one file share
+            %     the same tier, different files get successive tiers.
+            wfSIMSByChannel = false;
+            if waterfallOn
+                anySIMS = false;
+                for gi = 1:nDS
+                    gds = appData.datasets{plotIdx(gi)};
+                    if isfield(gds,'parserName') && strcmp(gds.parserName,'importSIMS')
+                        anySIMS = true; break;
+                    end
+                end
+                if anySIMS && nDS == 1
+                    wfSIMSByChannel = true;  % offset driven by channel k
+                elseif anySIMS && nDS > 1
+                    % Group by file — all channels share the dataset's group
+                    % (wfGroupIdx already defaults to per-dataset, which is correct)
+                end
+            end
+
             for si = 1:nDS
                 di          = plotIdx(si);
                 ds          = appData.datasets{di};
@@ -8813,6 +8834,9 @@ function varargout = dataImportGUI()
                 if isfield(ds,'color')  && ~isempty(ds.color),  dsColorOverride  = ds.color;  end
                 dsColorROverride = [];
                 if isfield(ds,'colorR') && ~isempty(ds.colorR), dsColorROverride = ds.colorR; end
+
+                % SIMS flag: legend shows element name only, unit goes on y-axis
+                isSIMSds = isfield(ds,'parserName') && strcmp(ds.parserName,'importSIMS');
 
                 for k = 1:nY
                     colorIdx  = (si-1)*nY + k;
@@ -8945,7 +8969,21 @@ function varargout = dataImportGUI()
 
                     else
                         % --- Standard (non-neutron) path ---
-                        baseLabel = [guiLabel(d.labels{idx}, d.units{idx}), fileSuffix];
+                        % SIMS: legend shows element name only (unit goes on y-axis)
+                        if isSIMSds
+                            baseLabel = [d.labels{idx}, fileSuffix];
+                        else
+                            baseLabel = [guiLabel(d.labels{idx}, d.units{idx}), fileSuffix];
+                        end
+
+                        % Waterfall offset index for this trace.
+                        % SIMS single-file: each element k gets its own tier.
+                        % SIMS multi-file:  all elements share the file's tier.
+                        if wfSIMSByChannel
+                            wfOffset = k - 1;
+                        else
+                            wfOffset = wfGroupIdx(si) - 1;
+                        end
 
                         % Raw overlay (dashed, desaturated 50% white-blend)
                         if showRawOver
@@ -8954,9 +8992,9 @@ function varargout = dataImportGUI()
                             if ctFactor > 0, yRaw = yRaw / ctFactor; end
                             if effectiveSpacing ~= 0
                                 if wfLogMode
-                                    yRaw = yRaw * effectiveSpacing^(wfGroupIdx(si) - 1);
+                                    yRaw = yRaw * effectiveSpacing^wfOffset;
                                 else
-                                    yRaw = yRaw + (wfGroupIdx(si) - 1) * effectiveSpacing;
+                                    yRaw = yRaw + wfOffset * effectiveSpacing;
                                 end
                             end
                             rawColor = 0.5 * baseColor + 0.5 * [1 1 1];
@@ -8977,9 +9015,9 @@ function varargout = dataImportGUI()
                         if ctFactor > 0, yPrimary = yPrimary / ctFactor; end
                         if effectiveSpacing ~= 0
                             if wfLogMode
-                                yPrimary = yPrimary * effectiveSpacing^(wfGroupIdx(si) - 1);
+                                yPrimary = yPrimary * effectiveSpacing^wfOffset;
                             else
-                                yPrimary = yPrimary + (wfGroupIdx(si) - 1) * effectiveSpacing;
+                                yPrimary = yPrimary + wfOffset * effectiveSpacing;
                             end
                         end
                         if isdatetime(xVecPrimary)
@@ -9053,7 +9091,11 @@ function varargout = dataImportGUI()
                         idx2 = find(strcmp(d.labels, y2Sel{k2}), 1);
                         if isempty(idx2), continue; end
 
-                        baseLabel2 = [guiLabel(d.labels{idx2}, d.units{idx2}), fileSuffix];
+                        if isSIMSds
+                            baseLabel2 = [d.labels{idx2}, fileSuffix];
+                        else
+                            baseLabel2 = [guiLabel(d.labels{idx2}, d.units{idx2}), fileSuffix];
+                        end
                         yY2 = primaryD.values(:, idx2);
                         if ctFactor > 0, yY2 = yY2 / ctFactor; end
 
@@ -9249,11 +9291,25 @@ function varargout = dataImportGUI()
                 xlabel(targetAx, xLabel);
             end
 
-            % Y label: custom override, mag unit, waterfall, then auto (single dataset only)
+            % Y label: custom override, mag unit, SIMS, waterfall, then auto (single dataset only)
+            isSIMSActive = isfield(activeDs,'parserName') && strcmp(activeDs.parserName,'importSIMS');
             if ~isempty(efCustomYLabel.Value)
                 ylabel(targetAx, efCustomYLabel.Value);
             elseif ~isempty(magYLabel)
                 ylabel(targetAx, magYLabel);
+            elseif isSIMSActive
+                % SIMS: show concentration unit on y-axis (shared across elements)
+                simsUnit = '';
+                for su = 1:numel(activeDs.data.units)
+                    if ~isempty(activeDs.data.units{su})
+                        simsUnit = activeDs.data.units{su}; break;
+                    end
+                end
+                if isempty(simsUnit)
+                    ylabel(targetAx, 'Concentration');
+                else
+                    ylabel(targetAx, ['Concentration (' simsUnit ')']);
+                end
             elseif waterfallOn
                 ylabel(targetAx, 'Intensity (a.u.)');
             elseif nY == 1 && nDS == 1
@@ -11064,23 +11120,47 @@ function varargout = dataImportGUI()
     %COMPUTEAUTOWATERFALLSPACING  Return spacing for automatic waterfall.
     %  Linear mode: 1.1× the maximum data range (additive offset).
     %  Log mode:    10^(1.1 × max log-range) as a multiplicative factor.
+    %  SIMS single-file: scan across all selected channels, not datasets.
         ySel = ensureCell(lbY.Value);
+        nDS2 = numel(appData.datasets);
+
+        % Detect SIMS single-file → scan all selected channels
+        isSIMSSingle = (nDS2 == 1) && ...
+            isfield(appData.datasets{1},'parserName') && ...
+            strcmp(appData.datasets{1}.parserName,'importSIMS') && ...
+            numel(ySel) > 1;
+
         if strcmp(ddScaleY.Value, 'Log')
             % Log mode — return a multiplier (ratio between adjacent traces)
             s = 10;   % safe fallback: one decade
             if isempty(ySel), return; end
             maxLogRange = 0;
-            for ddi = 1:numel(appData.datasets)
-                ds2      = appData.datasets{ddi};
+            if isSIMSSingle
+                ds2      = appData.datasets{1};
                 primaryD = guiTernary(~isempty(ds2.corrData), ds2.corrData, ds2.data);
-                idx2     = find(strcmp(primaryD.labels, ySel{1}), 1);
-                if isempty(idx2), continue; end
-                yVals = primaryD.values(:, idx2);
-                dm2 = buildDisplayMask(ds2);
-                yVals = yVals(yVals > 0 & ~isnan(yVals) & dm2);
-                if numel(yVals) < 2, continue; end
-                r = log10(max(yVals)) - log10(min(yVals));
-                if r > maxLogRange, maxLogRange = r; end
+                dm2      = buildDisplayMask(ds2);
+                for ci = 1:numel(ySel)
+                    idx2 = find(strcmp(primaryD.labels, ySel{ci}), 1);
+                    if isempty(idx2), continue; end
+                    yVals = primaryD.values(:, idx2);
+                    yVals = yVals(yVals > 0 & ~isnan(yVals) & dm2);
+                    if numel(yVals) < 2, continue; end
+                    r = log10(max(yVals)) - log10(min(yVals));
+                    if r > maxLogRange, maxLogRange = r; end
+                end
+            else
+                for ddi = 1:nDS2
+                    ds2      = appData.datasets{ddi};
+                    primaryD = guiTernary(~isempty(ds2.corrData), ds2.corrData, ds2.data);
+                    idx2     = find(strcmp(primaryD.labels, ySel{1}), 1);
+                    if isempty(idx2), continue; end
+                    yVals = primaryD.values(:, idx2);
+                    dm2 = buildDisplayMask(ds2);
+                    yVals = yVals(yVals > 0 & ~isnan(yVals) & dm2);
+                    if numel(yVals) < 2, continue; end
+                    r = log10(max(yVals)) - log10(min(yVals));
+                    if r > maxLogRange, maxLogRange = r; end
+                end
             end
             if maxLogRange > 0, s = 10^(maxLogRange * 1.1); end
         else
@@ -11088,17 +11168,32 @@ function varargout = dataImportGUI()
             s = 1;   % safe fallback if no data range can be determined
             if isempty(ySel), return; end
             maxRange = 0;
-            for ddi = 1:numel(appData.datasets)
-                ds2      = appData.datasets{ddi};
+            if isSIMSSingle
+                ds2      = appData.datasets{1};
                 primaryD = guiTernary(~isempty(ds2.corrData), ds2.corrData, ds2.data);
-                idx2     = find(strcmp(primaryD.labels, ySel{1}), 1);
-                if isempty(idx2), continue; end
-                yVals = primaryD.values(:, idx2);
-                dm2 = buildDisplayMask(ds2);
-                yVals = yVals(~isnan(yVals) & dm2);
-                if numel(yVals) < 2, continue; end
-                r = max(yVals) - min(yVals);
-                if r > maxRange, maxRange = r; end
+                dm2      = buildDisplayMask(ds2);
+                for ci = 1:numel(ySel)
+                    idx2 = find(strcmp(primaryD.labels, ySel{ci}), 1);
+                    if isempty(idx2), continue; end
+                    yVals = primaryD.values(:, idx2);
+                    yVals = yVals(~isnan(yVals) & dm2);
+                    if numel(yVals) < 2, continue; end
+                    r = max(yVals) - min(yVals);
+                    if r > maxRange, maxRange = r; end
+                end
+            else
+                for ddi = 1:nDS2
+                    ds2      = appData.datasets{ddi};
+                    primaryD = guiTernary(~isempty(ds2.corrData), ds2.corrData, ds2.data);
+                    idx2     = find(strcmp(primaryD.labels, ySel{1}), 1);
+                    if isempty(idx2), continue; end
+                    yVals = primaryD.values(:, idx2);
+                    dm2 = buildDisplayMask(ds2);
+                    yVals = yVals(~isnan(yVals) & dm2);
+                    if numel(yVals) < 2, continue; end
+                    r = max(yVals) - min(yVals);
+                    if r > maxRange, maxRange = r; end
+                end
             end
             if maxRange > 0, s = maxRange * 1.1; end
         end
