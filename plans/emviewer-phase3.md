@@ -4,11 +4,13 @@ Gap analysis vs. Gatan Digital Micrograph (GMS 3/4). Excludes live acquisition,
 microscope control, EELS/EDS spectroscopy, and scripting engine — those are
 instrument-tied features outside emViewerGUI's scope as an offline viewer.
 
+> **Status: All 20 features implemented (Phase 3 complete).**
+
 ---
 
 ## Tier 1 — High-Value, Moderate Effort
 
-### 1. Radial Profile from FFT / Diffraction
+### ~~1. Radial Profile from FFT / Diffraction~~ ✅
 Compute radial average and radial max profiles from FFT or loaded diffraction
 patterns. Essential for powder diffraction / amorphous film analysis (Thon rings,
 nanocrystalline grain-size estimation). Output as 1D plot (spatial frequency vs.
@@ -18,7 +20,7 @@ intensity) with export to CSV.
 **Touches:** `emViewerGUI.m` (button in Process section + callback), `+imaging/radialProfile.m` (new).
 **Effort:** ~120 lines. Polar resampling via `atan2`/`hypot` binning on FFT magnitude.
 
-### 2. d-Spacing Measurement from FFT Spots
+### ~~2. d-Spacing Measurement from FFT Spots~~ ✅
 Click on a spot in FFT display → report d-spacing (Å or nm) using pixel
 calibration. Two modes: (a) single-spot distance from center, (b) two-spot
 pair distance. Overlay labeled circles on measured spots. Requires calibrated
@@ -28,7 +30,7 @@ pixel size to convert px⁻¹ → real-space distance.
 **Touches:** `emViewerGUI.m` (new capture mode `'dspacing'`), measurement table integration.
 **Effort:** ~100 lines. Core math: `d = 1 / (r_px * scale_per_px)`.
 
-### 3. Morphological Operations (Binary Masks)
+### ~~3. Morphological Operations (Binary Masks)~~ ✅
 Erosion, dilation, opening, closing on thresholded/binary images. Critical
 preprocessing step before particle counting — separates touching particles
 (complement to watershed), removes noise speckles, fills holes.
@@ -37,7 +39,7 @@ preprocessing step before particle counting — separates touching particles
 **Touches:** `emViewerGUI.m` (buttons in Process section), `+imaging/morphOp.m` (new).
 **Effort:** ~80 lines. Implement via `conv2` with structuring element (no toolbox).
 
-### 4. Log / Sqrt / Power Contrast Transforms
+### ~~4. Log / Sqrt / Power Contrast Transforms~~ ✅
 Currently only linear contrast mapping. Add logarithmic, square-root, and
 power-law (gamma is separate — this is a display transform applied before
 the contrast window). Essential for diffraction patterns and FFTs where
@@ -47,7 +49,7 @@ dynamic range spans several orders of magnitude.
 **Touches:** `emViewerGUI.m` (dropdown in Contrast section), `displayImage()` pipeline.
 **Effort:** ~40 lines. Insert transform step between raw→display mapping.
 
-### 5. Arrow Annotations
+### ~~5. Arrow Annotations~~ ✅
 Directional arrows for pointing out features in publications. Click start
 point → drag to end → arrow with optional text label. Configurable color,
 line width, head size. Persisted in annotations array; burned into export.
@@ -60,7 +62,7 @@ line width, head size. Persisted in annotations array; burned into export.
 
 ## Tier 2 — Moderate Value, Low-to-Moderate Effort
 
-### 6. Image Inversion
+### ~~6. Image Inversion~~ ✅
 One-click invert: `img = max(img(:)) - img`. Simple but constantly needed
 (bright-field ↔ dark-field, negative contrast for publication). Add to
 Process section with undo support.
@@ -68,14 +70,14 @@ Process section with undo support.
 **DM equivalent:** Process > Invert.
 **Touches:** `emViewerGUI.m` (button + callback). ~15 lines.
 
-### 7. Unsharp Mask / Sharpen Filter
+### ~~7. Unsharp Mask / Sharpen Filter~~ ✅
 Sharpen = original + gain × (original − blurred). Single slider for
 sharpening strength. Complementary to existing Gaussian blur.
 
 **DM equivalent:** Process > Sharpen.
 **Touches:** `emViewerGUI.m` (button), `+imaging/unsharpMask.m` (new). ~40 lines.
 
-### 8. Width-Averaged Line Profile
+### ~~8. Width-Averaged Line Profile~~ ✅
 Current line profile is 1-pixel-wide interpolation. Add configurable width
 (3–50 px) that averages perpendicular to the profile direction. Reduces
 noise in profiles across lattice fringes or interfaces.
@@ -83,7 +85,7 @@ noise in profiles across lattice fringes or interfaces.
 **DM equivalent:** Line profile with adjustable integration width.
 **Touches:** `emViewerGUI.m` (width spinner in profile dialog), `+imaging/lineProfile.m` (modify). ~50 lines.
 
-### 9. Ellipse ROI
+### ~~9. Ellipse ROI~~ ✅
 Add elliptical ROI tool alongside existing rectangle ROI. Report mean/std/
 min/max/area statistics. Important for analyzing circular features (pores,
 particles, beam spots) that rectangle ROI poorly captures.
@@ -91,7 +93,7 @@ particles, beam spots) that rectangle ROI poorly captures.
 **DM equivalent:** Ellipse ROI in ROI toolbox.
 **Touches:** `emViewerGUI.m` (new capture mode `'roiellipse'`). ~80 lines.
 
-### 10. Image Binning (Spatial Downsampling)
+### ~~10. Image Binning (Spatial Downsampling)~~ ✅
 Bin N×N pixel blocks by summing or averaging. Reduces noise (sum mode) or
 file size (average mode). Standard preprocessing for noisy STEM images.
 Options: 2×2, 4×4, 8×8.
@@ -103,7 +105,7 @@ Options: 2×2, 4×4, 8×8.
 
 ## Tier 3 — Specialized / Advanced
 
-### 11. SER/EMI Format Import (FEI/ThermoFisher TIA)
+### ~~11. SER/EMI Format Import (FEI/ThermoFisher TIA)~~ ✅
 Very common TEM data format from FEI (now ThermoFisher) microscopes. Binary
 format with header + data blocks. Many university TEM labs export SER files
 alongside DM3. Would significantly expand format coverage.
@@ -112,7 +114,7 @@ alongside DM3. Would significantly expand format coverage.
 **Touches:** `+parser/importSER.m` (new), `+parser/resolveParser.m`, `emViewerGUI.m` file filter.
 **Effort:** ~200 lines. Binary format is documented (FEI TIA specification).
 
-### 12. MRC Format Import (Electron Tomography)
+### ~~12. MRC Format Import (Electron Tomography)~~ ✅
 Standard format for cryo-EM and tomography data (CCP-EM, IMOD, RELION).
 Simple binary header (1024 bytes) + raw data. Growing user base as cryo-EM
 becomes mainstream in materials science.
@@ -121,7 +123,7 @@ becomes mainstream in materials science.
 **Touches:** `+parser/importMRC.m` (new), dispatch registration.
 **Effort:** ~150 lines. Well-documented header spec (MRC2014 standard).
 
-### 13. Butterworth Bandpass Filter
+### ~~13. Butterworth Bandpass Filter~~ ✅
 Smooth frequency-domain filter without ringing artifacts (unlike hard FFT
 masks). Parameterized by low/high cutoff radii and order. Preferred over
 hard masks for lattice-fringe filtering and periodic noise removal.
@@ -129,7 +131,7 @@ hard masks for lattice-fringe filtering and periodic noise removal.
 **DM equivalent:** Butterworth filter for streak-free FFT.
 **Touches:** `emViewerGUI.m` (dialog), `+imaging/butterworthFilter.m` (new). ~60 lines.
 
-### 14. Calibration Propagation
+### ~~14. Calibration Propagation~~ ✅
 Track pixel calibration through processing operations (crop, rotate, FFT,
 bin). Currently calibration is lost after some transforms. Store calibration
 in appData per-image and update it when operations change the spatial scale.
@@ -138,7 +140,7 @@ in appData per-image and update it when operations change the spatial scale.
 **Touches:** `emViewerGUI.m` (all processing callbacks that change dimensions).
 **Effort:** ~100 lines across many callbacks. Systematic but not complex.
 
-### 15. Radial Integration for Powder Diffraction
+### ~~15. Radial Integration for Powder Diffraction~~ ✅
 Full azimuthal integration of 2D diffraction patterns to produce 1D powder
 patterns (intensity vs. 2θ or d-spacing). Center-finding via symmetry.
 Sector masks for partial integration. Export integrated pattern as CSV.
@@ -150,35 +152,35 @@ Sector masks for partial integration. Export integrated pattern as CSV.
 
 ## Tier 4 — Quality-of-Life
 
-### 16. Polygon ROI
+### ~~16. Polygon ROI~~ ✅
 Free-form polygon ROI (click vertices, double-click to close). Statistics
 computed over irregular region. Complements rectangle and ellipse ROIs for
 grain boundaries, irregular features.
 
 **Touches:** `emViewerGUI.m` (new capture mode `'roipoly'`). ~90 lines.
 
-### 17. Line / Rectangle / Shape Annotations
+### ~~17. Line / Rectangle / Shape Annotations~~ ✅
 Draw lines, rectangles, circles as persistent annotations (not measurements).
 Configurable color, width, fill. For marking regions of interest in figures.
 
 **DM equivalent:** Shape annotation tools.
 **Touches:** `emViewerGUI.m` (annotation struct extension). ~80 lines.
 
-### 18. Batch File Conversion (Format Transform)
+### ~~18. Batch File Conversion (Format Transform)~~ ✅
 Convert between formats: DM3→TIFF, TIFF→PNG, etc. with metadata preservation
 where possible. Useful for archiving or sharing data with non-DM users.
 
 **DM equivalent:** File > Batch Convert.
 **Touches:** `emViewerGUI.m` (menu item), leverages existing parsers + `imwrite`. ~60 lines.
 
-### 19. Colormap Editor / Custom LUT
+### ~~19. Colormap Editor / Custom LUT~~ ✅
 Create or import custom colormaps beyond the built-in set. Important for
 specific visualization needs (diverging colormaps for strain, cyclic for
 phase). Simple UI: pick N color stops, interpolate between them.
 
 **Touches:** `emViewerGUI.m` (preferences extension). ~100 lines.
 
-### 20. Surface / 3D Visualization
+### ~~20. Surface / 3D Visualization~~ ✅
 Render image intensity as a 3D surface plot (`surf`/`mesh`) in a separate
 figure. Useful for visualizing peak shapes, AFM-like topography, or
 intensity distributions. Rotate/zoom via MATLAB's built-in 3D controls.

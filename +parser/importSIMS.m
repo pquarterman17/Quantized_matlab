@@ -211,33 +211,33 @@ function data = importSIMS(filepath, options)
     [elemNames, concUnits] = cleanElementNames(elemHeaders);
 
     % ════════════════════════════════════════════════════════════════
-    %  STEP 9b: Recover element names from header metadata rows
+    %  STEP 9b: Recover element names from pre-header rows
     %
-    %  Some SIMS vendors place element names in a
-    %  dedicated row *above* the Depth / CONC. header row, using the
-    %  depth (odd) column positions and leaving the concentration
-    %  (even) column positions blank:
+    %  Some SIMS vendors place element names in a dedicated row
+    %  *above* the Depth / CONC. header row.  In the original CSV,
+    %  element names appear at depth-column positions with separator
+    %  and concentration columns blank:
     %
-    %    H  |    | C  |    | O  |    | AL-> |    | Si-> |    | ...
-    %    Depth | CONC. | Depth | CONC. | ...
-    %    (nm) | (atoms/cc) | ...
+    %    H  |    |    | C  |    |    | O  |    |    | ...
+    %    Depth | CONC. |    | Depth | CONC. |    | ...
+    %    (nm) | (atoms/cc) |    | (nm) | ...
     %
-    %  When cleanElementNames produces empty labels (because the header
-    %  row contains bare unit strings like "(atoms/cc)"), we scan
-    %  headerMetadata for a row that fits this paired-name pattern and
-    %  use its odd-position tokens as element names.
+    %  We apply the same emptyMask column removal to each pre-header
+    %  row, then check if odd positions (1,3,5,...) contain text while
+    %  even positions are blank — the paired-name pattern.
     % ════════════════════════════════════════════════════════════════
-    if isPaired && any(cellfun(@isempty, elemNames)) && ~isempty(headerMetadata)
+    if isPaired && any(cellfun(@isempty, elemNames)) && headerRow > 1
         nE = numel(elemNames);
-        for mi = 1:numel(headerMetadata)
-            % IMPORTANT: use CollapseDelimiters=false so consecutive
-            % delimiters (e.g. "H,,C") produce empty tokens ('H','','C'),
-            % not collapsed tokens ('H','C').
-            parts = strtrim(strsplit(headerMetadata{mi}, char(delim), ...
-                            'CollapseDelimiters', false));
-            if numel(parts) < nE, continue; end      % need at least nE name slots
-            % Trailing empty tokens may be absent (no trailing delimiter),
-            % so pad to 2*nE before slicing.
+        for mi = 1:headerRow-1
+            rowToks = tokens{mi};
+            % Pad to match original data width, then apply emptyMask
+            if numel(rowToks) < numel(emptyMask)
+                rowToks(end+1 : numel(emptyMask)) = {''};
+            elseif numel(rowToks) > numel(emptyMask)
+                rowToks = rowToks(1:numel(emptyMask));
+            end
+            parts = strtrim(rowToks(~emptyMask));  % same columns kept in data
+
             if numel(parts) < 2 * nE
                 parts(end+1 : 2*nE) = {''};
             end
@@ -395,8 +395,22 @@ function [headerRow, dataStartRow] = detectLayout(tokens, hdrOpt, dsOpt)
 
     if hdrOpt >= 0
         headerRow = hdrOpt;
-    elseif firstDataIdx > 1 && numericScore(firstDataIdx - 1) < 0.5
-        headerRow = firstDataIdx - 1;
+    elseif firstDataIdx > 1
+        % Walk backward past blank rows (all tokens empty) to find real header
+        candidate = firstDataIdx - 1;
+        while candidate >= 1
+            row = tokens{candidate};
+            hasContent = any(cellfun(@(s) ~isempty(strtrim(s)), row));
+            if hasContent && numericScore(candidate) < 0.5
+                break;
+            end
+            candidate = candidate - 1;
+        end
+        if candidate >= 1
+            headerRow = candidate;
+        else
+            headerRow = 0;
+        end
     else
         headerRow = 0;
     end

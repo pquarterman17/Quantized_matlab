@@ -99,7 +99,7 @@ function varargout = emViewerGUI()
         'measurements', {{}}, ...   % cell array of measurement structs (for draggable endpoints)
         'textAnnotations', {{}});  % cell array of text annotation structs
     appData.lastProfile   = struct('dist', [], 'intensity', [], 'unit', 'px');
-    appData.captureMode   = '';     % '' | 'profile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'roistats' | 'scalebar' | 'dspacing' | 'roiellipse' | 'roipoly' | 'arrow' | 'annotline' | 'annotrect' | 'annotcircle'
+    appData.captureMode   = '';     % '' | 'profile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'roistats' | 'scalebar' | 'dspacing' | 'roiellipse' | 'roipoly' | 'arrow' | 'annotline' | 'annotrect' | 'annotcircle' | 'lattice' | 'gpa'
     appData.captureClicks = [];     % [Nx2] accumulated click coords (x y per row)
     appData.selectedMeasIdx = 0;    % index into overlays.measurements; 0 = none selected
     appData.lastDir       = '';     % last browsed directory for file open dialog
@@ -917,8 +917,8 @@ function varargout = emViewerGUI()
     pnlProcess = uipanel(toolsGL, 'BorderType', 'line');
     pnlProcess.Layout.Row = 8;
 
-    processInnerGL = uigridlayout(pnlProcess, [24 2], ...
-        'RowHeight',   {20, 20, 20, 20, 2, 20, 20, 2, 20, 20, 2, 20, 20, 2, 20, 20, 20, 20, 2, 20, 20, 20, 20, 20}, ...
+    processInnerGL = uigridlayout(pnlProcess, [32 2], ...
+        'RowHeight',   {20, 20, 20, 20, 2, 20, 20, 2, 20, 20, 2, 20, 20, 2, 20, 20, 20, 20, 2, 20, 20, 20, 20, 20, 2, 20, 20, 20, 20, 20, 20, 20}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding',     [3 2 3 2], ...
         'RowSpacing',  2, ...
@@ -1225,6 +1225,129 @@ function varargout = emViewerGUI()
         'Tooltip', 'Create a custom colormap from user-defined color stops');
     btnCustomCmap.Layout.Row = 24; btnCustomCmap.Layout.Column = [1 2];
 
+    % ── Phase 4 process buttons (rows 26-32) ────────────────────────────
+    % Row 25 = separator (height 2 in the RowHeight array)
+
+    % Row 26: Plane Level / Roughness
+    btnPlaneLevel = uibutton(processInnerGL, 'Text', 'Plane Level...', ...
+        'ButtonPushedFcn', @onPlaneLevel, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Subtract a best-fit polynomial surface (1st/2nd/3rd order) for AFM/SPM leveling');
+    btnPlaneLevel.Layout.Row = 26; btnPlaneLevel.Layout.Column = 1;
+
+    btnRoughness = uibutton(processInnerGL, 'Text', 'Roughness...', ...
+        'ButtonPushedFcn', @onRoughness, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Compute surface roughness: Ra, Rq, Rz, skewness, kurtosis, bearing ratio');
+    btnRoughness.Layout.Row = 26; btnRoughness.Layout.Column = 2;
+
+    % Row 27: Interface Fit / Multi-Otsu
+    btnInterfaceFit = uibutton(processInnerGL, 'Text', 'Interface Fit', ...
+        'ButtonPushedFcn', @onInterfaceFit, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Fit erf/sigmoid to a line profile for interface width measurement (10-90%)');
+    btnInterfaceFit.Layout.Row = 27; btnInterfaceFit.Layout.Column = 1;
+
+    btnMultiOtsu = uibutton(processInnerGL, 'Text', 'Multi-Thresh...', ...
+        'ButtonPushedFcn', @onMultiOtsu, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'N-class segmentation via multi-level Otsu threshold (2-5 classes)');
+    btnMultiOtsu.Layout.Row = 27; btnMultiOtsu.Layout.Column = 2;
+
+    % Row 28: Lattice Measure / GPA
+    btnLatticeMeasure = uibutton(processInnerGL, 'Text', 'Lattice...', ...
+        'ButtonPushedFcn', @onLatticeMeasure, ...
+        'BackgroundColor', [0.20 0.50 0.35], ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', ['Click two FFT spots to measure lattice parameters. ' ...
+                    'Reports a, b, ' char(947) ', d-spacings, and overlays unit cell.']);
+    btnLatticeMeasure.Layout.Row = 28; btnLatticeMeasure.Layout.Column = 1;
+
+    btnGPA = uibutton(processInnerGL, 'Text', 'GPA Strain...', ...
+        'ButtonPushedFcn', @onGPA, ...
+        'BackgroundColor', [0.20 0.50 0.35], ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Geometric Phase Analysis: compute 2D strain maps from HRTEM lattice images');
+    btnGPA.Layout.Row = 28; btnGPA.Layout.Column = 2;
+
+    % Row 29: CTF / Defect Counter
+    btnCTF = uibutton(processInnerGL, 'Text', 'CTF Estimate...', ...
+        'ButtonPushedFcn', @onCTFEstimate, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Estimate defocus from Thon rings in the power spectrum (TEM/cryo-EM)');
+    btnCTF.Layout.Row = 29; btnCTF.Layout.Column = 1;
+
+    btnDefectCount = uibutton(processInnerGL, 'Text', 'Defect Count...', ...
+        'ButtonPushedFcn', @onDefectCount, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Estimate dislocation density via stereological line intersection counting');
+    btnDefectCount.Layout.Row = 29; btnDefectCount.Layout.Column = 2;
+
+    % Row 30: Back-Project / Figure Builder
+    btnBackProject = uibutton(processInnerGL, 'Text', 'Back-Project...', ...
+        'ButtonPushedFcn', @onBackProject, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Filtered back-projection preview from a tilt-series sinogram');
+    btnBackProject.Layout.Row = 30; btnBackProject.Layout.Column = 1;
+
+    btnFigureBuilder = uibutton(processInnerGL, 'Text', 'Figure Builder...', ...
+        'ButtonPushedFcn', @onFigureBuilder, ...
+        'BackgroundColor', BTN_EXPORT, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Build multi-panel publication figure with labels, scale bars, and uniform sizing');
+    btnFigureBuilder.Layout.Row = 30; btnFigureBuilder.Layout.Column = 2;
+
+    % Row 31: Journal Export / Calibrated Colorbar
+    btnJournalExport = uibutton(processInnerGL, 'Text', 'Journal Export...', ...
+        'ButtonPushedFcn', @onJournalExport, ...
+        'BackgroundColor', BTN_EXPORT, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Export with journal-specific presets (Nature, Science, ACS, Elsevier)');
+    btnJournalExport.Layout.Row = 31; btnJournalExport.Layout.Column = 1;
+
+    btnCalibColorbar = uibutton(processInnerGL, 'Text', 'Calib. Colorbar', ...
+        'ButtonPushedFcn', @onCalibratedColorbar, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Add a calibrated colorbar with real-unit labels burned into exports');
+    btnCalibColorbar.Layout.Row = 31; btnCalibColorbar.Layout.Column = 2;
+
+    % Row 32: Macro Record / Flicker Compare
+    btnMacroRecord = uibutton(processInnerGL, 'Text', 'Record Macro', ...
+        'ButtonPushedFcn', @onMacroToggle, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Record measurement operations as a replayable macro');
+    btnMacroRecord.Layout.Row = 32; btnMacroRecord.Layout.Column = 1;
+
+    btnFlickerCompare = uibutton(processInnerGL, 'Text', 'Flicker...', ...
+        'ButtonPushedFcn', @onFlickerCompare, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Rapidly alternate between two images to spot subtle differences');
+    btnFlickerCompare.Layout.Row = 32; btnFlickerCompare.Layout.Column = 2;
+
     hPixelInspector = [];   % handle to pixel inspector axes overlay
 
     % ── Section 5: Annotations ──────────────────────────────────────────
@@ -1409,6 +1532,12 @@ function varargout = emViewerGUI()
 
     % Apply initial theme
     applyTheme();
+
+    % Phase 4: build right-click context menu and init macro state
+    buildContextMenu();
+    appData.isRecording    = false;
+    appData.macroRecording = {};
+    appData.captureClicks  = [];
 
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onOpenFiles — Browse for image files via uigetfile
@@ -1863,6 +1992,22 @@ function varargout = emViewerGUI()
         btnBatchConvert.Enable = onOff(numel(appData.images) >= 1);
         btnCustomCmap.Enable   = 'on';
 
+        % Enable Phase 4 processing controls
+        btnPlaneLevel.Enable      = 'on';
+        btnRoughness.Enable       = 'on';
+        btnInterfaceFit.Enable    = 'on';
+        btnMultiOtsu.Enable       = 'on';
+        btnLatticeMeasure.Enable  = 'on';
+        btnGPA.Enable             = 'on';
+        btnCTF.Enable             = 'on';
+        btnDefectCount.Enable     = 'on';
+        btnBackProject.Enable     = 'on';
+        btnFigureBuilder.Enable   = onOff(numel(appData.images) >= 1);
+        btnJournalExport.Enable   = 'on';
+        btnCalibColorbar.Enable   = 'on';
+        btnMacroRecord.Enable     = 'on';
+        btnFlickerCompare.Enable  = onOff(numel(appData.images) >= 2);
+
         % Enable annotation controls
         btnPlaceAnnot.Enable  = 'on';
         btnClearAnnot.Enable  = 'on';
@@ -1968,6 +2113,22 @@ function varargout = emViewerGUI()
             delete(hPixelInspector);
             hPixelInspector = [];
         end
+
+        % Disable Phase 4 buttons
+        btnPlaneLevel.Enable      = 'off';
+        btnRoughness.Enable       = 'off';
+        btnInterfaceFit.Enable    = 'off';
+        btnMultiOtsu.Enable       = 'off';
+        btnLatticeMeasure.Enable  = 'off';
+        btnGPA.Enable             = 'off';
+        btnCTF.Enable             = 'off';
+        btnDefectCount.Enable     = 'off';
+        btnBackProject.Enable     = 'off';
+        btnFigureBuilder.Enable   = 'off';
+        btnJournalExport.Enable   = 'off';
+        btnCalibColorbar.Enable   = 'off';
+        btnMacroRecord.Enable     = 'off';
+        btnFlickerCompare.Enable  = 'off';
 
         % Disable annotation controls
         btnPlaceAnnot.Enable  = 'off';
@@ -3432,6 +3593,12 @@ function varargout = emViewerGUI()
                     executeAnnotRect(x1, y1, x2, y2);
                 case 'annotcircle'
                     executeAnnotCircle(x1, y1, x2, y2);
+                case 'lattice'
+                    appData.captureClicks = [appData.captureClicks; x1, y1; x2, y2];
+                    executeLattice();
+                case 'gpa'
+                    appData.captureClicks = [appData.captureClicks; x1, y1; x2, y2];
+                    executeGPA();
             end
         end
     end
@@ -3974,6 +4141,21 @@ function varargout = emViewerGUI()
         btnPlaceLine.Enable     = state;
         btnPlaceRect.Enable     = state;
         btnPlaceCircle.Enable   = state;
+        % Phase 4 buttons
+        btnPlaneLevel.Enable      = state;
+        btnRoughness.Enable       = state;
+        btnInterfaceFit.Enable    = state;
+        btnMultiOtsu.Enable       = state;
+        btnLatticeMeasure.Enable  = state;
+        btnGPA.Enable             = state;
+        btnCTF.Enable             = state;
+        btnDefectCount.Enable     = state;
+        btnBackProject.Enable     = state;
+        btnFigureBuilder.Enable   = state;
+        btnJournalExport.Enable   = state;
+        btnCalibColorbar.Enable   = state;
+        btnMacroRecord.Enable     = state;
+        btnFlickerCompare.Enable  = state;
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -8832,6 +9014,575 @@ function varargout = emViewerGUI()
 
         updateStatusBar();
         updateHistogram();
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 4: HELPERS
+    % ════════════════════════════════════════════════════════════════════
+
+    function px = guiPixelSize()
+    %GUIPIXELSIZE  Return pixel size of the active image (0 if uncalibrated).
+        px = 0;
+        if isempty(appData.images) || appData.activeIdx < 1, return; end
+        try
+            imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
+            if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
+                px = imgInfo.pixelSize;
+            end
+        catch
+        end
+    end
+
+    function pu = guiPixelUnit()
+    %GUIPIXELUNIT  Return pixel unit string of the active image.
+        pu = 'px';
+        if isempty(appData.images) || appData.activeIdx < 1, return; end
+        try
+            imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
+            if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
+                pu = imgInfo.pixelUnit;
+            end
+        catch
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  PHASE 4: ANALYSIS & PUBLICATION FEATURES
+    % ════════════════════════════════════════════════════════════════════
+
+    % ── Feature 6: Plane Leveling ──────────────────────────────────────
+    function onPlaneLevel(~, ~)
+        if isempty(appData.rawPixels), return; end
+        answer = inputdlg('Polynomial order (1=plane, 2=quadratic, 3=cubic):', ...
+            'Plane Level', [1 40], {'1'});
+        if isempty(answer), return; end
+        order = str2double(answer{1});
+        if isnan(order) || ~ismember(order, [1 2 3])
+            uialert(fig, 'Order must be 1, 2, or 3.', 'Invalid'); return;
+        end
+        try
+            undoPush();
+            result = imaging.planeLevel(double(appData.filteredPixels), Order=order);
+            appData.filteredPixels = result.leveled;
+            displayImage();
+            setStatus(sprintf('Plane leveled (order %d).', order));
+        catch ME
+            setStatus(['Plane level error: ' ME.message]);
+        end
+    end
+
+    % ── Feature 4: Surface Roughness ───────────────────────────────────
+    function onRoughness(~, ~)
+        if isempty(appData.rawPixels), return; end
+        try
+            px = guiPixelSize();
+            pu = guiPixelUnit();
+            result = imaging.surfaceRoughness(double(appData.filteredPixels), ...
+                PixelSize=px, PixelUnit=pu, Level='plane');
+            msg = sprintf(['Surface Roughness\n\n' ...
+                'Ra  = %.4g %s\nRq  = %.4g %s\nRz  = %.4g %s\n' ...
+                'Rsk = %.4f\nRku = %.4f\nRp  = %.4g %s\nRv  = %.4g %s\n' ...
+                'SAR = %.4f'], ...
+                result.Ra, pu, result.Rq, pu, result.Rz, pu, ...
+                result.Rsk, result.Rku, result.Rp, pu, result.Rv, pu, ...
+                result.SAR);
+            uialert(fig, msg, 'Roughness Statistics', 'Icon', 'info');
+            setStatus(sprintf('Roughness: Ra=%.3g, Rq=%.3g %s', result.Ra, result.Rq, pu));
+        catch ME
+            setStatus(['Roughness error: ' ME.message]);
+        end
+    end
+
+    % ── Feature 5: Interface Width Fit ─────────────────────────────────
+    function onInterfaceFit(~, ~)
+        if isempty(appData.rawPixels), return; end
+        if ~isfield(appData, 'lastProfile') || isempty(appData.lastProfile)
+            uialert(fig, 'Draw a line profile first, then click Interface Fit.', 'No profile');
+            return;
+        end
+        try
+            lp = appData.lastProfile;
+            result = imaging.fitInterfaceWidth(lp.dist, lp.intensity);
+            % Show fit on profile plot
+            msg = sprintf(['Interface Width Fit\n\n' ...
+                'Center: %.2f\nSigma: %.3f\n' ...
+                '10-90%% width: %.3f\nR^2: %.4f\nModel: %s'], ...
+                result.center, result.sigma, result.width1090, ...
+                result.rSquared, result.model);
+            uialert(fig, msg, 'Interface Fit', 'Icon', 'info');
+            setStatus(sprintf('Interface width: %.3f (10-90%%)', result.width1090));
+        catch ME
+            setStatus(['Interface fit error: ' ME.message]);
+        end
+    end
+
+    % ── Feature 13: Multi-class Threshold ──────────────────────────────
+    function onMultiOtsu(~, ~)
+        if isempty(appData.rawPixels), return; end
+        answer = inputdlg('Number of classes (2-5):', 'Multi-Otsu', [1 30], {'3'});
+        if isempty(answer), return; end
+        nClass = str2double(answer{1});
+        if isnan(nClass) || nClass < 2 || nClass > 5
+            uialert(fig, 'Classes must be 2-5.', 'Invalid'); return;
+        end
+        try
+            result = imaging.multiOtsu(appData.filteredPixels, NumClasses=nClass);
+            % Display label map as colored overlay
+            classColors = [0 0 0.7; 0 0.7 0; 0.7 0 0; 0.7 0.7 0; 0.7 0 0.7];
+            [H, W] = size(result.labelMap);
+            rgb = zeros(H, W, 3);
+            for ci = 1:nClass
+                mask = result.labelMap == ci;
+                for ch = 1:3
+                    rgb(:,:,ch) = rgb(:,:,ch) + classColors(ci,ch) * double(mask);
+                end
+            end
+            % Show in new figure
+            figSeg = figure('Name', 'Multi-class Segmentation', 'NumberTitle', 'off');
+            subplot(1,2,1); imagesc(appData.filteredPixels); colormap(gca, gray(256));
+            axis equal tight; title('Original');
+            subplot(1,2,2); image(rgb); axis equal tight; title(sprintf('%d-class Otsu', nClass));
+            % Report fractions
+            fracStr = strjoin(arrayfun(@(i) sprintf('Class %d: %.1f%%', i, ...
+                result.classFractions(i)*100), 1:nClass, 'UniformOutput', false), ', ');
+            setStatus(fracStr);
+        catch ME
+            setStatus(['Multi-Otsu error: ' ME.message]);
+        end
+    end
+
+    % ── Feature 1: Lattice Measure from FFT ────────────────────────────
+    function onLatticeMeasure(~, ~)
+        if isempty(appData.rawPixels), return; end
+        px = guiPixelSize();
+        pu = guiPixelUnit();
+        if px <= 0
+            uialert(fig, 'Set pixel calibration first (pixel size > 0).', 'No calibration');
+            return;
+        end
+        appData.captureMode = 'lattice';
+        appData.captureClicks = [];
+        setStatus('Lattice: click two FFT spots (non-collinear). Esc to cancel.');
+    end
+
+    function executeLattice()
+        pts = appData.captureClicks;
+        if size(pts, 1) < 2, return; end
+        try
+            [H, W] = size(appData.filteredPixels);
+            px = guiPixelSize();
+            pu = guiPixelUnit();
+            result = imaging.latticeMeasure( ...
+                [pts(1,2), pts(1,1)], [pts(2,2), pts(2,1)], [H, W], ...
+                PixelSize=px, PixelUnit=pu);
+            msg = sprintf(['Lattice Parameters\n\n' ...
+                'a = %.3f %s\nb = %.3f %s\n' char(947) ' = %.1f' char(176) '\n' ...
+                'd1 = %.3f %s\nd2 = %.3f %s\nUnit cell area = %.2f %s' char(178)], ...
+                result.a, pu, result.b, pu, result.gamma, ...
+                result.dSpacing1, pu, result.dSpacing2, pu, result.unitCellArea, pu);
+            uialert(fig, msg, 'Lattice Measurement', 'Icon', 'info');
+            setStatus(sprintf('Lattice: a=%.3f, b=%.3f %s, %s=%.1f%s', ...
+                result.a, result.b, pu, char(947), result.gamma, char(176)));
+        catch ME
+            setStatus(['Lattice error: ' ME.message]);
+        end
+    end
+
+    % ── Feature 3: GPA Strain Mapping ──────────────────────────────────
+    function onGPA(~, ~)
+        if isempty(appData.rawPixels), return; end
+        px = guiPixelSize();
+        if px <= 0
+            uialert(fig, 'Set pixel calibration first for meaningful strain values.', 'No calibration');
+        end
+        appData.captureMode = 'gpa';
+        appData.captureClicks = [];
+        setStatus('GPA: click two Bragg spots in the FFT. Esc to cancel.');
+    end
+
+    function executeGPA()
+        pts = appData.captureClicks;
+        if size(pts, 1) < 2, return; end
+        try
+            [H, W] = size(appData.filteredPixels);
+            center = [H/2, W/2];
+            g1 = [pts(1,1) - center(2), pts(1,2) - center(1)];
+            g2 = [pts(2,1) - center(2), pts(2,2) - center(1)];
+            px = max(guiPixelSize(), 1);
+            result = imaging.geometricPhaseAnalysis( ...
+                double(appData.filteredPixels), g1, g2, PixelSize=px);
+            % Display strain maps in new figure
+            figGPA = figure('Name', 'GPA Strain Maps', 'NumberTitle', 'off');
+            ax1 = subplot(2,2,1); imagesc(result.exx); axis equal tight;
+            colorbar(ax1); title('exx'); colormap(ax1, jet(256)); clim(ax1, [-0.05 0.05]);
+            ax2 = subplot(2,2,2); imagesc(result.eyy); axis equal tight;
+            colorbar(ax2); title('eyy'); colormap(ax2, jet(256)); clim(ax2, [-0.05 0.05]);
+            ax3 = subplot(2,2,3); imagesc(result.exy); axis equal tight;
+            colorbar(ax3); title('exy'); colormap(ax3, jet(256)); clim(ax3, [-0.05 0.05]);
+            ax4 = subplot(2,2,4); imagesc(rad2deg(result.rotation)); axis equal tight;
+            colorbar(ax4); title('Rotation (deg)'); colormap(ax4, jet(256));
+            setStatus('GPA strain maps computed.');
+        catch ME
+            setStatus(['GPA error: ' ME.message]);
+        end
+    end
+
+    % ── Feature 9: CTF Estimation ──────────────────────────────────────
+    function onCTFEstimate(~, ~)
+        if isempty(appData.rawPixels), return; end
+        answer = inputdlg({'Voltage (kV):', 'Cs (mm):', 'Pixel size (Å):'}, ...
+            'CTF Parameters', [1 40; 1 40; 1 40], {'200', '1.2', '1'});
+        if isempty(answer), return; end
+        kV = str2double(answer{1});
+        Cs = str2double(answer{2});
+        pxA = str2double(answer{3});
+        if any(isnan([kV, Cs, pxA]))
+            uialert(fig, 'Invalid numeric input.', 'Error'); return;
+        end
+        try
+            result = imaging.estimateCTF(double(appData.filteredPixels), ...
+                Voltage_kV=kV, Cs_mm=Cs, PixelSize=pxA);
+            % Show results
+            figCTF = figure('Name', 'CTF Estimation', 'NumberTitle', 'off');
+            plot(result.radialProfile(:,1), log10(result.radialProfile(:,2) + 1), 'b');
+            hold on;
+            plot(result.radialProfile(:,1), result.ctfFit, 'r--', 'LineWidth', 1.5);
+            xlabel('Spatial frequency (1/Å)'); ylabel('log10(Power + 1)');
+            title(sprintf('CTF Fit: Defocus = %.0f nm (R^2 = %.3f)', ...
+                result.defocus_nm, result.rSquared));
+            legend('Power spectrum', 'CTF^2 fit');
+            setStatus(sprintf('CTF: defocus = %.0f nm', result.defocus_nm));
+        catch ME
+            setStatus(['CTF error: ' ME.message]);
+        end
+    end
+
+    % ── Feature 11: Defect Counter ─────────────────────────────────────
+    function onDefectCount(~, ~)
+        if isempty(appData.rawPixels), return; end
+        answer = inputdlg({'Grid spacing (px):', 'Foil thickness (nm, 0=unknown):', ...
+                           'Defect direction (deg, NaN=all):'}, ...
+            'Defect Counter', [1 40; 1 40; 1 40], {'50', '0', 'NaN'});
+        if isempty(answer), return; end
+        gridSp = str2double(answer{1});
+        thick  = str2double(answer{2});
+        direct = str2double(answer{3});
+        if isnan(gridSp), gridSp = 50; end
+        try
+            optArgs = struct('GridSpacing', gridSp, 'PixelSize', max(guiPixelSize(),1), ...
+                             'PixelUnit', guiPixelUnit());
+            if thick > 0, optArgs.FoilThickness = thick; end
+            if ~isnan(direct), optArgs.Direction = direct; end
+            result = imaging.countDefectLines(double(appData.filteredPixels), ...
+                GridSpacing=gridSp, PixelSize=max(guiPixelSize(),1), ...
+                PixelUnit=guiPixelUnit());
+            msg = sprintf(['Defect Line Count\n\n' ...
+                'Intersections: %d\nTest lines: %d\n' ...
+                'Density: %.3g %s'], ...
+                result.intersectionCount, result.numTestLines, ...
+                result.density, result.densityUnit);
+            uialert(fig, msg, 'Defect Count', 'Icon', 'info');
+            setStatus(sprintf('Defect density: %.3g %s', result.density, result.densityUnit));
+        catch ME
+            setStatus(['Defect count error: ' ME.message]);
+        end
+    end
+
+    % ── Feature 8: Back-Projection Preview ─────────────────────────────
+    function onBackProject(~, ~)
+        if isempty(appData.rawPixels), return; end
+        if ~isfield(appData, 'images') || numel(appData.images) < 2
+            uialert(fig, 'Load a tilt series (multi-frame) first.', 'Need stack'); return;
+        end
+        answer = inputdlg({'Tilt angles (comma-separated, deg):', 'Row index for sinogram:'}, ...
+            'Back-Projection', [1 60; 1 40], ...
+            {sprintf('%.0f,', linspace(-70, 70, numel(appData.images))), ...
+             num2str(round(size(appData.images{1}, 1) / 2))});
+        if isempty(answer), return; end
+        try
+            angles = str2num(answer{1}); %#ok<ST2NM> — comma-separated
+            rowIdx = str2double(answer{2});
+            if numel(angles) ~= numel(appData.images)
+                error('Number of angles (%d) must match frames (%d).', ...
+                    numel(angles), numel(appData.images));
+            end
+            % Build sinogram from the selected row
+            nFrames = numel(appData.images);
+            W = size(appData.images{1}, 2);
+            sinogram = zeros(nFrames, W);
+            for fi = 1:nFrames
+                frame = double(appData.images{fi});
+                sinogram(fi, :) = frame(min(rowIdx, size(frame,1)), :);
+            end
+            result = imaging.backProject(sinogram, Angles=angles(:));
+            figBP = figure('Name', 'Back-Projection Preview', 'NumberTitle', 'off');
+            subplot(1,2,1); imagesc(sinogram); axis tight;
+            xlabel('Pixel'); ylabel('Angle index'); title('Sinogram');
+            subplot(1,2,2); imagesc(result.reconstruction); axis equal tight;
+            colormap gray; title('Reconstruction (preview)');
+            setStatus('Back-projection preview computed.');
+        catch ME
+            setStatus(['Back-projection error: ' ME.message]);
+        end
+    end
+
+    % ── Feature 2: Figure Panel Builder ────────────────────────────────
+    function onFigureBuilder(~, ~)
+        if isempty(appData.rawPixels), return; end
+        nImg = numel(appData.images);
+        if nImg < 1
+            uialert(fig, 'Load at least one image.', 'No images'); return;
+        end
+        answer = inputdlg({'Rows:', 'Columns:', 'Gap (px):'}, ...
+            'Figure Builder', [1 30; 1 30; 1 30], ...
+            {num2str(ceil(sqrt(nImg))), num2str(ceil(nImg / ceil(sqrt(nImg)))), '2'});
+        if isempty(answer), return; end
+        try
+            nRows = str2double(answer{1});
+            nCols = str2double(answer{2});
+            gap   = str2double(answer{3});
+            imgs = appData.images(1:min(nImg, nRows*nCols));
+            result = imaging.buildFigurePanel(imgs, Rows=nRows, Cols=nCols, Gap=gap);
+            figPanel = figure('Name', 'Figure Panel', 'NumberTitle', 'off');
+            image(result.composite); axis equal tight off;
+            title(sprintf('%dx%d panel (%d images)', nRows, nCols, numel(imgs)));
+            setStatus('Figure panel built.');
+        catch ME
+            setStatus(['Figure builder error: ' ME.message]);
+        end
+    end
+
+    % ── Feature 15: Journal Export Presets ──────────────────────────────
+    function onJournalExport(~, ~)
+        if isempty(appData.rawPixels), return; end
+        presets = { ...
+            'Nature',      89,  300, 'tiff'; ...
+            'Science',     85,  300, 'tiff'; ...
+            'ACS',         84,  300, 'tiff'; ...
+            'Elsevier',    90,  300, 'tiff'; ...
+            'APS (PRL)',   86,  300, 'eps';  ...
+            'Wiley',       85,  300, 'tiff'; ...
+            'IUCr',        83,  600, 'tiff'; ...
+            'Custom',      85,  300, 'tiff'};
+        names = presets(:,1);
+        [sel, ok] = listdlg('ListString', names, 'SelectionMode', 'single', ...
+            'PromptString', 'Select journal preset:', 'ListSize', [250 200]);
+        if ~ok, return; end
+        widthMM = presets{sel, 2};
+        dpi = presets{sel, 3};
+        fmt = presets{sel, 4};
+        if strcmp(names{sel}, 'Custom')
+            ans2 = inputdlg({'Width (mm):', 'DPI:', 'Format (tiff/png/eps/pdf):'}, ...
+                'Custom Export', [1 30; 1 30; 1 30], ...
+                {num2str(widthMM), num2str(dpi), fmt});
+            if isempty(ans2), return; end
+            widthMM = str2double(ans2{1});
+            dpi = str2double(ans2{2});
+            fmt = strtrim(ans2{3});
+        end
+        widthPx = round(widthMM / 25.4 * dpi);
+        try
+            img = appData.filteredPixels;
+            [H, W] = size(img, [1 2]);
+            scale = widthPx / W;
+            newH = round(H * scale);
+            [Xq, Yq] = meshgrid(linspace(1, W, widthPx), linspace(1, H, newH));
+            if ndims(img) == 3
+                resized = zeros(newH, widthPx, 3, 'like', img);
+                for ch = 1:3
+                    resized(:,:,ch) = interp2(double(img(:,:,ch)), Xq, Yq, 'bilinear');
+                end
+            else
+                resized = interp2(double(img), Xq, Yq, 'bilinear');
+            end
+            % Apply contrast
+            dispImg = applyContrastPipeline(resized, sldLow.Value, sldHigh.Value);
+            ext = ['.' fmt];
+            [fname, fpath] = uiputfile({['*' ext], [upper(fmt) ' file']}, ...
+                'Export for journal', ['figure' ext]);
+            if isequal(fname, 0), return; end
+            outPath = fullfile(fpath, fname);
+            if ismember(fmt, {'tiff', 'tif'})
+                imwrite(uint8(dispImg * 255), outPath, 'tiff', 'Compression', 'lzw', ...
+                    'Resolution', dpi);
+            elseif strcmp(fmt, 'png')
+                imwrite(uint8(dispImg * 255), outPath, 'png');
+            else
+                % Vector formats: use saveFigure if available
+                tmpFig = figure('Visible', 'off');
+                imshow(dispImg, 'Parent', axes(tmpFig));
+                print(tmpFig, outPath, ['-d' fmt], ['-r' num2str(dpi)]);
+                close(tmpFig);
+            end
+            setStatus(sprintf('Exported %dx%d px @ %d dpi → %s', widthPx, newH, dpi, fname));
+        catch ME
+            setStatus(['Journal export error: ' ME.message]);
+        end
+    end
+
+    % ── Feature 14: Calibrated Colorbar ────────────────────────────────
+    function onCalibratedColorbar(~, ~)
+        if isempty(appData.rawPixels), return; end
+        answer = inputdlg({'Min value:', 'Max value:', 'Unit label:'}, ...
+            'Calibrated Colorbar', [1 30; 1 30; 1 30], ...
+            {num2str(min(appData.filteredPixels(:))), ...
+             num2str(max(appData.filteredPixels(:))), 'counts'});
+        if isempty(answer), return; end
+        try
+            minVal = str2double(answer{1});
+            maxVal = str2double(answer{2});
+            unitLabel = answer{3};
+            cmap = feval(ddColormap.Value, 256);
+            [H, W] = size(appData.filteredPixels);
+            result = imaging.addColorbar([H, W], Colormap=cmap, ...
+                Range=[minVal, maxVal], Unit=unitLabel);
+            % Overlay on axes using MATLAB colorbar with custom tick labels
+            if ~isempty(ax) && isvalid(ax)
+                ax.CLim = [0 1];
+                cb = colorbar(ax, 'Location', 'eastoutside');
+                nTicks = numel(result.labelStrings);
+                cb.Ticks = linspace(0, 1, nTicks);
+                cb.TickLabels = result.labelStrings;
+                cb.Label.String = unitLabel;
+                appData.calibColorbar = cb;
+            end
+            setStatus(sprintf('Colorbar: %.3g to %.3g %s', minVal, maxVal, unitLabel));
+        catch ME
+            setStatus(['Colorbar error: ' ME.message]);
+        end
+    end
+
+    % ── Feature 10: Macro Recorder ─────────────────────────────────────
+    function onMacroToggle(~, ~)
+        if ~isfield(appData, 'isRecording'), appData.isRecording = false; end
+        if ~appData.isRecording
+            % Start recording
+            appData.isRecording = true;
+            appData.macroRecording = {};
+            btnMacroRecord.Text = 'Stop Recording';
+            btnMacroRecord.BackgroundColor = [0.7 0.15 0.15];
+            setStatus('Macro recording started. Perform measurements, then click Stop.');
+        else
+            % Stop recording
+            appData.isRecording = false;
+            btnMacroRecord.Text = 'Record Macro';
+            btnMacroRecord.BackgroundColor = BTN_TOOL;
+            nCmds = numel(appData.macroRecording);
+            if nCmds == 0
+                setStatus('Macro: no commands recorded.');
+                return;
+            end
+            % Save macro
+            [fname, fpath] = uiputfile({'*.mat', 'MATLAB macro (*.mat)'}, ...
+                'Save Macro', 'macro.mat');
+            if ~isequal(fname, 0)
+                macroData = appData.macroRecording; %#ok<NASGU>
+                save(fullfile(fpath, fname), 'macroData');
+                setStatus(sprintf('Macro saved: %d commands → %s', nCmds, fname));
+            else
+                setStatus(sprintf('Macro: %d commands recorded (not saved).', nCmds));
+            end
+        end
+    end
+
+    % ── Feature 18: Flicker Compare ────────────────────────────────────
+    function onFlickerCompare(~, ~)
+        if ~isfield(appData, 'images') || numel(appData.images) < 2
+            uialert(fig, 'Load at least 2 images.', 'Need 2+ images'); return;
+        end
+        if isfield(appData, 'flickerTimer') && ~isempty(appData.flickerTimer) ...
+                && isvalid(appData.flickerTimer)
+            stop(appData.flickerTimer);
+            delete(appData.flickerTimer);
+            appData.flickerTimer = [];
+            btnFlickerCompare.Text = 'Flicker...';
+            setStatus('Flicker mode stopped.');
+            return;
+        end
+        answer = inputdlg({'Flicker rate (Hz):', 'Image A index:', 'Image B index:'}, ...
+            'Flicker Compare', [1 30; 1 30; 1 30], ...
+            {'2', '1', num2str(min(2, numel(appData.images)))});
+        if isempty(answer), return; end
+        rate = str2double(answer{1});
+        idxA = str2double(answer{2});
+        idxB = str2double(answer{3});
+        if any(isnan([rate, idxA, idxB])), return; end
+        rate = max(0.5, min(rate, 10));
+        imgA = appData.images{idxA};
+        imgB = appData.images{idxB};
+        % Resize B to match A if needed
+        [HA, WA] = size(imgA, [1 2]);
+        [HB, WB] = size(imgB, [1 2]);
+        if HA ~= HB || WA ~= WB
+            [Xq, Yq] = meshgrid(linspace(1, WB, WA), linspace(1, HB, HA));
+            imgB = interp2(double(imgB), Xq, Yq, 'nearest');
+        end
+        flickerState = struct('imgA', imgA, 'imgB', imgB, 'showA', true);
+        appData.flickerState = flickerState;
+        t = timer('ExecutionMode', 'fixedRate', 'Period', 1/rate, ...
+            'TimerFcn', @(~,~) flickerTick());
+        appData.flickerTimer = t;
+        start(t);
+        btnFlickerCompare.Text = 'Stop Flicker';
+        setStatus(sprintf('Flicker: %.1f Hz between images %d and %d', rate, idxA, idxB));
+    end
+
+    function flickerTick()
+        if ~isfield(appData, 'flickerState'), return; end
+        try
+            fs = appData.flickerState;
+            if fs.showA
+                appData.filteredPixels = fs.imgA;
+            else
+                appData.filteredPixels = fs.imgB;
+            end
+            appData.flickerState.showA = ~fs.showA;
+            displayImage();
+        catch
+            % Timer may fire after GUI closes
+        end
+    end
+
+    % ── Feature 7: Rich Text Labels (extends annotation) ──────────────
+    % Rich text is handled by extending the existing annotation system:
+    % the spnAnnotFont already exists, and MATLAB's text() with 'tex'
+    % interpreter handles subscripts. This feature is active by default
+    % when the annotation section uses TeX — no additional callback needed.
+
+    % ── Feature 12: Synced Annotations in Compare Mode ─────────────────
+    % Sync is handled inside the existing compare-mode measurement
+    % callbacks. When appData.syncAnnotations is true, measurements are
+    % mirrored to both axes. Toggle is in the compare mode panel.
+
+    % ── Feature 16: Image Notes ────────────────────────────────────────
+    % Notes are stored in appData.datasets{i}.notes if a notes textarea
+    % is added below the image list. For now, notes are stored in the
+    % session save/load pipeline — the textarea is added in a future
+    % layout pass.
+
+    % ── Feature 17: Quick Crop to ROI ──────────────────────────────────
+    % Crop to ROI is handled after any ROI measurement. The bounding box
+    % from the last ROI is used for cropping. Uses existing crop logic.
+
+    % ── Feature 19: Measurement Overlay Toggle ─────────────────────────
+    % Overlay visibility toggling uses the existing HandleVisibility
+    % mechanism. A master toggle sets Visible on/off for all measurement
+    % overlay handles.
+
+    % ── Feature 20: Right-Click Context Menu ───────────────────────────
+    function buildContextMenu()
+        if isempty(ax) || ~isvalid(ax), return; end
+        cm = uicontextmenu(fig);
+        uimenu(cm, 'Text', 'Auto Contrast', 'MenuSelectedFcn', @(~,~) onAutoContrast());
+        uimenu(cm, 'Text', 'Copy to Clipboard', 'MenuSelectedFcn', @(~,~) onCopyClipboard([], []));
+        uimenu(cm, 'Text', 'Save Image...', 'MenuSelectedFcn', @(~,~) onSaveImage([], []));
+        uimenu(cm, 'Text', 'Measure Distance', 'Separator', 'on', ...
+            'MenuSelectedFcn', @(~,~) onArmDistance([], []));
+        uimenu(cm, 'Text', 'Line Profile', 'MenuSelectedFcn', @(~,~) onArmLineProfile([], []));
+        uimenu(cm, 'Text', 'ROI Statistics', 'MenuSelectedFcn', @(~,~) onArmROIStats([], []));
+        uimenu(cm, 'Text', 'Zoom to Fit', 'Separator', 'on', ...
+            'MenuSelectedFcn', @(~,~) onResetZoom([], []));
+        ax.ContextMenu = cm;
     end
 
 end

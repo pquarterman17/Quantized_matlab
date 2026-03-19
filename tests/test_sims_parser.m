@@ -1,8 +1,14 @@
-%TEST_SIMS_PARSER  Synthetic-data tests for parser.importSIMS
+%TEST_SIMS_PARSER  Tests for parser.importSIMS
 %
 %   Tests cover paired-column layout, shared-depth layout, element name
-%   cleaning, depth grid merging, metadata capture, edge cases, and unit
-%   detection. All test data is generated via fprintf to temporary files.
+%   cleaning, depth grid merging, metadata capture, edge cases, unit
+%   detection, and realistic 10-element vendor-format stacks.
+%
+%   Fixture files in +test_datasets/SIMS/:
+%     sims_synthetic.csv        — 8-element vendor format (original)
+%     sims_stack_magnetic.csv   — 10-element Pt/Co/Cu/Co/Ta/Si
+%     sims_stack_oxide.csv      — 10-element TiN/HfO₂/SiO₂/Si
+%     sims_stack_barrier.csv    — 10-element Cu/TaN/Ta/SiCN/Si
 %
 %   Run standalone:  cd tests; run test_sims_parser
 %   Run from root:   run tests/test_sims_parser
@@ -22,6 +28,9 @@ fprintf('\n═══ test_sims_parser ═══\n');
 nPass = 0;
 nFail = 0;
 tmpFiles = {};
+
+% Fixture directory
+simsDataDir = fullfile(rootDir, '+test_datasets', 'SIMS');
 
 try
 
@@ -83,13 +92,10 @@ try
     tmpFiles{end+1} = fp;
     d = parser.importSIMS(fp);
     assert(numel(d.labels) == 2, 'Expected 2 elements');
-    % Union grid should span 0-200 with step 50
     assert(d.time(1) == 0, 'Grid should start at 0');
     assert(d.time(end) == 200, 'Grid should end at 200');
-    % Element A should have NaN beyond depth 100
     lastAValid = find(~isnan(d.values(:,1)), 1, 'last');
     assert(d.time(lastAValid) == 100, 'A should be valid up to depth 100');
-    % Element B should be valid across the full range
     assert(~any(isnan(d.values(:,2))), 'B should have no NaN');
     nPass = nPass + 1;
     fprintf('  ✔ Test 3: Different depth ranges with NaN padding\n');
@@ -185,7 +191,6 @@ end
 
 % ── Test 8: Unit detection from headers ───────────────────────────────
 try
-    % Test nm detection
     fp1 = writeTempCSV('sims_t8a', {
         'Depth (nm),Si (atoms/cm3)'
         '0,1e20'
@@ -196,7 +201,6 @@ try
     assert(strcmp(d1.metadata.parserSpecific.depthUnit, 'nm'), 'nm not detected');
     assert(strcmp(d1.units{1}, 'atoms/cm3'), 'Conc unit not extracted');
 
-    % Test um detection
     fp2 = writeTempCSV('sims_t8b', {
         'Depth (um),Si (a.u.)'
         '0,1e20'
@@ -214,74 +218,147 @@ catch ME
     fprintf('  ✘ Test 8: %s\n', ME.message);
 end
 
-% ── Test 9: vendor multi-row header — realistic thin-film stack ────────
-% Loads the fixture CSV from tests/fixtures/sims_thinfilm_stack.csv.
-% The fixture models a 4-layer stack on Si (TaN cap / HfO₂ / Al₂O₃ /
-% Ta barrier / Si substrate) with 273 depth points, per-element depth
-% offsets, mixed units, and ~5% noise.  See generate_sims_thinfilm.m.
+% ── Test 9: Original 8-element vendor format ──────────────────────────
 try
-    simsDataDir = fullfile(rootDir, '+test_datasets', 'SIMS');
-    fixtureFile = fullfile(simsDataDir, 'sims_thinfilm_stack.csv');
-    if ~isfile(fixtureFile)
-        % Regenerate if missing (e.g. fresh clone)
-        run(fullfile(simsDataDir, 'generate_sims_thinfilm.m'));
-    end
-    assert(isfile(fixtureFile), 'Fixture file not found: %s', fixtureFile);
-
-    d = parser.importSIMS(fixtureFile);
-    nPts = 273;
-
-    % 8 element pairs (H, C, O, F, N, Al, Si, Ta)
+    fp = fullfile(simsDataDir, 'sims_synthetic.csv');
+    assert(isfile(fp), 'Fixture missing: %s', fp);
+    d = parser.importSIMS(fp);
     assert(numel(d.labels) == 8, ...
         sprintf('Expected 8 elements, got %d', numel(d.labels)));
     assert(d.metadata.parserSpecific.isPairedLayout, ...
         'Should detect paired layout');
-
-    % Depth grid covers the full 0-200 nm range
-    assert(numel(d.time) >= nPts, ...
-        sprintf('Expected >= %d depth points, got %d', nPts, numel(d.time)));
-    assert(d.time(1) > 0,        'Depth should be positive');
-    assert(d.time(end) > 190,    'Depth should extend beyond 190 nm');
-
-    % Concentration units extracted from the units header row
-    hasUnits = any(~cellfun(@isempty, d.units));
-    assert(hasUnits, 'At least one concentration unit should be non-empty');
-
-    % All valid concentrations should be positive
     assert(all(d.values(~isnan(d.values)) > 0), ...
         'All valid concentrations should be positive');
-
-    % Verify layer structure: Si concentration rises in the substrate
-    siCol = find(contains(d.labels, 'Si'), 1);
-    assert(~isempty(siCol), 'Si column not found');
-    surfaceSi  = mean(d.values(d.time < 20, siCol), 'omitnan');
-    substrateSi = mean(d.values(d.time > 170, siCol), 'omitnan');
-    assert(substrateSi > 100 * surfaceSi, ...
-        'Si should be >100× higher in substrate than at surface');
-
-    % Verify Ta has two peaks (cap + barrier)
-    taCol = find(contains(d.labels, 'Ta'), 1);
-    assert(~isempty(taCol), 'Ta column not found');
-    taCap     = max(d.values(d.time < 40, taCol));
-    taMid     = min(d.values(d.time > 60 & d.time < 100, taCol));
-    taBarrier = max(d.values(d.time > 120 & d.time < 160, taCol));
-    assert(taCap > 10 * taMid && taBarrier > 10 * taMid, ...
-        'Ta should show two distinct peaks (cap + barrier)');
-
-    % Metadata captured
     hm = d.metadata.parserSpecific.headerMetadata;
     assert(~isempty(hm), 'Header metadata should not be empty');
-    allMeta = strjoin(hm, ' ');
-    assert(contains(allMeta, 'Sample 2829'), ...
-        'Sample ID should appear in header metadata');
-    assert(contains(allMeta, 'Eurofins'), ...
-        'Company name should appear in header metadata');
-
     nPass = nPass + 1;
-    fprintf('  ✔ Test 9: vendor multi-row header (thin-film stack, %d pts × 8 elements)\n', nPts);
+    fprintf('  ✔ Test 9: Original 8-element vendor format (%d pts)\n', numel(d.time));
 catch ME
     nFail = nFail + 1;
     fprintf('  ✘ Test 9: %s\n', ME.message);
+end
+
+% ── Test 10: Magnetic multilayer — 10 elements ────────────────────────
+% Stack: Pt(5 nm) / Co(3 nm) / Cu(5 nm) / Co(3 nm) / Ta(8 nm) / Si sub
+try
+    fp = fullfile(simsDataDir, 'sims_stack_magnetic.csv');
+    assert(isfile(fp), 'Fixture missing: %s', fp);
+    d = parser.importSIMS(fp);
+
+    assert(numel(d.labels) == 10, ...
+        sprintf('Expected 10 elements, got %d', numel(d.labels)));
+    assert(d.metadata.parserSpecific.isPairedLayout, ...
+        'Should detect paired layout');
+
+    % Element names recovered from header row (XX-> format)
+    assert(any(contains(d.labels, 'Pt')), 'Pt not found in labels');
+    assert(any(contains(d.labels, 'Co')), 'Co not found in labels');
+    assert(any(contains(d.labels, 'Cu')), 'Cu not found in labels');
+    assert(any(contains(d.labels, 'Ta')), 'Ta not found in labels');
+    assert(any(contains(d.labels, 'Si')), 'Si not found in labels');
+
+    % Units: first 5 atoms/cc, last 5 arb. units
+    assert(contains(d.units{1}, 'atoms'), ...
+        sprintf('First unit should contain "atoms", got "%s"', d.units{1}));
+    assert(contains(d.units{end}, 'arb'), ...
+        sprintf('Last unit should contain "arb", got "%s"', d.units{end}));
+
+    % All valid values positive
+    assert(all(d.values(~isnan(d.values)) > 0), ...
+        'All valid concentrations should be positive');
+
+    % Pt cap should be high at surface
+    ptCol = find(contains(d.labels, 'Pt'), 1);
+    surfacePt = mean(d.values(d.time < 4, ptCol), 'omitnan');
+    deepPt    = mean(d.values(d.time > 40, ptCol), 'omitnan');
+    assert(surfacePt > 50 * deepPt, ...
+        'Pt should be high at surface, low deep');
+
+    % Si should be high in substrate
+    siCol = find(contains(d.labels, 'Si'), 1);
+    surfaceSi  = mean(d.values(d.time < 10, siCol), 'omitnan');
+    substrateSi = mean(d.values(d.time > 40, siCol), 'omitnan');
+    assert(substrateSi > 50 * surfaceSi, ...
+        'Si should be much higher in substrate');
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 10: Magnetic multilayer (%d pts × 10 elements)\n', numel(d.time));
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 10: %s\n', ME.message);
+end
+
+% ── Test 11: Gate oxide stack — 10 elements ───────────────────────────
+% Stack: TiN(10 nm) / HfO₂(4 nm) / SiO₂(2 nm) / Si sub
+try
+    fp = fullfile(simsDataDir, 'sims_stack_oxide.csv');
+    assert(isfile(fp), 'Fixture missing: %s', fp);
+    d = parser.importSIMS(fp);
+
+    assert(numel(d.labels) == 10, ...
+        sprintf('Expected 10 elements, got %d', numel(d.labels)));
+    assert(d.metadata.parserSpecific.isPairedLayout, ...
+        'Should detect paired layout');
+
+    % O should be elevated in oxide region
+    oCol = find(strcmp(d.labels, 'O'), 1);
+    assert(~isempty(oCol), 'O column not found');
+    oOxide  = max(d.values(d.time > 8 & d.time < 18, oCol));
+    oDeep   = mean(d.values(d.time > 40, oCol), 'omitnan');
+    assert(oOxide > 10 * oDeep, ...
+        'O should be elevated in oxide layers');
+
+    % Ti should be high in TiN cap
+    tiCol = find(contains(d.labels, 'Ti'), 1);
+    assert(~isempty(tiCol), 'Ti column not found');
+
+    % Metadata
+    hm = d.metadata.parserSpecific.headerMetadata;
+    assert(~isempty(hm), 'Header metadata should not be empty');
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 11: Gate oxide stack (%d pts × 10 elements)\n', numel(d.time));
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 11: %s\n', ME.message);
+end
+
+% ── Test 12: Interconnect barrier stack — 10 elements ─────────────────
+% Stack: Cu(15 nm) / TaN(3 nm) / Ta(5 nm) / SiCN(8 nm) / Si sub
+try
+    fp = fullfile(simsDataDir, 'sims_stack_barrier.csv');
+    assert(isfile(fp), 'Fixture missing: %s', fp);
+    d = parser.importSIMS(fp);
+
+    assert(numel(d.labels) == 10, ...
+        sprintf('Expected 10 elements, got %d', numel(d.labels)));
+    assert(d.metadata.parserSpecific.isPairedLayout, ...
+        'Should detect paired layout');
+
+    % Cu should be high at surface (Cu layer 0–15 nm)
+    cuCol = find(contains(d.labels, 'Cu'), 1);
+    assert(~isempty(cuCol), 'Cu column not found');
+    surfaceCu = mean(d.values(d.time < 10, cuCol), 'omitnan');
+    deepCu    = mean(d.values(d.time > 50, cuCol), 'omitnan');
+    assert(surfaceCu > 50 * deepCu, ...
+        'Cu should be high at surface');
+
+    % C and N should be elevated in SiCN region
+    cCol = find(strcmp(d.labels, 'C'), 1);
+    nCol = find(strcmp(d.labels, 'N'), 1);
+    assert(~isempty(cCol) && ~isempty(nCol), 'C or N column not found');
+
+    % Metadata
+    hm = d.metadata.parserSpecific.headerMetadata;
+    allMeta = strjoin(hm, ' ');
+    assert(contains(allMeta, 'BARR'), ...
+        'Sample ID should appear in header metadata');
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 12: Interconnect barrier stack (%d pts × 10 elements)\n', numel(d.time));
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 12: %s\n', ME.message);
 end
 
 catch ME

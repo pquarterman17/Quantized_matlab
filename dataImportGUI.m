@@ -376,9 +376,9 @@ function varargout = dataImportGUI()
     fileListPanel = uipanel(contentGL, 'BorderType', 'none', 'Scrollable', 'on');
     fileListPanel.Layout.Row = 1; fileListPanel.Layout.Column = 1;
 
-    % Stacked vertically: Add | Remove | Filter | Merge | Listbox
-    tbGL = uigridlayout(fileListPanel,[7 2], ...
-        'RowHeight',    {22,22,22,22,22,22,180}, ...
+    % Stacked vertically: Add | Remove | Filter | Merge | Up/Down | Animate/Shortcuts | Settings | Listbox
+    tbGL = uigridlayout(fileListPanel,[8 2], ...
+        'RowHeight',    {22,22,22,22,22,22,22,180}, ...
         'ColumnWidth',  {'1x','1x'}, ...
         'Padding',      [0 0 0 0], ...
         'RowSpacing',   2, ...
@@ -443,13 +443,21 @@ function varargout = dataImportGUI()
         'Tooltip','Show keyboard shortcuts');
     btnShortcuts.Layout.Row = 6; btnShortcuts.Layout.Column = 2;
 
+    btnSettings = uibutton(tbGL,'Text',[char(9881) '  Settings...'], ...
+        'ButtonPushedFcn',@(~,~) onOpenSettings(), ...
+        'BackgroundColor',BTN_TOOL, ...
+        'FontColor',[0.85 0.85 0.85], ...
+        'FontSize',10, ...
+        'Tooltip','Theme, plot style, and other global preferences');
+    btnSettings.Layout.Row = 7; btnSettings.Layout.Column = [1 2];
+
     lbDatasets = uilistbox(tbGL, ...
         'Items',     {'(no files loaded — click  Add File(s)...  to begin)'}, ...
         'ItemsData', {0}, ...
         'Multiselect','on', ...
         'ValueChangedFcn',@onSelectDataset, ...
         'Tooltip','Loaded datasets — click to make active; Ctrl+click to select multiple; right-click to remove');
-    lbDatasets.Layout.Row = 7; lbDatasets.Layout.Column = [1 2];
+    lbDatasets.Layout.Row = 8; lbDatasets.Layout.Column = [1 2];
 
     % Context menu for dataset list (right-click) — #12 expanded
     % uicontextmenu on uifigure components requires R2023b+; guard for older versions.
@@ -488,7 +496,7 @@ function varargout = dataImportGUI()
     ctrlPanel.Layout.Column = 2;
 
     ctrlGL = uigridlayout(ctrlPanel,[8 1], ...
-        'RowHeight', {24,100,80,80,66,22,22,20}, ...
+        'RowHeight', {24,120,80,22,66,22,22,20}, ...
         'Padding',   [4 4 4 4], ...
         'RowSpacing', 2);
 
@@ -518,13 +526,12 @@ function varargout = dataImportGUI()
         'ValueChangedFcn',@(~,~) onPlot([],[]));
     lbY2.Layout.Row = 2; lbY2.Layout.Column = 1;
 
-    % Plot-style buttons (row 4) — colormap, theme, then 2×2 style buttons.
-    styleGL = uigridlayout(ctrlGL,[4 4], ...
+    % Colormap selector (row 4) — theme + plot style moved to Settings dialog
+    styleGL = uigridlayout(ctrlGL,[1 4], ...
         'Padding',[0 0 0 0],'ColumnSpacing',2,'RowSpacing',2, ...
-        'ColumnWidth',{'1x','1x','1x','1x'},'RowHeight',{18,18,20,20});
+        'ColumnWidth',{'1x','1x','1x','1x'},'RowHeight',{18});
     styleGL.Layout.Row = 4;
 
-    % Row 1: Colormap label + selector
     lblColormap = uilabel(styleGL,'Text','Colormap:','FontSize',10);
     lblColormap.Layout.Row = 1; lblColormap.Layout.Column = 1;
 
@@ -536,35 +543,8 @@ function varargout = dataImportGUI()
         'ValueChangedFcn', @(~,~) onPlot([],[]));
     ddColormap.Layout.Row = 1; ddColormap.Layout.Column = [2 4];
 
-    % Row 2: Theme selector
-    lblTheme = uilabel(styleGL,'Text','Theme:','FontSize',10);
-    lblTheme.Layout.Row = 2; lblTheme.Layout.Column = 1;
-
-    ddTheme = uidropdown(styleGL, ...
-        'Items',   {'Light', 'Dark'}, ...
-        'Value',   'Light', ...
-        'Tooltip', 'Switch between light and dark GUI themes', ...
-        'ValueChangedFcn', @onThemeChanged);
-    ddTheme.Layout.Row = 2; ddTheme.Layout.Column = [2 4];
-
-    % Rows 3-4: Style buttons (2 per row)
-    btnStyleLine = uibutton(styleGL,'Text','Line', ...
-        'ButtonPushedFcn',@(~,~) onStylePick('Line'), ...
-        'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG);
-    btnStyleLine.Layout.Row = 3; btnStyleLine.Layout.Column = [1 2];
-
-    btnStyleScatter = uibutton(styleGL,'Text','Scatter', ...
-        'ButtonPushedFcn',@(~,~) onStylePick('Scatter'));
-    btnStyleScatter.Layout.Row = 3; btnStyleScatter.Layout.Column = [3 4];
-
-    btnStyleLineMarkers = uibutton(styleGL,'Text','Line + Markers', ...
-        'ButtonPushedFcn',@(~,~) onStylePick('Line+Pts'));
-    btnStyleLineMarkers.Layout.Row = 4; btnStyleLineMarkers.Layout.Column = [1 2];
-
-    btnStyleErrorBand = uibutton(styleGL,'Text','Error Band', ...
-        'ButtonPushedFcn',@(~,~) onStylePick('ErrorBand'), ...
-        'Tooltip','Plot with shaded error bands (auto-detects error columns)');
-    btnStyleErrorBand.Layout.Row = 4; btnStyleErrorBand.Layout.Column = [3 4];
+    % Theme value stored here but UI moved to Settings dialog
+    appData.theme = 'Light';
 
     % Row 5: Axis scale dropdowns (3 rows: X, Left Y, Right Y)
     scaleGL = uigridlayout(ctrlGL,[3 2], ...
@@ -1816,7 +1796,7 @@ function varargout = dataImportGUI()
 
     % Row 8: "Advanced..." toggle (collapsed by default)
     PEAK_ADV_ROWS = 9;
-    PEAK_ADV_HEIGHTS = 22;
+    PEAK_ADV_HEIGHTS = 46;
     btnMorePeak = uibutton(peakBtnGL, 'Text', [char(9654) ' Advanced...'], ...
         'FontSize', 9, 'FontColor', [0.55 0.55 0.55], ...
         'BackgroundColor', peakBtnGL.BackgroundColor, ...
@@ -1824,10 +1804,10 @@ function varargout = dataImportGUI()
         'ButtonPushedFcn', @(~,~) onToggleAdvancedPeakTools());
     btnMorePeak.Layout.Row = 8; btnMorePeak.Layout.Column = [1 2];
 
-    % Row 8: Advanced peak tools (collapsed by default) — 3 buttons side-by-side in a sub-grid
-    peakAdvGL = uigridlayout(peakBtnGL, [1 3], ...
-        'Padding', [0 0 0 0], 'ColumnSpacing', 3, ...
-        'ColumnWidth', {'1x','1x','1x'});
+    % Row 8: Advanced peak tools (collapsed by default) — 2x3 sub-grid
+    peakAdvGL = uigridlayout(peakBtnGL, [2 3], ...
+        'Padding', [0 0 0 0], 'ColumnSpacing', 3, 'RowSpacing', 2, ...
+        'ColumnWidth', {'1x','1x','1x'}, 'RowHeight', {22, 22});
     peakAdvGL.Layout.Row = 9; peakAdvGL.Layout.Column = [1 2];
 
     btnWHPlot = uibutton(peakAdvGL, 'Text', 'W-H Plot', ...
@@ -1836,19 +1816,26 @@ function varargout = dataImportGUI()
         'Tooltip', ['Williamson-Hall strain analysis: plot ' char(946) char(183) ...
                     'cos' char(952) ' vs 4' char(183) 'sin' char(952) ...
                     '.  Needs ' char(8805) '3 fitted peaks.']);
-    btnWHPlot.Layout.Column = 1;
+    btnWHPlot.Layout.Row = 1; btnWHPlot.Layout.Column = 1;
 
     btnFFTThickness = uibutton(peakAdvGL, 'Text', 'FFT Thick.', ...
         'ButtonPushedFcn', @onFFTThickness, ...
         'BackgroundColor', BTN_ACCENT, 'FontColor', BTN_FG, ...
         'Tooltip', 'Compute film thickness from Laue / Kiessig fringe periodicity via FFT');
-    btnFFTThickness.Layout.Column = 2;
+    btnFFTThickness.Layout.Row = 1; btnFFTThickness.Layout.Column = 2;
 
     btnRefineLattice = uibutton(peakAdvGL, 'Text', 'Lattice...', ...
         'ButtonPushedFcn', @onRefineLattice, ...
         'BackgroundColor', BTN_ACCENT, 'FontColor', BTN_FG, ...
         'Tooltip', 'Refine lattice parameters from fitted peak positions + hkl Miller indices');
-    btnRefineLattice.Layout.Column = 3;
+    btnRefineLattice.Layout.Row = 1; btnRefineLattice.Layout.Column = 3;
+
+    btnMatchPhases = uibutton(peakAdvGL, 'Text', 'Match Phases', ...
+        'ButtonPushedFcn', @onMatchPhases, ...
+        'BackgroundColor', [0.20 0.50 0.35], 'FontColor', BTN_FG, ...
+        'Tooltip', ['Match detected peak d-spacings against a built-in database of ~50 phases ' ...
+                    '(metals, oxides, substrates, perovskites). Tolerance slider adjustable.']);
+    btnMatchPhases.Layout.Row = 2; btnMatchPhases.Layout.Column = [1 3];
 
     % Row 9: Min sep / wavelength / source / K factor / instrument broadening (shared sub-grid)
     % X-ray source lookup table: {display name, wavelength_A}
@@ -2697,25 +2684,8 @@ function varargout = dataImportGUI()
                 vars.(sprintf('D%d', di)) = yVec;
             end
 
-            % Replace D<N> references with struct field access for safe evaluation
-            safeExpr = expr;
-            for ri = sort(refIdxs, 'descend')  % descend to avoid D1 matching in D10
-                safeExpr = strrep(safeExpr, sprintf('D%d', ri), sprintf('vars.D%d', ri));
-            end
-
-            % Validate expression against whitelist (#23)
-            stripped = regexprep(safeExpr, 'vars\.D\d+', '');  % remove dataset refs
-            stripped = regexprep(stripped, '[\d.eE+\-*/^().,\s]', '');  % remove numbers/operators
-            allowedFuncs = {'log10','log','abs','diff','sqrt','exp','sin','cos','tan','real','imag','cumsum','cumtrapz','gradient'};
-            for afi = 1:numel(allowedFuncs)
-                stripped = strrep(stripped, allowedFuncs{afi}, '');
-            end
-            if ~isempty(strtrim(stripped))
-                error('Expression contains disallowed tokens: "%s". Only math operators, numbers, and functions (log10, abs, diff, sqrt, exp, sin, cos, gradient) are permitted.', strtrim(stripped));
-            end
-
-            % Evaluate expression
-            yResult = eval(safeExpr); 
+            % Evaluate expression safely — no eval(); uses dispatch-based parser
+            yResult = safeEvalMathExpr(expr, vars);
             if ~isnumeric(yResult) || numel(yResult) ~= numel(xBase)
                 error('Expression did not produce a vector of the correct length.');
             end
@@ -5042,6 +5012,139 @@ function varargout = dataImportGUI()
     end
 
     % ════════════════════════════════════════════════════════════════════
+    %  3.1a  PHASE IDENTIFICATION (PEAK DATABASE MATCHING)
+    % ════════════════════════════════════════════════════════════════════
+
+    function onMatchPhases(~, ~)
+    %ONMATCHPHASES  Match detected peaks against built-in crystallographic database.
+    %   Uses d-spacing comparison with adjustable tolerance.  Overlays
+    %   vertical tick marks for matched reference positions.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig, 'Load a file first.', 'No data'); return;
+        end
+        ds  = appData.datasets{appData.activeIdx};
+        pks = ds.peaks;
+        if isempty(pks) || ~isstruct(pks)
+            uialert(fig, 'Detect peaks first (Auto Peak button).', 'No peaks'); return;
+        end
+
+        wl_A = extractWavelength_A(ds);
+        if isnan(wl_A) || wl_A <= 0
+            uialert(fig, ['Wavelength is required for phase matching.  ' ...
+                          'Enter a value in the ' char(955) ' field or select an X-ray source.'], ...
+                          'Wavelength needed'); return;
+        end
+
+        % Collect peak centers (2theta)
+        centers = [pks.center];
+        centers = centers(~isnan(centers));
+        if isempty(centers)
+            uialert(fig, 'No valid peak centers found.', 'No peaks'); return;
+        end
+
+        try
+            % Ask for tolerance via a simple dialog
+            answer = inputdlg( ...
+                {['d-spacing tolerance (' char(197) '):'], ...
+                 'Min. match fraction (0-1):'}, ...
+                'Phase Match Settings', [1 40], {'0.03', '0.3'});
+            if isempty(answer), return; end
+            tol      = str2double(answer{1});
+            minFrac  = str2double(answer{2});
+            if isnan(tol) || isnan(minFrac)
+                uialert(fig, 'Invalid numeric input.', 'Error'); return;
+            end
+
+            matches = calc.crystal.matchPhases(centers(:), ...
+                Lambda=wl_A, Tolerance=tol, MinMatchFrac=minFrac);
+
+            if isempty(matches)
+                uialert(fig, ...
+                    sprintf('No phases matched with tolerance %.3f %s and min fraction %.0f%%.', ...
+                            tol, char(197), minFrac*100), ...
+                    'No matches');
+                return;
+            end
+
+            % Build results display
+            nShow = min(numel(matches), 10);
+            lines = cell(nShow, 1);
+            for mi = 1:nShow
+                m = matches(mi);
+                hklStr = strjoin(m.matchedHKL, ', ');
+                lines{mi} = sprintf('%d. %s  [%s]  —  %.0f%%  (%d/%d peaks)  hkl: %s', ...
+                    mi, m.phaseName, m.formula, m.score*100, m.nMatched, m.nObserved, hklStr);
+            end
+
+            % Let user select which phases to overlay
+            [sel, ok] = listdlg('ListString', lines, ...
+                'SelectionMode', 'multiple', ...
+                'ListSize', [550 300], ...
+                'PromptString', 'Select phase(s) to overlay on plot:', ...
+                'Name', 'Phase Match Results');
+            if ~ok || isempty(sel), return; end
+
+            % Remove existing phase tick marks
+            delete(findall(ax, 'Tag', 'GUIPhaseTickMark'));
+            delete(findall(ax, 'Tag', 'GUIPhaseLabel'));
+
+            % Overlay vertical tick marks for selected phases
+            phaseColors = [ ...
+                0.85 0.20 0.20;  % red
+                0.20 0.50 0.80;  % blue
+                0.20 0.70 0.30;  % green
+                0.80 0.50 0.10;  % orange
+                0.60 0.20 0.70;  % purple
+                0.10 0.70 0.70;  % teal
+                0.90 0.40 0.60;  % pink
+                0.50 0.50 0.20;  % olive
+                0.35 0.35 0.80;  % indigo
+                0.80 0.30 0.30]; % dark red
+
+            yLims = ax.YLim;
+            tickBase = yLims(1);
+            tickTop  = tickBase + 0.08 * (yLims(2) - yLims(1));
+            labelY   = tickBase - 0.03 * (yLims(2) - yLims(1));
+
+            hold(ax, 'on');
+            for si = 1:numel(sel)
+                m = matches(sel(si));
+                ci = mod(si-1, size(phaseColors, 1)) + 1;
+                col = phaseColors(ci, :);
+
+                % Draw tick marks at all reference 2theta positions in range
+                refTT = m.allRefTwoTheta;
+                xRange = ax.XLim;
+                inView = refTT(refTT >= xRange(1) & refTT <= xRange(2) & ~isnan(refTT));
+
+                for ti = 1:numel(inView)
+                    line(ax, [inView(ti), inView(ti)], [tickBase, tickTop], ...
+                        'Color', col, 'LineWidth', 1.5, ...
+                        'HandleVisibility', 'off', 'Tag', 'GUIPhaseTickMark');
+                end
+
+                % Phase label at the left edge
+                if ~isempty(inView)
+                    text(ax, xRange(1) + 0.01*(xRange(2)-xRange(1)), ...
+                         labelY - (si-1)*0.035*(yLims(2)-yLims(1)), ...
+                         sprintf('%s', m.phaseName), ...
+                         'Color', col, 'FontSize', 8, 'FontWeight', 'bold', ...
+                         'HandleVisibility', 'off', 'Tag', 'GUIPhaseLabel');
+                end
+            end
+
+            % Status bar update
+            topMatch = matches(sel(1));
+            lblStatus.Text = sprintf('Phase match: %s (%.0f%%) — %d phase(s) overlaid', ...
+                topMatch.phaseName, topMatch.score*100, numel(sel));
+
+        catch ME
+            logGUIError('Phase Match Error', ME.message, ME);
+            uialert(fig, sprintf('Phase matching failed:\n\n%s', ME.message), 'Error');
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
     %  3.1  FILM THICKNESS FROM LAUE FRINGES (FFT)
     % ════════════════════════════════════════════════════════════════════
 
@@ -6276,25 +6379,96 @@ function varargout = dataImportGUI()
 
     function onStylePick(styleName)
         appData.style = styleName;
-        allBtns   = {btnStyleLine, btnStyleScatter, btnStyleLineMarkers, btnStyleErrorBand};
-        allStyles = {'Line', 'Scatter', 'Line+Pts', 'ErrorBand'};
-        for i = 1:numel(allBtns)
-            if strcmp(allStyles{i}, styleName)
-                allBtns{i}.BackgroundColor = BTN_PRIMARY;
-                allBtns{i}.FontColor       = BTN_FG;
-            else
-                allBtns{i}.BackgroundColor = [0.94 0.94 0.94];
-                allBtns{i}.FontColor       = [0 0 0];
-            end
-        end
         if appData.activeIdx > 0 && ~isempty(appData.datasets)
             onPlot([],[]);
         end
     end
 
+    function onOpenSettings()
+    %ONOPENSETTINGS  Open a global settings dialog for theme + plot style.
+        % Position dialog near the main figure
+        figPos = fig.Position;
+        dlgW = 280; dlgH = 220;
+        dlgX = figPos(1) + round((figPos(3) - dlgW) / 2);
+        dlgY = figPos(2) + round((figPos(4) - dlgH) / 2);
+
+        settingsFig = uifigure('Name','Settings', ...
+            'Position',[dlgX dlgY dlgW dlgH], ...
+            'Resize','off');
+
+        % Match current theme colours from the theme struct
+        isDark = strcmp(appData.theme, 'Dark');
+        if isDark
+            th = styles.dark();
+            settingsFig.Color = th.bgColor;
+            lblFg = th.fgColor;
+        else
+            settingsFig.Color = [0.94 0.94 0.94];
+            lblFg = [0 0 0];
+        end
+
+        sGL = uigridlayout(settingsFig,[5 2], ...
+            'RowHeight', {24, 28, 14, 28, '1x'}, ...
+            'ColumnWidth', {90, '1x'}, ...
+            'Padding', [16 16 16 16], ...
+            'RowSpacing', 8);
+
+        % ── Theme selector ──
+        lblTh = uilabel(sGL,'Text','Theme:','FontSize',12,'FontColor',lblFg);
+        lblTh.Layout.Row = 1; lblTh.Layout.Column = 1;
+
+        ddThemeDlg = uidropdown(sGL, ...
+            'Items', {'Light','Dark'}, ...
+            'Value', appData.theme, ...
+            'FontSize', 12, ...
+            'ValueChangedFcn', @(src,~) applyThemeFromDialog(src.Value, settingsFig));
+        ddThemeDlg.Layout.Row = 1; ddThemeDlg.Layout.Column = 2;
+
+        % ── Plot Style selector ──
+        lblSt = uilabel(sGL,'Text','Plot Style:','FontSize',12,'FontColor',lblFg);
+        lblSt.Layout.Row = 2; lblSt.Layout.Column = 1;
+
+        STYLE_NAMES = {'Line', 'Scatter', 'Line + Markers', 'Error Band'};
+        STYLE_KEYS  = {'Line', 'Scatter', 'Line+Pts',       'ErrorBand'};
+        currentIdx = find(strcmp(STYLE_KEYS, appData.style), 1);
+        if isempty(currentIdx), currentIdx = 1; end
+
+        ddStyleDlg = uidropdown(sGL, ...
+            'Items', STYLE_NAMES, ...
+            'ItemsData', STYLE_KEYS, ...
+            'Value', STYLE_KEYS{currentIdx}, ...
+            'FontSize', 12, ...
+            'ValueChangedFcn', @(src,~) onStylePick(src.Value));
+        ddStyleDlg.Layout.Row = 2; ddStyleDlg.Layout.Column = 2;
+
+        % ── Separator label ──
+        lblInfo = uilabel(sGL,'Text','Changes apply immediately.', ...
+            'FontSize',10,'FontColor',[0.5 0.5 0.5],'FontAngle','italic');
+        lblInfo.Layout.Row = 3; lblInfo.Layout.Column = [1 2];
+
+        % ── Close button ──
+        btnClose = uibutton(sGL,'Text','Close', ...
+            'FontSize',12, ...
+            'ButtonPushedFcn',@(~,~) delete(settingsFig));
+        btnClose.Layout.Row = 4; btnClose.Layout.Column = [1 2];
+    end
+
+    function applyThemeFromDialog(themeName, settingsFig)
+    %APPLYTHEMEFROMDIALOG  Apply theme change from the settings dialog.
+        appData.theme = themeName;
+        onThemeChanged([], []);
+        % Update dialog colours to match new theme
+        if strcmp(themeName, 'Dark')
+            th = styles.dark();
+            settingsFig.Color = th.bgColor;
+        else
+            settingsFig.Color = [0.94 0.94 0.94];
+        end
+    end
+
     function onThemeChanged(~,~)
     %ONTHEMECHANGED  Apply light or dark theme to the entire GUI.
-        isDark = strcmp(ddTheme.Value, 'Dark');
+        isDark = strcmp(appData.theme, 'Dark');
         if isDark
             th = styles.dark();
         else
@@ -8658,6 +8832,8 @@ function varargout = dataImportGUI()
             delete(findall(targetAx, 'Tag', 'GUIFringeMarker'));
             delete(findall(targetAx, 'Tag', 'GUIFringeAnnotation'));
             delete(findall(targetAx, 'Tag', 'GUIFringeSpan'));
+            delete(findall(targetAx, 'Tag', 'GUIPhaseTickMark'));
+            delete(findall(targetAx, 'Tag', 'GUIPhaseLabel'));
             delete(targetAx.Children);
             cla(targetAx);
             % cla() removes plot children but DOES NOT reset XLim/YLim — MATLAB
@@ -11528,7 +11704,7 @@ function varargout = dataImportGUI()
         end
         prompt = sprintf(['Create a new column from existing columns.\n\n' ...
                           'Available columns:\n%s\n\n' ...
-                          'Use C1, C2, ... or col("Name").\n' ...
+                          'Use C1, C2, ... to reference columns.\n' ...
                           'Examples: C1./C2,  log10(C1),  C1*1e3'], ...
                           strjoin(colInfo, '\n'));
         answer = inputdlg({prompt, 'New column name:'}, ...
@@ -11543,12 +11719,8 @@ function varargout = dataImportGUI()
             for ci = 1:numel(d.labels)
                 colVars.(sprintf('C%d', ci)) = d.values(:, ci);
             end
-            % Replace C<N> references
-            safeExpr = expr;
-            for ci = sort(1:numel(d.labels), 'descend')
-                safeExpr = strrep(safeExpr, sprintf('C%d', ci), sprintf('colVars.C%d', ci));
-            end
-            yResult = eval(safeExpr);
+            % Evaluate via safe recursive-descent parser (no eval)
+            yResult = safeEvalMathExpr(expr, colVars);
             if ~isnumeric(yResult) || numel(yResult) ~= size(d.values, 1)
                 error('Result must be a vector with %d elements.', size(d.values, 1));
             end
@@ -12479,6 +12651,218 @@ function wl_A = extractWavelength_A(ds)
         end
     end
 end
+
+
+function result = safeEvalMathExpr(expr, vars)
+%SAFEEVALMATHEXPR  Evaluate a dataset-math expression without eval().
+%
+%  Syntax
+%    result = safeEvalMathExpr(expr, vars)
+%
+%  Inputs
+%    expr — char expression such as 'D1 - D2', 'log10(D1)', 'abs(D1-D2)/D3'
+%    vars — struct whose fields are dataset vectors, e.g. vars.D1, vars.D2
+%
+%  Outputs
+%    result — numeric vector produced by the expression
+%
+%  Supported constructs
+%    Unary functions : log10 log abs diff sqrt exp sin cos tan
+%                      real imag cumsum cumtrapz gradient
+%    Binary operators: + - * / .^  (left-to-right, standard precedence)
+%    Grouping        : parentheses (arbitrary nesting)
+%    Operands        : dataset refs (D1, D2, …) and numeric literals
+%
+%  Errors
+%    Throws if unrecognised tokens remain after parsing.
+
+% ── dispatch table: function name → function handle ──────────────────────
+funcMap = containers.Map( ...
+    {'log10','log','abs','diff','sqrt','exp', ...
+     'sin','cos','tan','real','imag','cumsum','cumtrapz','gradient'}, ...
+    {@log10, @log, @abs, @diff, @sqrt, @exp, ...
+     @sin, @cos, @tan, @real, @imag, @cumsum, @cumtrapz, @gradient});
+
+% ── tokenise ─────────────────────────────────────────────────────────────
+tokens = tokenise(expr);
+
+% ── recursive-descent parse ───────────────────────────────────────────────
+pos = 1;
+result = parseExpr();
+if pos <= numel(tokens)
+    error('Unexpected token ''%s'' in expression.', tokens{pos});
+end
+
+% ─────────────────────────────────────────────────────────────────────────
+%  Nested parsing functions
+% ─────────────────────────────────────────────────────────────────────────
+
+    function toks = tokenise(s)
+    %TOKENISE  Split expression string into a cell array of token strings.
+        s = strtrim(s);
+        toks = {};
+        i = 1;
+        while i <= numel(s)
+            c = s(i);
+            if c == ' ' || c == 9  % skip whitespace
+                i = i + 1;
+            elseif c == '(' || c == ')' || c == '+' || c == '-' || c == '*' || c == '/'
+                toks{end+1} = c; %#ok<AGROW>
+                i = i + 1;
+            elseif c == '.' && i < numel(s) && s(i+1) == '^'
+                toks{end+1} = '.^'; %#ok<AGROW>
+                i = i + 2;
+            elseif c == '^'
+                toks{end+1} = '.^'; %#ok<AGROW>
+                i = i + 1;
+            elseif c == 'D' && i < numel(s) && s(i+1) >= '0' && s(i+1) <= '9'
+                % Dataset reference: D followed by one or more digits
+                j = i + 1;
+                while j <= numel(s) && s(j) >= '0' && s(j) <= '9'
+                    j = j + 1;
+                end
+                toks{end+1} = s(i:j-1); %#ok<AGROW>
+                i = j;
+            elseif (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                % Function or identifier name
+                j = i;
+                while j <= numel(s) && ((s(j) >= 'a' && s(j) <= 'z') || ...
+                                         (s(j) >= 'A' && s(j) <= 'Z') || ...
+                                         (s(j) >= '0' && s(j) <= '9'))
+                    j = j + 1;
+                end
+                toks{end+1} = s(i:j-1); %#ok<AGROW>
+                i = j;
+            elseif (c >= '0' && c <= '9') || c == '.'
+                % Numeric literal (including scientific notation)
+                j = i;
+                while j <= numel(s) && (s(j) >= '0' && s(j) <= '9' || s(j) == '.')
+                    j = j + 1;
+                end
+                if j <= numel(s) && (s(j) == 'e' || s(j) == 'E')
+                    j = j + 1;  % consume 'e'/'E'
+                    if j <= numel(s) && (s(j) == '+' || s(j) == '-')
+                        j = j + 1;  % consume sign
+                    end
+                    while j <= numel(s) && s(j) >= '0' && s(j) <= '9'
+                        j = j + 1;
+                    end
+                end
+                toks{end+1} = s(i:j-1); %#ok<AGROW>
+                i = j;
+            else
+                error('Unrecognised character ''%s'' in expression.', c);
+            end
+        end
+    end  % tokenise
+
+    function val = parseExpr()
+    %PARSEEXPR  Parse additive-level expression (lowest precedence).
+        val = parseTerm();
+        while pos <= numel(tokens) && (strcmp(tokens{pos}, '+') || strcmp(tokens{pos}, '-'))
+            op = tokens{pos};
+            pos = pos + 1;
+            rhs = parseTerm();
+            if strcmp(op, '+')
+                val = val + rhs;
+            else
+                val = val - rhs;
+            end
+        end
+    end  % parseExpr
+
+    function val = parseTerm()
+    %PARSETERM  Parse multiplicative-level expression.
+        val = parsePower();
+        while pos <= numel(tokens) && (strcmp(tokens{pos}, '*') || strcmp(tokens{pos}, '/'))
+            op = tokens{pos};
+            pos = pos + 1;
+            rhs = parsePower();
+            if strcmp(op, '*')
+                val = val .* rhs;
+            else
+                val = val ./ rhs;
+            end
+        end
+    end  % parseTerm
+
+    function val = parsePower()
+    %PARSEPOWER  Parse power expression (.^).
+        val = parseUnary();
+        if pos <= numel(tokens) && strcmp(tokens{pos}, '.^')
+            pos = pos + 1;
+            exp_val = parseUnary();
+            val = val .^ exp_val;
+        end
+    end  % parsePower
+
+    function val = parseUnary()
+    %PARSEUNARY  Parse unary minus or a primary expression.
+        if pos <= numel(tokens) && strcmp(tokens{pos}, '-')
+            pos = pos + 1;
+            val = -parsePrimary();
+        else
+            val = parsePrimary();
+        end
+    end  % parseUnary
+
+    function val = parsePrimary()
+    %PARSEPRIMARY  Parse a function call, parenthesised group, dataset ref, or literal.
+        if pos > numel(tokens)
+            error('Unexpected end of expression.');
+        end
+        tok = tokens{pos};
+
+        % Parenthesised group
+        if strcmp(tok, '(')
+            pos = pos + 1;
+            val = parseExpr();
+            if pos > numel(tokens) || ~strcmp(tokens{pos}, ')')
+                error('Missing closing parenthesis in expression.');
+            end
+            pos = pos + 1;
+            return
+        end
+
+        % Function call: known function name followed by '('
+        if isKey(funcMap, tok)
+            pos = pos + 1;
+            if pos > numel(tokens) || ~strcmp(tokens{pos}, '(')
+                error('Expected ''('' after function name ''%s''.', tok);
+            end
+            pos = pos + 1;  % consume '('
+            arg = parseExpr();
+            if pos > numel(tokens) || ~strcmp(tokens{pos}, ')')
+                error('Missing closing parenthesis after ''%s(...''.', tok);
+            end
+            pos = pos + 1;  % consume ')'
+            fn = funcMap(tok);
+            val = fn(arg);
+            return
+        end
+
+        % Dataset reference: D followed by digits
+        if ~isempty(regexp(tok, '^D\d+$', 'once'))
+            if ~isfield(vars, tok)
+                error('Dataset ''%s'' not found in variable map.', tok);
+            end
+            val = vars.(tok);
+            pos = pos + 1;
+            return
+        end
+
+        % Numeric literal
+        numVal = str2double(tok);
+        if ~isnan(numVal)
+            val = numVal;
+            pos = pos + 1;
+            return
+        end
+
+        error('Unrecognised token ''%s'' in expression.', tok);
+    end  % parsePrimary
+
+end  % safeEvalMathExpr
 
 
 function pairMap = findPolarizationPairs(datasets)

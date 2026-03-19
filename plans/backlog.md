@@ -7,19 +7,15 @@ Only items not yet completed are listed here.
 
 ## dataImportGUI Features
 
-### Dataset comparison / difference plots
-When comparing two XRD scans (e.g. before and after annealing), a "Difference" mode
-that plots `dataset_A − dataset_B` (with `interp1` alignment for mismatched x-grids).
-Also support ratio mode (`A / B`). Standard in commercial XRD software (HighScore, EVA).
+### ~~Dataset comparison / difference plots~~ — DONE
+Implemented via "Dataset Math..." button (`onDatasetMath`). Supports `D1 - D2`, `D1 / D2`,
+`log10(D1)`, `diff(D1)`, and arbitrary expressions with `interp1` alignment for mismatched
+x-grids. eval() replaced with safe recursive-descent parser (`safeEvalMathExpr`).
 
-**Touches:** `dataImportGUI.m` (button + callback), dataset struct (synthetic flag).
-
-### Peak database matching (XRD phase identification)
-Match detected peak d-spacings against a built-in database (~50 entries: Si, Al₂O₃,
-SrTiO₃, common metals, simple oxides). Tolerance slider (±0.02 Å default). Vertical
-tick marks with phase labels on the plot.
-
-**Touches:** New `+data/peak_database.mat`, `dataImportGUI.m` (peak panel button + overlay).
+### ~~Peak database matching (XRD phase identification)~~ — DONE
+Implemented: `calc.crystal.phaseDatabase()` (~50 phases), `calc.crystal.matchPhases()`,
+and "Match Phases" button in the peak panel Advanced section. Overlays vertical tick
+marks with phase labels on the plot. Adjustable d-spacing tolerance.
 
 ### Scripting / macro recorder
 "Record Macro" toggle captures GUI actions as MATLAB script calls to the programmatic
