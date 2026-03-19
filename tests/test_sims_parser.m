@@ -215,114 +215,21 @@ catch ME
 end
 
 % ── Test 9: vendor multi-row header — realistic thin-film stack ────────
-% Generates a synthetic SIMS depth profile for a 4-layer stack on Si:
-%
-%   Surface → 0 nm
-%   Layer 4 (TaN cap)       :   0 –  40 nm   (high Ta, N; surface H/C/F)
-%   Layer 3 (HfO₂ high-k)  :  40 –  80 nm   (high Hf, O)
-%   Layer 2 (Al₂O₃)        :  80 – 120 nm   (high Al, O)
-%   Layer 1 (Ta barrier)    : 120 – 160 nm   (high Ta)
-%   Si substrate            : 160+ nm        (high Si)
-%
-% Each element has its own slightly-offset depth vector (vendor quirk)
-% with Poisson-like noise (seeded RNG for reproducibility).
-% 8 elements: H, C, O, F, N, Al->, Si->, Ta->
+% Loads the fixture CSV from tests/fixtures/sims_thinfilm_stack.csv.
+% The fixture models a 4-layer stack on Si (TaN cap / HfO₂ / Al₂O₃ /
+% Ta barrier / Si substrate) with 273 depth points, per-element depth
+% offsets, mixed units, and ~5% noise.  See generate_sims_thinfilm.m.
 try
-    rng(42);  % reproducible noise
+    simsDataDir = fullfile(rootDir, '+test_datasets', 'SIMS');
+    fixtureFile = fullfile(simsDataDir, 'sims_thinfilm_stack.csv');
+    if ~isfile(fixtureFile)
+        % Regenerate if missing (e.g. fresh clone)
+        run(fullfile(simsDataDir, 'generate_sims_thinfilm.m'));
+    end
+    assert(isfile(fixtureFile), 'Fixture file not found: %s', fixtureFile);
+
+    d = parser.importSIMS(fixtureFile);
     nPts = 273;
-
-    % Per-element depth vectors (vendor instruments have small offsets)
-    depthOffsets = [0.27, 0.32, 0.37, 0.48, 0.53, 0.03, 0.11, 0.46];
-    depths = cell(1, 8);
-    for ei = 1:8
-        depths{ei} = linspace(depthOffsets(ei), 200 + depthOffsets(ei), nPts)';
-    end
-
-    % erfc-based layer builder:  erfc((z - edge) / width) transitions
-    % from ~1 (above edge) to ~0 (below edge).
-    layer = @(z, top, bot, w) 0.5 * (erfc((z - bot) ./ w) - erfc((z - top) ./ w));
-
-    % --- H: surface contamination peak, then background ---
-    zH = depths{1};
-    H = 5e22 * exp(-zH / 5) + 2e19 * ones(size(zH));  % surface spike + BG
-
-    % --- C: surface contamination, slight enrichment in TaN cap ---
-    zC = depths{2};
-    C = 1e20 * exp(-zC / 3) ...                         % surface spike
-      + 3e19 * layer(zC, 0, 40, 4) ...                  % TaN cap
-      + 5e17 * ones(size(zC));                           % background
-
-    % --- O: high in HfO₂ (40-80) and Al₂O₃ (80-120), low elsewhere ---
-    zO = depths{3};
-    O = 4.5e22 * layer(zO, 40, 80, 3) ...               % HfO₂
-      + 3.8e22 * layer(zO, 80, 120, 3) ...              % Al₂O₃
-      + 1e19  * ones(size(zO));                          % background
-
-    % --- F: surface contaminant, minor incorporation in HfO₂ ---
-    zF = depths{4};
-    F = 2e19 * exp(-zF / 6) ...                          % surface
-      + 8e18 * layer(zF, 40, 80, 4) ...                  % HfO₂ trace
-      + 5e16 * ones(size(zF));                           % background
-
-    % --- N: high in TaN cap (0-40), otherwise low ---
-    zN = depths{5};
-    N = 2.5e22 * layer(zN, 0, 40, 3) ...                 % TaN cap
-      + 3e17  * ones(size(zN));                          % background
-
-    % --- Al: high in Al₂O₃ layer (80-120) ---
-    zAl = depths{6};
-    Al = 3.2e22 * layer(zAl, 80, 120, 3) ...             % Al₂O₃
-       + 1e17  * ones(size(zAl));                        % background
-
-    % --- Si: substrate (160+), traces elsewhere ---
-    zSi = depths{7};
-    Si = 5e22  * 0.5 .* erfc(-(zSi - 160) ./ 4) ...     % substrate rises
-       + 2e18  * ones(size(zSi));                        % background
-
-    % --- Ta: TaN cap (0-40) + Ta barrier (120-160) ---
-    zTa = depths{8};
-    Ta = 3.5e22 * layer(zTa, 0, 40, 3) ...               % TaN cap
-       + 3.0e22 * layer(zTa, 120, 160, 3) ...            % Ta barrier
-       + 5e17  * ones(size(zTa));                        % background
-
-    % Add multiplicative Poisson-like noise (~5% relative)
-    concs = {H, C, O, F, N, Al, Si, Ta};
-    for ei = 1:8
-        noise = 1 + 0.05 * randn(nPts, 1);
-        noise(noise < 0.5) = 0.5;  % clamp to avoid negative
-        concs{ei} = concs{ei} .* noise;
-    end
-
-    % Build CSV lines
-    elemRow = 'H,,C,,O,,F,,N,,AL->,,Si->,,Ta->';
-    labelRow = 'Depth,CONC.,Depth,CONC.,Depth,CONC.,Depth,CONC.,Depth,CONC.,Depth,CONC.,Depth,CONC.,Depth,CONC.';
-    unitRow  = '(nm),(atoms/cc),(nm),(atoms/cc),(nm),(atoms/cc),(nm),(atoms/cc),(nm),(atoms/cc),(nm),(arb. units),(nm),(arb. units),(nm),(arb. units)';
-
-    dataLines = cell(nPts, 1);
-    for ri = 1:nPts
-        parts = cell(1, 8);
-        for ei = 1:8
-            parts{ei} = sprintf('%.5g,%.4E', depths{ei}(ri), concs{ei}(ri));
-        end
-        dataLines{ri} = strjoin(parts, ',');
-    end
-
-    allLines = [
-        {'Eurofins EAG Materials Science, LLC'}
-        {':Sample 2829'}
-        {'2/17/2026'}
-        {'Drawn Curves,8'}
-        {sprintf('Num of Cycles,%d', nPts)}
-        {''}
-        {elemRow}
-        {labelRow}
-        {unitRow}
-        {''}
-        dataLines
-    ];
-    fp = writeTempCSV('sims_t9_vendor_multirow', allLines);
-    tmpFiles{end+1} = fp;
-    d = parser.importSIMS(fp);
 
     % 8 element pairs (H, C, O, F, N, Al, Si, Ta)
     assert(numel(d.labels) == 8, ...
@@ -370,13 +277,11 @@ try
     assert(contains(allMeta, 'Eurofins'), ...
         'Company name should appear in header metadata');
 
-    rng('default');  % restore RNG state
     nPass = nPass + 1;
     fprintf('  ✔ Test 9: vendor multi-row header (thin-film stack, %d pts × 8 elements)\n', nPts);
 catch ME
     nFail = nFail + 1;
     fprintf('  ✘ Test 9: %s\n', ME.message);
-    rng('default');
 end
 
 catch ME
