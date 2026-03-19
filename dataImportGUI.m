@@ -378,7 +378,7 @@ function varargout = dataImportGUI()
 
     % Stacked vertically: Add | Remove | Filter | Merge | Up/Down | Animate/Shortcuts | Settings | Listbox
     tbGL = uigridlayout(fileListPanel,[8 2], ...
-        'RowHeight',    {22,22,22,22,22,22,22,180}, ...
+        'RowHeight',    {22,22,22,22,22,22,22,'1x'}, ...
         'ColumnWidth',  {'1x','1x'}, ...
         'Padding',      [0 0 0 0], ...
         'RowSpacing',   2, ...
@@ -496,7 +496,7 @@ function varargout = dataImportGUI()
     ctrlPanel.Layout.Column = 2;
 
     ctrlGL = uigridlayout(ctrlPanel,[8 1], ...
-        'RowHeight', {24,120,80,22,66,22,22,20}, ...
+        'RowHeight', {24,'2x','1x',22,66,22,22,20}, ...
         'Padding',   [4 4 4 4], ...
         'RowSpacing', 2);
 
@@ -714,7 +714,7 @@ function varargout = dataImportGUI()
 
     analysisGL = uigridlayout(analysisPanel,[1 4], ...
         'ColumnWidth', {320, 200, '7x', '3x'}, ...
-        'RowHeight',   {450}, ...
+        'RowHeight',   {'1x'}, ...
         'Padding',     [4 4 4 4], ...
         'ColumnSpacing', 6, ...
         'RowSpacing', 4);
@@ -2139,6 +2139,10 @@ function varargout = dataImportGUI()
         fig.Pointer = 'watch';
         nTotal = numel(fpaths);
 
+        % ── Excel "Apply to all" state ──
+        excelApplyAll    = false;   % true once user opts to reuse selection
+        excelSavedSheets = {};      % remembered sheet indices (by name)
+
         nLoaded = 0;
         for fi = 1:numel(fpaths)
             fp = fpaths{fi};
@@ -2159,16 +2163,46 @@ function varargout = dataImportGUI()
                     allSheetNames = {'Sheet1'};
                 end
                 if numel(allSheetNames) > 1
-                    selIdx = listdlg( ...
-                        'PromptString', {sprintf('Sheets in  %s:', [fnBase fExt]), ...
-                                         'Select sheets to import:'}, ...
-                        'ListString',   allSheetNames, ...
-                        'SelectionMode','multiple', ...
-                        'InitialValue', 1:numel(allSheetNames), ...
-                        'Name',         'Import Excel Sheets', ...
-                        'ListSize',     [220 160]);
-                    if isempty(selIdx), continue; end   % user cancelled this file
-                    selectedSheets = allSheetNames(selIdx);
+                    if excelApplyAll && ~isempty(excelSavedSheets)
+                        % Reuse saved selection — match by index, clamped to
+                        % this file's actual sheet count
+                        validIdx = excelSavedSheets(excelSavedSheets <= numel(allSheetNames));
+                        if isempty(validIdx), validIdx = 1; end
+                        selectedSheets = allSheetNames(validIdx);
+                    else
+                        selIdx = listdlg( ...
+                            'PromptString', {sprintf('Sheets in  %s:', [fnBase fExt]), ...
+                                             'Select sheets to import:'}, ...
+                            'ListString',   allSheetNames, ...
+                            'SelectionMode','multiple', ...
+                            'InitialValue', 1:numel(allSheetNames), ...
+                            'Name',         'Import Excel Sheets', ...
+                            'ListSize',     [220 160]);
+                        if isempty(selIdx), continue; end   % user cancelled this file
+                        selectedSheets = allSheetNames(selIdx);
+
+                        % Count remaining Excel files
+                        nExcelRemaining = 0;
+                        for ri = (fi+1):numel(fpaths)
+                            [~, ~, rExt] = fileparts(fpaths{ri});
+                            if any(strcmpi(rExt, excelExts))
+                                nExcelRemaining = nExcelRemaining + 1;
+                            end
+                        end
+                        if nExcelRemaining > 0
+                            selDesc = strjoin(cellstr(selectedSheets), ', ');
+                            answer = uiconfirm(fig, ...
+                                sprintf('Apply this sheet selection (%s) to the remaining %d Excel file(s)?', ...
+                                    selDesc, nExcelRemaining), ...
+                                'Apply to All', ...
+                                'Options', {'Apply to All', 'Choose Individually'}, ...
+                                'DefaultOption', 1, 'CancelOption', 2);
+                            if strcmp(answer, 'Apply to All')
+                                excelApplyAll    = true;
+                                excelSavedSheets = selIdx;
+                            end
+                        end
+                    end
                 else
                     selectedSheets = allSheetNames;
                 end
@@ -10668,6 +10702,27 @@ function varargout = dataImportGUI()
         else
             rootGL.RowHeight = {'1x','1x',16};
         end
+
+        % ── Adapt content columns for narrow windows ──
+        % On narrow screens, shrink file list and controls so preview is not crushed.
+        % On wide screens, respect persisted or default widths.
+        figW = pos(3);
+        defFileW = LAYOUT_DEFAULTS.fileListW;
+        defCtrlW = LAYOUT_DEFAULTS.ctrlPanelW;
+        if figW < 800
+            contentGL.ColumnWidth = {min(140, defFileW), min(160, defCtrlW), '1x'};
+        elseif figW < 1000
+            contentGL.ColumnWidth = {min(160, defFileW), min(175, defCtrlW), '1x'};
+        end
+        % (Wide windows keep whatever width the user or prefs last set.)
+
+        % ── Adapt analysis columns for narrow windows ──
+        defCorrW  = LAYOUT_DEFAULTS.corrPanelW;
+        defAxLimW = LAYOUT_DEFAULTS.axLimPanelW;
+        if figW < 900
+            analysisGL.ColumnWidth = {min(260, defCorrW), min(170, defAxLimW), '7x', '3x'};
+        end
+
         fig.SizeChangedFcn = @onFigSizeChanged;
     end
 
