@@ -255,7 +255,7 @@ function data = importSIMS(filepath, options)
             if nEvenBlank >= floor(nE * 0.5) && nOddText >= floor(nE * 0.5)
                 for p = 1:nE
                     if isempty(elemNames{p}) && ~isempty(oddParts{p})
-                        elemNames{p} = oddParts{p};
+                        elemNames{p} = cleanVendorElement(oddParts{p});
                     end
                 end
                 break;
@@ -606,5 +606,18 @@ function depthUnit = detectDepthUnit(colHeaders, headerMetadata)
         depthUnit = 'nm';
     elseif contains(allTextLower, 'angstrom') || contains(allText, char(197))  % Å
         depthUnit = 'A';
+    end
+end
+
+
+function name = cleanVendorElement(raw)
+%CLEANVENDORELEMENT  Normalize a raw element name from a vendor header row.
+%   Strips trailing '->' or '-->' (Eurofins/EAG arb-units marker) and
+%   normalizes capitalization to standard element symbols (first letter
+%   uppercase, rest lowercase): 'AL->' → 'Al', 'SI' → 'Si', 'TA' → 'Ta'.
+    name = regexprep(raw, '-+>$', '');   % strip -> or -->
+    name = strtrim(name);
+    if ~isempty(name) && all(isstrprop(name, 'alpha'))
+        name = [upper(name(1)), lower(name(2:end))];
     end
 end

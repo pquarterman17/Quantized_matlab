@@ -97,7 +97,12 @@ function result = resolveParser(filepath)
             result.name = 'importExcel';
 
         case {'.csv', '.tsv', '.txt'}
-            result.name = 'importCSV';
+            % Check for SIMS paired-column layout before falling back to CSV
+            if looksLikeSIMS(filepath)
+                result.name = 'importSIMS';
+            else
+                result.name = 'importCSV';
+            end
 
         case '.refl'
             result.name = 'importNCNRRefl';
@@ -122,6 +127,51 @@ function result = resolveParser(filepath)
                  '.xlsx/.xls/.xlsm/.xlsb/.ods, .csv/.tsv/.txt, ' ...
                  '.refl, .pnr, .datA/B/C/D, .dat\n' ...
                  'For headerless binary images use parser.importRawImage directly.'], ext);
+    end
+end
+
+
+% ────────────────────────────────────────────────────────────────────
+function tf = looksLikeSIMS(filepath)
+%LOOKSSLIMSIMS  Quick content scan: does a CSV look like SIMS paired-column data?
+%   Checks the first 20 lines for either:
+%     (a) A vendor signature: "Eurofins", "EAG", "SIMS" in the first few rows
+%     (b) A header row with repeated "Depth"+"CONC" column pairs (≥3 pairs)
+    tf = false;
+    try
+        fid = fopen(filepath, 'r');
+        if fid == -1, return; end
+        cleanObj = onCleanup(@() fclose(fid));
+        lines = cell(1, 20);
+        for i = 1:20
+            ln = fgetl(fid);
+            if ~ischar(ln), break; end
+            lines{i} = ln;
+        end
+    catch
+        return;
+    end
+
+    allText = strjoin(lines(~cellfun(@isempty, lines)), ' ');
+    allLower = lower(allText);
+
+    % (a) Vendor signature check
+    if contains(allLower, 'sims') || ...
+       (contains(allLower, 'eurofins') && contains(allLower, 'eag'))
+        tf = true;
+        return;
+    end
+
+    % (b) Repeated Depth + CONC column pairs in any single line
+    for i = 1:numel(lines)
+        if isempty(lines{i}), continue; end
+        ln = lower(lines{i});
+        nDepth = numel(regexp(ln, '\bdepth\b'));
+        nConc  = numel(regexp(ln, '\bconc'));
+        if nDepth >= 3 && nConc >= 3
+            tf = true;
+            return;
+        end
     end
 end
 

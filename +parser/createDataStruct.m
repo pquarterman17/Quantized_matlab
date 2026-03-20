@@ -46,9 +46,29 @@ function data = createDataStruct(timeVec, valuesMatrix, varargin)
         'parser:createDataStruct:unitCountMismatch', ...
         'Expected %d units for %d columns, got %d.', M, M, numel(units));
 
+    % Deduplicate labels: append " (2)", " (3)", ... to repeated names so
+    % that GUI list-box selection always maps to a unique column.
+    labels = deduplicateLabels(labels);
+
     data.time     = timeVec;
     data.values   = valuesMatrix;
     data.labels   = labels;
     data.units    = units;
     data.metadata = p.Results.metadata;
+end
+
+
+function labels = deduplicateLabels(labels)
+%DEDUPLICATELABELS  Append numeric suffixes to repeated label strings.
+%   {'A','B','A','A'} → {'A','B','A (2)','A (3)'}
+    seen = containers.Map('KeyType','char','ValueType','double');
+    for k = 1:numel(labels)
+        lbl = labels{k};
+        if seen.isKey(lbl)
+            seen(lbl) = seen(lbl) + 1;
+            labels{k} = sprintf('%s (%d)', lbl, seen(lbl));
+        else
+            seen(lbl) = 1;
+        end
+    end
 end
