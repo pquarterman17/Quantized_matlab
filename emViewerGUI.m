@@ -110,6 +110,33 @@ function varargout = emViewerGUI()
     appData.compareIdxR        = 0;       % right panel image index
     appData.compareActivePanel = 'L';     % 'L' or 'R' — which panel arrows control
 
+    % EDS multi-channel composite mode
+    appData.edsMode        = false;      % true when EDS composite is active
+    appData.edsChannels    = {};         % cell array of structs: .imageIdx, .label, .color, .visible, .intensity
+    appData.edsComposite   = [];         % [H x W x 3] double RGB composite
+
+    % EELS mode
+    appData.eelsMode       = false;
+    appData.eelsData       = [];      % spectrumData struct from importDM3
+    appData.eelsCube       = [];      % [Ny x Nx x nE] spectrum image cube
+    appData.eelsEnergyAxis = [];      % [nE x 1] energy axis (eV)
+    appData.eelsFig        = [];      % handle to spectrum figure
+    appData.eelsSSD        = [];      % single-scattering distribution from Fourier-log
+    appData.eelsKKResult   = [];      % Kramers-Kronig result struct
+
+    % Diffraction indexing
+    appData.diffMode       = false;
+    appData.diffSpots      = [];      % [N x 2] spot positions [row, col]
+    appData.diffResults    = [];      % indexDiffraction result struct
+    appData.diffCameraLen  = NaN;     % camera length in mm
+    appData.diffAccVoltage = 200;     % kV
+
+    % EDS quantification
+    appData.edsQuantified  = false;
+    appData.edsElements    = {};      % cell of element symbols
+    appData.edsAtomicPct   = {};      % cell of [HxW] atomic% maps
+    appData.edsWeightPct   = {};      % cell of [HxW] weight% maps
+
     % Annotation defaults
     appData.annotationColor = [1 1 1];    % white
 
@@ -230,8 +257,8 @@ function varargout = emViewerGUI()
     %  ROW 1: TOOLBAR
     %  [Open Files...] [Remove] | gap | [Fit] [1:1] | filename label
     % ════════════════════════════════════════════════════════════════════
-    toolbarGL = uigridlayout(rootGL, [1 14], ...
-        'ColumnWidth', {80, 120, 55, 14, 35, 35, 14, 60, 35, 14, 26, 26, 14, '1x'}, ...
+    toolbarGL = uigridlayout(rootGL, [1 15], ...
+        'ColumnWidth', {80, 120, 55, 14, 35, 35, 14, 60, 35, 35, 14, 26, 26, 14, '1x'}, ...
         'RowHeight',   {'1x'}, ...
         'Padding',     [4 2 4 2], ...
         'ColumnSpacing', 4);
@@ -302,35 +329,43 @@ function varargout = emViewerGUI()
         'Tooltip', 'Show thumbnail grid of all loaded images');
     btnGrid.Layout.Row = 1; btnGrid.Layout.Column = 9;
 
+    btnEDSToolbar = uibutton(toolbarGL, 'state', 'Text', 'EDS', ...
+        'ValueChangedFcn', @onEDSToolbarToggle, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Enter/exit multi-channel EDS false-color composite mode');
+    btnEDSToolbar.Layout.Row = 1; btnEDSToolbar.Layout.Column = 10;
+
     lblSep3 = uilabel(toolbarGL, 'Text', '|', ...
         'FontColor', [0.5 0.5 0.5], ...
         'HorizontalAlignment', 'center');
-    lblSep3.Layout.Row = 1; lblSep3.Layout.Column = 10;
+    lblSep3.Layout.Row = 1; lblSep3.Layout.Column = 11;
 
     btnPrefs = uibutton(toolbarGL, 'Text', char(9881), ...
         'ButtonPushedFcn', @onPreferences, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Tooltip', 'Preferences — default colormap, percentiles, export settings');
-    btnPrefs.Layout.Row = 1; btnPrefs.Layout.Column = 11;
+    btnPrefs.Layout.Row = 1; btnPrefs.Layout.Column = 12;
 
     btnThemeToggle = uibutton(toolbarGL, 'Text', char(9790), ...
         'ButtonPushedFcn', @onThemeToggle, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Tooltip', 'Toggle dark / light mode');
-    btnThemeToggle.Layout.Row = 1; btnThemeToggle.Layout.Column = 12;
+    btnThemeToggle.Layout.Row = 1; btnThemeToggle.Layout.Column = 13;
 
     lblSep4 = uilabel(toolbarGL, 'Text', '|', ...
         'FontColor', [0.5 0.5 0.5], ...
         'HorizontalAlignment', 'center');
-    lblSep4.Layout.Row = 1; lblSep4.Layout.Column = 13;
+    lblSep4.Layout.Row = 1; lblSep4.Layout.Column = 14;
 
     lblFilename = uilabel(toolbarGL, 'Text', '(no image loaded)', ...
         'FontSize', 11, ...
         'FontColor', [0.85 0.85 0.85], ...
         'HorizontalAlignment', 'left');
-    lblFilename.Layout.Row = 1; lblFilename.Layout.Column = 14;
+    lblFilename.Layout.Row = 1; lblFilename.Layout.Column = 15;
 
     % ════════════════════════════════════════════════════════════════════
     %  ROW 2: MAIN CONTENT — 3 columns
@@ -560,16 +595,19 @@ function varargout = emViewerGUI()
     % Sections: {name, headerRow, panelRow, openHeight, defaultCollapsed}
     SECT_CONTRAST   = struct('name','Contrast',    'headerRow',1, 'panelRow',2,  'openHeight',230, 'collapsed',false);
     SECT_HISTOGRAM  = struct('name','Histogram',   'headerRow',3, 'panelRow',4,  'openHeight',80,  'collapsed',false);
-    SECT_MEASURE    = struct('name','Measurement', 'headerRow',5, 'panelRow',6,  'openHeight',310, 'collapsed',true);
-    SECT_PROCESS    = struct('name','Processing',  'headerRow',7, 'panelRow',8,  'openHeight',420, 'collapsed',true);
-    SECT_ANNOT      = struct('name','Annotations', 'headerRow',9, 'panelRow',10, 'openHeight',145, 'collapsed',true);
-    SECT_META       = struct('name','Metadata',    'headerRow',11,'panelRow',12, 'openHeight',120, 'collapsed',true);
+    SECT_MEASURE    = struct('name','Measurement', 'headerRow',5, 'panelRow',6,  'openHeight',380, 'collapsed',true);
+    SECT_PROCESS    = struct('name','Processing',  'headerRow',7, 'panelRow',8,  'openHeight',530, 'collapsed',true);
+    SECT_ANNOT      = struct('name','Annotations',  'headerRow',9,  'panelRow',10, 'openHeight',145, 'collapsed',true);
+    SECT_EDS        = struct('name','EDS Channels', 'headerRow',11, 'panelRow',12, 'openHeight',520, 'collapsed',true);
+    SECT_META       = struct('name','Metadata',     'headerRow',19, 'panelRow',20, 'openHeight',120, 'collapsed',true);
+    SECT_EELS       = struct('name','EELS Spectrum','headerRow',15, 'panelRow',16, 'openHeight',470, 'collapsed',true);
+    SECT_DIFF       = struct('name','Diffraction',  'headerRow',17, 'panelRow',18, 'openHeight',380, 'collapsed',true);
 
     % Compute initial row heights: collapsed sections get 0
-    initH = {22, 230, 22, 80, 22, 0, 22, 0, 22, 0, 22, 0};
-    % (Measurement=0, Processing=0, Annotations=0, Metadata=0 on startup)
+    initH = {22, 230, 22, 80, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0};
+    % (Measurement=0, Processing=0, Annotations=0, EDS=0, EELS=0, Diff=0, Metadata=0 on startup)
 
-    toolsGL = uigridlayout(toolsPanel, [12 1], ...
+    toolsGL = uigridlayout(toolsPanel, [20 1], ...
         'RowHeight', initH, ...
         'ColumnWidth', {'1x'}, ...
         'Padding', [4 4 4 4], ...
@@ -745,8 +783,8 @@ function varargout = emViewerGUI()
     %   Row 6: Export Profile button
     %   Row 7: Clear All button
     %   Row 8: (padding)
-    measureInnerGL = uigridlayout(pnlMeasure, [15 2], ...
-        'RowHeight',   {18, 20, 2, 20, 20, 20, 20, 20, 2, 20, 20, 20, 20, 20, 20}, ...
+    measureInnerGL = uigridlayout(pnlMeasure, [18 2], ...
+        'RowHeight',   {18, 20, 2, 20, 20, 20, 20, 20, 2, 20, 20, 20, 20, 20, 20, 2, 20, 20}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding',     [3 2 3 2], ...
         'RowSpacing',  2, ...
@@ -903,6 +941,33 @@ function varargout = emViewerGUI()
         'Tooltip',         'Invert pixel values: img = max - img (bright-field / dark-field)');
     btnInvertImg.Layout.Row = 15; btnInvertImg.Layout.Column = [1 2];
 
+    % Row 16: separator
+    % Row 17-18: Measurement Statistics / Batch Measurement / Export to DataPlotter
+
+    btnMeasStats = uibutton(measureInnerGL, 'Text', 'Meas Stats', ...
+        'ButtonPushedFcn', @onMeasurementStats, ...
+        'BackgroundColor', BTN_EXPORT, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Show statistics for all measurements (mean, std, histogram)');
+    btnMeasStats.Layout.Row = 17; btnMeasStats.Layout.Column = 1;
+
+    btnBatchMeas = uibutton(measureInnerGL, 'Text', 'Batch Meas', ...
+        'ButtonPushedFcn', @onBatchMeasurement, ...
+        'BackgroundColor', BTN_EXPORT, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Apply measurement template across all loaded images');
+    btnBatchMeas.Layout.Row = 17; btnBatchMeas.Layout.Column = 2;
+
+    btnExportToDP = uibutton(measureInnerGL, 'Text', 'Profile → DataPlotter', ...
+        'ButtonPushedFcn', @onExportProfileToDP, ...
+        'BackgroundColor', BTN_EXPORT, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Send last line profile to DataPlotter as standard data struct');
+    btnExportToDP.Layout.Row = 18; btnExportToDP.Layout.Column = [1 2];
+
     % ROI Manager state
     appData.roiList = {};   % cell array of ROI structs: {name, xMin, xMax, yMin, yMax, stats}
 
@@ -917,8 +982,8 @@ function varargout = emViewerGUI()
     pnlProcess = uipanel(toolsGL, 'BorderType', 'line');
     pnlProcess.Layout.Row = 8;
 
-    processInnerGL = uigridlayout(pnlProcess, [32 2], ...
-        'RowHeight',   {20, 20, 20, 20, 2, 20, 20, 2, 20, 20, 2, 20, 20, 2, 20, 20, 20, 20, 2, 20, 20, 20, 20, 20, 2, 20, 20, 20, 20, 20, 20, 20}, ...
+    processInnerGL = uigridlayout(pnlProcess, [37 2], ...
+        'RowHeight',   {20, 20, 20, 20, 2, 20, 20, 2, 20, 20, 2, 20, 20, 2, 20, 20, 20, 20, 2, 20, 20, 20, 20, 20, 2, 20, 20, 20, 20, 20, 20, 20, 2, 20, 20, 20, 20}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding',     [3 2 3 2], ...
         'RowSpacing',  2, ...
@@ -1348,6 +1413,64 @@ function varargout = emViewerGUI()
         'Tooltip', 'Rapidly alternate between two images to spot subtle differences');
     btnFlickerCompare.Layout.Row = 32; btnFlickerCompare.Layout.Column = 2;
 
+    % Row 33: separator
+    % Row 34-37: New features
+    btn3DSurface = uibutton(processInnerGL, 'Text', '3D Surface', ...
+        'ButtonPushedFcn', @on3DSurface, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Render image as 3D height map (AFM/STM/topography)');
+    btn3DSurface.Layout.Row = 34; btn3DSurface.Layout.Column = 1;
+
+    btnLiveFFT = uibutton(processInnerGL, 'state', 'Text', 'Live FFT', ...
+        'ValueChangedFcn', @onLiveFFTToggle, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Show persistent FFT panel that updates with filters');
+    btnLiveFFT.Layout.Row = 34; btnLiveFFT.Layout.Column = 2;
+
+    btnTemplateMatch = uibutton(processInnerGL, 'Text', 'Template Match', ...
+        'ButtonPushedFcn', @onTemplateMatch, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Find repeated features by selecting a template region');
+    btnTemplateMatch.Layout.Row = 35; btnTemplateMatch.Layout.Column = 1;
+
+    btnStitchImages = uibutton(processInnerGL, 'Text', 'Stitch...', ...
+        'ButtonPushedFcn', @onStitchImages, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Stitch overlapping images into a panoramic mosaic');
+    btnStitchImages.Layout.Row = 35; btnStitchImages.Layout.Column = 2;
+
+    btnNoiseEstimate = uibutton(processInnerGL, 'Text', 'Noise Est.', ...
+        'ButtonPushedFcn', @onNoiseEstimate, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Characterize image noise and suggest optimal filter parameters');
+    btnNoiseEstimate.Layout.Row = 36; btnNoiseEstimate.Layout.Column = 1;
+
+    btnPubPresets = uibutton(processInnerGL, 'Text', 'Pub Presets', ...
+        'ButtonPushedFcn', @onPubPresets, ...
+        'BackgroundColor', BTN_EXPORT, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Apply journal-specific annotation formatting (APS/Nature/ACS)');
+    btnPubPresets.Layout.Row = 36; btnPubPresets.Layout.Column = 2;
+
+    btnColormapPreset = uibutton(processInnerGL, 'Text', 'EM Colormaps', ...
+        'ButtonPushedFcn', @onColormapPreset, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Auto-select colormap based on EM mode (SEM/TEM/STEM/EDS/phase)');
+    btnColormapPreset.Layout.Row = 37; btnColormapPreset.Layout.Column = [1 2];
+
     hPixelInspector = [];   % handle to pixel inspector axes overlay
 
     % ── Section 5: Annotations ──────────────────────────────────────────
@@ -1440,20 +1563,417 @@ function varargout = emViewerGUI()
         'Tooltip', 'Click center then edge to draw a circle annotation');
     btnPlaceCircle.Layout.Row = 6; btnPlaceCircle.Layout.Column = 2;
 
-    % ── Section 6: Metadata (populated) ──────────────────────────────────
+    % ── Section 6: EDS Channels ──────────────────────────────────────────
+    btnEDSHeader = uibutton(toolsGL, 'Text', [ARROW_SHUT ' EDS Channels'], ...
+        'HorizontalAlignment', 'left', ...
+        'BackgroundColor', HDR_BG, 'FontColor', HDR_FG, ...
+        'FontWeight', 'bold', 'FontSize', 11, ...
+        'ButtonPushedFcn', @(~,~) toggleSection(SECT_EDS));
+    btnEDSHeader.Layout.Row = 11;
+
+    pnlEDS = uipanel(toolsGL, 'BorderType', 'line');
+    pnlEDS.Layout.Row = 12;
+
+    edsInnerGL = uigridlayout(pnlEDS, [14 2], ...
+        'RowHeight', {28, 28, 100, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28}, ...
+        'ColumnWidth', {'1x', '1x'}, ...
+        'Padding', [4 4 4 4], ...
+        'RowSpacing', 3);
+
+    btnEnterEDS = uibutton(edsInnerGL, 'Text', 'Enter EDS Mode', ...
+        'ButtonPushedFcn', @onEnterEDS, ...
+        'BackgroundColor', BTN_PRIMARY, ...
+        'FontColor', BTN_FG, ...
+        'FontWeight', 'bold', ...
+        'Enable', 'off', ...
+        'Tooltip', 'Enter multi-channel EDS false-color composite mode');
+    btnEnterEDS.Layout.Row = 1; btnEnterEDS.Layout.Column = [1 2];
+
+    btnAddChannel = uibutton(edsInnerGL, 'Text', 'Add Channel', ...
+        'ButtonPushedFcn', @onAddEDSChannel, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Add active image as an EDS channel');
+    btnAddChannel.Layout.Row = 2; btnAddChannel.Layout.Column = 1;
+
+    btnRemoveChannel = uibutton(edsInnerGL, 'Text', 'Remove', ...
+        'ButtonPushedFcn', @onRemoveEDSChannel, ...
+        'BackgroundColor', BTN_DANGER, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Remove selected channel from composite');
+    btnRemoveChannel.Layout.Row = 2; btnRemoveChannel.Layout.Column = 2;
+
+    lbEDSChannels = uilistbox(edsInnerGL, ...
+        'Items', {'(no channels)'}, ...
+        'ItemsData', 0, ...
+        'ValueChangedFcn', @onEDSChannelSelected, ...
+        'FontSize', 10);
+    lbEDSChannels.Layout.Row = 3; lbEDSChannels.Layout.Column = [1 2];
+
+    EDS_COLORS = {'red', 'green', 'blue', 'cyan', 'magenta', 'yellow', 'white'};
+
+    lblEDSColor = uilabel(edsInnerGL, 'Text', 'Color:', ...
+        'FontSize', 10, 'HorizontalAlignment', 'right');
+    lblEDSColor.Layout.Row = 4; lblEDSColor.Layout.Column = 1;
+
+    ddChannelColor = uidropdown(edsInnerGL, ...
+        'Items', EDS_COLORS, ...
+        'Value', 'red', ...
+        'ValueChangedFcn', @onChannelColorChanged, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Pseudo-color for this channel');
+    ddChannelColor.Layout.Row = 4; ddChannelColor.Layout.Column = 2;
+
+    cbChannelVisible = uicheckbox(edsInnerGL, ...
+        'Text', 'Visible', ...
+        'Value', true, ...
+        'ValueChangedFcn', @onChannelVisibilityChanged, ...
+        'Enable', 'off');
+    cbChannelVisible.Layout.Row = 5; cbChannelVisible.Layout.Column = 1;
+
+    lblEDSIntensity = uilabel(edsInnerGL, 'Text', 'Int: 1.00', ...
+        'FontSize', 10, 'HorizontalAlignment', 'center');
+    lblEDSIntensity.Layout.Row = 5; lblEDSIntensity.Layout.Column = 2;
+
+    sldChannelIntensity = uislider(edsInnerGL, ...
+        'Limits', [0 1], ...
+        'Value', 1, ...
+        'ValueChangedFcn', @onChannelIntensityChanged, ...
+        'Enable', 'off');
+    sldChannelIntensity.Layout.Row = 6; sldChannelIntensity.Layout.Column = [1 2];
+
+    efChannelLabel = uieditfield(edsInnerGL, 'text', ...
+        'Value', '', ...
+        'ValueChangedFcn', @onChannelLabelChanged, ...
+        'Enable', 'off', ...
+        'Placeholder', 'Channel label');
+    efChannelLabel.Layout.Row = 7; efChannelLabel.Layout.Column = [1 2];
+
+    btnExportComposite = uibutton(edsInnerGL, 'Text', 'Export RGB...', ...
+        'ButtonPushedFcn', @onExportEDSComposite, ...
+        'BackgroundColor', BTN_EXPORT, ...
+        'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Save the blended RGB composite to PNG/TIFF');
+    btnExportComposite.Layout.Row = 8; btnExportComposite.Layout.Column = [1 2];
+
+    % EDS Quantification controls (rows 9-12)
+    btnAssignElements = uibutton(edsInnerGL, 'Text', 'Assign Elements', ...
+        'ButtonPushedFcn', @onAssignElements, ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Assign element symbols to EDS channels');
+    btnAssignElements.Layout.Row = 9; btnAssignElements.Layout.Column = [1 2];
+
+    btnQuantifyCL = uibutton(edsInnerGL, 'Text', 'Quantify (Cliff-Lorimer)', ...
+        'ButtonPushedFcn', @onQuantifyCL, ...
+        'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
+        'FontWeight', 'bold', ...
+        'Enable', 'off', ...
+        'Tooltip', 'Compute atomic% and weight% maps using Cliff-Lorimer method');
+    btnQuantifyCL.Layout.Row = 10; btnQuantifyCL.Layout.Column = [1 2];
+
+    btnCompositionProfile = uibutton(edsInnerGL, 'Text', 'Composition Profile', ...
+        'ButtonPushedFcn', @onCompositionProfile, ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Click two points for a line composition profile');
+    btnCompositionProfile.Layout.Row = 11; btnCompositionProfile.Layout.Column = [1 2];
+
+    btnROIComposition = uibutton(edsInnerGL, 'Text', 'ROI Composition', ...
+        'ButtonPushedFcn', @onROIComposition, ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Click two corners for mean composition in ROI');
+    btnROIComposition.Layout.Row = 12; btnROIComposition.Layout.Column = [1 2];
+
+    % Row 13: Thickness + Take-off angle for ZAF
+    edtEDSThickness = uieditfield(edsInnerGL, 'text', ...
+        'Value', '100', 'Placeholder', 't (nm)');
+    edtEDSThickness.Layout.Row = 13; edtEDSThickness.Layout.Column = 1;
+
+    edtEDSTakeOff = uieditfield(edsInnerGL, 'text', ...
+        'Value', '20', 'Placeholder', 'angle (deg)');
+    edtEDSTakeOff.Layout.Row = 13; edtEDSTakeOff.Layout.Column = 2;
+
+    % Row 14: Quantify ZAF button
+    btnQuantifyZAF = uibutton(edsInnerGL, 'Text', 'Quantify ZAF', ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'ZAF-corrected quantification (thick specimens)', ...
+        'Enable', 'off', ...
+        'ButtonPushedFcn', @(~,~) onQuantifyZAF());
+    btnQuantifyZAF.Layout.Row = 14; btnQuantifyZAF.Layout.Column = [1 2];
+
+    % ── Section 8: EELS Spectrum ──────────────────────────────────────────
+    btnEELSHeader = uibutton(toolsGL, 'Text', [ARROW_SHUT ' EELS Spectrum'], ...
+        'HorizontalAlignment', 'left', ...
+        'BackgroundColor', HDR_BG, 'FontColor', HDR_FG, ...
+        'FontWeight', 'bold', 'FontSize', 11, ...
+        'ButtonPushedFcn', @(~,~) toggleSection(SECT_EELS));
+    btnEELSHeader.Layout.Row = 15;
+
+    pnlEELS = uipanel(toolsGL, 'BorderType', 'line');
+    pnlEELS.Layout.Row = 16;
+
+    eelsInnerGL = uigridlayout(pnlEELS, [11 2], ...
+        'RowHeight', {28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28}, ...
+        'ColumnWidth', {'1x', '1x'}, ...
+        'Padding', [4 4 4 4], ...
+        'RowSpacing', 3);
+
+    btnEnterEELS = uibutton(eelsInnerGL, 'Text', 'Enter EELS', ...
+        'ButtonPushedFcn', @onEnterEELS, ...
+        'BackgroundColor', BTN_PRIMARY, ...
+        'FontColor', BTN_FG, ...
+        'FontWeight', 'bold', ...
+        'Enable', 'off', ...
+        'Tooltip', 'Enter EELS spectrum analysis mode');
+    btnEnterEELS.Layout.Row = 1; btnEnterEELS.Layout.Column = [1 2];
+
+    lblEELSPreEdge = uilabel(eelsInnerGL, 'Text', 'Pre-edge Window:', ...
+        'FontSize', 10, 'HorizontalAlignment', 'left');
+    lblEELSPreEdge.Layout.Row = 2; lblEELSPreEdge.Layout.Column = 1;
+
+    eelsPreEdgeGL = uigridlayout(eelsInnerGL, [1 2], ...
+        'RowHeight', {'1x'}, 'ColumnWidth', {'1x','1x'}, ...
+        'Padding', [0 0 0 0], 'RowSpacing', 0, 'ColumnSpacing', 2);
+    eelsPreEdgeGL.Layout.Row = 2; eelsPreEdgeGL.Layout.Column = 2;
+
+    edtEELSPreEdgeStart = uieditfield(eelsPreEdgeGL, 'text', ...
+        'Value', '100', 'Placeholder', 'E1 eV', 'FontSize', 9);
+    edtEELSPreEdgeStart.Layout.Row = 1; edtEELSPreEdgeStart.Layout.Column = 1;
+
+    edtEELSPreEdgeEnd = uieditfield(eelsPreEdgeGL, 'text', ...
+        'Value', '700', 'Placeholder', 'E2 eV', 'FontSize', 9);
+    edtEELSPreEdgeEnd.Layout.Row = 1; edtEELSPreEdgeEnd.Layout.Column = 2;
+
+    btnEELSFitBG = uibutton(eelsInnerGL, 'Text', 'Fit Background', ...
+        'ButtonPushedFcn', @onEELSFitBackground, ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Fit and subtract pre-edge background');
+    btnEELSFitBG.Layout.Row = 3; btnEELSFitBG.Layout.Column = 1;
+
+    ddEELSMethod = uidropdown(eelsInnerGL, ...
+        'Items', {'powerlaw', 'exponential'}, ...
+        'Value', 'powerlaw', ...
+        'Enable', 'off', ...
+        'Tooltip', 'Background fitting model');
+    ddEELSMethod.Layout.Row = 3; ddEELSMethod.Layout.Column = 2;
+
+    chkShowEdges = uicheckbox(eelsInnerGL, 'Text', 'Show Edges', ...
+        'Value', false, ...
+        'ValueChangedFcn', @onEELSShowEdges, ...
+        'Enable', 'off');
+    chkShowEdges.Layout.Row = 4; chkShowEdges.Layout.Column = 1;
+
+    ddEdgeFilter = uidropdown(eelsInnerGL, ...
+        'Items', {'All'}, ...
+        'Value', 'All', ...
+        'Enable', 'off', ...
+        'Tooltip', 'Filter edges by element');
+    ddEdgeFilter.Layout.Row = 4; ddEdgeFilter.Layout.Column = 2;
+
+    lblEELSSigWin = uilabel(eelsInnerGL, 'Text', 'Signal Window:', ...
+        'FontSize', 10, 'HorizontalAlignment', 'left');
+    lblEELSSigWin.Layout.Row = 5; lblEELSSigWin.Layout.Column = 1;
+
+    eelsSigWinGL = uigridlayout(eelsInnerGL, [1 2], ...
+        'RowHeight', {'1x'}, 'ColumnWidth', {'1x','1x'}, ...
+        'Padding', [0 0 0 0], 'RowSpacing', 0, 'ColumnSpacing', 2);
+    eelsSigWinGL.Layout.Row = 5; eelsSigWinGL.Layout.Column = 2;
+
+    edtEELSSignalStart = uieditfield(eelsSigWinGL, 'text', ...
+        'Value', '700', 'Placeholder', 'E1 eV', 'FontSize', 9);
+    edtEELSSignalStart.Layout.Row = 1; edtEELSSignalStart.Layout.Column = 1;
+
+    edtEELSSignalEnd = uieditfield(eelsSigWinGL, 'text', ...
+        'Value', '750', 'Placeholder', 'E2 eV', 'FontSize', 9);
+    edtEELSSignalEnd.Layout.Row = 1; edtEELSSignalEnd.Layout.Column = 2;
+
+    btnEELSExtractMap = uibutton(eelsInnerGL, 'Text', 'Extract Map', ...
+        'ButtonPushedFcn', @onEELSExtractMap, ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Extract EELS elemental map from spectrum image');
+    btnEELSExtractMap.Layout.Row = 6; btnEELSExtractMap.Layout.Column = 1;
+
+    btnEELSThickness = uibutton(eelsInnerGL, 'Text', 'Thickness Map', ...
+        'ButtonPushedFcn', @onEELSThicknessMap, ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Compute t/lambda thickness map from log-ratio');
+    btnEELSThickness.Layout.Row = 6; btnEELSThickness.Layout.Column = 2;
+
+    btnEELSAlignZLP = uibutton(eelsInnerGL, 'Text', 'Align ZLP', ...
+        'ButtonPushedFcn', @onEELSAlignZLP, ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Align zero-loss peak across spectrum image frames');
+    btnEELSAlignZLP.Layout.Row = 7; btnEELSAlignZLP.Layout.Column = [1 2];
+
+    % Row 8: Deconvolve (Fourier-Log)
+    btnEELSDeconvolve = uibutton(eelsInnerGL, 'Text', 'Deconvolve', ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Fourier-log plural scattering removal', ...
+        'Enable', 'off', ...
+        'ButtonPushedFcn', @(~,~) onEELSDeconvolve());
+    btnEELSDeconvolve.Layout.Row = 8; btnEELSDeconvolve.Layout.Column = [1 2];
+
+    % Row 9: ELNES extraction
+    btnEELSELNES = uibutton(eelsInnerGL, 'Text', 'ELNES', ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Extract near-edge fine structure', ...
+        'Enable', 'off', ...
+        'ButtonPushedFcn', @(~,~) onEELSExtractELNES());
+    btnEELSELNES.Layout.Row = 9; btnEELSELNES.Layout.Column = 1;
+
+    edtEELSEdgeOnset = uieditfield(eelsInnerGL, 'text', ...
+        'Value', '708', 'Placeholder', 'Onset eV', ...
+        'Tooltip', 'Edge onset energy for ELNES');
+    edtEELSEdgeOnset.Layout.Row = 9; edtEELSEdgeOnset.Layout.Column = 2;
+
+    % Row 10: Kramers-Kronig
+    btnEELSKK = uibutton(eelsInnerGL, 'Text', 'Kramers-Kronig', ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Compute dielectric function from low-loss EELS', ...
+        'Enable', 'off', ...
+        'ButtonPushedFcn', @(~,~) onEELSKramersKronig());
+    btnEELSKK.Layout.Row = 10; btnEELSKK.Layout.Column = [1 2];
+
+    % Row 11: Navigate pixel (spectrum image)
+    btnEELSNavigate = uibutton(eelsInnerGL, 'state', 'Text', 'Navigate Pixel', ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Click on image to show pixel spectrum', ...
+        'Enable', 'off', ...
+        'ValueChangedFcn', @(src,~) onEELSNavigateToggle(src));
+    btnEELSNavigate.Layout.Row = 11; btnEELSNavigate.Layout.Column = [1 2];
+
+    % ── Section 9: Diffraction Indexing ──────────────────────────────────
+    btnDiffHeader = uibutton(toolsGL, 'Text', [ARROW_SHUT ' Diffraction'], ...
+        'HorizontalAlignment', 'left', ...
+        'BackgroundColor', HDR_BG, 'FontColor', HDR_FG, ...
+        'FontWeight', 'bold', 'FontSize', 11, ...
+        'ButtonPushedFcn', @(~,~) toggleSection(SECT_DIFF));
+    btnDiffHeader.Layout.Row = 17;
+
+    pnlDiff = uipanel(toolsGL, 'BorderType', 'line');
+    pnlDiff.Layout.Row = 18;
+
+    diffInnerGL = uigridlayout(pnlDiff, [9 2], ...
+        'RowHeight', {28, 28, 28, 28, 28, 28, '1x', 28, 28}, ...
+        'ColumnWidth', {'1x', '1x'}, ...
+        'Padding', [4 4 4 4], ...
+        'RowSpacing', 3);
+
+    btnAutoDetectSpots = uibutton(diffInnerGL, 'Text', 'Auto-detect Spots', ...
+        'ButtonPushedFcn', @onAutoDetectSpots, ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Automatically find diffraction spots');
+    btnAutoDetectSpots.Layout.Row = 1; btnAutoDetectSpots.Layout.Column = 1;
+
+    btnClickDiffSpot = uibutton(diffInnerGL, 'Text', 'Click Spots', ...
+        'ButtonPushedFcn', @onClickDiffSpot, ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Click to manually mark diffraction spots');
+    btnClickDiffSpot.Layout.Row = 1; btnClickDiffSpot.Layout.Column = 2;
+
+    btnClearDiffSpots = uibutton(diffInnerGL, 'Text', 'Clear Spots', ...
+        'ButtonPushedFcn', @onClearDiffSpots, ...
+        'BackgroundColor', BTN_DANGER, 'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Remove all diffraction spot markers');
+    btnClearDiffSpots.Layout.Row = 2; btnClearDiffSpots.Layout.Column = 1;
+
+    lblSpotCount = uilabel(diffInnerGL, 'Text', '0 spots', ...
+        'FontSize', 10, 'HorizontalAlignment', 'center');
+    lblSpotCount.Layout.Row = 2; lblSpotCount.Layout.Column = 2;
+
+    lblCameraLen = uilabel(diffInnerGL, 'Text', 'Camera Length (mm):', ...
+        'FontSize', 9, 'HorizontalAlignment', 'left');
+    lblCameraLen.Layout.Row = 3; lblCameraLen.Layout.Column = 1;
+
+    edtCameraLen = uieditfield(diffInnerGL, 'text', ...
+        'Value', '', 'Placeholder', 'e.g. 200', 'FontSize', 9);
+    edtCameraLen.Layout.Row = 3; edtCameraLen.Layout.Column = 2;
+
+    lblAccVoltage = uilabel(diffInnerGL, 'Text', 'Voltage (kV):', ...
+        'FontSize', 10, 'HorizontalAlignment', 'left');
+    lblAccVoltage.Layout.Row = 4; lblAccVoltage.Layout.Column = 1;
+
+    ddAccVoltage = uidropdown(diffInnerGL, ...
+        'Items', {'80 kV', '100 kV', '120 kV', '200 kV', '300 kV'}, ...
+        'Value', '200 kV', ...
+        'Enable', 'off', ...
+        'Tooltip', 'Electron accelerating voltage');
+    ddAccVoltage.Layout.Row = 4; ddAccVoltage.Layout.Column = 2;
+
+    btnMatchDiffraction = uibutton(diffInnerGL, 'Text', 'Match Phases', ...
+        'ButtonPushedFcn', @onMatchDiffraction, ...
+        'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
+        'FontWeight', 'bold', ...
+        'Enable', 'off', ...
+        'Tooltip', 'Index diffraction pattern and match to crystal phases');
+    btnMatchDiffraction.Layout.Row = 5; btnMatchDiffraction.Layout.Column = 1;
+
+    btnOverlayDiffRings = uibutton(diffInnerGL, 'Text', 'Overlay Rings', ...
+        'ButtonPushedFcn', @onOverlayDiffRings, ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Enable', 'off', ...
+        'Tooltip', 'Overlay d-spacing rings for selected phase');
+    btnOverlayDiffRings.Layout.Row = 5; btnOverlayDiffRings.Layout.Column = 2;
+
+    lblZoneAxisLabel = uilabel(diffInnerGL, 'Text', 'Zone Axis:', ...
+        'FontSize', 10, 'HorizontalAlignment', 'left');
+    lblZoneAxisLabel.Layout.Row = 6; lblZoneAxisLabel.Layout.Column = 1;
+
+    lblZoneAxis = uilabel(diffInnerGL, 'Text', '', ...
+        'FontSize', 10, 'HorizontalAlignment', 'left', 'FontWeight', 'bold');
+    lblZoneAxis.Layout.Row = 6; lblZoneAxis.Layout.Column = 2;
+
+    lbxDiffResults = uilistbox(diffInnerGL, ...
+        'Items', {}, ...
+        'FontSize', 9);
+    lbxDiffResults.Layout.Row = 7; lbxDiffResults.Layout.Column = [1 2];
+
+    % Row 8: Zone axis + Simulate
+    edtZoneAxis = uieditfield(diffInnerGL, 'text', ...
+        'Value', '0 0 1', 'Placeholder', 'Zone axis [u v w]');
+    edtZoneAxis.Layout.Row = 8; edtZoneAxis.Layout.Column = 1;
+
+    btnSimDiffraction = uibutton(diffInnerGL, 'Text', 'Simulate', ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Kinematic diffraction simulation', ...
+        'Enable', 'off', ...
+        'ButtonPushedFcn', @(~,~) onSimulateDiffraction());
+    btnSimDiffraction.Layout.Row = 8; btnSimDiffraction.Layout.Column = 2;
+
+    % Row 9: Virtual Dark-Field
+    btnVDF = uibutton(diffInnerGL, 'Text', 'Virtual Dark-Field', ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Select FFT spot for virtual dark-field image', ...
+        'Enable', 'off', ...
+        'ButtonPushedFcn', @(~,~) onVirtualDarkField());
+    btnVDF.Layout.Row = 9; btnVDF.Layout.Column = [1 2];
+
+    % ── Section 10: Metadata (populated) ─────────────────────────────────
     btnMetaHeader = uibutton(toolsGL, 'Text', [ARROW_SHUT ' Metadata'], ...
         'HorizontalAlignment', 'left', ...
         'BackgroundColor', HDR_BG, 'FontColor', HDR_FG, ...
         'FontWeight', 'bold', 'FontSize', 11, ...
         'ButtonPushedFcn', @(~,~) toggleSection(SECT_META));
-    btnMetaHeader.Layout.Row = 11;
+    btnMetaHeader.Layout.Row = 19;
 
     taMetadata = uitextarea(toolsGL, ...
         'Value', {'(no image loaded)'}, ...
         'Editable', 'off', ...
         'FontName', 'Courier New', ...
         'FontSize', 10);
-    taMetadata.Layout.Row = 12;
+    taMetadata.Layout.Row = 20;
 
     % ════════════════════════════════════════════════════════════════════
     %  ROW 3: STATUS BAR
@@ -1525,6 +2045,45 @@ function varargout = emViewerGUI()
         api.setGamma       = @(g) setGammaAPI(g);
         api.sessionSave    = @(fp) sessionSaveAPI(fp);
         api.sessionLoad    = @(fp) sessionLoadAPI(fp);
+
+        % New features
+        api.view3D          = @() on3DSurface([], []);
+        api.templateMatch   = @(x1,y1,w,h) templateMatchAPI(x1,y1,w,h);
+        api.noiseEstimate   = @() noiseEstimateAPI();
+        api.getMeasStats    = @() getMeasStatsAPI();
+
+        % EDS composite mode
+        api.enterEDS        = @() onEnterEDS([], []);
+        api.exitEDS         = @() onExitEDS();
+        api.isEDSMode       = @() appData.edsMode;
+        api.getEDSChannels  = @() appData.edsChannels;
+        api.setEDSChannel   = @(idx, field, val) setEDSChannelAPI(idx, field, val);
+        api.getEDSComposite = @() appData.edsComposite;
+
+        % EELS API
+        api.enterEELS        = @() onEnterEELS([], []);
+        api.exitEELS         = @() onExitEELS();
+        api.isEELSMode       = @() appData.eelsMode;
+        api.eelsBackground   = @(fitWin) eelsBackgroundAPI(fitWin);
+        api.eelsExtractMap   = @(sigWin, bgWin) eelsExtractMapAPI(sigWin, bgWin);
+        api.eelsDeconvolve    = @() onEELSDeconvolve([], []);
+        api.eelsELNES         = @(onset) eelsELNESAPI(onset);
+        api.eelsKramersKronig = @() onEELSKramersKronig([], []);
+        api.eelsNavigate      = @(row, col) eelsNavigateAPI(row, col);
+
+        % Diffraction API
+        api.findDiffSpots       = @() onAutoDetectSpots([], []);
+        api.matchDiffraction    = @() onMatchDiffraction([], []);
+        api.getDiffResults      = @() appData.diffResults;
+        api.simulateDiffraction = @(phase, za) simDiffAPI(phase, za);
+        api.virtualDarkField    = @(center, radius) vdfAPI(center, radius);
+
+        % EDS Quantification API
+        api.edsAssignElements    = @(elems) edsAssignAPI(elems);
+        api.edsQuantify          = @() onQuantifyCL([], []);
+        api.getEDSQuantification = @() struct('atomicPct', {appData.edsAtomicPct}, ...
+            'weightPct', {appData.edsWeightPct}, 'elements', {appData.edsElements});
+        api.edsQuantifyZAF       = @(t, angle) quantifyZAFAPI(t, angle);
 
         api.close          = @() close(fig);
         varargout{1}       = api;
@@ -1620,6 +2179,7 @@ function varargout = emViewerGUI()
             exitCompareMode();
         end
         btnCompare.Enable = onOff(numel(appData.images) >= 2);
+        btnEDSToolbar.Enable = onOff(numel(appData.images) >= 1);
 
         rebuildImageList();
 
@@ -1797,6 +2357,10 @@ function varargout = emViewerGUI()
         if appData.compareMode
             return;   % in compare mode, use displayCompareImage instead
         end
+        if appData.edsMode
+            compositeEDS();
+            return;   % in EDS mode, show composite instead of single image
+        end
         if appData.activeIdx < 1 || appData.activeIdx > numel(appData.images)
             clearDisplay();
             return;
@@ -1966,6 +2530,7 @@ function varargout = emViewerGUI()
         btnBatchCrop.Enable     = onOff(numel(appData.images) >= 2);
         btnMontage.Enable       = onOff(numel(appData.images) >= 2);
         btnSessionSave.Enable   = 'on';
+        btnEnterEDS.Enable      = 'on';
         btnGrid.Enable          = onOff(numel(appData.images) >= 2);
         btnExportMeasure.Enable = 'on';
         btnDiffRings.Enable     = 'on';
@@ -2007,6 +2572,16 @@ function varargout = emViewerGUI()
         btnCalibColorbar.Enable   = 'on';
         btnMacroRecord.Enable     = 'on';
         btnFlickerCompare.Enable  = onOff(numel(appData.images) >= 2);
+        btn3DSurface.Enable       = 'on';
+        btnLiveFFT.Enable         = 'on';
+        btnTemplateMatch.Enable   = 'on';
+        btnStitchImages.Enable    = onOff(numel(appData.images) >= 2);
+        btnNoiseEstimate.Enable   = 'on';
+        btnPubPresets.Enable      = 'on';
+        btnColormapPreset.Enable  = 'on';
+        btnMeasStats.Enable       = 'on';
+        btnBatchMeas.Enable       = onOff(numel(appData.images) >= 2);
+        btnExportToDP.Enable      = 'on';
 
         % Enable annotation controls
         btnPlaceAnnot.Enable  = 'on';
@@ -2027,6 +2602,7 @@ function varargout = emViewerGUI()
         appData.preCropPixels  = [];
         appData.displayImg     = [];
         appData.imgHandle      = [];
+        appData.edsComposite   = [];
         if ~isempty(ax) && isvalid(ax)
             delete(ax.Children);
             cla(ax);
@@ -2094,6 +2670,11 @@ function varargout = emViewerGUI()
         btnBatchCrop.Enable      = 'off';
         btnMontage.Enable        = 'off';
         btnSessionSave.Enable    = 'off';
+        btnEnterEDS.Enable       = 'off';
+        btnEDSToolbar.Enable     = 'off';
+        btnAddChannel.Enable     = 'off';
+        btnRemoveChannel.Enable  = 'off';
+        btnExportComposite.Enable = 'off';
         btnGrid.Enable           = 'off';
         btnExportMeasure.Enable  = 'off';
         btnDiffRings.Enable      = 'off';
@@ -2382,6 +2963,7 @@ function varargout = emViewerGUI()
         appData.images{end+1} = data;
         appData.activeIdx = numel(appData.images);
         btnCompare.Enable = onOff(numel(appData.images) >= 2);
+        btnEDSToolbar.Enable = onOff(numel(appData.images) >= 1);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3149,6 +3731,11 @@ function varargout = emViewerGUI()
         if cbMinimap.Value && ~isempty(hMinimap) && isvalid(hMinimap)
             updateMinimapRect();
         end
+
+        % Update live FFT if active
+        if ~isempty(appData.liveFFTFig) && isvalid(appData.liveFFTFig)
+            updateLiveFFT();
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3551,6 +4138,61 @@ function varargout = emViewerGUI()
             'HandleVisibility', 'off');
         appData.overlays.clickMarkers{end+1} = hMark;
 
+        % Handle single-click modes that accumulate without a fixed endpoint
+        if strcmp(appData.captureMode, 'diffspot')
+            newSpot = [y, x];  % [row, col]
+            appData.diffSpots = [appData.diffSpots; newSpot];
+            drawDiffSpots();
+            lblSpotCount.Text = sprintf('%d spots', size(appData.diffSpots, 1));
+            return;
+        end
+
+        if strcmp(appData.captureMode, 'specnav')
+            % Navigate spectrum image pixel — single click, stays active
+            col = round(x); row = round(y);
+            [Ny, Nx, ~] = size(appData.eelsCube);
+            if row >= 1 && row <= Ny && col >= 1 && col <= Nx
+                spec = squeeze(double(appData.eelsCube(row, col, :)));
+                delete(findobj(ax, 'Tag', 'specnav_marker'));
+                hold(ax, 'on');
+                plot(ax, col, row, 'r+', 'MarkerSize', 15, 'LineWidth', 2, ...
+                    'Tag', 'specnav_marker', 'HandleVisibility', 'off');
+                hold(ax, 'off');
+                if ~isempty(appData.eelsFig) && isvalid(appData.eelsFig)
+                    ax2 = findobj(appData.eelsFig, 'Type', 'axes');
+                    if ~isempty(ax2)
+                        cla(ax2(1));
+                        plot(ax2(1), appData.eelsEnergyAxis, spec, 'k-', 'LineWidth', 1);
+                        xlabel(ax2(1), 'Energy Loss (eV)'); ylabel(ax2(1), 'Counts');
+                        title(ax2(1), sprintf('Pixel [%d, %d]', row, col));
+                        grid(ax2(1), 'on');
+                    end
+                end
+                setStatus(sprintf('Pixel [%d,%d]: max=%.0f', row, col, max(spec)));
+            end
+            return;
+        end
+
+        if strcmp(appData.captureMode, 'vdf_select')
+            % Virtual dark-field — single click selects the FFT spot
+            col = round(x); row = round(y);
+            idx = appData.activeIdx;
+            if idx > 0 && idx <= numel(appData.images)
+                pixels = double(appData.images{idx}.metadata.parserSpecific.imageData.pixels);
+                try
+                    vdf = imaging.virtualDarkField(pixels, 'MaskCenter', [row col], 'MaskRadius', 10);
+                    imagesc(ax, vdf); colormap(ax, 'gray'); axis(ax, 'image');
+                    title(ax, sprintf('VDF at [%d,%d]', row, col));
+                catch ME
+                    setStatus(sprintf('VDF failed: %s', ME.message));
+                end
+            end
+            appData.captureMode = '';
+            fig.WindowButtonDownFcn = @onIdleMouseDown;
+            fig.Pointer = 'arrow';
+            return;
+        end
+
         % Accumulate clicks
         appData.captureClicks(end+1, :) = [x, y];
 
@@ -3599,6 +4241,31 @@ function varargout = emViewerGUI()
                 case 'gpa'
                     appData.captureClicks = [appData.captureClicks; x1, y1; x2, y2];
                     executeGPA();
+                case 'edsprofile'
+                    p1 = [x1, y1];
+                    p2 = [x2, y2];
+                    profile = imaging.edsCompositionProfile(appData.edsAtomicPct, ...
+                        appData.edsElements, p1(1), p1(2), p2(1), p2(2));
+                    profFig = figure('Name', 'Composition Profile');
+                    ax2 = axes(profFig);
+                    plot(ax2, profile.distance, profile.atomicPct, 'LineWidth', 1.5);
+                    xlabel(ax2, sprintf('Distance (%s)', profile.unit));
+                    ylabel(ax2, 'Atomic %%');
+                    legend(ax2, appData.edsElements);
+                    title(ax2, 'EDS Composition Profile');
+                    grid(ax2, 'on');
+                    setStatus('Profile extracted');
+                case 'edsroi'
+                    c1 = max(1, min(round(x1), round(x2)));
+                    c2 = min(size(appData.edsAtomicPct{1},2), max(round(x1), round(x2)));
+                    r1 = max(1, min(round(y1), round(y2)));
+                    r2 = min(size(appData.edsAtomicPct{1},1), max(round(y1), round(y2)));
+                    msg = 'ROI Composition: ';
+                    for kq = 1:numel(appData.edsElements)
+                        roi = appData.edsAtomicPct{kq}(r1:r2, c1:c2);
+                        msg = [msg sprintf('%s=%.1f%% ', appData.edsElements{kq}, nanmean(roi(:)))]; %#ok<AGROW>
+                    end
+                    setStatus(msg);
             end
         end
     end
@@ -3810,6 +4477,11 @@ function varargout = emViewerGUI()
     function enterCompareMode()
         if numel(appData.images) < 2
             return;
+        end
+
+        % Mutually exclusive with EDS mode
+        if appData.edsMode
+            onExitEDS();
         end
 
         appData.compareMode = true;
@@ -4156,6 +4828,56 @@ function varargout = emViewerGUI()
         btnCalibColorbar.Enable   = state;
         btnMacroRecord.Enable     = state;
         btnFlickerCompare.Enable  = state;
+        % New feature buttons
+        btn3DSurface.Enable       = state;
+        btnLiveFFT.Enable         = state;
+        btnTemplateMatch.Enable   = state;
+        btnStitchImages.Enable    = state;
+        btnNoiseEstimate.Enable   = state;
+        btnPubPresets.Enable      = state;
+        btnColormapPreset.Enable  = state;
+        btnMeasStats.Enable       = state;
+        btnBatchMeas.Enable       = state;
+        btnExportToDP.Enable      = state;
+        % EDS channel controls (only in EDS mode)
+        if ~appData.edsMode
+            btnAddChannel.Enable       = state;
+            btnRemoveChannel.Enable    = state;
+            ddChannelColor.Enable      = state;
+            cbChannelVisible.Enable    = state;
+            sldChannelIntensity.Enable = state;
+            efChannelLabel.Enable      = state;
+            btnExportComposite.Enable  = state;
+        end
+        % EDS quantification controls
+        btnAssignElements.Enable       = state;
+        btnQuantifyCL.Enable           = state;
+        btnCompositionProfile.Enable   = state;
+        btnROIComposition.Enable       = state;
+        % EELS controls
+        btnEnterEELS.Enable            = state;
+        btnEELSFitBG.Enable            = state;
+        ddEELSMethod.Enable            = state;
+        chkShowEdges.Enable            = state;
+        ddEdgeFilter.Enable            = state;
+        btnEELSExtractMap.Enable       = state;
+        btnEELSThickness.Enable        = state;
+        btnEELSAlignZLP.Enable         = state;
+        btnEELSDeconvolve.Enable       = state;
+        btnEELSELNES.Enable            = state;
+        btnEELSKK.Enable               = state;
+        btnEELSNavigate.Enable         = state;
+        % Diffraction controls
+        btnAutoDetectSpots.Enable      = state;
+        btnClickDiffSpot.Enable        = state;
+        btnClearDiffSpots.Enable       = state;
+        ddAccVoltage.Enable            = state;
+        btnMatchDiffraction.Enable     = state;
+        btnOverlayDiffRings.Enable     = state;
+        btnSimDiffraction.Enable       = state;
+        btnVDF.Enable                  = state;
+        % ZAF quantification
+        btnQuantifyZAF.Enable          = state;
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4169,8 +4891,11 @@ function varargout = emViewerGUI()
             case 'Histogram',   hdr = btnHistogramHeader;
             case 'Measurement', hdr = btnMeasureHeader;
             case 'Processing',  hdr = btnProcessHeader;
-            case 'Annotations', hdr = btnAnnotHeader;
-            case 'Metadata',    hdr = btnMetaHeader;
+            case 'Annotations',  hdr = btnAnnotHeader;
+            case 'EDS Channels', hdr = btnEDSHeader;
+            case 'EELS Spectrum', hdr = btnEELSHeader;
+            case 'Diffraction',  hdr = btnDiffHeader;
+            case 'Metadata',     hdr = btnMetaHeader;
             otherwise, return;
         end
 
@@ -4373,6 +5098,7 @@ function varargout = emViewerGUI()
         pnlMeasure.BackgroundColor   = panelBG;
         pnlProcess.BackgroundColor   = panelBG;
         pnlAnnot.BackgroundColor     = panelBG;
+        pnlEDS.BackgroundColor       = panelBG;
 
         % Section header buttons
         btnContrastHeader.BackgroundColor  = hdrBG;
@@ -4385,6 +5111,8 @@ function varargout = emViewerGUI()
         btnProcessHeader.FontColor         = hdrFG;
         btnAnnotHeader.BackgroundColor     = hdrBG;
         btnAnnotHeader.FontColor           = hdrFG;
+        btnEDSHeader.BackgroundColor       = hdrBG;
+        btnEDSHeader.FontColor             = hdrFG;
         btnMetaHeader.BackgroundColor      = hdrBG;
         btnMetaHeader.FontColor            = hdrFG;
 
@@ -4439,6 +5167,7 @@ function varargout = emViewerGUI()
             measureInnerGL.BackgroundColor  = panelBG;
             processInnerGL.BackgroundColor  = panelBG;
             annotInnerGL.BackgroundColor    = panelBG;
+            edsInnerGL.BackgroundColor      = panelBG;
             toolsGL.BackgroundColor         = panelBG;
         catch
         end
@@ -6496,6 +7225,699 @@ function varargout = emViewerGUI()
     end
 
     % ════════════════════════════════════════════════════════════════════
+    %  EDS MULTI-CHANNEL COMPOSITE MODE
+    % ════════════════════════════════════════════════════════════════════
+
+    function onEDSToolbarToggle(src, ~)
+    %ONEDSTOOLBARTOGGLE  Toolbar state button toggle for EDS mode.
+        if src.Value
+            onEnterEDS([], []);
+        else
+            onExitEDS();
+        end
+    end
+
+    function onEnterEDS(~, ~)
+    %ONENTEREDS  Enter multi-channel EDS false-color composite mode.
+        if isempty(appData.images)
+            return;
+        end
+
+        % Mutually exclusive with compare mode
+        if appData.compareMode
+            btnCompare.Value = false;
+            exitCompareMode();
+        end
+
+        appData.edsMode = true;
+        btnEDSToolbar.Value = true;
+        btnEnterEDS.Text = 'Exit EDS Mode';
+        btnEnterEDS.BackgroundColor = BTN_DANGER;
+        btnEnterEDS.ButtonPushedFcn = @(~,~) onExitEDS();
+
+        % Auto-populate channels from all loaded images if empty
+        if isempty(appData.edsChannels)
+            defaultColors = EDS_COLORS;
+            nImg = numel(appData.images);
+            for ci = 1:nImg
+                [~, fn, fe] = fileparts(appData.images{ci}.metadata.source);
+                ch.imageIdx  = ci;
+                ch.label     = [fn fe];
+                ch.color     = defaultColors{mod(ci-1, numel(defaultColors)) + 1};
+                ch.visible   = true;
+                ch.intensity = 1.0;
+                appData.edsChannels{ci} = ch;
+            end
+        end
+
+        % Enable channel controls
+        btnAddChannel.Enable       = 'on';
+        btnRemoveChannel.Enable    = 'on';
+        ddChannelColor.Enable      = 'on';
+        cbChannelVisible.Enable    = 'on';
+        sldChannelIntensity.Enable = 'on';
+        efChannelLabel.Enable      = 'on';
+        btnExportComposite.Enable  = 'on';
+
+        % Disable tools that don't apply in EDS mode
+        setToolsEnabled('off');
+        btnEnterEDS.Enable = 'on';
+        btnEDSToolbar.Enable = 'on';
+
+        refreshEDSList();
+        compositeEDS();
+        setStatus('EDS composite mode — adjust channels in Tools > EDS Channels');
+    end
+
+    function onExitEDS()
+    %ONEXITEDS  Exit EDS composite mode, restore normal view.
+        appData.edsMode = false;
+        appData.edsComposite = [];
+        btnEDSToolbar.Value = false;
+        btnEnterEDS.Text = 'Enter EDS Mode';
+        btnEnterEDS.BackgroundColor = BTN_PRIMARY;
+        btnEnterEDS.ButtonPushedFcn = @onEnterEDS;
+
+        % Disable channel controls
+        btnAddChannel.Enable       = 'off';
+        btnRemoveChannel.Enable    = 'off';
+        ddChannelColor.Enable      = 'off';
+        cbChannelVisible.Enable    = 'off';
+        sldChannelIntensity.Enable = 'off';
+        efChannelLabel.Enable      = 'off';
+        btnExportComposite.Enable  = 'off';
+
+        % Re-enable tools
+        setToolsEnabled('on');
+
+        % Restore normal display
+        if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
+            displayImage();
+        else
+            clearDisplay();
+        end
+        setStatus('Exited EDS mode');
+    end
+
+    function compositeEDS()
+    %COMPOSITEEDS  Blend all visible EDS channels into an RGB composite.
+        if ~appData.edsMode || isempty(appData.edsChannels)
+            return;
+        end
+
+        % Determine output dimensions from visible channels
+        H = Inf; W = Inf;
+        hasVisible = false;
+        for ci = 1:numel(appData.edsChannels)
+            ch = appData.edsChannels{ci};
+            if ~ch.visible, continue; end
+            if ch.imageIdx < 1 || ch.imageIdx > numel(appData.images), continue; end
+            gray = getGrayscale(appData.images{ch.imageIdx});
+            [h2, w2] = size(gray);
+            H = min(H, h2);
+            W = min(W, w2);
+            hasVisible = true;
+        end
+
+        if ~hasVisible
+            % Show black image
+            if ~isempty(ax) && isvalid(ax)
+                delete(ax.Children); cla(ax);
+                appData.edsComposite = zeros(256, 256, 3);
+                appData.displayImg = appData.edsComposite;
+                hImg = image(ax, appData.edsComposite);
+                appData.imgHandle = hImg;
+                axis(ax, 'image');
+                ax.XTick = []; ax.YTick = [];
+            end
+            return;
+        end
+
+        % Additive blend
+        composite = zeros(H, W, 3);
+        for ci = 1:numel(appData.edsChannels)
+            ch = appData.edsChannels{ci};
+            if ~ch.visible, continue; end
+            if ch.imageIdx < 1 || ch.imageIdx > numel(appData.images), continue; end
+
+            gray = getGrayscale(appData.images{ch.imageIdx});
+            gray = gray(1:H, 1:W);
+
+            % Normalize to [0,1]
+            gmin = min(gray(:));
+            gmax = max(gray(:));
+            if gmax > gmin
+                gray = (gray - gmin) / (gmax - gmin);
+            else
+                gray = zeros(H, W);
+            end
+
+            % Scale by channel intensity and apply color
+            rgb = applyColorChannel(gray * ch.intensity, ch.color);
+            composite = composite + rgb;
+        end
+        composite = min(1, composite);
+
+        appData.edsComposite = composite;
+        appData.displayImg = composite;
+
+        % Render on main axes
+        if ~isempty(ax) && isvalid(ax)
+            delete(ax.Children); cla(ax);
+            hImg = image(ax, composite);
+            appData.imgHandle = hImg;
+            axis(ax, 'image');
+            ax.XTick = []; ax.YTick = [];
+            cmapName = ddColormap.Value;
+            colormap(ax, feval(cmapName, 256));
+        end
+    end
+
+    function refreshEDSList()
+    %REFRESHEDSLIST  Rebuild the EDS channel listbox from appData.edsChannels.
+        if isempty(appData.edsChannels)
+            lbEDSChannels.Items = {'(no channels)'};
+            lbEDSChannels.ItemsData = 0;
+            return;
+        end
+        items = cell(1, numel(appData.edsChannels));
+        idata = zeros(1, numel(appData.edsChannels));
+        for ci = 1:numel(appData.edsChannels)
+            ch = appData.edsChannels{ci};
+            visStr = '';
+            if ~ch.visible, visStr = ' [hidden]'; end
+            items{ci} = sprintf('[%s] %s (img %d)%s', ...
+                ch.color, ch.label, ch.imageIdx, visStr);
+            idata(ci) = ci;
+        end
+        lbEDSChannels.Items = items;
+        lbEDSChannels.ItemsData = idata;
+        if ~isempty(idata)
+            lbEDSChannels.Value = idata(1);
+            populateEDSControls(1);
+        end
+    end
+
+    function populateEDSControls(idx)
+    %POPULATEEDSCONTROLS  Fill channel property widgets from selected channel.
+        if idx < 1 || idx > numel(appData.edsChannels)
+            return;
+        end
+        ch = appData.edsChannels{idx};
+        ddChannelColor.Value      = ch.color;
+        cbChannelVisible.Value    = ch.visible;
+        sldChannelIntensity.Value = ch.intensity;
+        lblEDSIntensity.Text      = sprintf('Int: %.2f', ch.intensity);
+        efChannelLabel.Value      = ch.label;
+    end
+
+    function onEDSChannelSelected(~, ~)
+    %ONEDSCHANNELSELECTED  Listbox selection changed — populate controls.
+        idx = lbEDSChannels.Value;
+        if isempty(idx) || (isnumeric(idx) && idx == 0)
+            return;
+        end
+        populateEDSControls(idx);
+    end
+
+    function onAddEDSChannel(~, ~)
+    %ONADDEDSCHANNEL  Add the active image as a new EDS channel.
+        if appData.activeIdx < 1 || appData.activeIdx > numel(appData.images)
+            return;
+        end
+        % Check if already added
+        for ci = 1:numel(appData.edsChannels)
+            if appData.edsChannels{ci}.imageIdx == appData.activeIdx
+                setStatus(sprintf('Image %d is already an EDS channel', appData.activeIdx));
+                return;
+            end
+        end
+        [~, fn, fe] = fileparts(appData.images{appData.activeIdx}.metadata.source);
+        ch.imageIdx  = appData.activeIdx;
+        ch.label     = [fn fe];
+        nCh = numel(appData.edsChannels);
+        ch.color     = EDS_COLORS{mod(nCh, numel(EDS_COLORS)) + 1};
+        ch.visible   = true;
+        ch.intensity = 1.0;
+        appData.edsChannels{end+1} = ch;
+        refreshEDSList();
+        if appData.edsMode
+            compositeEDS();
+        end
+    end
+
+    function onRemoveEDSChannel(~, ~)
+    %ONREMOVEEDSCHANNEL  Remove selected channel from EDS list.
+        idx = lbEDSChannels.Value;
+        if isempty(idx) || (isnumeric(idx) && idx == 0)
+            return;
+        end
+        if idx >= 1 && idx <= numel(appData.edsChannels)
+            appData.edsChannels(idx) = [];
+        end
+        refreshEDSList();
+        if appData.edsMode
+            compositeEDS();
+        end
+    end
+
+    function onChannelColorChanged(~, ~)
+    %ONCHANNELCOLORCHANGED  Update color assignment for selected channel.
+        idx = lbEDSChannels.Value;
+        if isempty(idx) || idx < 1 || idx > numel(appData.edsChannels)
+            return;
+        end
+        appData.edsChannels{idx}.color = ddChannelColor.Value;
+        refreshEDSList();
+        lbEDSChannels.Value = idx;
+        if appData.edsMode, compositeEDS(); end
+    end
+
+    function onChannelVisibilityChanged(~, ~)
+    %ONCHANNELVISIBILITYCHANGED  Toggle visibility for selected channel.
+        idx = lbEDSChannels.Value;
+        if isempty(idx) || idx < 1 || idx > numel(appData.edsChannels)
+            return;
+        end
+        appData.edsChannels{idx}.visible = cbChannelVisible.Value;
+        refreshEDSList();
+        lbEDSChannels.Value = idx;
+        if appData.edsMode, compositeEDS(); end
+    end
+
+    function onChannelIntensityChanged(~, ~)
+    %ONCHANNELINTENSITYCHANGED  Update intensity scaling for selected channel.
+        idx = lbEDSChannels.Value;
+        if isempty(idx) || idx < 1 || idx > numel(appData.edsChannels)
+            return;
+        end
+        appData.edsChannels{idx}.intensity = sldChannelIntensity.Value;
+        lblEDSIntensity.Text = sprintf('Int: %.2f', sldChannelIntensity.Value);
+        refreshEDSList();
+        lbEDSChannels.Value = idx;
+        if appData.edsMode, compositeEDS(); end
+    end
+
+    function onChannelLabelChanged(~, ~)
+    %ONCHANNELLABELCHANGED  Update label for selected channel.
+        idx = lbEDSChannels.Value;
+        if isempty(idx) || idx < 1 || idx > numel(appData.edsChannels)
+            return;
+        end
+        appData.edsChannels{idx}.label = efChannelLabel.Value;
+        refreshEDSList();
+        lbEDSChannels.Value = idx;
+    end
+
+    function onExportEDSComposite(~, ~)
+    %ONEXPORTEDSCOMPOSITE  Save the EDS composite RGB image to file.
+        if isempty(appData.edsComposite)
+            uialert(fig, 'No EDS composite to export.', 'Export', 'Icon', 'warning');
+            return;
+        end
+        startPath = appData.lastDir;
+        if isempty(startPath) || ~isfolder(startPath), startPath = pwd; end
+
+        [saveName, saveDir] = uiputfile( ...
+            {'*.png', 'PNG (*.png)'; '*.tif;*.tiff', 'TIFF (*.tif)'}, ...
+            'Export EDS Composite', fullfile(startPath, 'eds_composite.png'));
+        if isequal(saveName, 0), return; end
+
+        outPath = fullfile(saveDir, saveName);
+        try
+            imwrite(uint8(appData.edsComposite * 255), outPath);
+            setStatus(sprintf('EDS composite saved: %s', outPath));
+        catch ME
+            uialert(fig, sprintf('Export failed:\n%s', ME.message), ...
+                'Error', 'Icon', 'error');
+        end
+    end
+
+    function setEDSChannelAPI(idx, field, val)
+    %SETEDSCHANNELAPI  Programmatic setter for EDS channel properties.
+        if idx < 1 || idx > numel(appData.edsChannels)
+            error('emViewerGUI:invalidIdx', 'Channel index %d out of range', idx);
+        end
+        switch field
+            case 'color'
+                appData.edsChannels{idx}.color = val;
+            case 'visible'
+                appData.edsChannels{idx}.visible = val;
+            case 'intensity'
+                appData.edsChannels{idx}.intensity = max(0, min(1, val));
+            case 'label'
+                appData.edsChannels{idx}.label = val;
+            otherwise
+                error('emViewerGUI:invalidField', 'Unknown field: %s', field);
+        end
+        refreshEDSList();
+        if appData.edsMode, compositeEDS(); end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  NEW FEATURES: 3D Surface, Live FFT, Template Match, Stitch,
+    %  Noise Estimate, Pub Presets, Colormap Presets, Measurement Stats,
+    %  Batch Measurement, Export to DataPlotter
+    % ════════════════════════════════════════════════════════════════════
+
+    function on3DSurface(~, ~)
+    %ON3DSURFACE  Render the current image as a 3D height map.
+        if isempty(appData.filteredPixels), return; end
+        surfFig = figure('Name', 'EM 3D Surface View', 'NumberTitle', 'off', ...
+            'Units', 'pixels', 'Position', [200 150 700 550], 'Tag', 'emViewer3D');
+        surfAx = axes(surfFig);
+        img = appData.filteredPixels;
+        % Downsample large images for performance
+        [H, W] = size(img);
+        maxDim = 512;
+        if H > maxDim || W > maxDim
+            factor = max(H, W) / maxDim;
+            newH = round(H / factor); newW = round(W / factor);
+            [Xq, Yq] = meshgrid(linspace(1, W, newW), linspace(1, H, newH));
+            img = interp2(double(img), Xq, Yq, 'linear');
+        end
+        surf(surfAx, img, 'EdgeColor', 'none');
+        colormap(surfAx, gray(256));
+        colorbar(surfAx);
+        axis(surfAx, 'tight');
+        surfAx.View = [-37.5 30];
+        xlabel(surfAx, 'X (px)'); ylabel(surfAx, 'Y (px)'); zlabel(surfAx, 'Intensity');
+        title(surfAx, '3D Surface View', 'Interpreter', 'none');
+        rotate3d(surfFig, 'on');
+        setStatus('3D surface view opened — drag to rotate');
+    end
+
+    appData.liveFFTFig = [];  % persistent live FFT figure handle
+
+    function onLiveFFTToggle(src, ~)
+    %ONLIVEFFTTOGGLE  Show/hide persistent FFT panel that updates with filters.
+        if src.Value
+            % Create live FFT figure
+            appData.liveFFTFig = figure('Name', 'Live FFT', 'NumberTitle', 'off', ...
+                'Units', 'pixels', 'Position', [250 200 400 400], ...
+                'Tag', 'emViewerLiveFFT', ...
+                'DeleteFcn', @(~,~) set(src, 'Value', false));
+            updateLiveFFT();
+        else
+            if ~isempty(appData.liveFFTFig) && isvalid(appData.liveFFTFig)
+                delete(appData.liveFFTFig);
+            end
+            appData.liveFFTFig = [];
+        end
+    end
+
+    function updateLiveFFT()
+    %UPDATELIVEFFT  Refresh the live FFT display from current filteredPixels.
+        if isempty(appData.liveFFTFig) || ~isvalid(appData.liveFFTFig), return; end
+        if isempty(appData.filteredPixels), return; end
+        fftAx = findobj(appData.liveFFTFig, 'Type', 'axes');
+        if isempty(fftAx)
+            fftAx = axes(appData.liveFFTFig);
+        end
+        F = fft2(double(appData.filteredPixels));
+        Fshift = fftshift(F);
+        mag = log10(1 + abs(Fshift));
+        imagesc(fftAx, mag);
+        axis(fftAx, 'image');
+        colormap(fftAx, gray(256));
+        fftAx.XTick = []; fftAx.YTick = [];
+        title(fftAx, 'Live FFT (log magnitude)');
+    end
+
+    function onTemplateMatch(~, ~)
+    %ONTEMPLATEMATCH  Select a template ROI and find matches in the image.
+        if isempty(appData.filteredPixels), return; end
+        % Prompt for template region via crop-style selection
+        answer = inputdlg({'X start:', 'Y start:', 'Width:', 'Height:'}, ...
+            'Select Template Region', 1, {'10', '10', '50', '50'});
+        if isempty(answer), return; end
+        x1 = str2double(answer{1}); y1 = str2double(answer{2});
+        tw = str2double(answer{3}); th = str2double(answer{4});
+        [H, W] = size(appData.filteredPixels);
+        x2 = min(x1 + tw - 1, W); y2 = min(y1 + th - 1, H);
+        template = appData.filteredPixels(max(1,y1):y2, max(1,x1):x2);
+        if numel(template) < 4
+            uialert(fig, 'Template too small.', 'Template Match', 'Icon', 'warning');
+            return;
+        end
+        fig.Pointer = 'watch'; drawnow;
+        try
+            r = imaging.templateMatch(appData.filteredPixels, template, Threshold=0.6);
+            fig.Pointer = 'arrow';
+            % Mark matches on image
+            if r.nMatches > 0
+                hold(ax, 'on');
+                for mi = 1:r.nMatches
+                    plot(ax, r.locations(mi,2), r.locations(mi,1), 'r+', ...
+                        'MarkerSize', 12, 'LineWidth', 2, 'HandleVisibility', 'off');
+                end
+                hold(ax, 'off');
+            end
+            setStatus(sprintf('Template match: %d matches found (threshold=%.2f)', ...
+                r.nMatches, r.threshold));
+        catch ME
+            fig.Pointer = 'arrow';
+            uialert(fig, sprintf('Template match failed:\n%s', ME.message), ...
+                'Error', 'Icon', 'error');
+        end
+    end
+
+    function onStitchImages(~, ~)
+    %ONSTITCHIMAGES  Stitch all loaded images into a panoramic mosaic.
+        if numel(appData.images) < 2
+            uialert(fig, 'Need at least 2 images to stitch.', 'Stitch', 'Icon', 'warning');
+            return;
+        end
+        layouts = {'horizontal', 'vertical', 'auto'};
+        [sel, ok] = listdlg('ListString', layouts, 'SelectionMode', 'single', ...
+            'PromptString', 'Layout direction:', 'ListSize', [150 60]);
+        if ~ok, return; end
+        fig.Pointer = 'watch'; drawnow;
+        try
+            imgs = cell(1, numel(appData.images));
+            for si = 1:numel(appData.images)
+                imgs{si} = getGrayscale(appData.images{si});
+            end
+            r = imaging.stitchImages(imgs, Layout=layouts{sel});
+            % Show in new figure
+            sFig = figure('Name', 'Stitched Mosaic', 'NumberTitle', 'off', ...
+                'Tag', 'emViewerStitch');
+            sAx = axes(sFig);
+            imagesc(sAx, r.mosaic);
+            axis(sAx, 'image'); colormap(sAx, gray(256));
+            sAx.XTick = []; sAx.YTick = [];
+            title(sAx, sprintf('Mosaic: %d images (%s)', r.nImages, r.layout));
+            fig.Pointer = 'arrow';
+            setStatus(sprintf('Stitched %d images (%s layout)', r.nImages, r.layout));
+        catch ME
+            fig.Pointer = 'arrow';
+            uialert(fig, sprintf('Stitch failed:\n%s', ME.message), 'Error', 'Icon', 'error');
+        end
+    end
+
+    function onNoiseEstimate(~, ~)
+    %ONNOISEESTIMATE  Characterize noise and suggest filter parameters.
+        if isempty(appData.filteredPixels), return; end
+        try
+            r = imaging.noiseEstimate(appData.filteredPixels, Method='both');
+            msg = { ...
+                sprintf('Noise σ = %.3f', r.sigma), ...
+                sprintf('SNR = %.1f dB (%.1f linear)', r.snr, r.snrLinear), ...
+                sprintf('Noise type: %s', r.noiseType), ...
+                '', ...
+                'Suggested filter:', ...
+                sprintf('  Type: %s', r.suggestedFilter.type), ...
+                sprintf('  σ = %.1f (Gaussian) or window = %d (median)', ...
+                    r.suggestedFilter.sigma, r.suggestedFilter.window)};
+            uialert(fig, strjoin(msg, '\n'), 'Noise Estimate', 'Icon', 'info');
+            setStatus(sprintf('Noise: σ=%.3f, SNR=%.1fdB, type=%s', r.sigma, r.snr, r.noiseType));
+        catch ME
+            uialert(fig, sprintf('Noise estimate failed:\n%s', ME.message), ...
+                'Error', 'Icon', 'error');
+        end
+    end
+
+    function onPubPresets(~, ~)
+    %ONPUBPRESETS  Apply journal-specific annotation formatting.
+        journals = {'APS (Phys Rev)', 'Nature', 'ACS (JACS/Nano)', 'Elsevier'};
+        [sel, ok] = listdlg('ListString', journals, 'SelectionMode', 'single', ...
+            'PromptString', 'Select journal preset:', 'ListSize', [200 80]);
+        if ~ok, return; end
+        switch sel
+            case 1  % APS
+                sbFont = 10; sbColor = [1 1 1]; annFont = 8;
+            case 2  % Nature
+                sbFont = 12; sbColor = [1 1 1]; annFont = 10;
+            case 3  % ACS
+                sbFont = 10; sbColor = [0 0 0]; annFont = 9;
+            case 4  % Elsevier
+                sbFont = 11; sbColor = [1 1 1]; annFont = 9;
+        end
+        % Apply to scale bar if present
+        if ~isempty(appData.overlays.scalebar)
+            sb = appData.overlays.scalebar;
+            if isfield(sb, 'label') && isvalid(sb.label)
+                sb.label.FontSize = sbFont;
+                sb.label.Color = sbColor;
+            end
+        end
+        % Apply to annotations
+        for ai = 1:numel(appData.overlays.textAnnotations)
+            ann = appData.overlays.textAnnotations{ai};
+            if isfield(ann, 'handle') && isvalid(ann.handle)
+                ann.handle.FontSize = annFont;
+            end
+        end
+        setStatus(sprintf('Applied %s publication preset', journals{sel}));
+    end
+
+    function onColormapPreset(~, ~)
+    %ONCOLORMAPPRESET  Auto-select colormap based on EM mode.
+        modes = {'SEM (gray)', 'TEM BF (gray)', 'STEM-HAADF (hot)', ...
+                 'STEM-ABF (bone)', 'EDS (parula)', 'Phase (hsv)', ...
+                 'Topography (turbo)', 'Diff. pattern (copper)'};
+        cmaps = {'gray', 'gray', 'hot', 'bone', 'parula', 'hsv', 'turbo', 'copper'};
+        [sel, ok] = listdlg('ListString', modes, 'SelectionMode', 'single', ...
+            'PromptString', 'Select EM imaging mode:', 'ListSize', [220 120]);
+        if ~ok, return; end
+        ddColormap.Value = cmaps{sel};
+        if ~isempty(ax) && isvalid(ax)
+            colormap(ax, feval(cmaps{sel}, 256));
+        end
+        setStatus(sprintf('Colormap: %s (%s)', cmaps{sel}, modes{sel}));
+    end
+
+    function onMeasurementStats(~, ~)
+    %ONMEASUREMENTSTATS  Show aggregate statistics for all measurements.
+        meas = appData.overlays.measurements;
+        if isempty(meas)
+            uialert(fig, 'No measurements to analyze.', 'Stats', 'Icon', 'info');
+            return;
+        end
+        % Collect distances
+        dists = [];
+        for mi = 1:numel(meas)
+            m = meas{mi};
+            if isfield(m, 'distance') && ~isnan(m.distance)
+                dists(end+1) = m.distance; %#ok<AGROW>
+            end
+        end
+        if isempty(dists)
+            uialert(fig, 'No distance measurements found.', 'Stats', 'Icon', 'info');
+            return;
+        end
+        % Show stats + histogram
+        statsFig = figure('Name', 'Measurement Statistics', 'NumberTitle', 'off', ...
+            'Units', 'pixels', 'Position', [300 200 500 400], 'Tag', 'emViewerMeasStats');
+        subplot(2, 1, 1);
+        histogram(dists, max(3, round(sqrt(numel(dists)))));
+        xlabel('Distance'); ylabel('Count');
+        title(sprintf('N=%d, Mean=%.2f, Std=%.2f, Min=%.2f, Max=%.2f', ...
+            numel(dists), mean(dists), std(dists), min(dists), max(dists)));
+        subplot(2, 1, 2);
+        plot(1:numel(dists), sort(dists), 'bo-', 'LineWidth', 1.5);
+        xlabel('Rank'); ylabel('Distance'); title('Sorted Measurements');
+        setStatus(sprintf('Stats: N=%d, mean=%.2f ± %.2f', numel(dists), mean(dists), std(dists)));
+    end
+
+    function onBatchMeasurement(~, ~)
+    %ONBATCHMEASUREMENT  Apply line profile measurement across all images.
+        if numel(appData.images) < 2
+            uialert(fig, 'Need 2+ images for batch measurement.', 'Batch', 'Icon', 'warning');
+            return;
+        end
+        answer = inputdlg({'X1:', 'Y1:', 'X2:', 'Y2:'}, ...
+            'Line Profile Coordinates (same for all images)', 1, {'10', '10', '100', '100'});
+        if isempty(answer), return; end
+        x1 = str2double(answer{1}); y1 = str2double(answer{2});
+        x2 = str2double(answer{3}); y2 = str2double(answer{4});
+        fig.Pointer = 'watch'; drawnow;
+        try
+            batchFig = figure('Name', 'Batch Line Profiles', 'NumberTitle', 'off', ...
+                'Tag', 'emViewerBatchMeas');
+            batchAx = axes(batchFig);
+            hold(batchAx, 'on');
+            legends = {};
+            for bi = 1:numel(appData.images)
+                gray = getGrayscale(appData.images{bi});
+                [dist, intensity] = imaging.lineProfile(gray, x1, y1, x2, y2);
+                plot(batchAx, dist, intensity, 'LineWidth', 1.2);
+                [~, fn, fe] = fileparts(appData.images{bi}.metadata.source);
+                legends{bi} = [fn fe]; %#ok<AGROW>
+            end
+            hold(batchAx, 'off');
+            legend(batchAx, legends, 'Interpreter', 'none', 'Location', 'best');
+            xlabel(batchAx, 'Distance (px)'); ylabel(batchAx, 'Intensity');
+            title(batchAx, sprintf('Batch profiles: (%d,%d) to (%d,%d)', x1, y1, x2, y2));
+            fig.Pointer = 'arrow';
+            setStatus(sprintf('Batch profiles: %d images', numel(appData.images)));
+        catch ME
+            fig.Pointer = 'arrow';
+            uialert(fig, sprintf('Batch failed:\n%s', ME.message), 'Error', 'Icon', 'error');
+        end
+    end
+
+    function onExportProfileToDP(~, ~)
+    %ONEXPORTPROFILETODP  Send last line profile to DataPlotter as data struct.
+        if isempty(appData.lastProfile.dist)
+            uialert(fig, 'No line profile available. Draw one first.', ...
+                'Export', 'Icon', 'warning');
+            return;
+        end
+        % Build standard unified data struct
+        data = parser.createDataStruct( ...
+            appData.lastProfile.dist, ...
+            appData.lastProfile.intensity, ...
+            {'Intensity'}, ...
+            {appData.lastProfile.unit}, ...
+            struct('source', 'emViewerGUI line profile', 'parserName', 'emViewerGUI'));
+        % Save to workspace and launch DataPlotter
+        assignin('base', 'emProfileData', data);
+        setStatus('Line profile exported to workspace as ''emProfileData''. Launch DataPlotter to load.');
+        try
+            DataPlotter;
+        catch
+            % DataPlotter may not be on path
+        end
+    end
+
+    function result = templateMatchAPI(x1, y1, w, h)
+    %TEMPLATEMATCHAPI  API wrapper for template matching.
+        [H2, W2] = size(appData.filteredPixels);
+        x2 = min(x1 + w - 1, W2); y2 = min(y1 + h - 1, H2);
+        template = appData.filteredPixels(max(1,y1):y2, max(1,x1):x2);
+        result = imaging.templateMatch(appData.filteredPixels, template, Threshold=0.6);
+    end
+
+    function result = noiseEstimateAPI()
+    %NOISEESTIMATEAPI  API wrapper for noise estimation.
+        result = imaging.noiseEstimate(appData.filteredPixels, Method='both');
+    end
+
+    function result = getMeasStatsAPI()
+    %GETMEASSTATSAPI  Return aggregate measurement statistics.
+        meas = appData.overlays.measurements;
+        dists = [];
+        for mi = 1:numel(meas)
+            m = meas{mi};
+            if isfield(m, 'distance') && ~isnan(m.distance)
+                dists(end+1) = m.distance; %#ok<AGROW>
+            end
+        end
+        result.distances = dists;
+        result.count = numel(dists);
+        if ~isempty(dists)
+            result.mean = mean(dists);
+            result.std = std(dists);
+            result.min = min(dists);
+            result.max = max(dists);
+        else
+            result.mean = NaN; result.std = NaN;
+            result.min = NaN; result.max = NaN;
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onExportWithOverlays — Burn overlays into exported image
     % ════════════════════════════════════════════════════════════════════
     function onExportWithOverlays(~, ~)
@@ -7511,6 +8933,7 @@ function varargout = emViewerGUI()
             session.contrastHigh = sldHigh.Value;
             session.colormap     = ddColormap.Value;
             session.prefs        = appData.prefs;
+            session.edsChannels  = appData.edsChannels;
             save(outPath, 'session', '-v7.3');
             appData.sessionFile = outPath;
             setStatus(sprintf('Session saved: %s', outPath));
@@ -7544,6 +8967,7 @@ function varargout = emViewerGUI()
             if isfield(s, 'gamma'), appData.gamma = s.gamma; sldGamma.Value = s.gamma; end
             if isfield(s, 'roiList'), appData.roiList = s.roiList; end
             if isfield(s, 'measureLog'), appData.measurementLog = s.measureLog; end
+            if isfield(s, 'edsChannels'), appData.edsChannels = s.edsChannels; end
             if isfield(s, 'colormap') && ismember(s.colormap, ddColormap.Items)
                 ddColormap.Value = s.colormap;
             end
@@ -9583,6 +11007,755 @@ function varargout = emViewerGUI()
         uimenu(cm, 'Text', 'Zoom to Fit', 'Separator', 'on', ...
             'MenuSelectedFcn', @(~,~) onResetZoom([], []));
         ax.ContextMenu = cm;
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  EELS CALLBACKS
+    % ════════════════════════════════════════════════════════════════════
+
+    function onEnterEELS(~, ~)
+    %ONENTEREELS  Enter EELS spectrum analysis mode.
+        if isempty(appData.images), return; end
+
+        % Exit other exclusive modes first
+        if appData.edsMode
+            onExitEDS();
+        end
+        if appData.compareMode
+            exitCompareMode();
+        end
+
+        if ~appData.eelsMode
+            appData.eelsMode = true;
+            btnEnterEELS.Text = 'Exit EELS';
+            btnEnterEELS.BackgroundColor = BTN_DANGER;
+
+            % Try to load spectrum data from current image metadata
+            idx = appData.activeIdx;
+            if idx > 0 && idx <= numel(appData.images)
+                ps = appData.images{idx}.metadata.parserSpecific;
+                if isfield(ps, 'spectrumData')
+                    appData.eelsData = ps.spectrumData;
+                    appData.eelsEnergyAxis = ps.spectrumData.energyAxis;
+                    if isfield(ps, 'spectrumImage')
+                        appData.eelsCube = ps.spectrumImage.cube;
+                    end
+                end
+            end
+
+            if ~isempty(appData.eelsData)
+                showEELSSpectrum();
+            end
+
+            setStatus('EELS mode active');
+        else
+            onExitEELS();
+        end
+    end
+
+    function onExitEELS()
+    %ONEXITEELS  Exit EELS mode and clean up.
+        appData.eelsMode       = false;
+        appData.eelsData       = [];
+        appData.eelsCube       = [];
+        appData.eelsEnergyAxis = [];
+        btnEnterEELS.Text = 'Enter EELS';
+        btnEnterEELS.BackgroundColor = BTN_PRIMARY;
+
+        if ~isempty(appData.eelsFig) && isvalid(appData.eelsFig)
+            close(appData.eelsFig);
+        end
+        appData.eelsFig = [];
+
+        displayImage();
+        setStatus('');
+    end
+
+    function showEELSSpectrum()
+    %SHOWEELSSPECTRUM  Open or refresh the EELS spectrum figure.
+        if isempty(appData.eelsData), return; end
+
+        E = appData.eelsData.energyAxis;
+        I = double(appData.eelsData.counts);
+
+        if isempty(appData.eelsFig) || ~isvalid(appData.eelsFig)
+            appData.eelsFig = uifigure('Name', 'EELS Spectrum', ...
+                'Position', [100 100 700 400]);
+            eelsAx = uiaxes(appData.eelsFig, ...
+                'Position', [60 50 600 320]);
+        else
+            figure(appData.eelsFig);
+            eelsAx = findobj(appData.eelsFig, 'Type', 'axes');
+            if isempty(eelsAx)
+                eelsAx = uiaxes(appData.eelsFig, 'Position', [60 50 600 320]);
+            end
+            eelsAx = eelsAx(1);
+        end
+
+        cla(eelsAx);
+        plot(eelsAx, E, I, 'k-', 'LineWidth', 1);
+        xlabel(eelsAx, 'Energy Loss (eV)');
+        ylabel(eelsAx, 'Counts');
+        title(eelsAx, 'EELS Spectrum');
+        grid(eelsAx, 'on');
+    end
+
+    function onEELSFitBackground(~, ~)
+    %ONEELSFITBACKGROUND  Fit and subtract pre-edge background.
+        if isempty(appData.eelsData), return; end
+
+        E = appData.eelsData.energyAxis;
+        I = double(appData.eelsData.counts);
+
+        E1 = str2double(edtEELSPreEdgeStart.Value);
+        E2 = str2double(edtEELSPreEdgeEnd.Value);
+        if isnan(E1) || isnan(E2) || E1 >= E2
+            setStatus('Invalid pre-edge window');
+            return;
+        end
+
+        method = ddEELSMethod.Value;
+
+        try
+            [signal, bg, params] = imaging.eelsBackground(E, I, ...
+                'FitWindow', [E1 E2], 'Method', method);
+        catch ME
+            setStatus(['EELS background error: ' ME.message]);
+            return;
+        end
+
+        % Update spectrum plot
+        if ~isempty(appData.eelsFig) && isvalid(appData.eelsFig)
+            eelsAx = findobj(appData.eelsFig, 'Type', 'axes');
+            if ~isempty(eelsAx)
+                eelsAx = eelsAx(1);
+                cla(eelsAx);
+                hold(eelsAx, 'on');
+                plot(eelsAx, E, I, 'k-', 'LineWidth', 0.5, 'DisplayName', 'Raw');
+                plot(eelsAx, E, bg, 'r--', 'LineWidth', 1, 'DisplayName', 'Background');
+                plot(eelsAx, E, max(signal, 0), 'b-', 'LineWidth', 1, 'DisplayName', 'Signal');
+                hold(eelsAx, 'off');
+                legend(eelsAx, 'show');
+                if strcmp(method, 'powerlaw') && isstruct(params) && isfield(params, 'A')
+                    title(eelsAx, sprintf('BG: A=%.2g, r=%.3f', params.A, params.r));
+                end
+            end
+        end
+
+        setStatus(sprintf('Background fit: %s', method));
+    end
+
+    function onEELSShowEdges(~, ~)
+    %ONEELSSHOWEDEGS  Toggle reference edge markers on the EELS spectrum.
+        if isempty(appData.eelsFig) || ~isvalid(appData.eelsFig), return; end
+
+        eelsAx = findobj(appData.eelsFig, 'Type', 'axes');
+        if isempty(eelsAx), return; end
+        eelsAx = eelsAx(1);
+
+        % Remove existing edge markers
+        delete(findobj(eelsAx, 'Tag', 'eels_edge'));
+
+        if ~chkShowEdges.Value, return; end
+
+        try
+            edges = imaging.eelsEdgeTable();
+        catch
+            setStatus('imaging.eelsEdgeTable not available');
+            return;
+        end
+
+        % Filter by selected element if not 'All'
+        filterElem = ddEdgeFilter.Value;
+        if ~strcmp(filterElem, 'All') && ~isempty(edges)
+            mask = strcmp({edges.element}, filterElem);
+            edges = edges(mask);
+        end
+
+        hold(eelsAx, 'on');
+        for k = 1:numel(edges)
+            xline(eelsAx, edges(k).onsetEV, ':', 'Color', [0.8 0 0], ...
+                'LineWidth', 0.8, 'Tag', 'eels_edge', ...
+                'Label', edges(k).symbol, 'LabelVerticalAlignment', 'bottom');
+        end
+        hold(eelsAx, 'off');
+    end
+
+    function onEELSExtractMap(~, ~)
+    %ONEELSEXTRACTMAP  Extract a net-signal elemental map from spectrum image cube.
+        if isempty(appData.eelsCube)
+            setStatus('No spectrum image loaded');
+            return;
+        end
+
+        E1 = str2double(edtEELSSignalStart.Value);
+        E2 = str2double(edtEELSSignalEnd.Value);
+        if isnan(E1) || isnan(E2)
+            setStatus('Invalid signal window');
+            return;
+        end
+
+        bgE1 = str2double(edtEELSPreEdgeStart.Value);
+        bgE2 = str2double(edtEELSPreEdgeEnd.Value);
+        if ~isnan(bgE1) && ~isnan(bgE2) && bgE1 < bgE2
+            bgWin = [bgE1 bgE2];
+        else
+            bgWin = [];
+        end
+
+        try
+            map = imaging.eelsExtractMap(appData.eelsCube, appData.eelsEnergyAxis, ...
+                [E1 E2], 'BackgroundWindow', bgWin);
+        catch ME
+            setStatus(['EELS extract error: ' ME.message]);
+            return;
+        end
+
+        % Display map on main axes
+        cla(ax);
+        imagesc(ax, map);
+        colorbar(ax);
+        colormap(ax, 'hot');
+        title(ax, sprintf('EELS Map: %.0f-%.0f eV', E1, E2));
+        axis(ax, 'image');
+
+        setStatus(sprintf('Extracted map: %.0f-%.0f eV', E1, E2));
+    end
+
+    function onEELSThicknessMap(~, ~)
+    %ONEELSTHICKNESSMAP  Compute t/lambda thickness map via log-ratio method.
+        if isempty(appData.eelsCube)
+            setStatus('No spectrum image loaded');
+            return;
+        end
+
+        try
+            [tMap, mask] = imaging.eelsThicknessMap(appData.eelsCube, appData.eelsEnergyAxis);
+        catch ME
+            setStatus(['Thickness map error: ' ME.message]);
+            return;
+        end
+
+        cla(ax);
+        imagesc(ax, tMap);
+        colorbar(ax);
+        colormap(ax, 'parula');
+        title(ax, 't/\lambda thickness map');
+        axis(ax, 'image');
+
+        validVals = tMap(mask);
+        setStatus(sprintf('Thickness map: mean t/lambda=%.2f', mean(validVals)));
+    end
+
+    function onEELSAlignZLP(~, ~)
+    %ONEELSALIGNZLP  Align zero-loss peak across all frames of spectrum image.
+        if isempty(appData.eelsCube)
+            setStatus('No spectrum image loaded');
+            return;
+        end
+
+        try
+            [appData.eelsCube, shifts] = imaging.eelsAlignZLP( ...
+                appData.eelsCube, appData.eelsEnergyAxis);
+        catch ME
+            setStatus(['ZLP alignment error: ' ME.message]);
+            return;
+        end
+
+        % Rebuild sum spectrum
+        appData.eelsData.counts = squeeze(sum(sum(double(appData.eelsCube), 1), 2));
+        showEELSSpectrum();
+
+        setStatus(sprintf('ZLP aligned: max shift=%.0f channels', max(abs(shifts(:)))));
+    end
+
+    % API helpers for EELS
+    function eelsBackgroundAPI(fitWin)
+    %EELSBACKGROUNDAPI  Programmatic EELS background fitting.
+        edtEELSPreEdgeStart.Value = num2str(fitWin(1));
+        edtEELSPreEdgeEnd.Value   = num2str(fitWin(2));
+        onEELSFitBackground([], []);
+    end
+
+    function eelsExtractMapAPI(sigWin, bgWin)
+    %EELSEXTRACTMAPAPI  Programmatic EELS map extraction.
+        edtEELSSignalStart.Value = num2str(sigWin(1));
+        edtEELSSignalEnd.Value   = num2str(sigWin(2));
+        if nargin >= 2 && ~isempty(bgWin)
+            edtEELSPreEdgeStart.Value = num2str(bgWin(1));
+            edtEELSPreEdgeEnd.Value   = num2str(bgWin(2));
+        end
+        onEELSExtractMap([], []);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  EELS ADVANCED CALLBACKS (Deconvolve / ELNES / KK / Pixel Nav)
+    % ════════════════════════════════════════════════════════════════════
+
+    function onEELSDeconvolve(~, ~)
+    %ONEELSDECONVOLVE  Fourier-log plural scattering removal.
+        if isempty(appData.eelsData), return; end
+        E = appData.eelsData.energyAxis;
+        I = double(appData.eelsData.counts);
+        try
+            [ssd, tl] = imaging.eelsFourierLog(E, I);
+            appData.eelsSSD = ssd;
+            if ~isempty(appData.eelsFig) && isvalid(appData.eelsFig)
+                ax2 = findobj(appData.eelsFig, 'Type', 'axes');
+                if ~isempty(ax2)
+                    hold(ax2(1), 'on');
+                    plot(ax2(1), E, ssd, 'm-', 'LineWidth', 1.2, 'DisplayName', 'SSD');
+                    hold(ax2(1), 'off');
+                    legend(ax2(1), 'show');
+                end
+            end
+            setStatus(sprintf('Deconvolved: t/lambda=%.2f', tl));
+        catch ME
+            setStatus(sprintf('Deconvolution failed: %s', ME.message));
+        end
+    end
+
+    function onEELSExtractELNES(~, ~)
+    %ONEELSEXTRACTELNES  Extract near-edge fine structure (ELNES).
+        if isempty(appData.eelsData), return; end
+        onset = str2double(edtEELSEdgeOnset.Value);
+        if isnan(onset), setStatus('Invalid edge onset'); return; end
+        E = appData.eelsData.energyAxis;
+        I = double(appData.eelsData.counts);
+        if ~isempty(appData.eelsSSD), I = appData.eelsSSD; end
+        E1 = str2double(edtEELSPreEdgeStart.Value);
+        E2 = str2double(edtEELSPreEdgeEnd.Value);
+        if isnan(E1) || isnan(E2), setStatus('Set pre-edge window first'); return; end
+        try
+            res = imaging.eelsELNES(E, I, 'EdgeOnset', onset, 'FitWindow', [E1 E2]);
+            eFig = figure('Name', 'ELNES');
+            plot(res.relativeEnergy, res.intensity, 'b-', 'LineWidth', 1.5);
+            xlabel('Energy relative to onset (eV)'); ylabel('Normalized intensity');
+            title(sprintf('ELNES at %.0f eV (jump=%.1f)', onset, res.edgeJump));
+            grid on;
+            setStatus(sprintf('ELNES extracted: onset=%.0f eV', onset));
+        catch ME
+            setStatus(sprintf('ELNES failed: %s', ME.message));
+        end
+    end
+
+    function onEELSKramersKronig(~, ~)
+    %ONEELSKRAMERSKRONIG  Compute dielectric function from low-loss EELS via KK analysis.
+        if isempty(appData.eelsData), return; end
+        E = appData.eelsData.energyAxis;
+        I = double(appData.eelsData.counts);
+        try
+            res = imaging.eelsKramersKronig(E, I);
+            appData.eelsKKResult = res;
+            kkFig = figure('Name', 'Kramers-Kronig Analysis');
+            subplot(2,1,1);
+            plot(res.energy, res.eps1, 'b-', res.energy, res.eps2, 'r-', 'LineWidth', 1.2);
+            xlabel('Energy (eV)'); ylabel('\epsilon');
+            legend('\epsilon_1 (real)', '\epsilon_2 (imag)'); grid on;
+            title('Dielectric function');
+            subplot(2,1,2);
+            plot(res.energy, res.opticalConductivity, 'k-', 'LineWidth', 1.2);
+            xlabel('Energy (eV)'); ylabel('\sigma_1 (S/m)');
+            title('Optical conductivity'); grid on;
+            setStatus('Kramers-Kronig analysis complete');
+        catch ME
+            setStatus(sprintf('KK failed: %s', ME.message));
+        end
+    end
+
+    function onEELSNavigateToggle(src, ~)
+    %ONEELSNAVIGATETOGGLE  Toggle pixel-spectrum navigator mode.
+        if src.Value
+            if isempty(appData.eelsCube)
+                setStatus('No spectrum image loaded');
+                src.Value = false;
+                return;
+            end
+            appData.captureMode = 'specnav';
+            fig.WindowButtonDownFcn = @onCaptureClick;
+            fig.Pointer = 'crosshair';
+            setStatus('Click on image to show pixel spectrum');
+        else
+            appData.captureMode = '';
+            fig.WindowButtonDownFcn = @onIdleMouseDown;
+            fig.Pointer = 'arrow';
+            delete(findobj(ax, 'Tag', 'specnav_marker'));
+            setStatus('');
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  DIFFRACTION INDEXING CALLBACKS
+    % ════════════════════════════════════════════════════════════════════
+
+    function onAutoDetectSpots(~, ~)
+    %ONAUTODETECTSPOTS  Automatically find diffraction spots.
+        if isempty(appData.images), return; end
+
+        idx = appData.activeIdx;
+        if idx < 1, return; end
+        pixels = double(appData.images{idx}.metadata.parserSpecific.imageData.pixels);
+
+        try
+            spots = imaging.findDiffractionSpots(pixels);
+        catch ME
+            setStatus(['Spot detection error: ' ME.message]);
+            return;
+        end
+
+        appData.diffSpots = spots;
+        drawDiffSpots();
+        lblSpotCount.Text = sprintf('%d spots', size(spots, 1));
+        setStatus(sprintf('Found %d diffraction spots', size(spots, 1)));
+    end
+
+    function onClickDiffSpot(~, ~)
+    %ONCLICKDIFFSPOT  Enable manual click-to-add diffraction spots.
+        if isempty(appData.images), return; end
+        appData.captureMode   = 'diffspot';
+        appData.captureClicks = [];
+        fig.WindowButtonDownFcn = @onCaptureClick;
+        fig.Pointer = 'crosshair';
+        setStatus('Click to mark diffraction spots; press Escape when done');
+    end
+
+    function onClearDiffSpots(~, ~)
+    %ONCLEARDIFFSPOTS  Remove all diffraction spot markers and results.
+        appData.diffSpots   = [];
+        appData.diffResults = [];
+        delete(findobj(ax, 'Tag', 'diff_spot'));
+        delete(findobj(ax, 'Tag', 'diff_ring'));
+        lblSpotCount.Text = '0 spots';
+        lblZoneAxis.Text  = '';
+        lbxDiffResults.Items = {};
+        setStatus('Spots cleared');
+    end
+
+    function drawDiffSpots()
+    %DRAWDIFFSPOTS  Render current diffraction spot markers on main axes.
+        delete(findobj(ax, 'Tag', 'diff_spot'));
+        if isempty(appData.diffSpots), return; end
+        hold(ax, 'on');
+        plot(ax, appData.diffSpots(:,2), appData.diffSpots(:,1), ...
+            'ro', 'MarkerSize', 10, 'LineWidth', 1.5, 'Tag', 'diff_spot', ...
+            'HandleVisibility', 'off');
+        hold(ax, 'off');
+    end
+
+    function onMatchDiffraction(~, ~)
+    %ONMATCHDIFFRACTION  Index diffraction pattern and match to crystal phases.
+        if isempty(appData.diffSpots) || size(appData.diffSpots, 1) < 2
+            setStatus('Need at least 2 spots to index');
+            return;
+        end
+
+        idx = appData.activeIdx;
+        if idx < 1, return; end
+        imgData = appData.images{idx}.metadata.parserSpecific.imageData;
+        imgSz   = [size(imgData.pixels, 1), size(imgData.pixels, 2)];
+
+        camLen = str2double(edtCameraLen.Value);
+        if isnan(camLen), camLen = NaN; end
+
+        kVstr = ddAccVoltage.Value;
+        kV    = str2double(regexp(kVstr, '\d+', 'match', 'once'));
+
+        pxSz  = 1;
+        pxUnit = 'px';
+        if imgData.calibrated
+            pxSz   = imgData.pixelSize;
+            pxUnit = imgData.pixelUnit;
+        end
+
+        try
+            result = imaging.indexDiffraction(appData.diffSpots, imgSz, ...
+                'PixelSize', pxSz, 'PixelUnit', pxUnit, ...
+                'CameraLength', camLen, 'AccVoltage', kV);
+        catch ME
+            setStatus(['Indexing error: ' ME.message]);
+            return;
+        end
+
+        appData.diffResults = result;
+
+        % Populate results listbox
+        items = {};
+        for k = 1:numel(result.candidates)
+            c = result.candidates(k);
+            items{end+1} = sprintf('%s (%s) — %d/%d matched, score=%.2f', ...  %#ok<AGROW>
+                c.phaseName, c.formula, c.nMatched, c.nSpots, c.score);
+        end
+        lbxDiffResults.Items = items;
+        if ~isempty(items)
+            lbxDiffResults.Value = items{1};
+        end
+
+        % Zone axis for top candidate
+        if ~isempty(result.candidates) && ~any(isnan(result.candidates(1).zoneAxis))
+            za = result.candidates(1).zoneAxis;
+            lblZoneAxis.Text = sprintf('[%d %d %d]', za(1), za(2), za(3));
+        else
+            lblZoneAxis.Text = 'N/A';
+        end
+
+        setStatus(sprintf('Indexed: top=%s (score=%.2f)', ...
+            result.candidates(1).phaseName, result.candidates(1).score));
+    end
+
+    function onOverlayDiffRings(~, ~)
+    %ONOVERLAYDFFRINGS  Draw d-spacing rings for the selected diffraction phase.
+        if isempty(appData.diffResults), return; end
+
+        delete(findobj(ax, 'Tag', 'diff_ring'));
+
+        selVal = lbxDiffResults.Value;
+        if isempty(selVal), return; end
+        selIdx = find(strcmp(lbxDiffResults.Items, selVal), 1);
+        if isempty(selIdx), selIdx = 1; end
+
+        if selIdx > numel(appData.diffResults.candidates), return; end
+        cand   = appData.diffResults.candidates(selIdx);
+        center = appData.diffResults.center;
+
+        theta = linspace(0, 2*pi, 100);
+        hold(ax, 'on');
+        for k = 1:numel(cand.matchedD)
+            R  = appData.diffResults.measuredR(k);
+            cx = center(2) + R * cos(theta);
+            cy = center(1) + R * sin(theta);
+            plot(ax, cx, cy, 'g-', 'LineWidth', 0.8, 'Tag', 'diff_ring', ...
+                'HandleVisibility', 'off');
+            if ~isempty(cand.matchedHKL) && size(cand.matchedHKL, 1) >= k
+                hkl = cand.matchedHKL(k,:);
+                text(ax, center(2) + R*1.05, center(1), ...
+                    sprintf('(%d%d%d)', hkl(1), hkl(2), hkl(3)), ...
+                    'Color', 'g', 'FontSize', 9, 'Tag', 'diff_ring');
+            end
+        end
+        hold(ax, 'off');
+    end
+
+    function onSimulateDiffraction(~, ~)
+    %ONSIMULATEDDIFFRACTION  Kinematic diffraction simulation for matched phase.
+        if isempty(appData.diffResults) || isempty(appData.diffResults.candidates)
+            setStatus('Match phases first');
+            return;
+        end
+        phaseName = appData.diffResults.candidates(1).phaseName;
+        zaStr = edtZoneAxis.Value;
+        za = sscanf(zaStr, '%d %d %d', [1 3]);
+        if numel(za) ~= 3, setStatus('Invalid zone axis'); return; end
+        kVstr = ddAccVoltage.Value;
+        kV = str2double(regexprep(kVstr, '[^0-9]', ''));
+        camLen = str2double(edtCameraLen.Value);
+        if isnan(camLen), camLen = 200; end
+        try
+            res = imaging.simulateDiffraction(phaseName, 'ZoneAxis', za, ...
+                'AccVoltage', kV, 'CameraLength', camLen);
+            simFig = figure('Name', sprintf('Simulated: %s [%d%d%d]', phaseName, za));
+            imagesc(log10(res.image + 1)); colormap gray; axis image;
+            title(sprintf('%s — [%d%d%d] zone axis', phaseName, za));
+            setStatus(sprintf('Simulated %s [%d%d%d]: %d spots', phaseName, za, numel(res.spots)));
+        catch ME
+            setStatus(sprintf('Simulation failed: %s', ME.message));
+        end
+    end
+
+    function onVirtualDarkField(~, ~)
+    %ONVIRTUALDARKFIELD  Select an FFT spot for virtual dark-field imaging.
+        if isempty(appData.images), return; end
+        appData.captureMode = 'vdf_select';
+        fig.WindowButtonDownFcn = @onCaptureClick;
+        fig.Pointer = 'crosshair';
+        setStatus('Click on FFT spot for virtual dark-field');
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  EDS QUANTIFICATION CALLBACKS
+    % ════════════════════════════════════════════════════════════════════
+
+    function onAssignElements(~, ~)
+    %ONASSIGNELEMENTS  Assign element symbols to loaded EDS channels.
+        if ~appData.edsMode || isempty(appData.edsChannels), return; end
+
+        nCh      = numel(appData.edsChannels);
+        elements = cell(1, nCh);
+
+        % Auto-detect element symbol from channel label (e.g. "Fe_Ka" → "Fe")
+        for k = 1:nCh
+            lbl = appData.edsChannels{k}.label;
+            tok = regexp(lbl, '^([A-Z][a-z]?)', 'tokens', 'once');
+            if ~isempty(tok)
+                elements{k} = tok{1};
+            else
+                elements{k} = sprintf('El%d', k);
+            end
+        end
+
+        % Ask user to confirm / override
+        prompt   = cell(1, nCh);
+        defaults = cell(1, nCh);
+        for k = 1:nCh
+            prompt{k}   = sprintf('Channel %d (%s):', k, appData.edsChannels{k}.label);
+            defaults{k} = elements{k};
+        end
+
+        answer = inputdlg(prompt, 'Assign Elements', 1, defaults);
+        if isempty(answer), return; end
+
+        appData.edsElements = answer';
+        setStatus(sprintf('Elements assigned: %s', strjoin(appData.edsElements, ', ')));
+    end
+
+    function onQuantifyCL(~, ~)
+    %ONQUANTIFYCL  Quantify EDS composition using the Cliff-Lorimer method.
+        if ~appData.edsMode || isempty(appData.edsChannels)
+            return;
+        end
+        if isempty(appData.edsElements)
+            setStatus('Assign elements first');
+            return;
+        end
+
+        nCh  = numel(appData.edsChannels);
+        maps = cell(1, nCh);
+        for k = 1:nCh
+            chIdx  = appData.edsChannels{k}.imageIdx;
+            maps{k} = double(appData.images{chIdx}.metadata.parserSpecific.imageData.pixels);
+        end
+
+        try
+            result = imaging.cliffLorimer(maps, appData.edsElements);
+        catch ME
+            setStatus(['Cliff-Lorimer error: ' ME.message]);
+            return;
+        end
+
+        appData.edsAtomicPct  = result.atomicPctMaps;
+        appData.edsWeightPct  = result.weightPctMaps;
+        appData.edsQuantified = true;
+
+        % Build summary status string
+        msg = 'Composition (at%): ';
+        for k = 1:nCh
+            msg = [msg sprintf('%s=%.1f%% ', appData.edsElements{k}, result.meanAtomicPct(k))]; %#ok<AGROW>
+        end
+        setStatus(msg);
+    end
+
+    function onCompositionProfile(~, ~)
+    %ONCOMPOSITIONPROFILE  Draw a line-scan composition profile from EDS quantification.
+        if ~appData.edsQuantified
+            setStatus('Run quantification first');
+            return;
+        end
+        appData.captureMode   = 'edsprofile';
+        appData.captureClicks = [];
+        fig.WindowButtonDownFcn = @onCaptureClick;
+        fig.Pointer = 'crosshair';
+        setStatus('Click 2 points for composition profile (Escape to cancel)');
+    end
+
+    function onROIComposition(~, ~)
+    %ONROICOMPOSITION  Compute mean composition in a rectangular ROI.
+        if ~appData.edsQuantified
+            setStatus('Run quantification first');
+            return;
+        end
+        appData.captureMode   = 'edsroi';
+        appData.captureClicks = [];
+        fig.WindowButtonDownFcn = @onCaptureClick;
+        fig.Pointer = 'crosshair';
+        setStatus('Click 2 corners for ROI composition (Escape to cancel)');
+    end
+
+    % API helper for EDS element assignment
+    function edsAssignAPI(elems)
+    %EDSASSIGNAPI  Programmatically assign element symbols to EDS channels.
+        appData.edsElements = elems;
+    end
+
+    function onQuantifyZAF(~, ~)
+    %ONQUANTIFYZAF  ZAF-corrected EDS quantification for thick specimens.
+        if ~appData.edsMode || isempty(appData.edsChannels), return; end
+        if isempty(appData.edsElements), setStatus('Assign elements first'); return; end
+        nCh = numel(appData.edsChannels);
+        maps = cell(1, nCh);
+        for k = 1:nCh
+            chIdx = appData.edsChannels{k}.imageIdx;
+            maps{k} = double(appData.images{chIdx}.metadata.parserSpecific.imageData.pixels);
+        end
+        thickness = str2double(edtEDSThickness.Value);
+        takeoff   = str2double(edtEDSTakeOff.Value);
+        if isnan(thickness), thickness = 100; end
+        if isnan(takeoff),   takeoff   = 20;  end
+        try
+            result = imaging.zafCorrection(maps, appData.edsElements, ...
+                'Thickness', thickness, 'TakeOffAngle', takeoff);
+            appData.edsAtomicPct  = result.atomicPctMaps;
+            appData.edsWeightPct  = result.weightPctMaps;
+            appData.edsQuantified = true;
+            msg = 'ZAF (at%): ';
+            for k = 1:nCh
+                msg = [msg sprintf('%s=%.1f%% ', appData.edsElements{k}, result.meanAtomicPct(k))]; %#ok<AGROW>
+            end
+            setStatus(msg);
+        catch ME
+            setStatus(sprintf('ZAF failed: %s', ME.message));
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  API HELPERS: Advanced EELS, Diffraction, ZAF
+    % ════════════════════════════════════════════════════════════════════
+
+    function eelsELNESAPI(onset)
+    %EELSELNESAPI  Programmatic ELNES extraction at given onset energy.
+        edtEELSEdgeOnset.Value = num2str(onset);
+        onEELSExtractELNES([], []);
+    end
+
+    function eelsNavigateAPI(row, col)
+    %EELSNAVIGATEAPI  Programmatic spectrum navigation to pixel [row, col].
+        if isempty(appData.eelsCube), return; end
+        [Ny, Nx, ~] = size(appData.eelsCube);
+        if row >= 1 && row <= Ny && col >= 1 && col <= Nx
+            spec = squeeze(double(appData.eelsCube(row, col, :)));
+            showEELSSpectrum();
+            ax2 = findobj(appData.eelsFig, 'Type', 'axes');
+            if ~isempty(ax2)
+                cla(ax2(1));
+                plot(ax2(1), appData.eelsEnergyAxis, spec, 'k-', 'LineWidth', 1);
+                title(ax2(1), sprintf('Pixel [%d, %d]', row, col));
+            end
+        end
+    end
+
+    function simDiffAPI(phase, za)
+    %SIMDIFFAPI  Programmatic diffraction simulation for given phase and zone axis.
+        edtZoneAxis.Value = sprintf('%d %d %d', za);
+        % Temporarily store phase name so onSimulateDiffraction can find it
+        if ~isempty(appData.diffResults) && ~isempty(appData.diffResults.candidates)
+            appData.diffResults.candidates(1).phaseName = phase;
+        end
+        onSimulateDiffraction([], []);
+    end
+
+    function vdfAPI(center, radius)
+    %VDFAPI  Programmatic virtual dark-field image from mask center and radius.
+        idx = appData.activeIdx;
+        if idx > 0 && idx <= numel(appData.images)
+            pixels = double(appData.images{idx}.metadata.parserSpecific.imageData.pixels);
+            vdf = imaging.virtualDarkField(pixels, 'MaskCenter', center, 'MaskRadius', radius);
+            imagesc(ax, vdf); colormap(ax, 'gray'); axis(ax, 'image');
+        end
+    end
+
+    function quantifyZAFAPI(t, angle)
+    %QUANTIFYZAFAPI  Programmatic ZAF quantification with given thickness and take-off angle.
+        edtEDSThickness.Value = num2str(t);
+        edtEDSTakeOff.Value   = num2str(angle);
+        onQuantifyZAF([], []);
     end
 
 end

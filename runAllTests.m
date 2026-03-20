@@ -7,7 +7,8 @@ function runAllTests(options)
 %
 %   Name-Value Options:
 %       Group    "all" (default) | "parser" | "batch" | "gui" | "xrd2d" |
-%                "sims" | "em" | "emgui"
+%                "sims" | "em" | "emgui" | "eds" | "eels" | "diffindex" |
+%                "edsquant" | "eels_adv" | "diff_sim"
 %                Run only the specified group of test suites.
 %
 %   Groups:
@@ -18,14 +19,28 @@ function runAllTests(options)
 %       sims     — SIMS depth profile parser tests
 %       em       — EM image parsers: importTIFF, importRawImage (synthetic data)
 %       emgui    — headless emViewerGUI API tests (opens/closes figures, slower)
+%       eds      — EDS multi-channel composite mode tests
+%       eels     — EELS imaging utilities (synthetic data, no files)
+%       eels_adv — Advanced EELS: Fourier-log, ELNES, Kramers-Kronig
+%       diffindex — diffraction indexing utilities (calcElectronWavelength,
+%                   findDiffractionSpots, indexDiffraction)
+%       diff_sim — Diffraction simulation, virtual dark-field, ZAF correction
+%       edsquant — EDS quantification (edsKFactorTable, cliffLorimer,
+%                  edsCompositionProfile)
 %       all      — all of the above, in order
 %
 %   Examples:
-%       runAllTests                   % full suite
-%       runAllTests(Group="parser")   % fast parser checks only
-%       runAllTests(Group="gui")      % GUI tests only
-%       runAllTests(Group="em")       % EM image parser tests
-%       runAllTests(Group="emgui")    % EM Viewer GUI API tests
+%       runAllTests                      % full suite
+%       runAllTests(Group="parser")      % fast parser checks only
+%       runAllTests(Group="gui")         % GUI tests only
+%       runAllTests(Group="em")          % EM image parser tests
+%       runAllTests(Group="emgui")       % EM Viewer GUI API tests
+%       runAllTests(Group="eds")         % EDS composite mode tests
+%       runAllTests(Group="eels")        % EELS utilities
+%       runAllTests(Group="eels_adv")    % advanced EELS (Fourier-log, ELNES, KK)
+%       runAllTests(Group="diffindex")   % diffraction indexing
+%       runAllTests(Group="diff_sim")    % diffraction simulation, VDF, ZAF
+%       runAllTests(Group="edsquant")    % EDS quantification
 %
 %   Throws an error if any suite fails so CI/scripts can detect failures.
 
@@ -34,7 +49,9 @@ arguments
 end
 
 options.Group = validatestring(options.Group, ...
-    ["all", "parser", "batch", "xrd2d", "gui", "sims", "em", "emgui"]);
+    ["all", "parser", "batch", "xrd2d", "gui", "sims", "em", "emgui", "eds", ...
+     "xrayneutron", "superconductor", "cif", "optics", "vacuum", "electrochemistry", ...
+     "eels", "eels_adv", "diffindex", "diff_sim", "edsquant", "contour"]);
 
 % Build absolute paths to test scripts so `run` works regardless of CWD.
 ROOT  = fileparts(mfilename('fullpath'));
@@ -57,9 +74,22 @@ SUITES = {
     T('test_em_parsers'),          'em',     'EM image parsers: importTIFF + importRawImage'
     T('test_imaging_utils'),       'em',     'Imaging utilities: contrast, filter, FFT, profile, scale bar, thumbnail'
     T('test_em_gui_harness'),      'emgui',  'EM Viewer GUI API: load, contrast, filter, FFT, profile, export'
+    T('test_eds_composite'),       'eds',    'EDS multi-channel composite mode API tests'
+    T('test_calc_xrayneutron'),    'xrayneutron', 'X-ray/Neutron calculation module'
+    T('test_superconductor'),      'superconductor', 'Superconductor calculation module'
+    T('test_cif_parser'),          'cif',    'CIF parser and crystal cache'
+    T('test_calc_optics'),         'optics', 'Optics module: Fresnel, angles, depths'
+    T('test_calc_vacuum'),         'vacuum', 'Vacuum module: MFP, sputter yield, pump-down'
+    T('test_calc_electrochemistry'), 'electrochemistry', 'Electrochemistry: Nernst, BV, Tafel'
     T('test_real_dm3'),             'em',     'Real DM3/TIFF files from +test_datasets/Microscopy'
     T('test_csv_mixed_format'),    'parser', 'CSV mixed/awkward format handling'
     T('test_new_features'),        'parser', 'Features 4-16: utilities and parser changes'
+    T('test_eels'),                'eels',   'EELS utilities: edge table, background, thickness, ZLP align, extract map'
+    T('test_eels_advanced'),       'eels_adv', 'EELS advanced: Fourier-log deconvolution, ELNES, Kramers-Kronig'
+    T('test_diffraction_index'),   'diffindex', 'Diffraction indexing: wavelength, spot finding, phase matching'
+    T('test_diffraction_sim'),     'diff_sim',  'Diffraction simulation, virtual dark-field, ZAF correction'
+    T('test_eds_quantification'),  'edsquant',  'EDS quantification: k-factor table, Cliff-Lorimer, composition profile'
+    T('test_contour_features'),    'contour',   'Contour/heatmap: gridding, plot styles, edge cases, export'
 };
 
 % Filter by group

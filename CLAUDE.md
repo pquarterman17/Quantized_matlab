@@ -11,6 +11,7 @@ thin_film_toolkit_matlab/
 ├── setupToolbox.m          # Entry point — adds toolbox root to MATLAB path
 ├── DataPlotter.m         # Interactive uifigure GUI: browse, preview, correct, peaks, export
 ├── xrdConvertGUI.m         # Standalone batch XRD file converter GUI
+├── materialsCalcGUI.m      # Materials calculator GUI (13 tabs: units, crystal, electrical, semiconductor, thin film, X-ray/neutron, superconductor, optics, vacuum, electrochem, multilayer, periodic table, favorites)
 ├── emViewerGUI.m           # Standalone electron microscopy image viewer (TIFF/RAW/DM3/DM4)
 ├── runAllTests.m           # Master test runner; groups: parser/batch/xrd2d/gui/em/emgui/all
 ├── tests/                  # All test scripts (run via: run tests/test_parsers)
@@ -29,6 +30,13 @@ thin_film_toolkit_matlab/
 │   ├── test_em_parsers.m           # EM image parser tests: importTIFF + importRawImage + importDM3 (synthetic)
 │   ├── test_imaging_utils.m        # Unit tests for all +imaging functions
 │   ├── test_em_gui_harness.m       # Headless emViewerGUI API tests (12 tests)
+│   ├── test_eds_composite.m        # EDS multi-channel composite mode tests (10 tests)
+│   ├── test_calc_xrayneutron.m    # X-ray/Neutron module tests
+│   ├── test_superconductor.m      # Superconductor module tests
+│   ├── test_cif_parser.m          # CIF parser and crystal cache tests
+│   ├── test_eels.m                 # EELS utility tests (synthetic data)
+│   ├── test_diffraction_index.m    # Diffraction indexing tests
+│   ├── test_eds_quantification.m   # EDS quantification tests
 │   └── archive_2026-03-10/         # Superseded tests (kept for reference)
 ├── +parser/                # Data import namespace
 │   ├── importAuto.m        # Auto-detect file type and dispatch to correct parser
@@ -58,7 +66,18 @@ thin_film_toolkit_matlab/
 │   ├── lineProfile.m       # Intensity along a line via interp2; optional pixel calibration
 │   ├── measureDistance.m   # Calibrated point-to-point Euclidean distance
 │   ├── addScaleBar.m       # Scale bar rectangle + label overlay on axes
-│   └── generateThumbnail.m # Downsample via block-averaging or bilinear interp2
+│   ├── generateThumbnail.m # Downsample via block-averaging or bilinear interp2
+│   ├── eelsEdgeTable.m     # Built-in EELS core-loss edge database (~50 edges)
+│   ├── eelsBackground.m    # Power-law/exponential EELS background subtraction
+│   ├── eelsThicknessMap.m  # Log-ratio t/λ thickness from spectrum image
+│   ├── eelsAlignZLP.m      # Zero-loss peak alignment via cross-correlation
+│   ├── eelsExtractMap.m    # Elemental map extraction from EELS spectrum image
+│   ├── calcElectronWavelength.m # Relativistic electron wavelength (kV → Å)
+│   ├── findDiffractionSpots.m   # Auto-detect spots in diffraction patterns
+│   ├── indexDiffraction.m  # Match diffraction spots to crystal phase database
+│   ├── cliffLorimer.m      # Cliff-Lorimer thin-film EDS quantification
+│   ├── edsKFactorTable.m   # Built-in k-factors relative to Si (200 kV)
+│   └── edsCompositionProfile.m # Composition line profile from EDS maps
 ├── +plotting/              # Plot helper functions
 │   ├── formatAxes.m        # Apply theme to an axes object (fonts, grid, labels)
 │   ├── lineColors.m        # Return N colours from the active theme palette
@@ -326,6 +345,69 @@ Post-generation toolbar on every output figure: H/V reference lines, shaded regi
 | Multi-Dataset Overlay | `Overlay` checkbox | Select all datasets and overlay on same axes with unified legend |
 | Plot Templates | `Templates...` | Save/load axis limits, corrections, labels, scale as reusable .mat presets |
 | Batch Figure Export | `Batch Figs...` | Export every loaded dataset as individual PNG/PDF/SVG/EPS with journal template |
+| Advanced Analysis | `⚙ Advanced ▾` | Popup menu: Integrate, Dataset Math, Curve Fit, Resample, Column Calculator, Inset Plot, Graph Digitizer |
+| Data Table | `▾ Data Table` bar | Collapsible spreadsheet below plot: view/edit all data, mask rows, column stats, Save As (CSV/Excel) |
+
+### Data Table (Spreadsheet View)
+
+Collapsible panel below the plot axes. Toggle via the "▾ Data Table" bar.
+
+- **Full cell editing** — click any cell to modify values; edits stored in a working copy (original data untouched)
+- **Units row** — displays column units from the parser
+- **Column stats** — row count, column count, masked point count in the toolbar
+- **Data masking** — select rows → "Mask Sel." to exclude from plot/analysis; "Unmask All" to restore
+- **Save As** — export working copy (with edits) to new CSV or Excel file; optionally exclude masked rows
+- **Auto-refresh** — table updates when switching datasets or applying corrections
+
+### General Curve Fitting (Advanced > Curve Fit...)
+
+Separate dialog with 15 built-in models:
+
+| Category | Models |
+|----------|--------|
+| Linear/Polynomial | Linear, Poly 2, Poly 3 |
+| Exponential | Decay, Growth, Double Decay |
+| Peak shapes | Gaussian, Lorentzian, Voigt (approx) |
+| Other | Power Law, Sigmoid, Arrhenius, Langmuir, Logarithmic, Sqrt |
+
+- **X-range limiting** — fit only within [Xmin, Xmax]
+- **Editable initial guesses** — auto-populated from data, user can override
+- **Fit engine** — `fminsearch` (Nelder-Mead simplex), 10k eval limit
+- **Results** — R², RMSE, parameter table, fit curve + residual plot
+- **Plot on Main** — overlay fit curve on DataPlotter axes with equation annotation
+- **Copy** — parameters + stats to clipboard
+
+**Future:** Custom equation editor, Levenberg-Marquardt, weighted fitting, confidence bands, global fitting.
+
+### Graph Digitizer (Advanced > Graph Digitizer...)
+
+Extract data points from a screenshot or image of a published graph:
+
+1. **Load Image** — browse for PNG/JPG/TIFF screenshot of a figure
+2. **Set Axes (4 clicks)** — click 4 reference points in order: X1 (left), X2 (right), Y1 (bottom), Y2 (top), then enter their known data values
+3. **Collect Points** — click on data points; pixel coords auto-converted to data coords via linear calibration
+4. **Export** — save as CSV or load directly into DataPlotter as a new dataset (auto-sorted by X)
+
+Features: undo last point, clear all, editable point table, orange calibration markers, red crosshair data markers.
+
+### Peak Deconvolution (Visual Decomposition)
+
+After running "Fit All (global)" in the Peak Analysis window, individual peak components are automatically overlaid on the main plot:
+- Each peak drawn as a **dashed colored curve** (unique color per peak)
+- **Composite model** drawn as solid red line (sum of all peaks + background)
+- **Linear background** drawn as dotted gray line
+- All overlays tagged `GUIPeakDecomp` and cleared on next plot redraw
+- Also callable programmatically via `onShowDecomposition()`
+
+### Contour / Heatmap (Figure Builder)
+
+New figure type in Advanced Figure Builder: **Contour / Heatmap**
+
+- Select dataset, X/Y/Z columns from dropdowns
+- 4 plot styles: Filled contour, Contour lines (labeled), Pseudocolor (pcolor), Surface (3D)
+- 10 colormaps (parula, viridis, plasma, inferno, hot, jet, turbo, gray, bone, copper)
+- Scattered XYZ data auto-gridded via `scatteredInterpolant` (or `griddata` fallback)
+- 3D Surface mode enables `rotate3d` for interactive viewing
 
 ### Transform Options (Corrections Panel)
 
@@ -351,6 +433,19 @@ api.autoContrast();
 api.getLineProfile(10, 10, 200, 200);
 api.rotateFlip('rot90cw');       % rotate/flip: 'rot90cw','rot90ccw','fliph','flipv'
 api.setPixelSize(2.4, 'nm');     % override pixel calibration
+
+% EDS multi-channel composite mode
+api.loadImages({'Fe_Ka.tif', 'O_Ka.tif', 'Si_Ka.tif'});
+api.enterEDS();                          % auto-populates channels from loaded images
+chs = api.getEDSChannels();              % cell array of channel structs
+api.setEDSChannel(1, 'color', 'red');    % assign pseudo-color
+api.setEDSChannel(2, 'color', 'green');
+api.setEDSChannel(3, 'color', 'blue');
+api.setEDSChannel(2, 'intensity', 0.8); % scale channel brightness
+api.setEDSChannel(3, 'visible', false);  % hide a channel
+comp = api.getEDSComposite();            % [H x W x 3] RGB double
+api.exportImage('eds_composite.png');    % save blended composite
+api.exitEDS();                           % return to normal view
 api.close();
 
 % Import EM image data directly from the command line
@@ -385,7 +480,17 @@ thumb = imaging.generateThumbnail(img.pixels, MaxSize=256);
 
 **Processing:** Gaussian filter, median filter, CLAHE, rotate 90°CW/CCW, flip H/V, FFT display, FFT masking with inverse FFT (interactive mask placement via ButtonDownFcn), crop, zoom box.
 
-**Advanced:** Particle/feature counting (threshold + connected-component labeling via two-pass union-find, no toolbox), drift correction / image alignment (cross-correlation), color overlay / channel merge (assign colormaps to two images and blend).
+**Advanced:** Particle/feature counting (threshold + connected-component labeling via two-pass union-find, no toolbox), drift correction / image alignment (cross-correlation), color overlay / channel merge (assign colormaps to two images and blend), **EDS multi-channel composite** (false-color blending of element maps with per-channel color, visibility, and intensity controls), **template matching** (NCC-based feature finding), **image stitching** (panoramic mosaic from overlapping tiles), **noise characterization** (MAD/local-variance estimation with filter recommendations).
+
+**EELS Analysis:** Background subtraction (power-law/exponential), core-loss edge identification (~50 built-in edges), elemental map extraction from spectrum images, thickness mapping (log-ratio t/λ), zero-loss peak alignment. Supports 1D spectra and 3D spectrum image datacubes from DM3/DM4 files.
+
+**Diffraction Indexing:** Auto-detect spots in FFT/diffraction patterns, match against built-in crystal database (~50 phases), zone axis identification, ring overlay for matched phases. Supports both FFT geometry and calibrated TEM diffraction (camera length input).
+
+**EDS Quantification:** Cliff-Lorimer thin-film quantification from EDS element maps, built-in k-factor table (47 elements, 200 kV), atomic% and weight% maps, composition line profiles, ROI composition analysis.
+
+**Analysis Tools:** 3D surface view (height map rendering), live FFT panel (persistent, updates with filters), measurement statistics (aggregate histogram + stats), batch measurement (same profile across all images), export profile to DataPlotter.
+
+**Publication Tools:** Journal presets (APS/Nature/ACS/Elsevier annotation formatting), EM colormap presets (SEM/TEM/STEM-HAADF/EDS/phase/topography).
 
 **Stack Navigator:** Multi-frame TIFF detection with frame slider, prev/next buttons, and Maximum Intensity Projection (MIP). Shown automatically when loading multi-page TIFFs.
 
@@ -397,6 +502,112 @@ thumb = imaging.generateThumbnail(img.pixels, MaxSize=256);
 
 **Capture modes** (`appData.captureMode`): `'profile'`, `'distance'`, `'angle'`, `'polyline'`, `'roistats'`, `'zoom'`, `'crop'`, `'savecrop'`, `'annotation'`.
 
+### EELS Analysis
+```matlab
+% Import EELS spectrum from DM3/DM4
+data = parser.importDM3('eels_spectrum.dm3');
+spec = data.metadata.parserSpecific.spectrumData;
+plot(spec.energyAxis, spec.counts);
+xlabel('Energy Loss (eV)'); ylabel('Counts');
+
+% Background subtraction (power-law)
+[signal, bg] = imaging.eelsBackground(spec.energyAxis, spec.counts, ...
+    FitWindow=[600 700]);
+
+% Show edge markers
+edges = imaging.eelsEdgeTable();
+feEdge = edges(strcmp({edges.symbol}, 'Fe-L23'));
+xline(feEdge.onsetEV, 'r--', feEdge.symbol);
+
+% Spectrum image: load 3D datacube
+data = parser.importDM3('spectrum_image.dm3');
+si = data.metadata.parserSpecific.spectrumImage;
+% si.cube = [Ny x Nx x nE], si.energyAxis = [nE x 1]
+
+% Extract elemental map
+feMap = imaging.eelsExtractMap(si.cube, si.energyAxis, [708 750], ...
+    BackgroundWindow=[600 700]);
+imagesc(feMap); colorbar; title('Fe-L_{2,3} map');
+
+% Thickness mapping
+[tMap, mask] = imaging.eelsThicknessMap(si.cube, si.energyAxis);
+
+% ZLP alignment
+[alignedCube, shifts] = imaging.eelsAlignZLP(si.cube, si.energyAxis);
+```
+
+### Diffraction Pattern Indexing
+```matlab
+% Auto-detect spots in FFT or diffraction pattern
+spots = imaging.findDiffractionSpots(fftImage, MinRadius=15, Threshold=0.05);
+
+% Match against crystal database
+result = imaging.indexDiffraction(spots, size(fftImage), ...
+    PixelSize=0.195, PixelUnit='nm', AccVoltage=200);
+
+% Top candidate
+fprintf('Best match: %s (score=%.0f%%)\n', ...
+    result.candidates(1).phaseName, result.candidates(1).score*100);
+
+% Zone axis
+za = result.candidates(1).zoneAxis;
+fprintf('Zone axis: [%d %d %d]\n', za);
+
+% Electron wavelength
+lambda = imaging.calcElectronWavelength(200);  % 0.02508 Å
+```
+
+### EDS Quantification
+```matlab
+% Cliff-Lorimer quantification from intensity maps
+maps = {fe_map, o_map, ti_map};
+elements = {'Fe', 'O', 'Ti'};
+result = imaging.cliffLorimer(maps, elements);
+% result.atomicPctMaps, result.weightPctMaps, result.meanAtomicPct
+
+% Built-in k-factors
+kTable = imaging.edsKFactorTable();
+kFe = kTable('Fe');  % 1.21
+
+% Composition line profile
+profile = imaging.edsCompositionProfile(result.atomicPctMaps, elements, ...
+    x1, y1, x2, y2, PixelSize=2.4, PixelUnit='nm');
+plot(profile.distance, profile.atomicPct);
+legend(elements);
+```
+
+### Materials Calculator
+```matlab
+materialsCalcGUI                                    % launch interactive GUI
+api = materialsCalcGUI();                            % headless API for testing
+
+% Unit conversions
+api.convert(1, 'eV', 'nm')                          % energy ↔ wavelength
+
+% Crystal calculations
+api.calcDSpacing(3.905, 1, 1, 0)                    % cubic d-spacing
+api.calcPlaneSpacings(5.431, 'F')                    % FCC Si allowed reflections
+
+% X-ray/Neutron SLD
+api.calcNeutronSLD('SrTiO3', 5.12)                  % neutron SLD
+api.calcXraySLD('Si', 2.33)                          % X-ray SLD
+api.calcQToTwoTheta(2.0, 1.5406)                    % Q → 2θ conversion
+
+% Superconductor calculations
+api.calcLondonDepth('Nb', 4.2)                       % London depth at 4.2 K
+api.calcCriticalFields('Nb', 4.2)                    % critical fields at 4.2 K
+
+% Favorites
+api.addFavorite('STO SLD', 'X-ray/Neutron', '3.54e-6', '\mathrm{SLD}')
+api.getFavorites()
+
+api.close()
+```
+
+**13 Tabs:** Unit Converter, Crystal, Electrical, Semiconductor, Thin Film, X-ray/Neutron, Superconductor, Optics, Vacuum, Electrochem, Multilayer, Periodic Table, Favorites
+
+**Packages:** `+calc/constants.m`, `+calc/unitConvert.m`, `+calc/elementData.m`, `+calc/+crystal/` (13), `+calc/+electrical/` (5), `+calc/+semiconductor/` (12), `+calc/+thinFilm/` (9, incl. ion beam), `+calc/+magnetic/` (4), `+calc/+substrates/` (2), `+calc/+xrayNeutron/` (11), `+calc/+superconductor/` (6), `+calc/+optics/` (7), `+calc/+vacuum/` (6), `+calc/+electrochemistry/` (5), `+calc/importCIF.m`, `+calc/crystalCache.m`
+
 ### Running the test suite
 ```matlab
 runAllTests                     % all suites (~2 min including GUI tests)
@@ -407,6 +618,13 @@ runAllTests(Group="sims")       % SIMS depth profile parser tests
 runAllTests(Group="batch")      % batchImport / batchConvertXRD integration
 runAllTests(Group="em")         % EM image parsers + imaging utilities (no GUI, fast)
 runAllTests(Group="emgui")      % headless emViewerGUI API tests (requires display)
+runAllTests(Group="eds")        % EDS multi-channel composite mode tests
+runAllTests(Group="xrayneutron") % X-ray/Neutron calculation module tests
+runAllTests(Group="superconductor") % superconductor calculation module tests
+runAllTests(Group="cif")        % CIF parser and crystal cache tests
+runAllTests(Group="eels")           % EELS analysis utility tests
+runAllTests(Group="diffindex")      % Diffraction indexing tests
+runAllTests(Group="edsquant")       % EDS quantification tests
 ```
 
 Individual suites can still be run directly:
@@ -422,6 +640,10 @@ run tests/test_sims_parser        % SIMS depth profile parser (synthetic data)
 run tests/test_em_parsers         % EM image parsers: importTIFF + importRawImage + importDM3
 run tests/test_imaging_utils      % imaging utilities: contrast, filter, FFT, profile
 run tests/test_em_gui_harness     % EM Viewer GUI API (requires display)
+run tests/test_eds_composite      % EDS multi-channel composite mode
+run tests/test_eels                  % EELS utilities (synthetic data)
+run tests/test_diffraction_index     % Diffraction indexing (synthetic spots)
+run tests/test_eds_quantification    % EDS quantification (synthetic maps)
 ```
 
 ## Key Design Decisions
