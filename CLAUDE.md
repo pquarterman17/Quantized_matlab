@@ -72,7 +72,12 @@ thin_film_toolkit_matlab/
 │   ├── writeXRDcsv.m       # Write XRD data to CSV (standard or Origin ASCII format)
 │   ├── estimateBackground.m # Polynomial background estimation for XRD/spectroscopy data
 │   ├── findPeaksRobust.m   # Peak detection with prominence filtering (no toolbox required)
-│   └── pseudoVoigt.m       # Pseudo-Voigt peak shape function (eta-weighted Gaussian+Lorentzian)
+│   ├── pseudoVoigt.m       # Pseudo-Voigt peak shape function (eta-weighted Gaussian+Lorentzian)
+│   ├── derivative.m        # Numerical derivative (dY/dX, d²Y/dX²) with optional pre-smoothing
+│   ├── cumulativeIntegral.m # Cumulative trapezoidal integral (∫Y dx)
+│   ├── logDerivative.m     # Logarithmic derivative d(log Y)/d(log X) for power-law detection
+│   ├── datasetAlgebra.m    # Combine two datasets: A±B, A×B, A/B, (A-B)/(A+B) asymmetry
+│   └── confidenceBand.m    # Mean±std or median±IQR from N repeat datasets
 └── +scripts/
     ├── batchImport.m       # Walk a directory, call importAuto on each supported file
     ├── batchConvertXRD.m   # Batch-convert XRD files (.xrdml/.raw/.brml) to CSV via writeXRDcsv
@@ -250,6 +255,23 @@ plotting.saveFigure(fig, 'scan.pdf');
 normI  = utilities.normalize(data.values);               % [0,1] range
 smI    = utilities.smoothData(data.values, 'Window', 9); % Gaussian smooth
 [H_T, u] = utilities.convertUnits(data.time, 'Oe', 'T');
+
+% Derivatives and transforms
+dydx   = utilities.derivative(data.time, data.values);            % dY/dX
+d2ydx2 = utilities.derivative(data.time, data.values, 'Order', 2); % d²Y/dX²
+intY   = utilities.cumulativeIntegral(data.time, data.values);    % ∫Y dx
+dlogy  = utilities.logDerivative(Q, R, 'PreSmooth', 3);           % power-law exponent
+
+% Dataset algebra
+diff  = utilities.datasetAlgebra(dsA, dsB, 'A-B');
+asym  = utilities.datasetAlgebra(Rup, Rdown, '(A-B)/(A+B)');
+ratio = utilities.datasetAlgebra(dsA, dsB, 'A/B', 'InterpMethod', 'pchip');
+
+% Confidence band from N repeat measurements
+band = utilities.confidenceBand({d1, d2, d3, d4, d5}, 'Method', 'mean');
+fill([band.x; flipud(band.x)], [band.upper; flipud(band.lower)], ...
+     'b', 'FaceAlpha', 0.2);
+hold on; plot(band.x, band.center, 'b-', 'LineWidth', 1.5);
 ```
 
 ### Interactive GUI
@@ -288,11 +310,34 @@ Launched from DataPlotter → Tools → **Figures...** button. Opens a popup wit
 | Normalized Overlay | Peak/range/z-score/area normalization with optional X alignment |
 | Before / After | Side-by-side raw vs corrected |
 | Parameter Evolution | Track peak metrics across datasets |
-| Broken Axis | Split X with gap and diagonal break marks |
+| Broken Axis | Split X or Y axis with gap and diagonal break marks |
+| Confidence Band | Mean±std or median±IQR shaded band from N repeat datasets |
 
 Global options: journal templates (APS/Nature/ACS), error style (bars/band), grayscale mode (line-style + marker cycling), font, dimensions.
 
-Post-generation toolbar on every output figure: H/V reference lines, shaded regions, text/arrow annotations, peak labels, inset zoom.
+Post-generation toolbar on every output figure: H/V reference lines, shaded regions, text/arrow annotations, peak labels, inset zoom. Multi-Panel and Quick Grid figures also get a linked cursor (vertical line tracking across all panels on hover).
+
+### Advanced DataPlotter Tools
+
+| Tool | Button | Description |
+|------|--------|-------------|
+| Data Cursor | `Cursor` | Click to snap to nearest point (x,y); click again for delta (dx,dy) |
+| Dataset Math | `Math...` | Combine two datasets: A±B, A×B, A/B, (A-B)/(A+B) with interpolation |
+| Multi-Dataset Overlay | `Overlay` checkbox | Select all datasets and overlay on same axes with unified legend |
+| Plot Templates | `Templates...` | Save/load axis limits, corrections, labels, scale as reusable .mat presets |
+| Batch Figure Export | `Batch Figs...` | Export every loaded dataset as individual PNG/PDF/SVG/EPS with journal template |
+
+### Transform Options (Corrections Panel)
+
+The derivative dropdown now includes 5 options: `None`, `dY/dX`, `d²Y/dX²`, `∫Y dx` (cumulative integral), `dlog/dlog` (log derivative for power-law detection).
+
+### 2D Map Colormap Editor
+
+For 2D XRDML area-detector data, the map panel includes: intensity scale (Linear/Log₁₀), colorbar min/max range override, 10 colormaps (parula, viridis, plasma, inferno, hot, jet, turbo, gray, bone, copper).
+
+### Asymmetric Error Bars
+
+The Figure Builder auto-detects separate upper/lower error columns (e.g., `dR+`/`dR-`, `Rerr+`/`Rerr-`) and renders as asymmetric error bars or asymmetric shaded bands.
 
 ### EM Image Viewer
 ```matlab

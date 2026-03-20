@@ -968,9 +968,11 @@ function varargout = DataPlotter()
     lblDerivative.Layout.Row = CROW.NORM_DERIV; lblDerivative.Layout.Column = 3;
 
     ddDerivative = uidropdown(corrGL, ...
-        'Items',   {'None', 'dY/dX', 'd²Y/dX²'}, ...
+        'Items',   {'None', 'dY/dX', 'd²Y/dX²', '∫Y dx', 'dlog/dlog'}, ...
         'Value',   'None', ...
-        'Tooltip', 'Compute derivative after smoothing: dY/dX (gradient) or d²Y/dX² (second derivative). Essential for phase transition detection.', ...
+        'Tooltip', ['Transforms: dY/dX, d²Y/dX² (derivatives), ' ...
+                    char(8747) 'Y dx (cumulative integral), ' ...
+                    'dlog/dlog (log derivative — power-law exponent).'], ...
         'ValueChangedFcn', @(~,~) markCorrectionsDirty());
     ddDerivative.Layout.Row = CROW.NORM_DERIV; ddDerivative.Layout.Column = 4;
 
@@ -1624,8 +1626,8 @@ function varargout = DataPlotter()
         'ButtonPushedFcn', @(~,~) toggleSaveSection('tools','Tools'));
     btnSaveHdrTools.Layout.Row = 7;
 
-    saveToolsGL = uigridlayout(saveGL, [3 2], ...
-        'RowHeight', {24, 24, 24}, 'ColumnWidth', {'1x','1x'}, ...
+    saveToolsGL = uigridlayout(saveGL, [6 2], ...
+        'RowHeight', {24, 24, 24, 24, 24, 24}, 'ColumnWidth', {'1x','1x'}, ...
         'Padding', [0 0 0 0], 'RowSpacing', 2, 'ColumnSpacing', 3);
     saveToolsGL.Layout.Row = 8;
 
@@ -1664,6 +1666,44 @@ function varargout = DataPlotter()
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Tooltip', 'Advanced Figure Builder');
     btnAdvFigure.Layout.Row = 3; btnAdvFigure.Layout.Column = 2;
+
+    % Row 4: Data Cursor + Dataset Math
+    btnDataCursor = uibutton(saveToolsGL,'Text','Cursor', ...
+        'ButtonPushedFcn', @onToggleDataCursor, ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Toggle interactive data cursor — click to read (x,y), click again for delta');
+    btnDataCursor.Layout.Row = 4; btnDataCursor.Layout.Column = 1;
+
+    btnDatasetMath = uibutton(saveToolsGL,'Text','Math...', ...
+        'ButtonPushedFcn', @onDatasetAlgebra, ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Dataset algebra: combine two datasets (A+B, A-B, A/B, A*B, asymmetry)');
+    btnDatasetMath.Layout.Row = 4; btnDatasetMath.Layout.Column = 2;
+
+    % Row 5: Overlay + Templates
+    cbOverlayMode = uicheckbox(saveToolsGL, ...
+        'Text', 'Overlay', ...
+        'Value', false, ...
+        'Tooltip', 'Overlay selected datasets on the same axes with unified legend', ...
+        'ValueChangedFcn', @onOverlayModeChanged);
+    cbOverlayMode.Layout.Row = 5; cbOverlayMode.Layout.Column = 1;
+
+    btnTemplates = uibutton(saveToolsGL,'Text','Templates...', ...
+        'ButtonPushedFcn', @onPlotTemplates, ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Save/load plot formatting presets (axis limits, corrections, labels)');
+    btnTemplates.Layout.Row = 5; btnTemplates.Layout.Column = 2;
+
+    % Row 6: Batch Fig Export (placeholder row for future buttons)
+    btnBatchFigExport = uibutton(saveToolsGL,'Text','Batch Figs...', ...
+        'ButtonPushedFcn', @onBatchFigureExport, ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Export all datasets as individual figures with consistent formatting');
+    btnBatchFigExport.Layout.Row = 6; btnBatchFigExport.Layout.Column = 1;
+
+    uilabel(saveToolsGL,'Text','');  % spacer
+    saveToolsGL.Children(end).Layout.Row = 6;
+    saveToolsGL.Children(end).Layout.Column = 2;
 
     % ── Peak Analysis window (separate uifigure) ──────────────────────────
     % The peak table + controls live in their own window, opened on demand.
@@ -1916,8 +1956,8 @@ function varargout = DataPlotter()
     map2DPanel.Layout.Row = 1; map2DPanel.Layout.Column = 4;
     map2DPanel.Visible = 'off';   % shown only when a 2D area-detector dataset is active
 
-    map2DGL = uigridlayout(map2DPanel,[7 2], ...
-        'RowHeight',    {20, 20, 20, 20, 22, 18, '1x'}, ...
+    map2DGL = uigridlayout(map2DPanel,[11 2], ...
+        'RowHeight',    {20, 20, 20, 20, 20, 20, 20, 22, 18, 18, '1x'}, ...
         'ColumnWidth',  {85, '1x'}, ...
         'Padding',      [4 4 4 4], ...
         'RowSpacing',   3, ...
@@ -1960,25 +2000,53 @@ function varargout = DataPlotter()
         'ValueChangedFcn', @(~,~) onPlot([],[]));
     ddMap2DCmap.Layout.Row = 4; ddMap2DCmap.Layout.Column = 2;
 
+    % Row 5: Intensity scale (log/linear)
+    lblMap2DScale = uilabel(map2DGL,'Text','Intensity:','FontSize',10,'HorizontalAlignment','right');
+    lblMap2DScale.Layout.Row = 5; lblMap2DScale.Layout.Column = 1;
+    ddMap2DScale = uidropdown(map2DGL, ...
+        'Items',           {'Linear','Log₁₀'}, ...
+        'Value',           'Log₁₀', ...
+        'Tooltip',         'Linear or log₁₀ intensity scaling for the 2D map', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    ddMap2DScale.Layout.Row = 5; ddMap2DScale.Layout.Column = 2;
+
+    % Row 6: Colorbar range min
+    lblMap2DCMin = uilabel(map2DGL,'Text','CBar min:','FontSize',10,'HorizontalAlignment','right');
+    lblMap2DCMin.Layout.Row = 6; lblMap2DCMin.Layout.Column = 1;
+    efMap2DCMin = uieditfield(map2DGL,'Value','','Placeholder','auto', ...
+        'FontSize',10, ...
+        'Tooltip','Minimum colorbar value (blank = auto)', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    efMap2DCMin.Layout.Row = 6; efMap2DCMin.Layout.Column = 2;
+
+    % Row 7: Colorbar range max
+    lblMap2DCMax = uilabel(map2DGL,'Text','CBar max:','FontSize',10,'HorizontalAlignment','right');
+    lblMap2DCMax.Layout.Row = 7; lblMap2DCMax.Layout.Column = 1;
+    efMap2DCMax = uieditfield(map2DGL,'Value','','Placeholder','auto', ...
+        'FontSize',10, ...
+        'Tooltip','Maximum colorbar value (blank = auto)', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    efMap2DCMax.Layout.Row = 7; efMap2DCMax.Layout.Column = 2;
+
     btnPoleFigure = uibutton(map2DGL,'Text','Pole Figure...', ...
         'ButtonPushedFcn',@onPoleFigure, ...
         'BackgroundColor',[0.30 0.45 0.55], ...
         'FontColor',[1 1 1], ...
         'Tooltip','Open a polar plot of integrated intensity at a chosen 2θ position');
-    btnPoleFigure.Layout.Row = 5; btnPoleFigure.Layout.Column = [1 2];
+    btnPoleFigure.Layout.Row = 8; btnPoleFigure.Layout.Column = [1 2];
 
     lblMap2DInfo = uilabel(map2DGL,'Text','', ...
         'FontSize', 9, ...
         'FontColor', [0.4 0.4 0.4], ...
         'HorizontalAlignment', 'center', ...
         'WordWrap', 'on');
-    lblMap2DInfo.Layout.Row = 6; lblMap2DInfo.Layout.Column = [1 2];
+    lblMap2DInfo.Layout.Row = 9; lblMap2DInfo.Layout.Column = [1 2];
 
     lblMap2DHint = uilabel(map2DGL,'Text','Shift+click: H-cut  |  Ctrl+click: V-cut', ...
         'FontSize', 8, ...
         'FontColor', [0.55 0.55 0.55], ...
         'HorizontalAlignment', 'center');
-    lblMap2DHint.Layout.Row = 7; lblMap2DHint.Layout.Column = [1 2];
+    lblMap2DHint.Layout.Row = 10; lblMap2DHint.Layout.Column = [1 2];
 
     % ── Drag-and-drop: register every major surface as a drop target (R2023a+) ──
     % In uifigure the CEF renderer consumes drag events at whichever child
@@ -6977,12 +7045,15 @@ function varargout = DataPlotter()
         derivMode = ddDerivative.Value;
         if ~strcmp(derivMode, 'None') && ~isdatetime(corrData.time)
             xVec = double(corrData.time);
-            for k = 1:size(corrData.values, 2)
-                if strcmp(derivMode, 'dY/dX')
-                    corrData.values(:, k) = gradient(corrData.values(:, k), xVec);
-                else  % d²Y/dX²
-                    corrData.values(:, k) = gradient(gradient(corrData.values(:, k), xVec), xVec);
-                end
+            switch derivMode
+                case 'dY/dX'
+                    corrData.values = utilities.derivative(xVec, corrData.values, 'Order', 1);
+                case 'd²Y/dX²'
+                    corrData.values = utilities.derivative(xVec, corrData.values, 'Order', 2);
+                case '∫Y dx'
+                    corrData.values = utilities.cumulativeIntegral(xVec, corrData.values);
+                case 'dlog/dlog'
+                    corrData.values = utilities.logDerivative(xVec, corrData.values);
             end
         end
 
@@ -10077,8 +10148,9 @@ function varargout = DataPlotter()
             Xmat = [];  Ymat = [];
         end
 
-        % Log intensity (ddScaleY re-purposed as log-I for 2D)
-        if strcmp(ddScaleY.Value, 'Log')
+        % Log intensity — use dedicated 2D scale dropdown (ddMap2DScale)
+        useLogI = strcmp(ddMap2DScale.Value, 'Log₁₀');
+        if useLogI
             I = log10(max(I, 1e-9));
         end
 
@@ -10119,8 +10191,21 @@ function varargout = DataPlotter()
                 contourf(targetAx, Xmat, Ymat, I, nLvl);
         end
 
+        % Apply colorbar range limits from the editor controls
+        cMin = str2double(efMap2DCMin.Value);
+        cMax = str2double(efMap2DCMax.Value);
+        if ~isnan(cMin) && ~isnan(cMax) && cMax > cMin
+            caxis(targetAx, [cMin cMax]);  %#ok<CAXIS>
+        elseif ~isnan(cMin)
+            cl = caxis(targetAx);  %#ok<CAXIS>
+            caxis(targetAx, [cMin cl(2)]);  %#ok<CAXIS>
+        elseif ~isnan(cMax)
+            cl = caxis(targetAx);  %#ok<CAXIS>
+            caxis(targetAx, [cl(1) cMax]);  %#ok<CAXIS>
+        end
+
         % Colorbar with intensity unit label
-        if strcmp(ddScaleY.Value, 'Log')
+        if useLogI
             cbStr = ['log_{10}(I / ' map.intensityUnit ')'];
         else
             cbStr = ['I (' map.intensityUnit ')'];
@@ -11783,6 +11868,493 @@ function varargout = DataPlotter()
         appData.insetAx = insetAx;
     end
 
+    % ── Interactive Data Cursor ────────────────────────────────────────
+
+    function onToggleDataCursor(~,~)
+    %ONTOGGLEDATACURSOR  Toggle interactive data cursor mode.
+    %  Click on plot to snap to nearest data point and show (x,y).
+    %  Click a second point to show delta.  Click button again to exit.
+        if ~isfield(appData, 'cursorActive'), appData.cursorActive = false; end
+        if appData.cursorActive
+            % Deactivate cursor
+            appData.cursorActive = false;
+            btnDataCursor.BackgroundColor = BTN_TOOL;
+            fig.WindowButtonDownFcn = '';
+            % Remove cursor graphics
+            if isfield(appData, 'cursorMarker') && isvalid(appData.cursorMarker)
+                delete(appData.cursorMarker);
+            end
+            if isfield(appData, 'cursorLabel') && isvalid(appData.cursorLabel)
+                delete(appData.cursorLabel);
+            end
+            if isfield(appData, 'cursorMarker2') && isvalid(appData.cursorMarker2)
+                delete(appData.cursorMarker2);
+            end
+            if isfield(appData, 'cursorDeltaLabel') && isvalid(appData.cursorDeltaLabel)
+                delete(appData.cursorDeltaLabel);
+            end
+            if isfield(appData, 'cursorLine') && isvalid(appData.cursorLine)
+                delete(appData.cursorLine);
+            end
+            appData.cursorClickCount = 0;
+            setStatus('Cursor off.');
+        else
+            if isempty(appData.datasets) || appData.activeIdx < 1
+                uialert(fig,'Load a file first.','No data'); return;
+            end
+            appData.cursorActive = true;
+            appData.cursorClickCount = 0;
+            btnDataCursor.BackgroundColor = BTN_PRIMARY;
+            fig.WindowButtonDownFcn = @onCursorClick;
+            setStatus('Cursor ON — click on plot to read values. Click again for delta.');
+        end
+    end
+
+    function onCursorClick(~,~)
+    %ONCURSORCLICK  Handle click in data cursor mode.
+        if ~appData.cursorActive, return; end
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+
+        % Get click position in axes coordinates
+        cp = ax.CurrentPoint;
+        xClick = cp(1,1);
+        yClick = cp(1,2);
+
+        % Check if click is within axes limits
+        xl = ax.XLim; yl = ax.YLim;
+        if xClick < xl(1) || xClick > xl(2) || yClick < yl(1) || yClick > yl(2)
+            return;
+        end
+
+        % Get active dataset
+        d = getPlotData(appData.activeIdx);
+        if isempty(d) || isempty(d.time), return; end
+
+        xData = double(d.time);
+        yData = d.values;
+        if isempty(yData), return; end
+
+        % Find nearest point (use first visible Y channel)
+        yCol = yData(:, 1);
+        % Normalize distances to axes range for fair comparison
+        xRange = diff(xl); yRange = diff(yl);
+        if xRange == 0, xRange = 1; end
+        if yRange == 0, yRange = 1; end
+        dist = ((xData - xClick) / xRange).^2 + ((yCol - yClick) / yRange).^2;
+        [~, idx] = min(dist);
+        xSnap = xData(idx);
+        ySnap = yCol(idx);
+
+        appData.cursorClickCount = appData.cursorClickCount + 1;
+
+        if appData.cursorClickCount == 1
+            % First click: show point
+            if isfield(appData, 'cursorMarker') && isvalid(appData.cursorMarker)
+                delete(appData.cursorMarker);
+            end
+            if isfield(appData, 'cursorLabel') && isvalid(appData.cursorLabel)
+                delete(appData.cursorLabel);
+            end
+            % Clean up any previous second-click graphics
+            if isfield(appData, 'cursorMarker2') && isvalid(appData.cursorMarker2)
+                delete(appData.cursorMarker2);
+            end
+            if isfield(appData, 'cursorDeltaLabel') && isvalid(appData.cursorDeltaLabel)
+                delete(appData.cursorDeltaLabel);
+            end
+            if isfield(appData, 'cursorLine') && isvalid(appData.cursorLine)
+                delete(appData.cursorLine);
+            end
+
+            hold(ax, 'on');
+            appData.cursorMarker = plot(ax, xSnap, ySnap, 'ro', ...
+                'MarkerSize', 10, 'LineWidth', 2, 'HandleVisibility', 'off');
+            lbl = sprintf('(%.6g, %.6g)', xSnap, ySnap);
+            appData.cursorLabel = text(ax, xSnap, ySnap, ['  ' lbl], ...
+                'FontSize', 9, 'Color', [0.8 0 0], 'FontWeight', 'bold', ...
+                'BackgroundColor', [1 1 1 0.85], 'EdgeColor', [0.7 0.7 0.7], ...
+                'VerticalAlignment', 'bottom', 'HandleVisibility', 'off');
+
+            appData.cursorPt1 = [xSnap, ySnap];
+            setStatus(sprintf('Point 1: x = %.6g, y = %.6g  —  click again for delta', xSnap, ySnap));
+
+        elseif appData.cursorClickCount == 2
+            % Second click: show delta
+            hold(ax, 'on');
+            appData.cursorMarker2 = plot(ax, xSnap, ySnap, 'bs', ...
+                'MarkerSize', 10, 'LineWidth', 2, 'HandleVisibility', 'off');
+
+            dx = xSnap - appData.cursorPt1(1);
+            dy = ySnap - appData.cursorPt1(2);
+            lbl = sprintf('(%.6g, %.6g)\n\\Delta x=%.6g  \\Delta y=%.6g', xSnap, ySnap, dx, dy);
+            appData.cursorDeltaLabel = text(ax, xSnap, ySnap, ['  ' lbl], ...
+                'FontSize', 9, 'Color', [0 0 0.8], 'FontWeight', 'bold', ...
+                'BackgroundColor', [1 1 1 0.85], 'EdgeColor', [0.5 0.5 0.8], ...
+                'VerticalAlignment', 'top', 'HandleVisibility', 'off');
+
+            % Draw connecting line
+            appData.cursorLine = plot(ax, ...
+                [appData.cursorPt1(1), xSnap], [appData.cursorPt1(2), ySnap], ...
+                '--', 'Color', [0.5 0.5 0.5], 'LineWidth', 0.75, ...
+                'HandleVisibility', 'off');
+
+            setStatus(sprintf('Delta: dx = %.6g, dy = %.6g', dx, dy));
+            appData.cursorClickCount = 0;  % reset for next pair
+        end
+    end
+
+    % ── Dataset Algebra ────────────────────────────────────────────────
+
+    function onDatasetAlgebra(~,~)
+    %ONDATASETALGEBRA  Open dialog to combine two datasets arithmetically.
+        if isempty(appData.datasets) || numel(appData.datasets) < 2
+            uialert(fig, 'Load at least two files to use dataset math.', 'Need 2+ datasets');
+            return;
+        end
+        nDS = numel(appData.datasets);
+        dsNames = cell(1, nDS);
+        for ii = 1:nDS
+            [~, fn, fx] = fileparts(appData.datasets{ii}.filepath);
+            dsNames{ii} = [fn, fx];
+        end
+
+        % Build dialog
+        mathFig = uifigure('Name', 'Dataset Math', 'Position', [350 300 420 280], 'Resize', 'off');
+        mGL = uigridlayout(mathFig, [7 2], ...
+            'RowHeight', {22, 22, 22, 22, 22, 22, 30}, ...
+            'ColumnWidth', {110, '1x'}, ...
+            'Padding', [10 10 10 10], 'RowSpacing', 6);
+
+        uilabel(mGL, 'Text', 'Dataset A:', 'HorizontalAlignment', 'right', 'FontWeight', 'bold');
+        ddMathA = uidropdown(mGL, 'Items', dsNames, 'ItemsData', 1:nDS, ...
+            'Value', min(1, nDS));
+
+        uilabel(mGL, 'Text', 'Channel A:', 'HorizontalAlignment', 'right');
+        ddMathChA = uidropdown(mGL, 'Items', appData.datasets{1}.data.labels, ...
+            'ItemsData', 1:numel(appData.datasets{1}.data.labels), 'Value', 1);
+
+        uilabel(mGL, 'Text', 'Dataset B:', 'HorizontalAlignment', 'right', 'FontWeight', 'bold');
+        ddMathB = uidropdown(mGL, 'Items', dsNames, 'ItemsData', 1:nDS, ...
+            'Value', min(2, nDS));
+
+        uilabel(mGL, 'Text', 'Channel B:', 'HorizontalAlignment', 'right');
+        ddMathChB = uidropdown(mGL, 'Items', appData.datasets{min(2,nDS)}.data.labels, ...
+            'ItemsData', 1:numel(appData.datasets{min(2,nDS)}.data.labels), 'Value', 1);
+
+        uilabel(mGL, 'Text', 'Operation:', 'HorizontalAlignment', 'right', 'FontWeight', 'bold');
+        ddMathOp = uidropdown(mGL, 'Items', {'A-B', 'A+B', 'A/B', 'A*B', '(A-B)/(A+B)'}, ...
+            'Value', 'A-B');
+
+        uilabel(mGL, 'Text', 'Interpolation:', 'HorizontalAlignment', 'right');
+        ddMathInterp = uidropdown(mGL, 'Items', {'pchip', 'linear', 'spline'}, 'Value', 'pchip');
+
+        % Update channel lists when dataset selection changes
+        ddMathA.ValueChangedFcn = @(~,~) set(ddMathChA, ...
+            'Items', appData.datasets{ddMathA.Value}.data.labels, ...
+            'ItemsData', 1:numel(appData.datasets{ddMathA.Value}.data.labels), 'Value', 1);
+        ddMathB.ValueChangedFcn = @(~,~) set(ddMathChB, ...
+            'Items', appData.datasets{ddMathB.Value}.data.labels, ...
+            'ItemsData', 1:numel(appData.datasets{ddMathB.Value}.data.labels), 'Value', 1);
+
+        btnGL = uigridlayout(mGL, [1 2], 'ColumnWidth', {'1x', '1x'}, ...
+            'Padding', [0 0 0 0], 'ColumnSpacing', 8);
+        btnGL.Layout.Row = 7; btnGL.Layout.Column = [1 2];
+
+        uibutton(btnGL, 'Text', 'Compute', ...
+            'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
+            'FontWeight', 'bold', ...
+            'ButtonPushedFcn', @(~,~) doMathCompute());
+        uibutton(btnGL, 'Text', 'Cancel', ...
+            'ButtonPushedFcn', @(~,~) delete(mathFig));
+
+        function doMathCompute()
+            try
+                idxA = ddMathA.Value;  idxB = ddMathB.Value;
+                dsA = getPlotData(idxA);
+                dsB = getPlotData(idxB);
+                result = utilities.datasetAlgebra(dsA, dsB, ddMathOp.Value, ...
+                    'ChannelA', ddMathChA.Value, 'ChannelB', ddMathChB.Value, ...
+                    'InterpMethod', ddMathInterp.Value);
+
+                % Add result as a new virtual dataset
+                newDS = struct();
+                newDS.data     = result;
+                newDS.corrData = [];
+                newDS.filepath = sprintf('[Math: %s %s %s]', dsNames{idxA}, ddMathOp.Value, dsNames{idxB});
+                newDS.xOff = 0; newDS.yOff = 0;
+                newDS.bgSlope = 0; newDS.bgInt = 0;
+                newDS.smoothEnabled = false; newDS.smoothWindow = 5; newDS.smoothMethod = 'Moving';
+                newDS.xTrimMin = NaN; newDS.xTrimMax = NaN;
+                newDS.normMethod = 'None'; newDS.derivativeMode = 'None';
+                newDS.peaks = struct('center',{},'fwhm',{},'height',{},'area',{}, ...
+                                     'fitCurve',{},'status',{},'dSpacing',{});
+                newDS.axLims = struct('xMin','','xMax','','xStep','', ...
+                                      'yMin','','yMax','','yStep','', ...
+                                      'y2Min','','y2Max','','y2Step','');
+                newDS.parserName = 'datasetAlgebra';
+
+                appData.datasets{end+1} = newDS;
+                appData.activeIdx = numel(appData.datasets);
+                updateFileList();
+                updateControlsForActiveDataset();
+                onPlot([],[]);
+                delete(mathFig);
+                setStatus(sprintf('Math result added: %s', ddMathOp.Value));
+            catch ME
+                uialert(mathFig, ME.message, 'Math Error');
+            end
+        end
+    end
+
+    % ── Multi-Dataset Overlay ──────────────────────────────────────────
+
+    function onOverlayModeChanged(~,~)
+    %ONOVERLAYCHANGED  Toggle multi-dataset overlay mode.
+    %  When enabled, selects ALL loaded datasets in the listbox so they
+    %  are all plotted simultaneously with a unified legend.
+        if ~isfield(appData, 'overlayMode'), appData.overlayMode = false; end
+        appData.overlayMode = cbOverlayMode.Value;
+        if appData.overlayMode && numel(appData.datasets) > 1
+            % Select all datasets in the listbox
+            allIdx = num2cell(1:numel(appData.datasets));
+            lbDatasets.Value = allIdx;
+            setStatus(sprintf('Overlay ON — all %d datasets overlaid.', numel(appData.datasets)));
+        else
+            % Revert to just the active dataset
+            lbDatasets.Value = {appData.activeIdx};
+            setStatus('Overlay off.');
+        end
+        onPlot([],[]);
+    end
+
+    % ── Plot Templates ─────────────────────────────────────────────────
+
+    function onPlotTemplates(~,~)
+    %ONPLOTTEMPLATES  Save or load plot formatting presets.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig, 'Load a file first.', 'No data'); return;
+        end
+
+        tplFig = uifigure('Name', 'Plot Templates', 'Position', [350 300 360 200], 'Resize', 'off');
+        tplGL = uigridlayout(tplFig, [3 2], ...
+            'RowHeight', {30, 30, '1x'}, 'ColumnWidth', {'1x', '1x'}, ...
+            'Padding', [15 15 15 15], 'RowSpacing', 10);
+
+        uibutton(tplGL, 'Text', 'Save Template...', ...
+            'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
+            'FontWeight', 'bold', ...
+            'ButtonPushedFcn', @(~,~) doSaveTemplate());
+        uibutton(tplGL, 'Text', 'Load Template...', ...
+            'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+            'FontWeight', 'bold', ...
+            'ButtonPushedFcn', @(~,~) doLoadTemplate());
+
+        uibutton(tplGL, 'Text', 'Delete Template...', ...
+            'ButtonPushedFcn', @(~,~) doDeleteTemplate());
+        uibutton(tplGL, 'Text', 'Cancel', ...
+            'ButtonPushedFcn', @(~,~) delete(tplFig));
+
+        lblInfo = uilabel(tplGL, 'Text', 'Templates save axis limits, corrections, normalization, labels, and scale settings.', ...
+            'WordWrap', 'on', 'FontSize', 9, 'FontColor', [0.4 0.4 0.4]);
+        lblInfo.Layout.Row = 3; lblInfo.Layout.Column = [1 2];
+
+        function doSaveTemplate()
+            [fname, fpath] = uiputfile('*.mat', 'Save Plot Template');
+            if isequal(fname, 0), return; end
+
+            ds = appData.datasets{appData.activeIdx};
+            tpl = struct();
+            % Axis limits
+            tpl.xMin = efXMin.Value; tpl.xMax = efXMax.Value; tpl.xStep = efXStep.Value;
+            tpl.yMin = efYMin.Value; tpl.yMax = efYMax.Value; tpl.yStep = efYStep.Value;
+            % Corrections
+            tpl.xOff = ds.xOff; tpl.yOff = ds.yOff;
+            tpl.bgSlope = ds.bgSlope; tpl.bgInt = ds.bgInt;
+            tpl.smoothEnabled = ds.smoothEnabled;
+            tpl.smoothWindow = ds.smoothWindow;
+            tpl.smoothMethod = ds.smoothMethod;
+            tpl.normMethod = ds.normMethod;
+            tpl.derivativeMode = ds.derivativeMode;
+            tpl.xTrimMin = ds.xTrimMin; tpl.xTrimMax = ds.xTrimMax;
+            % Labels
+            tpl.plotTitle = efPlotTitle.Value;
+            tpl.xLabel = efXLabel.Value;
+            tpl.yLabel = efYLabel.Value;
+            % Scale
+            tpl.xScale = ax.XScale;
+            tpl.yScale = ax.YScale;
+            % Tick format
+            tpl.xTickFormat = ddXTickFmt.Value;
+            tpl.yTickFormat = ddYTickFmt.Value;
+
+            save(fullfile(fpath, fname), '-struct', 'tpl'); %#ok<SAVEVAR>
+            setStatus(sprintf('Template saved: %s', fname));
+        end
+
+        function doLoadTemplate()
+            [fname, fpath] = uigetfile('*.mat', 'Load Plot Template');
+            if isequal(fname, 0), return; end
+
+            tpl = load(fullfile(fpath, fname));
+            ds = appData.datasets{appData.activeIdx};
+
+            % Apply corrections
+            if isfield(tpl, 'xOff'), efXOffset.Value = tpl.xOff; ds.xOff = tpl.xOff; end
+            if isfield(tpl, 'yOff'), efYOffset.Value = tpl.yOff; ds.yOff = tpl.yOff; end
+            if isfield(tpl, 'bgSlope'), efBGSlope.Value = tpl.bgSlope; ds.bgSlope = tpl.bgSlope; end
+            if isfield(tpl, 'bgInt'), efBGIntercept.Value = tpl.bgInt; ds.bgInt = tpl.bgInt; end
+            if isfield(tpl, 'smoothEnabled'), cbSmooth.Value = tpl.smoothEnabled; ds.smoothEnabled = tpl.smoothEnabled; end
+            if isfield(tpl, 'smoothWindow'), efSmoothWin.Value = tpl.smoothWindow; ds.smoothWindow = tpl.smoothWindow; end
+            if isfield(tpl, 'smoothMethod'), ddSmoothMethod.Value = tpl.smoothMethod; ds.smoothMethod = tpl.smoothMethod; end
+            if isfield(tpl, 'normMethod'), ddNormalize.Value = tpl.normMethod; ds.normMethod = tpl.normMethod; end
+            if isfield(tpl, 'derivativeMode'), ddDerivative.Value = tpl.derivativeMode; ds.derivativeMode = tpl.derivativeMode; end
+            if isfield(tpl, 'xTrimMin') && ~isnan(tpl.xTrimMin), efXTrimMin.Value = num2str(tpl.xTrimMin); end
+            if isfield(tpl, 'xTrimMax') && ~isnan(tpl.xTrimMax), efXTrimMax.Value = num2str(tpl.xTrimMax); end
+
+            % Apply axis limits
+            if isfield(tpl, 'xMin'), efXMin.Value = tpl.xMin; end
+            if isfield(tpl, 'xMax'), efXMax.Value = tpl.xMax; end
+            if isfield(tpl, 'xStep'), efXStep.Value = tpl.xStep; end
+            if isfield(tpl, 'yMin'), efYMin.Value = tpl.yMin; end
+            if isfield(tpl, 'yMax'), efYMax.Value = tpl.yMax; end
+            if isfield(tpl, 'yStep'), efYStep.Value = tpl.yStep; end
+
+            % Apply labels
+            if isfield(tpl, 'plotTitle'), efPlotTitle.Value = tpl.plotTitle; end
+            if isfield(tpl, 'xLabel'), efXLabel.Value = tpl.xLabel; end
+            if isfield(tpl, 'yLabel'), efYLabel.Value = tpl.yLabel; end
+
+            % Apply tick formats
+            if isfield(tpl, 'xTickFormat'), ddXTickFmt.Value = tpl.xTickFormat; end
+            if isfield(tpl, 'yTickFormat'), ddYTickFmt.Value = tpl.yTickFormat; end
+
+            appData.datasets{appData.activeIdx} = ds;
+
+            % Re-apply corrections and replot
+            onApplyCorrections([],[]);
+            setStatus(sprintf('Template loaded: %s', fname));
+            delete(tplFig);
+        end
+
+        function doDeleteTemplate()
+            [fname, fpath] = uigetfile('*.mat', 'Delete Plot Template');
+            if isequal(fname, 0), return; end
+            delete(fullfile(fpath, fname));
+            setStatus(sprintf('Template deleted: %s', fname));
+        end
+    end
+
+    % ── Batch Figure Export ────────────────────────────────────────────
+
+    function onBatchFigureExport(~,~)
+    %ONBATCHFIGUREEXPORT  Export each loaded dataset as an individual figure.
+        if isempty(appData.datasets)
+            uialert(fig, 'Load files first.', 'No data'); return;
+        end
+
+        beFig = uifigure('Name', 'Batch Figure Export', 'Position', [350 300 400 250], 'Resize', 'off');
+        beGL = uigridlayout(beFig, [6 2], ...
+            'RowHeight', {22, 22, 22, 22, 22, 30}, ...
+            'ColumnWidth', {110, '1x'}, ...
+            'Padding', [10 10 10 10], 'RowSpacing', 6);
+
+        uilabel(beGL, 'Text', 'Format:', 'HorizontalAlignment', 'right');
+        ddBEFormat = uidropdown(beGL, 'Items', {'PNG','PDF','SVG','EPS'}, 'Value', 'PNG');
+
+        uilabel(beGL, 'Text', 'DPI (raster):', 'HorizontalAlignment', 'right');
+        spBEDpi = uispinner(beGL, 'Value', 300, 'Limits', [72 1200], 'Step', 50);
+
+        uilabel(beGL, 'Text', 'Width (in):', 'HorizontalAlignment', 'right');
+        spBEW = uispinner(beGL, 'Value', 7, 'Limits', [2 20], 'Step', 0.5);
+
+        uilabel(beGL, 'Text', 'Height (in):', 'HorizontalAlignment', 'right');
+        spBEH = uispinner(beGL, 'Value', 5, 'Limits', [2 20], 'Step', 0.5);
+
+        uilabel(beGL, 'Text', 'Template:', 'HorizontalAlignment', 'right');
+        ddBETpl = uidropdown(beGL, ...
+            'Items', {'None','APS (Phys Rev)','Nature','ACS'}, ...
+            'Value', 'None');
+
+        btnBEGL = uigridlayout(beGL, [1 2], 'ColumnWidth', {'1x','1x'}, ...
+            'Padding', [0 0 0 0], 'ColumnSpacing', 8);
+        btnBEGL.Layout.Row = 6; btnBEGL.Layout.Column = [1 2];
+
+        uibutton(btnBEGL, 'Text', 'Export All', ...
+            'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
+            'FontWeight', 'bold', ...
+            'ButtonPushedFcn', @(~,~) doBatchExport());
+        uibutton(btnBEGL, 'Text', 'Cancel', ...
+            'ButtonPushedFcn', @(~,~) delete(beFig));
+
+        function doBatchExport()
+            outDir = uigetdir('', 'Select output folder');
+            if isequal(outDir, 0), return; end
+
+            fmt = lower(ddBEFormat.Value);
+            nDS = numel(appData.datasets);
+            pb = uiprogressdlg(beFig, 'Title', 'Exporting...', 'Indeterminate', 'off');
+
+            for ii = 1:nDS
+                pb.Value = (ii-1)/nDS;
+                pb.Message = sprintf('Dataset %d of %d', ii, nDS);
+
+                ds = appData.datasets{ii};
+                d  = getPlotData(ii);
+                [~, fn, ~] = fileparts(ds.filepath);
+
+                % Create temporary figure
+                tmpFig = figure('Visible', 'off', 'Units', 'inches', ...
+                    'Position', [0 0 spBEW.Value spBEH.Value]);
+                tmpAx = axes(tmpFig);
+                hold(tmpAx, 'on'); box(tmpAx, 'on'); grid(tmpAx, 'on');
+
+                % Plot all Y channels
+                nCh = size(d.values, 2);
+                cols = plotting.lineColors(nCh);
+                for ch = 1:nCh
+                    plot(tmpAx, d.time, d.values(:, ch), '-', ...
+                        'Color', cols(ch,:), 'LineWidth', 1.5, ...
+                        'DisplayName', d.labels{ch});
+                end
+
+                % Apply template formatting
+                fontSize = 10;
+                fontName = 'Helvetica';
+                switch ddBETpl.Value
+                    case 'APS (Phys Rev)', fontSize = 8; fontName = 'Times New Roman';
+                    case 'Nature',         fontSize = 7; fontName = 'Helvetica';
+                    case 'ACS',            fontSize = 8; fontName = 'Helvetica';
+                end
+
+                tmpAx.FontSize = fontSize;
+                tmpAx.FontName = fontName;
+                tmpAx.TickDir = 'in';
+
+                xlabel(tmpAx, guiLabel(guiXName(d.metadata), guiXUnit(d.metadata)), 'FontSize', fontSize);
+                if nCh == 1
+                    ylabel(tmpAx, guiLabel(d.labels{1}, d.units{min(1,numel(d.units))}), 'FontSize', fontSize);
+                else
+                    ylabel(tmpAx, 'Intensity', 'FontSize', fontSize);
+                    legend(tmpAx, 'Location', 'best', 'FontSize', max(6, fontSize-2));
+                end
+                title(tmpAx, fn, 'FontSize', fontSize+1, 'Interpreter', 'none');
+
+                % Save
+                outPath = fullfile(outDir, [fn '.' fmt]);
+                switch fmt
+                    case 'png'
+                        exportgraphics(tmpFig, outPath, 'Resolution', spBEDpi.Value);
+                    case {'pdf','eps','svg'}
+                        exportgraphics(tmpFig, outPath, 'ContentType', 'vector');
+                end
+                close(tmpFig);
+            end
+            close(pb);
+            setStatus(sprintf('Exported %d figures to %s', nDS, outDir));
+            delete(beFig);
+        end
+    end
+
     % ── Advanced Figure Builder ────────────────────────────────────────
 
     function onAdvancedFigureBuilder(~,~)
@@ -11830,7 +12402,7 @@ function varargout = DataPlotter()
         uilabel(typeGL,'Text','Figure type:','FontSize',11, ...
             'FontWeight','bold','HorizontalAlignment','right');
         ddFigType = uidropdown(typeGL, ...
-            'Items', {'Multi-Panel','Quick Grid','Waterfall','Overlay + Residual','Normalized Overlay','Before / After','Parameter Evolution','Broken Axis'}, ...
+            'Items', {'Multi-Panel','Quick Grid','Waterfall','Overlay + Residual','Normalized Overlay','Before / After','Parameter Evolution','Broken Axis','Confidence Band'}, ...
             'Value', 'Multi-Panel', ...
             'ValueChangedFcn', @onTypeChanged);
         uilabel(typeGL,'Text','');  % spacer
@@ -11963,6 +12535,8 @@ function varargout = DataPlotter()
                     buildParamEvolConfig();
                 case 'Broken Axis'
                     buildBrokenAxisConfig();
+                case 'Confidence Band'
+                    buildConfidenceBandConfig();
             end
         end
 
@@ -12342,6 +12916,7 @@ function varargout = DataPlotter()
                 case 'Before / After',      generateBeforeAfter();
                 case 'Parameter Evolution', generateParamEvol();
                 case 'Broken Axis',         generateBrokenAxis();
+                case 'Confidence Band',     generateConfidenceBand();
             end
         end
 
@@ -12420,6 +12995,7 @@ function varargout = DataPlotter()
 
             linkIfNeeded(axList, shareX, shareY);
             addRefLineTools(outFig);
+            addLinkedCursor(outFig);
             figure(outFig);
             delete(bFig);
         end
@@ -12802,8 +13378,8 @@ function varargout = DataPlotter()
         %  CONFIG: Broken Axis
         % ────────────────────────────────────────────────────────────────
         function buildBrokenAxisConfig()
-            gl = uigridlayout(configPanel, [5 4], ...
-                'RowHeight', {22, 22, 22, 22, 22}, ...
+            gl = uigridlayout(configPanel, [6 4], ...
+                'RowHeight', {22, 22, 22, 22, 22, 22}, ...
                 'ColumnWidth', {90, '1x', 90, '1x'}, ...
                 'Padding', [8 8 8 8], 'RowSpacing', 6, 'ColumnSpacing', 6);
 
@@ -12816,13 +13392,18 @@ function varargout = DataPlotter()
             brWidgets.ddY = uidropdown(gl,'Items', allYLabels, ...
                 'Value', allYLabels{1}, 'FontSize', 9);
 
-            uilabel(gl,'Text','');  uilabel(gl,'Text','');
+            % Break axis selector
+            uilabel(gl,'Text','Break axis:','HorizontalAlignment','right','FontSize',9);
+            brWidgets.ddBreakAxis = uidropdown(gl, ...
+                'Items', {'X axis','Y axis'}, ...
+                'Value', 'X axis', 'FontSize', 9, ...
+                'Tooltip', 'Which axis to split with a gap');
 
             % Gap range
-            uilabel(gl,'Text','Gap X min:','HorizontalAlignment','right','FontSize',9);
+            uilabel(gl,'Text','Gap min:','HorizontalAlignment','right','FontSize',9);
             brWidgets.efGapLo = uieditfield(gl,'Value','','Placeholder','e.g. 30','FontSize',9);
 
-            uilabel(gl,'Text','Gap X max:','HorizontalAlignment','right','FontSize',9);
+            uilabel(gl,'Text','Gap max:','HorizontalAlignment','right','FontSize',9);
             brWidgets.efGapHi = uieditfield(gl,'Value','','Placeholder','e.g. 50','FontSize',9);
 
             % Options
@@ -12956,9 +13537,10 @@ function varargout = DataPlotter()
             gapLo = str2double(brWidgets.efGapLo.Value);
             gapHi = str2double(brWidgets.efGapHi.Value);
             logY  = brWidgets.cbLogY.Value;
+            breakAxis = brWidgets.ddBreakAxis.Value;
 
             if isnan(gapLo) || isnan(gapHi) || gapLo >= gapHi
-                uialert(bFig, 'Enter valid Gap X min < Gap X max.', 'Invalid gap'); return;
+                uialert(bFig, 'Enter valid Gap min < Gap max.', 'Invalid gap'); return;
             end
 
             d = getPlotData(di);
@@ -12972,88 +13554,150 @@ function varargout = DataPlotter()
             good = ~isnan(xAll) & ~isnan(yAll);
             xAll = xAll(good); yAll = yAll(good);
 
-            % Split data into left and right segments
-            leftMask  = xAll < gapLo;
-            rightMask = xAll > gapHi;
-
-            if ~any(leftMask) || ~any(rightMask)
-                uialert(bFig, 'Gap range leaves no data on one side.', 'Empty segment'); return;
-            end
-
-            xLeft = xAll(leftMask);  yLeft = yAll(leftMask);
-            xRight = xAll(rightMask); yRight = yAll(rightMask);
-
-            % Width ratio
-            ratioStr = brWidgets.ddRatio.Value;
-            switch ratioStr
-                case 'Proportional'
-                    rangeL = max(xLeft) - min(xLeft);
-                    rangeR = max(xRight) - min(xRight);
-                    wRatio = [rangeL rangeR];
-                case '1:1', wRatio = [1 1];
-                case '2:1', wRatio = [2 1];
-                case '1:2', wRatio = [1 2];
-                otherwise,  wRatio = [1 1];
-            end
-            wFrac = wRatio / sum(wRatio);
-
             fmtOpts = getFormatOpts();
             ls = localLineSpec(ddBStyle.Value);
-
-            outFig = figure('Name','Broken Axis','NumberTitle','off', ...
-                'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
-
-            % Create two axes side by side with a small gap
-            gap  = 0.03;  % normalized gap width for break marks
-            left_w  = (1 - gap) * wFrac(1) * 0.75;
-            right_w = (1 - gap) * wFrac(2) * 0.75;
-            left_x  = 0.12;
-            right_x = left_x + left_w + gap;
-
-            ax1 = axes(outFig, 'Position', [left_x  0.15 left_w  0.75]);
-            ax2 = axes(outFig, 'Position', [right_x 0.15 right_w 0.75]);
-
-            % Plot left segment
-            hold(ax1, 'on'); box(ax1, 'on'); grid(ax1, 'on');
-            plot(ax1, xLeft, yLeft, ls{:}, 'Color', [0.12 0.47 0.71], ...
-                'LineWidth', fmtOpts.lineWidth);
-            ax1.FontSize = fmtOpts.fontSize;
-            ax1.FontName = fmtOpts.fontName;
-            ax1.TickDir  = 'in';
-            ax1.XLim = [min(xLeft) max(xLeft)];
-
-            % Plot right segment
-            hold(ax2, 'on'); box(ax2, 'on'); grid(ax2, 'on');
-            plot(ax2, xRight, yRight, ls{:}, 'Color', [0.12 0.47 0.71], ...
-                'LineWidth', fmtOpts.lineWidth);
-            ax2.FontSize = fmtOpts.fontSize;
-            ax2.FontName = fmtOpts.fontName;
-            ax2.TickDir  = 'in';
-            ax2.XLim = [min(xRight) max(xRight)];
-            ax2.YTickLabel = {};  % suppress Y labels on right axes
-
-            % Link Y axes
-            linkaxes([ax1, ax2], 'y');
-
-            if logY
-                ax1.YScale = 'log'; ax2.YScale = 'log';
-            end
-
-            % Labels
             xLbl = guiLabel(guiXName(d.metadata), guiXUnit(d.metadata));
             yLbl = guiLabel(yName, d.units{min(idx, numel(d.units))});
-            xlabel(ax1, xLbl, 'FontSize', fmtOpts.fontSize);
-            xlabel(ax2, xLbl, 'FontSize', fmtOpts.fontSize);
-            ylabel(ax1, yLbl, 'FontSize', fmtOpts.fontSize);
 
-            ttl = brWidgets.efTitle.Value;
-            if ~isempty(ttl)
-                title(ax1, ttl, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
+            if strcmp(breakAxis, 'Y axis')
+                % ── Y-axis break ────────────────────────────────────────
+                bottomMask = yAll < gapLo;
+                topMask    = yAll > gapHi;
+
+                if ~any(bottomMask) || ~any(topMask)
+                    uialert(bFig, 'Gap range leaves no data on one side.', 'Empty segment'); return;
+                end
+
+                % Height ratio
+                ratioStr = brWidgets.ddRatio.Value;
+                switch ratioStr
+                    case 'Proportional'
+                        rangeB = gapLo - min(yAll(bottomMask));
+                        rangeT = max(yAll(topMask)) - gapHi;
+                        hRatio = [rangeB rangeT];
+                    case '1:1', hRatio = [1 1];
+                    case '2:1', hRatio = [2 1];
+                    case '1:2', hRatio = [1 2];
+                    otherwise,  hRatio = [1 1];
+                end
+                hFrac = hRatio / sum(hRatio);
+
+                outFig = figure('Name','Broken Y-Axis','NumberTitle','off', ...
+                    'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
+
+                gap = 0.03;
+                bot_h  = (1 - gap) * hFrac(1) * 0.72;
+                top_h  = (1 - gap) * hFrac(2) * 0.72;
+                bot_y  = 0.14;
+                top_y  = bot_y + bot_h + gap;
+
+                ax1 = axes(outFig, 'Position', [0.14 bot_y 0.78 bot_h]);
+                ax2 = axes(outFig, 'Position', [0.14 top_y 0.78 top_h]);
+
+                % Plot full data in both axes
+                hold(ax1, 'on'); box(ax1, 'on'); grid(ax1, 'on');
+                plot(ax1, xAll, yAll, ls{:}, 'Color', [0.12 0.47 0.71], ...
+                    'LineWidth', fmtOpts.lineWidth);
+                ax1.FontSize = fmtOpts.fontSize; ax1.FontName = fmtOpts.fontName;
+                ax1.TickDir = 'in';
+                ax1.YLim = [min(yAll(bottomMask))*0.95, gapLo];
+
+                hold(ax2, 'on'); box(ax2, 'on'); grid(ax2, 'on');
+                plot(ax2, xAll, yAll, ls{:}, 'Color', [0.12 0.47 0.71], ...
+                    'LineWidth', fmtOpts.lineWidth);
+                ax2.FontSize = fmtOpts.fontSize; ax2.FontName = fmtOpts.fontName;
+                ax2.TickDir = 'in';
+                ax2.YLim = [gapHi, max(yAll(topMask))*1.05];
+                ax2.XTickLabel = {};
+
+                linkaxes([ax1, ax2], 'x');
+
+                if logY
+                    ax1.YScale = 'log'; ax2.YScale = 'log';
+                end
+
+                xlabel(ax1, xLbl, 'FontSize', fmtOpts.fontSize);
+                ylabel(ax1, yLbl, 'FontSize', fmtOpts.fontSize);
+
+                ttl = brWidgets.efTitle.Value;
+                if ~isempty(ttl)
+                    title(ax2, ttl, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
+                end
+
+                % Draw break marks on top of bottom axes and bottom of top axes
+                drawBreakMarks(ax1, 'top');
+                drawBreakMarks(ax2, 'bottom');
+
+            else
+                % ── X-axis break (original behavior) ───────────────────
+                leftMask  = xAll < gapLo;
+                rightMask = xAll > gapHi;
+
+                if ~any(leftMask) || ~any(rightMask)
+                    uialert(bFig, 'Gap range leaves no data on one side.', 'Empty segment'); return;
+                end
+
+                xLeft = xAll(leftMask);  yLeft = yAll(leftMask);
+                xRight = xAll(rightMask); yRight = yAll(rightMask);
+
+                ratioStr = brWidgets.ddRatio.Value;
+                switch ratioStr
+                    case 'Proportional'
+                        rangeL = max(xLeft) - min(xLeft);
+                        rangeR = max(xRight) - min(xRight);
+                        wRatio = [rangeL rangeR];
+                    case '1:1', wRatio = [1 1];
+                    case '2:1', wRatio = [2 1];
+                    case '1:2', wRatio = [1 2];
+                    otherwise,  wRatio = [1 1];
+                end
+                wFrac = wRatio / sum(wRatio);
+
+                outFig = figure('Name','Broken Axis','NumberTitle','off', ...
+                    'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
+
+                gap  = 0.03;
+                left_w  = (1 - gap) * wFrac(1) * 0.75;
+                right_w = (1 - gap) * wFrac(2) * 0.75;
+                left_x  = 0.12;
+                right_x = left_x + left_w + gap;
+
+                ax1 = axes(outFig, 'Position', [left_x  0.15 left_w  0.75]);
+                ax2 = axes(outFig, 'Position', [right_x 0.15 right_w 0.75]);
+
+                hold(ax1, 'on'); box(ax1, 'on'); grid(ax1, 'on');
+                plot(ax1, xLeft, yLeft, ls{:}, 'Color', [0.12 0.47 0.71], ...
+                    'LineWidth', fmtOpts.lineWidth);
+                ax1.FontSize = fmtOpts.fontSize; ax1.FontName = fmtOpts.fontName;
+                ax1.TickDir  = 'in';
+                ax1.XLim = [min(xLeft) max(xLeft)];
+
+                hold(ax2, 'on'); box(ax2, 'on'); grid(ax2, 'on');
+                plot(ax2, xRight, yRight, ls{:}, 'Color', [0.12 0.47 0.71], ...
+                    'LineWidth', fmtOpts.lineWidth);
+                ax2.FontSize = fmtOpts.fontSize; ax2.FontName = fmtOpts.fontName;
+                ax2.TickDir  = 'in';
+                ax2.XLim = [min(xRight) max(xRight)];
+                ax2.YTickLabel = {};
+
+                linkaxes([ax1, ax2], 'y');
+
+                if logY
+                    ax1.YScale = 'log'; ax2.YScale = 'log';
+                end
+
+                xlabel(ax1, xLbl, 'FontSize', fmtOpts.fontSize);
+                xlabel(ax2, xLbl, 'FontSize', fmtOpts.fontSize);
+                ylabel(ax1, yLbl, 'FontSize', fmtOpts.fontSize);
+
+                ttl = brWidgets.efTitle.Value;
+                if ~isempty(ttl)
+                    title(ax1, ttl, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
+                end
+
+                drawBreakMarks(ax1, 'right');
+                drawBreakMarks(ax2, 'left');
             end
-
-            % Draw diagonal break marks on both axes
-            drawBreakMarks(ax1, 'right');
-            drawBreakMarks(ax2, 'left');
 
             addRefLineTools(outFig);
             figure(outFig);
@@ -13089,28 +13733,45 @@ function varargout = DataPlotter()
         end
 
         function drawBreakMarks(targetAx, side)
-        %DRAWBREAKMARKS  Draw diagonal break marks on the specified side of an axes.
+        %DRAWBREAKMARKS  Draw diagonal break marks on the specified side of axes.
+        %  side: 'left', 'right' (X-axis break), 'top', 'bottom' (Y-axis break)
+            xl = targetAx.XLim;
             yl = targetAx.YLim;
-            yMid = mean(yl);
-            ySpan = diff(yl) * 0.02;
 
-            if strcmp(side, 'right')
-                xl = targetAx.XLim;
-                xPos = xl(2);
-                dx = diff(xl) * 0.015;
-            else
-                xl = targetAx.XLim;
-                xPos = xl(1);
-                dx = diff(xl) * 0.015;
+            switch side
+                case 'right'
+                    xPos = xl(2);
+                    dx = diff(xl) * 0.015;
+                    yMid = mean(yl); ySpan = diff(yl) * 0.02;
+                    line(targetAx, [xPos-dx xPos+dx], [yMid-ySpan*2 yMid-ySpan*0.5], ...
+                        'Color','k','LineWidth',1.5,'Clipping','off','HandleVisibility','off');
+                    line(targetAx, [xPos-dx xPos+dx], [yMid+ySpan*0.5 yMid+ySpan*2], ...
+                        'Color','k','LineWidth',1.5,'Clipping','off','HandleVisibility','off');
+                case 'left'
+                    xPos = xl(1);
+                    dx = diff(xl) * 0.015;
+                    yMid = mean(yl); ySpan = diff(yl) * 0.02;
+                    line(targetAx, [xPos-dx xPos+dx], [yMid-ySpan*2 yMid-ySpan*0.5], ...
+                        'Color','k','LineWidth',1.5,'Clipping','off','HandleVisibility','off');
+                    line(targetAx, [xPos-dx xPos+dx], [yMid+ySpan*0.5 yMid+ySpan*2], ...
+                        'Color','k','LineWidth',1.5,'Clipping','off','HandleVisibility','off');
+                case 'top'
+                    yPos = yl(2);
+                    dy = diff(yl) * 0.015;
+                    xMid = mean(xl); xSpan = diff(xl) * 0.02;
+                    line(targetAx, [xMid-xSpan*2 xMid-xSpan*0.5], [yPos-dy yPos+dy], ...
+                        'Color','k','LineWidth',1.5,'Clipping','off','HandleVisibility','off');
+                    line(targetAx, [xMid+xSpan*0.5 xMid+xSpan*2], [yPos-dy yPos+dy], ...
+                        'Color','k','LineWidth',1.5,'Clipping','off','HandleVisibility','off');
+                case 'bottom'
+                    yPos = yl(1);
+                    dy = diff(yl) * 0.015;
+                    xMid = mean(xl); xSpan = diff(xl) * 0.02;
+                    line(targetAx, [xMid-xSpan*2 xMid-xSpan*0.5], [yPos-dy yPos+dy], ...
+                        'Color','k','LineWidth',1.5,'Clipping','off','HandleVisibility','off');
+                    line(targetAx, [xMid+xSpan*0.5 xMid+xSpan*2], [yPos-dy yPos+dy], ...
+                        'Color','k','LineWidth',1.5,'Clipping','off','HandleVisibility','off');
             end
-
-            % Draw two small diagonal lines at the break
-            line(targetAx, [xPos-dx xPos+dx], [yMid-ySpan*2 yMid-ySpan*0.5], ...
-                'Color', 'k', 'LineWidth', 1.5, 'Clipping', 'off', ...
-                'HandleVisibility', 'off');
-            line(targetAx, [xPos-dx xPos+dx], [yMid+ySpan*0.5 yMid+ySpan*2], ...
-                'Color', 'k', 'LineWidth', 1.5, 'Clipping', 'off', ...
-                'HandleVisibility', 'off');
         end
 
         % ────────────────────────────────────────────────────────────────
@@ -13303,6 +13964,7 @@ function varargout = DataPlotter()
 
             linkIfNeeded(allAxes(1:min(nSel,nPanels)), shareX, shareY);
             addRefLineTools(outFig);
+            addLinkedCursor(outFig);
             figure(outFig);
             delete(bFig);
         end
@@ -13404,16 +14066,27 @@ function varargout = DataPlotter()
                         plotLS = {'LineStyle', gsStyle, 'Marker', gsMarker, 'MarkerSize', 4};
                     end
 
-                    % Error handling
+                    % Error handling — check asymmetric first, then symmetric
+                    [errLoIdx, errHiIdx] = findAsymmetricErrorColumns(d.labels, yName);
                     errIdx = findErrorColumn(d.labels, yName);
-                    if ~isempty(errIdx) && ~strcmp(fmtOpts.errorStyle, 'None')
-                        yErr = d.values(:, errIdx);
-                        yErrG = yErr(good);
+                    hasAsymErr = ~isempty(errLoIdx) && ~isempty(errHiIdx);
+                    hasSymErr  = ~isempty(errIdx);
+
+                    if (hasAsymErr || hasSymErr) && ~strcmp(fmtOpts.errorStyle, 'None')
                         xG = xVec(good); yG = yVec(good);
+
+                        if hasAsymErr
+                            errLo = abs(d.values(good, errLoIdx));
+                            errHi = abs(d.values(good, errHiIdx));
+                        else
+                            yErr = d.values(good, errIdx);
+                            errLo = abs(yErr);
+                            errHi = abs(yErr);
+                        end
 
                         if strcmp(fmtOpts.errorStyle, 'Error Band')
                             fill(tAx, [xG; flipud(xG)], ...
-                                [yG + yErrG; flipud(yG - yErrG)], ...
+                                [yG + errHi; flipud(yG - errLo)], ...
                                 baseColor, 'FaceAlpha', 0.2, ...
                                 'EdgeColor', 'none', ...
                                 'HandleVisibility', 'off');
@@ -13421,8 +14094,8 @@ function varargout = DataPlotter()
                                 'Color', baseColor, ...
                                 'LineWidth', fmtOpts.lineWidth, ...
                                 'DisplayName', dName);
-                        else  % Error Bars
-                            errorbar(tAx, xG, yG, yErrG, ...
+                        else  % Error Bars (supports asymmetric via errorbar neg/pos args)
+                            errorbar(tAx, xG, yG, errLo, errHi, ...
                                 'Color', baseColor, ...
                                 'LineWidth', max(fmtOpts.lineWidth - 0.5, 0.75), ...
                                 'CapSize', 3, ...
@@ -13735,6 +14408,218 @@ function varargout = DataPlotter()
                 'HandleVisibility', 'off');
         end
 
+        % ────────────────────────────────────────────────────────────────
+        %  CONFIG: Confidence Band
+        % ────────────────────────────────────────────────────────────────
+        function buildConfidenceBandConfig()
+            gl = uigridlayout(configPanel, [4 4], ...
+                'RowHeight', {22, '1x', 22, 22}, ...
+                'ColumnWidth', {90, '1x', 90, '1x'}, ...
+                'Padding', [8 8 8 8], 'RowSpacing', 6, 'ColumnSpacing', 6);
+
+            uilabel(gl,'Text','Select 2+ datasets:','FontSize',9, ...
+                'FontAngle','italic','FontWeight','bold');
+            uilabel(gl,'Text',''); uilabel(gl,'Text','');
+            uilabel(gl,'Text','Y Channel:','FontSize',9,'FontWeight','bold');
+
+            cbWidgets.lbDS = uilistbox(gl,'Items', dsNames, 'ItemsData', 1:nDS, ...
+                'Multiselect', 'on', 'FontSize', 9);
+            cbWidgets.lbDS.Layout.Row = 2; cbWidgets.lbDS.Layout.Column = [1 2];
+
+            cbWidgets.ddY = uidropdown(gl,'Items', allYLabels, ...
+                'Value', allYLabels{1}, 'FontSize', 9);
+            cbWidgets.ddY.Layout.Row = 2; cbWidgets.ddY.Layout.Column = [3 4];
+
+            % Options row
+            uilabel(gl,'Text','Method:','HorizontalAlignment','right','FontSize',9);
+            cbWidgets.ddMethod = uidropdown(gl, ...
+                'Items', {'Mean ± Std','Median ± IQR'}, ...
+                'Value', 'Mean ± Std', 'FontSize', 9);
+
+            cbWidgets.cbLogY = uicheckbox(gl,'Text','Log Y','Value',false,'FontSize',9);
+            uilabel(gl,'Text','');
+
+            uilabel(gl,'Text','Title:','HorizontalAlignment','right','FontSize',9);
+            cbWidgets.efTitle = uieditfield(gl,'Value','','Placeholder','Figure title','FontSize',9);
+            cbWidgets.efTitle.Layout.Column = [2 4];
+
+            uilabel(gl,'Text','Band color:','HorizontalAlignment','right','FontSize',9);
+            cbWidgets.ddColor = uidropdown(gl, ...
+                'Items', {'Blue','Red','Green','Orange','Purple','Gray'}, ...
+                'Value', 'Blue', 'FontSize', 9);
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  GENERATE: Confidence Band
+        % ────────────────────────────────────────────────────────────────
+        function generateConfidenceBand()
+            dsIdx = ensureCellNum(cbWidgets.lbDS.Value);
+            if numel(dsIdx) < 2
+                uialert(bFig, 'Select at least 2 datasets.', 'Too few'); return;
+            end
+
+            yName  = cbWidgets.ddY.Value;
+            method = cbWidgets.ddMethod.Value;
+            logY   = cbWidgets.cbLogY.Value;
+
+            % Gather datasets and find the right channel
+            cellDS = cell(1, numel(dsIdx));
+            for si = 1:numel(dsIdx)
+                d = getPlotData(dsIdx(si));
+                chIdx = find(strcmp(d.labels, yName), 1);
+                if isempty(chIdx), chIdx = 1; end
+                cellDS{si} = d;
+            end
+
+            % Compute band
+            switch method
+                case 'Mean ± Std',   mStr = 'mean';
+                case 'Median ± IQR', mStr = 'median';
+                otherwise,           mStr = 'mean';
+            end
+
+            chIdx = find(strcmp(cellDS{1}.labels, yName), 1);
+            if isempty(chIdx), chIdx = 1; end
+
+            band = utilities.confidenceBand(cellDS, 'Method', mStr, 'Channel', chIdx);
+
+            % Color map
+            colorMap = struct('Blue',[0.12 0.47 0.71], 'Red',[0.84 0.15 0.16], ...
+                'Green',[0.17 0.63 0.17], 'Orange',[1.0 0.5 0.05], ...
+                'Purple',[0.58 0.40 0.74], 'Gray',[0.5 0.5 0.5]);
+            cName = cbWidgets.ddColor.Value;
+            if isfield(colorMap, cName)
+                col = colorMap.(cName);
+            else
+                col = [0.12 0.47 0.71];
+            end
+
+            fmtOpts = getFormatOpts();
+
+            outFig = figure('Name','Confidence Band','NumberTitle','off', ...
+                'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
+            oAx = axes(outFig);
+            hold(oAx, 'on'); box(oAx, 'on'); grid(oAx, 'on');
+
+            % Shaded band
+            xFill = [band.x; flipud(band.x)];
+            yFill = [band.upper; flipud(band.lower)];
+            fill(oAx, xFill, yFill, col, 'FaceAlpha', 0.25, 'EdgeColor', 'none', ...
+                'HandleVisibility', 'off');
+
+            % Center line
+            plot(oAx, band.x, band.center, '-', 'Color', col, ...
+                'LineWidth', fmtOpts.lineWidth, ...
+                'DisplayName', sprintf('%s (n=%d)', method, band.nSets));
+
+            if logY, oAx.YScale = 'log'; end
+            oAx.FontSize = fmtOpts.fontSize;
+            oAx.FontName = fmtOpts.fontName;
+            oAx.TickDir = 'in';
+
+            % Labels
+            d1 = getPlotData(dsIdx(1));
+            xLbl = guiLabel(guiXName(d1.metadata), guiXUnit(d1.metadata));
+            yLbl = guiLabel(yName, d1.units{min(chIdx, numel(d1.units))});
+            xlabel(oAx, xLbl, 'FontSize', fmtOpts.fontSize);
+            ylabel(oAx, yLbl, 'FontSize', fmtOpts.fontSize);
+            legend(oAx, 'Location', 'best', 'FontSize', max(6, fmtOpts.fontSize-2));
+
+            ttl = cbWidgets.efTitle.Value;
+            if ~isempty(ttl)
+                title(oAx, ttl, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
+            end
+
+            addRefLineTools(outFig);
+            figure(outFig);
+            delete(bFig);
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  Asymmetric error bar helper (for plotTraces)
+        % ────────────────────────────────────────────────────────────────
+        function plotAsymmetricErrors(tAx, xVec, yVec, errLo, errHi, col, style, lw)
+        %PLOTASYMMETRICERRORS  Render asymmetric error bars or error band.
+        %  errLo/errHi are absolute lower/upper error magnitudes.
+            switch style
+                case 'Error Bars'
+                    errorbar(tAx, xVec, yVec, errLo, errHi, 'o', ...
+                        'Color', col, 'LineWidth', lw * 0.6, ...
+                        'MarkerSize', 3, 'CapSize', 3, ...
+                        'HandleVisibility', 'off');
+                case 'Error Band'
+                    xFill = [xVec(:); flipud(xVec(:))];
+                    yFill = [(yVec(:) + errHi(:)); flipud(yVec(:) - errLo(:))];
+                    fill(tAx, xFill, yFill, col, 'FaceAlpha', 0.15, 'EdgeColor', 'none', ...
+                        'HandleVisibility', 'off');
+            end
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  Linked Cursor for Multi-Panel / Quick Grid figures
+        % ────────────────────────────────────────────────────────────────
+        function addLinkedCursor(outFig)
+        %ADDLINKEDCURSOR  Add a vertical cursor line that tracks across all
+        %  child axes when hovering.  Click to pin, click again to clear.
+            allAxes = findall(outFig, 'Type', 'axes');
+            if numel(allAxes) < 2, return; end
+
+            cursorLines = gobjects(numel(allAxes), 1);
+            for ai = 1:numel(allAxes)
+                cursorLines(ai) = xline(allAxes(ai), mean(allAxes(ai).XLim), ...
+                    'Color', [0.7 0 0 0.5], 'LineWidth', 0.75, ...
+                    'HandleVisibility', 'off', 'Visible', 'off');
+            end
+
+            pinned = false;
+            outFig.WindowButtonMotionFcn = @(~,~) onCursorMove();
+            outFig.WindowButtonDownFcn   = @(~,~) onCursorPin();
+
+            function onCursorMove()
+                if pinned, return; end
+                cp = outFig.CurrentPoint;  % [x, y] in figure normalized coords
+                % Find which axes the cursor is over
+                for ci = 1:numel(allAxes)
+                    axPos = getpixelposition(allAxes(ci), true);
+                    figPos = getpixelposition(outFig);
+                    % Convert figure normalized to pixel
+                    px = cp(1) * figPos(3);
+                    py = cp(2) * figPos(4);
+                    if px >= axPos(1) && px <= axPos(1)+axPos(3) && ...
+                       py >= axPos(2) && py <= axPos(2)+axPos(4)
+                        % Convert pixel to data coordinates
+                        xFrac = (px - axPos(1)) / axPos(3);
+                        xData = allAxes(ci).XLim(1) + xFrac * diff(allAxes(ci).XLim);
+                        % Update all cursor lines
+                        for li = 1:numel(cursorLines)
+                            if isvalid(cursorLines(li))
+                                cursorLines(li).Value = xData;
+                                cursorLines(li).Visible = 'on';
+                            end
+                        end
+                        return;
+                    end
+                end
+                % Not over any axes — hide cursors
+                for li = 1:numel(cursorLines)
+                    if isvalid(cursorLines(li))
+                        cursorLines(li).Visible = 'off';
+                    end
+                end
+            end
+
+            function onCursorPin()
+                pinned = ~pinned;
+                if ~pinned
+                    for li = 1:numel(cursorLines)
+                        if isvalid(cursorLines(li))
+                            cursorLines(li).Visible = 'off';
+                        end
+                    end
+                end
+            end
+        end
+
     end  % onAdvancedFigureBuilder
 
     if nargout > 0
@@ -13769,6 +14654,23 @@ function idx = findErrorColumn(labels, yLabel)
         lbl = lower(labels{li});
         if (contains(lbl, 'err') || contains(lbl, 'std')) && ~strcmpi(labels{li}, yLabel)
             idx = li; return;
+        end
+    end
+end
+
+function [idxLo, idxHi] = findAsymmetricErrorColumns(labels, yLabel)
+%FINDASYMMETRICERRORCOLUMNS  Find separate lower/upper error columns.
+%  Searches for patterns like 'dR+' / 'dR-', 'Rerr+' / 'Rerr-',
+%  'R_err_lo' / 'R_err_hi', etc.  Returns [] if not found.
+    idxLo = []; idxHi = [];
+    % Pattern 1: d<Label>+ / d<Label>-   (e.g. dR+ / dR-)
+    hiCands = {[yLabel '+'], ['d' yLabel '+'], [yLabel ' err+'], [yLabel '_err_hi'], [yLabel ' hi']};
+    loCands = {[yLabel '-'], ['d' yLabel '-'], [yLabel ' err-'], [yLabel '_err_lo'], [yLabel ' lo']};
+    for ci = 1:numel(hiCands)
+        hi = find(strcmpi(labels, hiCands{ci}), 1);
+        lo = find(strcmpi(labels, loCands{ci}), 1);
+        if ~isempty(hi) && ~isempty(lo)
+            idxHi = hi; idxLo = lo; return;
         end
     end
 end
