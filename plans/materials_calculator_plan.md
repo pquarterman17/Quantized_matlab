@@ -7,11 +7,12 @@
 | 1. Foundation | **COMPLETE** | 3 files (`constants.m`, `unitConvert.m`, `elementData.m`) | 85 pass |
 | 2. Core modules | **COMPLETE** | 38 files across 6 packages (`+crystal/`, `+electrical/`, `+semiconductor/`, `+thinFilm/`, `+magnetic/`, `+substrates/`) | 67 pass |
 | 3. GUI | **COMPLETE** | 1 file (`materialsCalcGUI.m`, ~1460 lines) + 1 test file | 21 pass |
-| 3b. Plane Spacings + Rich Text | Not started | 1 new calc function + GUI updates | — |
-| 4. X-ray/Neutron | Not started | — | — |
-| 5. Extensions | Not started | — | — |
+| 3b. Plane Spacings + Rich Text | **COMPLETE** | planeSpacings.m + GUI table card + HTML labels | Tests in test_calc_modules.m |
+| 4. X-ray/Neutron | **COMPLETE** | 11 functions in `+calc/+xrayNeutron/` + GUI tab | Tests in test_calc_xrayneutron.m |
+| 5. Extensions | **COMPLETE** | `+calc/+superconductor/` (6 functions), `importCIF.m`, `crystalCache.m`, Favorites tab | Tests in test_superconductor.m, test_cif_parser.m |
+| 6. Deferred modules | **COMPLETE** | `+calc/+optics/` (7), `+calc/+vacuum/` (6), `+calc/+electrochemistry/` (5), ion beam (3), multilayer builder, export report | Tests in test_calc_optics.m, test_calc_vacuum.m, test_calc_electrochemistry.m |
 
-**Total: 43 `.m` files implemented, 173 tests passing (85 + 67 + 21).**
+**Total: ~80 `.m` files implemented across 10 calc packages + GUI. All scheduled and deferred items complete.**
 
 ---
 

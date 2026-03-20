@@ -353,11 +353,10 @@ Naive nested-loop on 4096x4096 with 5x5 window = 16M comparisons × 25. Could ta
 | `DataPlotter.m` | Updated — "EM Viewer" button in dataset toolbar |
 | `CLAUDE.md` | Updated — full documentation for EM Viewer |
 
-### Deferred
+### Previously Deferred — Now Complete (2026-03-19)
 
-| Item | Reason |
+| Item | Status |
 |------|--------|
-| Session save/load | Low priority; no blocking dependencies |
-| Multi-channel EDS support | Requires multi-channel display model not in current GUI |
-| Session save/load in emViewerGUI | Phase 7e; lower priority than core viewer functionality |
-| Image registration (drift correction) | Post-launch feature; requires stack frame alignment algorithm |
+| Session save/load | Complete — GUI buttons (Save .mat / Load), API methods, Ctrl+Shift+S/L shortcuts |
+| Multi-channel EDS support | Complete — EDS composite mode with per-channel color, visibility, intensity; additive blending; export; 10 API tests |
+| Image registration (drift correction) | Complete — FFT cross-correlation alignment via `onAlignStack` |

@@ -628,6 +628,12 @@ function varargout = DataPlotter()
     title(ax,'Load a file to preview data','Interpreter','none');
     xlabel(ax,'');
     ylabel(ax,'');
+
+    % Table state (UI built later in dataTablePanel after analysisGL is created)
+    appData.tableVisible    = true;   % visible by default in analysis area
+    appData.tableWorkingCopy = [];
+    appData.tableMask       = [];
+    appData.tableEdited     = false;
     fig.WindowButtonDownFcn   = @onAxesButtonDown;  % normal mode; special modes overwrite this
     fig.WindowButtonMotionFcn = @onMouseHover;      % idle hover; drags overwrite and restore this
 
@@ -683,6 +689,8 @@ function varargout = DataPlotter()
             'MenuSelectedFcn', @(~,~) onCopyDataToClipboard([], []));
         uimenu(cmAxes, 'Text', 'Export Visible Range...', ...
             'MenuSelectedFcn', @(~,~) onExportVisibleRange());
+        uimenu(cmAxes, 'Text', 'Clear Fit Overlays', 'Separator', 'on', ...
+            'MenuSelectedFcn', @(~,~) onClearFitOverlays());
 
         ax.ContextMenu = cmAxes;
     catch
@@ -713,9 +721,9 @@ function varargout = DataPlotter()
         'Scrollable','on');
     analysisPanel.Layout.Row = 2; analysisPanel.Layout.Column = 1;
 
-    analysisGL = uigridlayout(analysisPanel,[1 4], ...
+    analysisGL = uigridlayout(analysisPanel,[2 4], ...
         'ColumnWidth', {320, '1x', 210, 0}, ...
-        'RowHeight',   {'1x'}, ...
+        'RowHeight',   {110, '1x'}, ...
         'Padding',     [4 4 4 4], ...
         'ColumnSpacing', 6, ...
         'RowSpacing', 4);
@@ -742,20 +750,20 @@ function varargout = DataPlotter()
     %   row 18  : Apply to All | Undo | Hide Dataset
     corrPanel = uipanel(analysisGL,'Title','Corrections','FontSize',11, ...
         'Scrollable','on');
-    corrPanel.Layout.Row = 1; corrPanel.Layout.Column = 1;
+    corrPanel.Layout.Row = [1 2]; corrPanel.Layout.Column = 1;
 
     % ── Row index constants for corrGL sections ──
     CROW = struct( ...
-        'STYLE',      1,  'SEC_OFFSETS', 2,  'XOFF',       3,  'YOFF',       4, ...
-        'BGORDER',    5,  'TOOLS',      6,  'SEC_PROC',   7,  'SMOOTH',     8, ...
-        'NORM_DERIV', 9,  'TRIM',      10,  'BASELINE',  11,  'SEC_BGFILE', 12, ...
-        'BGFILE',    13,  'BGSUBTR',   14,  'ASYM1',     15,  'ASYM2',     16, ...
-        'SEC_MAG',   17,  'MAG_MASS',  18,  'MAG_DIM',   19,  'MAG_THICK', 20, ...
-        'MAG_UNITS', 21,  'MAG_AUTO',  22, ...
-        'APPLY',     23,  'ACTIONS',   24,  'MASK',   25);
+        'STYLE',      1,  'ADVANCED',  2,  'SEC_OFFSETS', 3,  'XOFF',       4,  'YOFF',       5, ...
+        'BGORDER',    6,  'TOOLS',     7,  'SEC_PROC',   8,  'SMOOTH',     9, ...
+        'NORM_DERIV',10,  'TRIM',     11,  'BASELINE',  12,  'SEC_BGFILE', 13, ...
+        'BGFILE',    14,  'BGSUBTR',  15,  'ASYM1',     16,  'ASYM2',     17, ...
+        'SEC_MAG',   18,  'MAG_MASS', 19,  'MAG_DIM',   20,  'MAG_THICK', 21, ...
+        'MAG_UNITS', 22,  'MAG_AUTO', 23, ...
+        'APPLY',     24,  'ACTIONS',  25,  'MASK',   26);
 
-    corrGL = uigridlayout(corrPanel,[25 4], ...
-        'RowHeight',    {24, 20, 22,22,22,22, 20, 22,22,22,22, 20, 0,0, 0,0, ...
+    corrGL = uigridlayout(corrPanel,[26 4], ...
+        'RowHeight',    {24, 24, 20, 22,22,22,22, 20, 22,22,22,22, 20, 0,0, 0,0, ...
                          0,0,0,0,0,0, 24,22, 22}, ...
         'ColumnWidth',  {72,'1x',80,'1x'}, ...
         'Padding',      [4 4 4 4], ...
@@ -792,7 +800,15 @@ function varargout = DataPlotter()
         'ValueChangedFcn', @(~,~) updateApplyButtonStyle());
     cbLivePreview.Layout.Row = CROW.STYLE; cbLivePreview.Layout.Column = 4;
 
-    % Row 2: Section header — Offsets & Background (uibutton for click support)
+    % Row 2: Advanced Analysis button (prominent, always visible)
+    btnAdvancedCorr = uibutton(corrGL, 'Text', [char(9881) ' Advanced Analysis ' char(9662)], ...
+        'ButtonPushedFcn', @onShowAdvancedMenu, ...
+        'BackgroundColor', [0.22 0.44 0.22], 'FontColor', [1 1 1], ...
+        'FontWeight', 'bold', 'FontSize', 10, ...
+        'Tooltip', 'Advanced tools: Integrate, Curve Fit, Dataset Math, Digitizer, Resample...');
+    btnAdvancedCorr.Layout.Row = CROW.ADVANCED; btnAdvancedCorr.Layout.Column = [1 4];
+
+    % Row 3: Section header — Offsets & Background (uibutton for click support)
     lblSecOffsets = uibutton(corrGL, 'Text', [char(9660) ' Offsets & BG'], ...
         'FontSize', 9, 'FontWeight', 'bold', 'FontColor', [0.55 0.55 0.55], ...
         'BackgroundColor', corrGL.BackgroundColor, ...
@@ -1237,6 +1253,83 @@ function varargout = DataPlotter()
         'Scrollable','on');
     axLimPanel.Layout.Row = 1; axLimPanel.Layout.Column = 2;
 
+    % ── Data Table panel (row 2, col 2 — shares space with Axes above) ──
+    dataTablePanel = uipanel(analysisGL, 'Title', 'Data Table', 'FontSize', 10);
+    dataTablePanel.Layout.Row = 2; dataTablePanel.Layout.Column = 2;
+
+    % ── Data Table contents (toolbar + units + editable table) ───────
+    dataTableInnerGL = uigridlayout(dataTablePanel, [3 1], ...
+        'RowHeight', {22, 14, '1x'}, 'Padding', [2 2 2 2], 'RowSpacing', 1);
+
+    % Toolbar row
+    tableBarGL = uigridlayout(dataTableInnerGL, [1 7], ...
+        'ColumnWidth', {70, 70, 55, 50, 50, 50, '1x'}, ...
+        'RowHeight', {'1x'}, ...
+        'Padding', [2 0 2 0], 'ColumnSpacing', 3);
+    tableBarGL.Layout.Row = 1;
+
+    btnTableSaveAs = uibutton(tableBarGL, 'Text', 'Save As...', ...
+        'ButtonPushedFcn', @onTableSaveAs, ...
+        'BackgroundColor', [0.15 0.45 0.75], 'FontColor', [1 1 1], ...
+        'FontSize', 8, ...
+        'Tooltip', 'Save edited table to a new CSV or Excel file');
+    btnTableSaveAs.Layout.Column = 1;
+
+    btnTableMask = uibutton(tableBarGL, 'Text', 'Mask Sel.', ...
+        'ButtonPushedFcn', @onTableMaskSelected, ...
+        'BackgroundColor', [0.55 0.15 0.15], 'FontColor', [1 1 1], ...
+        'FontSize', 8, ...
+        'Tooltip', 'Mask selected rows — excluded from plot and analysis');
+    btnTableMask.Layout.Column = 2;
+
+    btnTableUnmask = uibutton(tableBarGL, 'Text', 'Unmask', ...
+        'ButtonPushedFcn', @onTableUnmaskAll, ...
+        'BackgroundColor', [0.28 0.28 0.28], 'FontColor', [0.8 0.8 0.8], ...
+        'FontSize', 8, ...
+        'Tooltip', 'Remove all row masks');
+    btnTableUnmask.Layout.Column = 3;
+
+    btnTableDescStats = uibutton(tableBarGL, 'Text', 'Stats', ...
+        'ButtonPushedFcn', @onDescriptiveStats, ...
+        'BackgroundColor', [0.28 0.28 0.28], 'FontColor', [0.8 0.8 0.8], ...
+        'FontSize', 8, ...
+        'Tooltip', 'Per-column descriptive statistics');
+    btnTableDescStats.Layout.Column = 4;
+
+    btnSortAsc = uibutton(tableBarGL, 'Text', [char(9650) 'Asc'], ...
+        'ButtonPushedFcn', @(~,~) onTableSort('ascend'), ...
+        'BackgroundColor', [0.28 0.28 0.28], 'FontColor', [0.8 0.8 0.8], ...
+        'FontSize', 8, ...
+        'Tooltip', 'Sort by selected column (ascending)');
+    btnSortAsc.Layout.Column = 5;
+
+    btnSortDesc = uibutton(tableBarGL, 'Text', [char(9660) 'Desc'], ...
+        'ButtonPushedFcn', @(~,~) onTableSort('descend'), ...
+        'BackgroundColor', [0.28 0.28 0.28], 'FontColor', [0.8 0.8 0.8], ...
+        'FontSize', 8, ...
+        'Tooltip', 'Sort by selected column (descending)');
+    btnSortDesc.Layout.Column = 6;
+
+    lblTableStats = uilabel(tableBarGL, 'Text', '', ...
+        'FontSize', 8, 'FontColor', [0.55 0.55 0.55], ...
+        'HorizontalAlignment', 'right');
+    lblTableStats.Layout.Column = 7;
+
+    % Units row
+    lblTableUnits = uilabel(dataTableInnerGL, 'Text', '', ...
+        'FontSize', 8, 'FontColor', [0.5 0.7 0.5], ...
+        'BackgroundColor', [0.16 0.16 0.16]);
+    lblTableUnits.Layout.Row = 2;
+
+    % Editable data table
+    tblData = uitable(dataTableInnerGL, ...
+        'ColumnName', {'(no data)'}, ...
+        'Data', {}, ...
+        'ColumnEditable', true, ...
+        'CellEditCallback', @onTableCellEdit, ...
+        'FontSize', 9);
+    tblData.Layout.Row = 3;
+
     axLimGL = uigridlayout(axLimPanel,[5 6], ...
         'RowHeight',    {22, 22, 0, 22, 0}, ...
         'ColumnWidth',  {24,'1x','1x','1x', 24, '1x'}, ...
@@ -1449,7 +1542,7 @@ function varargout = DataPlotter()
     % ── Save / Export panel (analysisGL col 3 — vertical, collapsible) ─────
     savePanel = uipanel(analysisGL,'Title','Save / Export','FontSize',10, ...
         'Scrollable','on');
-    savePanel.Layout.Row = 1; savePanel.Layout.Column = 3;
+    savePanel.Layout.Row = [1 2]; savePanel.Layout.Column = 3;
 
     % Vertical stacked layout with collapsible section headers
     % Rows: [hdrData, dataContent, hdrFig, figContent, hdrSession, sessionContent, hdrTools, toolsContent]
@@ -1626,84 +1719,69 @@ function varargout = DataPlotter()
         'ButtonPushedFcn', @(~,~) toggleSaveSection('tools','Tools'));
     btnSaveHdrTools.Layout.Row = 7;
 
-    saveToolsGL = uigridlayout(saveGL, [6 2], ...
-        'RowHeight', {24, 24, 24, 24, 24, 24}, 'ColumnWidth', {'1x','1x'}, ...
+    saveToolsGL = uigridlayout(saveGL, [5 2], ...
+        'RowHeight', {24, 24, 24, 24, 24}, 'ColumnWidth', {'1x','1x'}, ...
         'Padding', [0 0 0 0], 'RowSpacing', 2, 'ColumnSpacing', 3);
     saveToolsGL.Layout.Row = 8;
 
+    % Row 1: Batch XRD + Layout
     btnBatchConvertXRD = uibutton(saveToolsGL,'Text','Batch XRD', ...
         'ButtonPushedFcn', @onBatchConvertXRD, ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Tooltip', 'Batch XRD converter');
     btnBatchConvertXRD.Layout.Row = 1; btnBatchConvertXRD.Layout.Column = 1;
 
-    btnResample = uibutton(saveToolsGL,'Text','Resample...', ...
-        'ButtonPushedFcn', @onResampleDataset, ...
-        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
-        'Tooltip', 'Resample to uniform x-grid');
-    btnResample.Layout.Row = 1; btnResample.Layout.Column = 2;
-
-    btnColumnCalc = uibutton(saveToolsGL,'Text','Col. Calc...', ...
-        'ButtonPushedFcn', @onColumnCalculator, ...
-        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
-        'Tooltip', 'Column calculator');
-    btnColumnCalc.Layout.Row = 2; btnColumnCalc.Layout.Column = 1;
-
-    btnInset = uibutton(saveToolsGL,'Text','Inset Plot...', ...
-        'ButtonPushedFcn', @onCreateInset, ...
-        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
-        'Tooltip', 'Create inset zoom');
-    btnInset.Layout.Row = 2; btnInset.Layout.Column = 2;
-
     btnLayoutSettings = uibutton(saveToolsGL,'Text','Layout...', ...
         'ButtonPushedFcn', @onOpenLayoutSettings, ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Tooltip', 'Layout settings');
-    btnLayoutSettings.Layout.Row = 3; btnLayoutSettings.Layout.Column = 1;
+    btnLayoutSettings.Layout.Row = 1; btnLayoutSettings.Layout.Column = 2;
+
+    % Row 2: Cursor + Figures
+    btnDataCursor = uibutton(saveToolsGL,'Text','Cursor', ...
+        'ButtonPushedFcn', @onToggleDataCursor, ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Toggle interactive data cursor — click to read (x,y), click again for delta');
+    btnDataCursor.Layout.Row = 2; btnDataCursor.Layout.Column = 1;
 
     btnAdvFigure = uibutton(saveToolsGL,'Text','Figures...', ...
         'ButtonPushedFcn', @onAdvancedFigureBuilder, ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Tooltip', 'Advanced Figure Builder');
-    btnAdvFigure.Layout.Row = 3; btnAdvFigure.Layout.Column = 2;
+    btnAdvFigure.Layout.Row = 2; btnAdvFigure.Layout.Column = 2;
 
-    % Row 4: Data Cursor + Dataset Math
-    btnDataCursor = uibutton(saveToolsGL,'Text','Cursor', ...
-        'ButtonPushedFcn', @onToggleDataCursor, ...
-        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
-        'Tooltip', 'Toggle interactive data cursor — click to read (x,y), click again for delta');
-    btnDataCursor.Layout.Row = 4; btnDataCursor.Layout.Column = 1;
-
-    btnDatasetMath = uibutton(saveToolsGL,'Text','Math...', ...
-        'ButtonPushedFcn', @onDatasetAlgebra, ...
-        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
-        'Tooltip', 'Dataset algebra: combine two datasets (A+B, A-B, A/B, A*B, asymmetry)');
-    btnDatasetMath.Layout.Row = 4; btnDatasetMath.Layout.Column = 2;
-
-    % Row 5: Overlay + Templates
+    % Row 3: Overlay + Templates
     cbOverlayMode = uicheckbox(saveToolsGL, ...
         'Text', 'Overlay', ...
         'Value', false, ...
         'Tooltip', 'Overlay selected datasets on the same axes with unified legend', ...
         'ValueChangedFcn', @onOverlayModeChanged);
-    cbOverlayMode.Layout.Row = 5; cbOverlayMode.Layout.Column = 1;
+    cbOverlayMode.Layout.Row = 3; cbOverlayMode.Layout.Column = 1;
 
     btnTemplates = uibutton(saveToolsGL,'Text','Templates...', ...
         'ButtonPushedFcn', @onPlotTemplates, ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Tooltip', 'Save/load plot formatting presets (axis limits, corrections, labels)');
-    btnTemplates.Layout.Row = 5; btnTemplates.Layout.Column = 2;
+    btnTemplates.Layout.Row = 3; btnTemplates.Layout.Column = 2;
 
-    % Row 6: Batch Fig Export (placeholder row for future buttons)
+    % Row 4: Batch Fig Export
     btnBatchFigExport = uibutton(saveToolsGL,'Text','Batch Figs...', ...
         'ButtonPushedFcn', @onBatchFigureExport, ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Tooltip', 'Export all datasets as individual figures with consistent formatting');
-    btnBatchFigExport.Layout.Row = 6; btnBatchFigExport.Layout.Column = 1;
+    btnBatchFigExport.Layout.Row = 4; btnBatchFigExport.Layout.Column = 1;
 
     uilabel(saveToolsGL,'Text','');  % spacer
-    saveToolsGL.Children(end).Layout.Row = 6;
+    saveToolsGL.Children(end).Layout.Row = 4;
     saveToolsGL.Children(end).Layout.Column = 2;
+
+    % Row 5: Advanced menu button (full width, prominent)
+    btnAdvanced = uibutton(saveToolsGL,'Text',[char(9881) ' Advanced Analysis ' char(9662)], ...
+        'ButtonPushedFcn', @onShowAdvancedMenu, ...
+        'BackgroundColor', [0.22 0.44 0.22], 'FontColor', [1 1 1], ...
+        'FontWeight', 'bold', ...
+        'Tooltip', 'Advanced analysis & correction tools (integrate, math, resample, inset, ...)');
+    btnAdvanced.Layout.Row = 5; btnAdvanced.Layout.Column = [1 2];
 
     % ── Peak Analysis window (separate uifigure) ──────────────────────────
     % The peak table + controls live in their own window, opened on demand.
@@ -1953,7 +2031,7 @@ function varargout = DataPlotter()
     % ── 2D Map controls (col 3 of analysisGL — visible only for 2D data) ──
     map2DPanel = uipanel(analysisGL,'Title','2D Map View','FontSize',11, ...
         'Scrollable','on');
-    map2DPanel.Layout.Row = 1; map2DPanel.Layout.Column = 4;
+    map2DPanel.Layout.Row = [1 2]; map2DPanel.Layout.Column = 4;
     map2DPanel.Visible = 'off';   % shown only when a 2D area-detector dataset is active
 
     map2DGL = uigridlayout(map2DPanel,[11 2], ...
@@ -3309,6 +3387,10 @@ function varargout = DataPlotter()
 
         appData.selectedPeakIdx = 0;   % clear peak selection on dataset switch
         refreshPeakTable();
+
+        % Refresh data table if visible
+        appData.tableMask = [];  % reset mask on dataset switch
+        refreshDataTable();
     end
 
     % ── Axis / style callbacks ────────────────────────────────────────────
@@ -4539,6 +4621,114 @@ function varargout = DataPlotter()
         fig.Pointer = 'arrow';
         setStatus('Global peak fit complete.');
         onPlot([],[]);
+
+        % Auto-show decomposition after global fit
+        onShowDecomposition();
+    end
+
+    function onShowDecomposition(~, ~)
+    %ONSHOWDECOMPOSITION  Overlay individual peak components on the main axes.
+    %   Draws each fitted peak as a separate dashed curve plus the
+    %   composite model and a linear background. Requires peaks with
+    %   status 'fitted' or 'fitted(global)'.
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        ds = appData.datasets{appData.activeIdx};
+        if isempty(ds.peaks), return; end
+
+        % Remove any previous decomposition overlays
+        delete(findall(ax, 'Tag', 'GUIPeakDecomp'));
+
+        % Gather fitted peaks
+        nP = numel(ds.peaks);
+        fittedIdx = [];
+        for k = 1:nP
+            if contains(ds.peaks(k).status, 'fitted')
+                fittedIdx(end+1) = k; %#ok<AGROW>
+            end
+        end
+        if isempty(fittedIdx)
+            setStatus('No fitted peaks to decompose.');
+            return;
+        end
+
+        % Get the plotted data range
+        d = getPlotData(appData.activeIdx);
+        xAll = d.time;
+        xDense = linspace(min(xAll), max(xAll), 1000)';
+
+        % Determine model
+        modelName = 'Lorentzian';
+        if isfield(ds.peaks(fittedIdx(1)), 'model') && ~isempty(ds.peaks(fittedIdx(1)).model)
+            modelName = ds.peaks(fittedIdx(1)).model;
+        end
+
+        % Compute linear background from first and last peak bg values
+        bgSlope = 0; bgInt = 0;
+        if numel(fittedIdx) >= 2
+            p1 = ds.peaks(fittedIdx(1));
+            pN = ds.peaks(fittedIdx(end));
+            if isfield(p1, 'bg') && isfield(pN, 'bg') && ~isnan(p1.bg) && ~isnan(pN.bg)
+                bgSlope = (pN.bg - p1.bg) / max(eps, pN.center - p1.center);
+                bgInt = p1.bg - bgSlope * p1.center;
+            end
+        elseif isfield(ds.peaks(fittedIdx(1)), 'bg')
+            bgInt = ds.peaks(fittedIdx(1)).bg;
+        end
+
+        bgLine = bgSlope * xDense + bgInt;
+        composite = bgLine;
+
+        % Color palette for individual peaks
+        nFitted = numel(fittedIdx);
+        peakColors = lines(max(nFitted, 1));
+
+        hold(ax, 'on');
+
+        for fi = 1:nFitted
+            pk = ds.peaks(fittedIdx(fi));
+            H = pk.height;
+            x0 = pk.center;
+            fw = pk.fwhm;
+
+            switch modelName
+                case 'Gaussian'
+                    yPk = H * exp(-4*log(2) * ((xDense - x0)./fw).^2);
+                case 'Pseudo-Voigt'
+                    eta = 0.5;
+                    if isfield(pk, 'eta') && ~isnan(pk.eta), eta = pk.eta; end
+                    L = H ./ (1 + 4*((xDense - x0)./fw).^2);
+                    G = H * exp(-4*log(2) * ((xDense - x0)./fw).^2);
+                    yPk = eta * L + (1 - eta) * G;
+                otherwise  % Lorentzian
+                    yPk = H ./ (1 + 4*((xDense - x0)./fw).^2);
+            end
+
+            composite = composite + yPk;
+
+            % Draw individual peak (dashed, colored)
+            plot(ax, xDense, yPk + bgSlope * xDense + bgInt, '--', ...
+                'Color', [peakColors(fi,:) 0.6], ...
+                'LineWidth', 1.0, ...
+                'HandleVisibility', 'off', ...
+                'Tag', 'GUIPeakDecomp');
+        end
+
+        % Draw composite (solid red)
+        plot(ax, xDense, composite, '-', ...
+            'Color', [0.85 0.15 0.15], ...
+            'LineWidth', 1.5, ...
+            'HandleVisibility', 'off', ...
+            'Tag', 'GUIPeakDecomp');
+
+        % Draw background (thin dotted gray)
+        plot(ax, xDense, bgLine, ':', ...
+            'Color', [0.5 0.5 0.5], ...
+            'LineWidth', 0.8, ...
+            'HandleVisibility', 'off', ...
+            'Tag', 'GUIPeakDecomp');
+
+        hold(ax, 'off');
+        setStatus(sprintf('Decomposition: %d peaks + background overlaid', nFitted));
     end
 
     % ── Peak list management ─────────────────────────────────────────────
@@ -10504,6 +10694,16 @@ function varargout = DataPlotter()
             'Export Complete');
     end
 
+    function onClearFitOverlays(~, ~)
+    %ONCLEARFITOVERLAYS  Remove curve fit and peak decomposition overlays.
+        delete(findall(ax, 'Tag', 'curveFitOverlay'));
+        delete(findall(ax, 'Tag', 'curveFitLabel'));
+        delete(findall(ax, 'Tag', 'GUIPeakDecomp'));
+        delete(findall(ax, 'Tag', 'integrationShade'));
+        delete(findall(ax, 'Tag', 'integrationEdge'));
+        setStatus('Fit overlays cleared');
+    end
+
     function onCopyPlotToClipboard()
     %ONCOPYPLOTTOCLIPBOARD  Render current plot into a temporary figure and copy to clipboard.
         if isempty(appData.datasets) || appData.activeIdx < 1
@@ -12106,6 +12306,1365 @@ function varargout = DataPlotter()
         end
     end
 
+    % ── Data Table Functions ─────────────────────────────────────────────
+
+    % (Data table is always visible in the analysis panel — no toggle needed)
+
+    function refreshDataTable()
+    %REFRESHDATATABLE  Populate the table from the active dataset.
+        if appData.activeIdx < 1 || isempty(appData.datasets)
+            tblData.ColumnName = {'(no data)'};
+            tblData.Data = {};
+            lblTableUnits.Text = '';
+            lblTableStats.Text = '';
+            return;
+        end
+
+        d = getPlotData(appData.activeIdx);
+        xName = 'X';
+        if isfield(d.metadata, 'parserSpecific') && isfield(d.metadata.parserSpecific, 'xLabel')
+            xName = d.metadata.parserSpecific.xLabel;
+        elseif ~isempty(d.labels)
+            xName = 'X';
+        end
+
+        % Build column names: X + all Y channels + Masked
+        colNames = [{xName}, d.labels, {'Masked'}];
+        nRows = numel(d.time);
+        nCols = size(d.values, 2);
+
+        % Build data matrix (working copy)
+        xCol = d.time(:);
+        yMat = d.values;
+        % Initialize table mask from ds.mask (inverted convention)
+        ds2 = appData.datasets{appData.activeIdx};
+        if isfield(ds2, 'mask') && numel(ds2.mask) == nRows
+            appData.tableMask = ~ds2.mask;  % ds.mask true=included → tableMask true=excluded
+        elseif isempty(appData.tableMask) || numel(appData.tableMask) ~= nRows
+            appData.tableMask = false(nRows, 1);
+        end
+
+        % Store working copy
+        appData.tableWorkingCopy = [xCol, yMat];
+        appData.tableEdited = false;
+
+        % Build table data as cell for mixed types
+        tableData = num2cell([xCol, yMat]);
+        % Add mask column (logical checkbox)
+        maskCol = num2cell(appData.tableMask);
+        tableData = [tableData, maskCol];
+
+        tblData.ColumnName = colNames;
+        tblData.Data = tableData;
+        tblData.ColumnEditable = [true(1, 1 + nCols), true];  % all editable including mask
+
+        % Units row
+        if ~isempty(d.units)
+            unitStr = strjoin([{'—'}, d.units, {'—'}], '  |  ');
+            lblTableUnits.Text = ['  Units: ' unitStr];
+        else
+            lblTableUnits.Text = '';
+        end
+
+        % Stats summary
+        nMasked = sum(appData.tableMask);
+        lblTableStats.Text = sprintf('%d rows, %d cols, %d masked  ', ...
+            nRows, nCols + 1, nMasked);
+    end
+
+    function onTableCellEdit(~, evt)
+    %ONTABLECELLEDIT  Handle cell edits in the data table.
+        row = evt.Indices(1);
+        col = evt.Indices(2);
+        nDataCols = size(appData.tableWorkingCopy, 2);
+
+        if col <= nDataCols
+            % Data column edit
+            newVal = evt.NewData;
+            if isnumeric(newVal)
+                appData.tableWorkingCopy(row, col) = newVal;
+                appData.tableEdited = true;
+            end
+        elseif col == nDataCols + 1
+            % Mask column toggle
+            appData.tableMask(row) = logical(evt.NewData);
+            nMasked = sum(appData.tableMask);
+            nRows = size(appData.tableWorkingCopy, 1);
+            nCols = nDataCols;
+            lblTableStats.Text = sprintf('%d rows, %d cols, %d masked  ', ...
+                nRows, nCols, nMasked);
+            syncTableMaskToDataset();
+        end
+    end
+
+    function onTableMaskSelected(~, ~)
+    %ONTABLEMASKSELECTED  Mask the currently selected rows in the table.
+        sel = tblData.Selection;
+        if isempty(sel), return; end
+        rows = unique(sel(:, 1));
+        appData.tableMask(rows) = true;
+        % Update mask column in table display
+        for ri = 1:numel(rows)
+            tblData.Data{rows(ri), end} = true;
+        end
+        nMasked = sum(appData.tableMask);
+        nRows = size(appData.tableWorkingCopy, 1);
+        nCols = size(appData.tableWorkingCopy, 2);
+        lblTableStats.Text = sprintf('%d rows, %d cols, %d masked  ', ...
+            nRows, nCols, nMasked);
+        syncTableMaskToDataset();
+        setStatus(sprintf('Masked %d rows (%d total masked)', numel(rows), nMasked));
+    end
+
+    function onTableUnmaskAll(~, ~)
+    %ONTABLEUNMASKALL  Clear all row masks.
+        if isempty(appData.tableMask), return; end
+        appData.tableMask(:) = false;
+        refreshDataTable();
+        syncTableMaskToDataset();
+        setStatus('All masks cleared');
+    end
+
+    function syncTableMaskToDataset()
+    %SYNCTABLEMASKTODATASET  Push table mask into ds.mask and re-plot.
+    %   ds.mask uses inverted convention: true = included, false = excluded.
+    %   appData.tableMask: true = masked (excluded).
+        if appData.activeIdx < 1 || isempty(appData.datasets), return; end
+        ds = appData.datasets{appData.activeIdx};
+        nRaw = numel(ds.data.time);
+
+        if isempty(appData.tableMask)
+            ds.mask = true(nRaw, 1);
+        else
+            % tableMask may be sized to corrData; need to map back to raw
+            if numel(appData.tableMask) == nRaw
+                ds.mask = ~appData.tableMask;  % invert: table true=excluded → mask false=excluded
+            else
+                % Size mismatch (corrections changed row count) — apply to raw
+                ds.mask = true(nRaw, 1);
+                nM = min(numel(appData.tableMask), nRaw);
+                ds.mask(1:nM) = ~appData.tableMask(1:nM);
+            end
+        end
+        appData.datasets{appData.activeIdx} = ds;
+        onPlot([], []);  % redraw with faded masked points
+    end
+
+    function onDescriptiveStats(~, ~)
+    %ONDESCRIPTIVESTATS  Show per-column descriptive statistics popup.
+        if isempty(appData.tableWorkingCopy)
+            uialert(fig, 'No data loaded.', 'Stats');
+            return;
+        end
+        d = getPlotData(appData.activeIdx);
+        wc = appData.tableWorkingCopy;
+        mask = appData.tableMask;
+        if ~isempty(mask) && any(mask)
+            wc = wc(~mask, :);  % exclude masked rows
+        end
+        colNames = [{'X'}, d.labels];
+        nC = size(wc, 2);
+
+        % Compute stats
+        statNames = {'Mean', 'Std', 'Median', 'Min', 'Max', 'Skewness', 'Kurtosis', 'N'};
+        statData = cell(numel(statNames), nC);
+        for ci = 1:nC
+            col = wc(:, ci);
+            col = col(~isnan(col));
+            if isempty(col)
+                for si = 1:numel(statNames), statData{si, ci} = NaN; end
+                continue;
+            end
+            statData{1, ci} = mean(col);
+            statData{2, ci} = std(col);
+            statData{3, ci} = median(col);
+            statData{4, ci} = min(col);
+            statData{5, ci} = max(col);
+            % Skewness: E[(x-mu)^3] / sigma^3
+            mu = mean(col); sg = std(col);
+            if sg > 0
+                statData{6, ci} = mean(((col - mu) / sg).^3);
+                statData{7, ci} = mean(((col - mu) / sg).^4);
+            else
+                statData{6, ci} = 0;
+                statData{7, ci} = 0;
+            end
+            statData{8, ci} = numel(col);
+        end
+
+        % Show in popup figure
+        sFig = figure('Name', 'Descriptive Statistics', 'NumberTitle', 'off', ...
+            'Units', 'pixels', 'Position', [300 200 max(400, nC*100) 300], ...
+            'Tag', 'dpDescStats');
+        sAx = axes(sFig, 'Visible', 'off');
+        sAx.Position = [0 0 1 1];
+
+        % Build formatted text
+        lines = {};
+        lines{end+1} = sprintf('%-12s', '');
+        for ci = 1:nC
+            lines{end} = [lines{end} sprintf('  %12s', colNames{ci})];
+        end
+        lines{end+1} = repmat('-', 1, 12 + nC*14);
+        for si = 1:numel(statNames)
+            line = sprintf('%-12s', statNames{si});
+            for ci = 1:nC
+                v = statData{si, ci};
+                if si == 8
+                    line = [line sprintf('  %12d', round(v))]; %#ok<AGROW>
+                else
+                    line = [line sprintf('  %12.4g', v)]; %#ok<AGROW>
+                end
+            end
+            lines{end+1} = line; %#ok<AGROW>
+        end
+
+        text(sAx, 0.02, 0.95, strjoin(lines, '\n'), ...
+            'FontName', 'Courier New', 'FontSize', 10, ...
+            'VerticalAlignment', 'top', 'Units', 'normalized', ...
+            'Interpreter', 'none');
+
+        setStatus(sprintf('Stats: %d columns, %d rows (excl. %d masked)', ...
+            nC, size(wc, 1), sum(appData.tableMask)));
+    end
+
+    function onTableSort(direction)
+    %ONTABLESORT  Sort the data table by the selected column.
+        if isempty(appData.tableWorkingCopy), return; end
+        sel = tblData.Selection;
+        if isempty(sel)
+            % Default: sort by first column (X)
+            sortCol = 1;
+        else
+            sortCol = sel(1, 2);
+        end
+        nDataCols = size(appData.tableWorkingCopy, 2);
+        if sortCol > nDataCols
+            % Mask column selected — sort by X instead
+            sortCol = 1;
+        end
+        [~, idx] = sort(appData.tableWorkingCopy(:, sortCol), direction);
+        appData.tableWorkingCopy = appData.tableWorkingCopy(idx, :);
+        appData.tableMask = appData.tableMask(idx);
+        refreshDataTable();
+        setStatus(sprintf('Sorted by column %d (%s)', sortCol, direction));
+    end
+
+    function onTableSaveAs(~, ~)
+    %ONTABLESAVEAS  Save the working copy (with edits) to a new file.
+        if isempty(appData.tableWorkingCopy)
+            uialert(fig, 'No data to save.', 'Save As');
+            return;
+        end
+
+        [fn, fp] = uiputfile( ...
+            {'*.csv', 'CSV (*.csv)'; '*.xlsx', 'Excel (*.xlsx)'}, ...
+            'Save Table As');
+        if isequal(fn, 0), return; end
+        outPath = fullfile(fp, fn);
+
+        try
+            d = getPlotData(appData.activeIdx);
+            xName = 'X';
+            colNames = [{xName}, d.labels];
+
+            % Get working copy, excluding masked rows if desired
+            wc = appData.tableWorkingCopy;
+            mask = appData.tableMask;
+            if any(mask)
+                answer = questdlg('Exclude masked rows from export?', ...
+                    'Masked Rows', 'Exclude', 'Include All', 'Exclude');
+                if strcmp(answer, 'Exclude')
+                    wc = wc(~mask, :);
+                end
+            end
+
+            T = array2table(wc, 'VariableNames', ...
+                matlab.lang.makeValidName(colNames));
+
+            [~, ~, ext] = fileparts(outPath);
+            if strcmpi(ext, '.xlsx')
+                writetable(T, outPath);
+            else
+                writetable(T, outPath, 'Delimiter', ',');
+            end
+            setStatus(sprintf('Table saved: %s (%d rows)', fn, size(wc, 1)));
+        catch ME
+            uialert(fig, sprintf('Save failed:\n%s', ME.message), 'Error');
+        end
+    end
+
+    % ── Advanced Analysis & Correction Menu ─────────────────────────────
+
+    advMenuFig = [];  % persistent handle to the popup menu figure
+
+    function onShowAdvancedMenu(~, ~)
+    %ONSHOWADVANCEDMENU  Show a popup menu of advanced analysis tools.
+    %   Opens a small floating figure with a list of actions. Clicking an
+    %   action closes the popup and launches the corresponding dialog.
+
+        % Close existing popup if open
+        if ~isempty(advMenuFig) && isvalid(advMenuFig)
+            delete(advMenuFig);
+            advMenuFig = [];
+            return;  % toggle off
+        end
+
+        % Position near the Advanced button
+        figPos = fig.Position;
+        advMenuFig = uifigure('Name', 'Advanced Tools', ...
+            'Position', [figPos(1) + figPos(3) - 210, figPos(2) + figPos(4) - 430, 200, 340], ...
+            'Resize', 'off', ...
+            'CloseRequestFcn', @(~,~) closeAdvMenu());
+
+        advMenuGL = uigridlayout(advMenuFig, [14 1], ...
+            'RowHeight', {18, 26, 26, 26, 6, 18, 26, 26, 6, 18, 26, 6, 18, 26}, ...
+            'ColumnWidth', {'1x'}, ...
+            'Padding', [8 6 8 6], 'RowSpacing', 2);
+
+        % Section: Analysis
+        lbl1 = uilabel(advMenuGL, 'Text', 'ANALYSIS', 'FontSize', 9, 'FontWeight', 'bold', ...
+            'FontColor', [0.5 0.5 0.5]);
+        lbl1.Layout.Row = 1;
+
+        btn1 = uibutton(advMenuGL, 'Text', [char(8747) ' Integrate (bounded)...'], ...
+            'ButtonPushedFcn', @(~,~) advMenuAction(@onOpenIntegrationDialog), ...
+            'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
+            'HorizontalAlignment', 'left', ...
+            'Tooltip', 'Compute definite integral between two x-range edge points');
+        btn1.Layout.Row = 2;
+
+        btn2 = uibutton(advMenuGL, 'Text', [char(916) ' Dataset Math...'], ...
+            'ButtonPushedFcn', @(~,~) advMenuAction(@onDatasetAlgebra), ...
+            'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
+            'HorizontalAlignment', 'left', ...
+            'Tooltip', 'Combine datasets: A+B, A-B, A/B, A*B, asymmetry');
+        btn2.Layout.Row = 3;
+
+        btn3 = uibutton(advMenuGL, 'Text', [char(8776) ' Curve Fit...'], ...
+            'ButtonPushedFcn', @(~,~) advMenuAction(@onOpenCurveFitDialog), ...
+            'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
+            'HorizontalAlignment', 'left', ...
+            'Tooltip', 'Fit data to built-in models (exponential, power law, polynomial, Gaussian, ...)');
+        btn3.Layout.Row = 4;
+
+        % Separator (row 5)
+
+        % Section: Correction
+        lbl2 = uilabel(advMenuGL, 'Text', 'CORRECTION', 'FontSize', 9, 'FontWeight', 'bold', ...
+            'FontColor', [0.5 0.5 0.5]);
+        lbl2.Layout.Row = 6;
+
+        btn4 = uibutton(advMenuGL, 'Text', [char(8596) ' Resample...'], ...
+            'ButtonPushedFcn', @(~,~) advMenuAction(@onResampleDataset), ...
+            'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
+            'HorizontalAlignment', 'left', ...
+            'Tooltip', 'Resample data to a uniform x-grid');
+        btn4.Layout.Row = 7;
+
+        btn5 = uibutton(advMenuGL, 'Text', 'Column Calculator...', ...
+            'ButtonPushedFcn', @(~,~) advMenuAction(@onColumnCalculator), ...
+            'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
+            'HorizontalAlignment', 'left', ...
+            'Tooltip', 'Create new columns from expressions');
+        btn5.Layout.Row = 8;
+
+        % Separator (row 9)
+
+        % Section: Visualization
+        lbl3 = uilabel(advMenuGL, 'Text', 'VISUALIZATION', 'FontSize', 9, 'FontWeight', 'bold', ...
+            'FontColor', [0.5 0.5 0.5]);
+        lbl3.Layout.Row = 10;
+
+        btn6 = uibutton(advMenuGL, 'Text', 'Inset Plot...', ...
+            'ButtonPushedFcn', @(~,~) advMenuAction(@onCreateInset), ...
+            'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
+            'HorizontalAlignment', 'left', ...
+            'Tooltip', 'Create an inset zoom of a selected region');
+        btn6.Layout.Row = 11;
+
+        % Separator (row 12)
+
+        % Section: Data
+        lbl4 = uilabel(advMenuGL, 'Text', 'DATA', 'FontSize', 9, 'FontWeight', 'bold', ...
+            'FontColor', [0.5 0.5 0.5]);
+        lbl4.Layout.Row = 13;
+
+        btn7 = uibutton(advMenuGL, 'Text', [char(9998) ' Graph Digitizer...'], ...
+            'ButtonPushedFcn', @(~,~) advMenuAction(@onOpenDigitizer), ...
+            'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
+            'HorizontalAlignment', 'left', ...
+            'Tooltip', 'Extract data points from a graph image (screenshot/PDF figure)');
+        btn7.Layout.Row = 14;
+
+        function advMenuAction(callbackFcn)
+        %ADVMENUACTION  Close the popup then execute the callback.
+            closeAdvMenu();
+            callbackFcn([], []);
+        end
+
+        function closeAdvMenu()
+            if ~isempty(advMenuFig) && isvalid(advMenuFig)
+                delete(advMenuFig);
+            end
+            advMenuFig = [];
+        end
+    end
+
+    % ── Integration Dialog ──────────────────────────────────────────────
+
+    function onOpenIntegrationDialog(~, ~)
+    %ONOPENINTEGRATIONDIALOG  Open dialog for manual bounded integration.
+    %   User sets two x-range edge points (type or click-to-set),
+    %   selects a channel, and computes the definite integral.
+    %   The integrated region is shaded on the main axes.
+
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig, 'Load a dataset first.', 'Integrate');
+            return;
+        end
+
+        ds = appData.datasets{appData.activeIdx};
+        plotD = getPlotData(appData.activeIdx);
+        if isempty(plotD)
+            uialert(fig, 'Apply corrections or plot data first.', 'Integrate');
+            return;
+        end
+
+        xData = plotD.time;
+        labels = plotD.labels;
+        nCh = numel(labels);
+
+        % Default range: full x-extent
+        xMin = min(xData);
+        xMax = max(xData);
+
+        % Build dialog
+        intFig = uifigure('Name', 'Integrate — Bounded Area', ...
+            'Position', [350 280 440 340], 'Resize', 'off');
+        iGL = uigridlayout(intFig, [9 3], ...
+            'RowHeight', {22, 28, 28, 28, 12, 28, 50, 12, 34}, ...
+            'ColumnWidth', {100, '1x', 80}, ...
+            'Padding', [12 10 12 10], 'RowSpacing', 5);
+
+        % Row 1: Instructions
+        lblInstr = uilabel(iGL, 'Text', ...
+            'Set two x-range edge points, then compute the area.', ...
+            'FontSize', 10, 'FontColor', [0.5 0.5 0.5]);
+        lblInstr.Layout.Row = 1; lblInstr.Layout.Column = [1 3];
+
+        % Row 2: X1 (left edge)
+        uilabel(iGL, 'Text', 'X₁ (left edge):', ...
+            'HorizontalAlignment', 'right', 'FontWeight', 'bold');
+        efIntX1 = uieditfield(iGL, 'numeric', 'Value', xMin);
+        efIntX1.Layout.Row = 2; efIntX1.Layout.Column = 2;
+        btnPickX1 = uibutton(iGL, 'Text', 'Pick...', ...
+            'BackgroundColor', [0.28 0.28 0.28], 'FontColor', [1 1 1], ...
+            'Tooltip', 'Click on the plot to set X₁', ...
+            'ButtonPushedFcn', @(~,~) pickEdgePoint('x1'));
+        btnPickX1.Layout.Row = 2; btnPickX1.Layout.Column = 3;
+
+        % Row 3: X2 (right edge)
+        uilabel(iGL, 'Text', 'X₂ (right edge):', ...
+            'HorizontalAlignment', 'right', 'FontWeight', 'bold');
+        efIntX2 = uieditfield(iGL, 'numeric', 'Value', xMax);
+        efIntX2.Layout.Row = 3; efIntX2.Layout.Column = 2;
+        btnPickX2 = uibutton(iGL, 'Text', 'Pick...', ...
+            'BackgroundColor', [0.28 0.28 0.28], 'FontColor', [1 1 1], ...
+            'Tooltip', 'Click on the plot to set X₂', ...
+            'ButtonPushedFcn', @(~,~) pickEdgePoint('x2'));
+        btnPickX2.Layout.Row = 3; btnPickX2.Layout.Column = 3;
+
+        % Row 4: Channel selector
+        uilabel(iGL, 'Text', 'Channel:', ...
+            'HorizontalAlignment', 'right');
+        ddIntCh = uidropdown(iGL, 'Items', labels, ...
+            'ItemsData', 1:nCh, 'Value', 1);
+        ddIntCh.Layout.Row = 4; ddIntCh.Layout.Column = [2 3];
+
+        % Row 5: separator
+        % Row 6: Compute button
+        btnCompute = uibutton(iGL, 'Text', 'Compute Integral', ...
+            'BackgroundColor', BTN_PRIMARY, 'FontColor', [1 1 1], ...
+            'FontWeight', 'bold', ...
+            'ButtonPushedFcn', @(~,~) doComputeIntegral());
+        btnCompute.Layout.Row = 6; btnCompute.Layout.Column = [1 3];
+
+        % Row 7: Result display
+        lblIntResult = uilabel(iGL, 'Text', '', ...
+            'FontSize', 13, 'FontWeight', 'bold', ...
+            'HorizontalAlignment', 'center', ...
+            'Interpreter', 'html', 'WordWrap', 'on');
+        lblIntResult.Layout.Row = 7; lblIntResult.Layout.Column = [1 3];
+
+        % Row 8: separator
+        % Row 9: Close + Copy
+        btnRowGL = uigridlayout(iGL, [1 2], ...
+            'ColumnWidth', {'1x', '1x'}, 'Padding', [0 0 0 0], 'ColumnSpacing', 8);
+        btnRowGL.Layout.Row = 9; btnRowGL.Layout.Column = [1 3];
+
+        uibutton(btnRowGL, 'Text', 'Copy Result', ...
+            'BackgroundColor', [0.15 0.45 0.75], 'FontColor', [1 1 1], ...
+            'ButtonPushedFcn', @(~,~) copyIntResult());
+        uibutton(btnRowGL, 'Text', 'Close', ...
+            'ButtonPushedFcn', @(~,~) closeIntDialog());
+
+        % State for the integration result
+        intResult = struct('area', NaN, 'x1', NaN, 'x2', NaN, 'channel', '');
+        hShadePatch = [];  % handle to shaded region on main axes
+
+        function pickEdgePoint(which)
+        %PICKEDGEPOINT  Click on the main axes to set an edge point.
+            intFig.Visible = 'off';  % hide dialog so user can click plot
+            setStatus(sprintf('Click on the plot to set %s...', upper(which)));
+            fig.Pointer = 'crosshair';
+
+            % Temporarily install a one-shot click handler
+            oldBDF = ax.ButtonDownFcn;
+            ax.ButtonDownFcn = @(~, ~) captureClick(which, oldBDF);
+
+            function captureClick(wh, restoreFcn)
+                cp = ax.CurrentPoint;
+                xClick = cp(1, 1);
+                switch wh
+                    case 'x1'
+                        efIntX1.Value = xClick;
+                    case 'x2'
+                        efIntX2.Value = xClick;
+                end
+                ax.ButtonDownFcn = restoreFcn;
+                fig.Pointer = 'arrow';
+                intFig.Visible = 'on';
+                figure(intFig);
+                setStatus(sprintf('%s set to %.4g', upper(wh), xClick));
+            end
+        end
+
+        function doComputeIntegral()
+        %DOCOMPUTEINTEGRAL  Compute the definite integral between X1 and X2.
+            x1v = efIntX1.Value;
+            x2v = efIntX2.Value;
+            ch = ddIntCh.Value;
+
+            if x1v >= x2v
+                uialert(intFig, 'X₁ must be less than X₂.', 'Range Error');
+                return;
+            end
+
+            % Get the data to integrate
+            d = getPlotData(appData.activeIdx);
+            xAll = d.time;
+            yAll = d.values(:, ch);
+
+            % Mask to the range [x1, x2]
+            mask = xAll >= x1v & xAll <= x2v;
+            xSeg = xAll(mask);
+            ySeg = yAll(mask);
+
+            if numel(xSeg) < 2
+                uialert(intFig, 'Not enough data points in the selected range.', 'Error');
+                return;
+            end
+
+            % Trapezoidal integration
+            area = trapz(xSeg, ySeg);
+
+            intResult.area = area;
+            intResult.x1 = x1v;
+            intResult.x2 = x2v;
+            intResult.channel = labels{ch};
+
+            % Display result
+            lblIntResult.Text = sprintf( ...
+                ['<b>%s</b> %s Y dx = <b>%.6g</b><br>' ...
+                 'Range: [%.4g, %.4g] &nbsp; (%d points)'], ...
+                char(8747), char(160), area, x1v, x2v, numel(xSeg));
+
+            % Shade the region on the main axes
+            clearIntShading();
+            hold(ax, 'on');
+            % Fill polygon: bottom at y=0 or yMin, top at data
+            yBase = zeros(size(ySeg));
+            xPoly = [xSeg; flipud(xSeg)];
+            yPoly = [ySeg; yBase];
+            hShadePatch = fill(ax, xPoly, yPoly, [0.3 0.6 1.0], ...
+                'FaceAlpha', 0.3, 'EdgeColor', 'none', ...
+                'HandleVisibility', 'off', 'Tag', 'integrationShade');
+            % Draw vertical edge lines
+            yLimCurr = ax.YLim;
+            line(ax, [x1v x1v], yLimCurr, 'Color', [0.8 0.2 0.2], ...
+                'LineStyle', '--', 'LineWidth', 1.5, ...
+                'HandleVisibility', 'off', 'Tag', 'integrationEdge');
+            line(ax, [x2v x2v], yLimCurr, 'Color', [0.8 0.2 0.2], ...
+                'LineStyle', '--', 'LineWidth', 1.5, ...
+                'HandleVisibility', 'off', 'Tag', 'integrationEdge');
+            hold(ax, 'off');
+
+            setStatus(sprintf('Integral = %.6g over [%.4g, %.4g]', area, x1v, x2v));
+        end
+
+        function copyIntResult()
+            if isnan(intResult.area)
+                uialert(intFig, 'Compute an integral first.', 'Copy');
+                return;
+            end
+            txt = sprintf('Integral of %s from %.6g to %.6g = %.6g', ...
+                intResult.channel, intResult.x1, intResult.x2, intResult.area);
+            clipboard('copy', txt);
+            setStatus('Integration result copied to clipboard');
+        end
+
+        function closeIntDialog()
+            clearIntShading();
+            delete(intFig);
+        end
+
+        function clearIntShading()
+        %CLEARINTSHADING  Remove shading and edge lines from main axes.
+            if ~isempty(hShadePatch) && isvalid(hShadePatch)
+                delete(hShadePatch);
+                hShadePatch = [];
+            end
+            % Remove edge lines by tag
+            if ~isempty(ax) && isvalid(ax)
+                edgeLines = findobj(ax, 'Tag', 'integrationEdge');
+                delete(edgeLines);
+                shadePatches = findobj(ax, 'Tag', 'integrationShade');
+                delete(shadePatches);
+            end
+        end
+    end
+
+    % ── Curve Fitting Dialog ────────────────────────────────────────────
+
+    function onOpenCurveFitDialog(~, ~)
+    %ONOPENCURVEFITDIALOG  Open general-purpose curve fitting dialog.
+    %   Fits data to built-in models using Nelder-Mead simplex (fminsearch).
+    %   Shows fit curve, residuals, R², and parameter table.
+
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig, 'Load a dataset first.', 'Curve Fit');
+            return;
+        end
+
+        plotD = getPlotData(appData.activeIdx);
+        if isempty(plotD)
+            uialert(fig, 'Apply corrections or plot data first.', 'Curve Fit');
+            return;
+        end
+
+        xData = plotD.time;
+        labels = plotD.labels;
+
+        % ── Model library ────────────────────────────────────────────
+        % Each model: {name, displayEqn, nParams, paramNames, defaultP0, fitFcn}
+        % fitFcn = @(p, x) -> y
+        models = { ...
+            'Linear',           'y = a*x + b',               2, {'a','b'},         [1, 0], ...
+                @(p,x) p(1)*x + p(2);
+            'Polynomial 2',     'y = a*x^2 + b*x + c',       3, {'a','b','c'},     [0, 1, 0], ...
+                @(p,x) p(1)*x.^2 + p(2)*x + p(3);
+            'Polynomial 3',     'y = a*x^3 + b*x^2 + c*x + d', 4, {'a','b','c','d'}, [0, 0, 1, 0], ...
+                @(p,x) p(1)*x.^3 + p(2)*x.^2 + p(3)*x + p(4);
+            'Exponential Decay','y = a*exp(-x/b) + c',       3, {'a','b','c'},     [1, 1, 0], ...
+                @(p,x) p(1)*exp(-x./p(2)) + p(3);
+            'Exp. Growth',      'y = a*exp(x/b) + c',        3, {'a','b','c'},     [1, 1, 0], ...
+                @(p,x) p(1)*exp(x./p(2)) + p(3);
+            'Double Exp. Decay','y = a*exp(-x/b) + c*exp(-x/d) + e', 5, {'a','b','c','d','e'}, [1,1,0.5,5,0], ...
+                @(p,x) p(1)*exp(-x./p(2)) + p(3)*exp(-x./p(4)) + p(5);
+            'Power Law',        'y = a*x^b',                 2, {'a','b'},         [1, 1], ...
+                @(p,x) p(1)*abs(x).^p(2);
+            'Gaussian',         'y = a*exp(-(x-b)^2/(2*c^2))', 3, {'a','b','c'},  [1, 0, 1], ...
+                @(p,x) p(1)*exp(-(x-p(2)).^2./(2*p(3)^2));
+            'Lorentzian',       'y = a / (1 + ((x-b)/c)^2)', 3, {'a','b','c'},    [1, 0, 1], ...
+                @(p,x) p(1) ./ (1 + ((x-p(2))./p(3)).^2);
+            'Voigt (approx)',   'y = eta*L + (1-eta)*G',     4, {'amp','ctr','wid','eta'}, [1,0,1,0.5], ...
+                @(p,x) p(4)*(p(1)./(1+((x-p(2))./p(3)).^2)) + (1-p(4))*(p(1)*exp(-(x-p(2)).^2./(2*p(3)^2)));
+            'Sigmoid',          'y = a / (1 + exp(-(x-b)/c))',3, {'a','b','c'},    [1, 0, 1], ...
+                @(p,x) p(1) ./ (1 + exp(-(x-p(2))./p(3)));
+            'Arrhenius',        'y = a*exp(-b/x)',            2, {'a','Ea_over_kB'},[1, 1000], ...
+                @(p,x) p(1)*exp(-p(2)./x);
+            'Langmuir',         'y = a*x / (b + x)',          2, {'a','b'},         [1, 1], ...
+                @(p,x) p(1)*x ./ (p(2) + x);
+            'Logarithmic',      'y = a*ln(x) + b',           2, {'a','b'},         [1, 0], ...
+                @(p,x) p(1)*log(abs(x)) + p(2);
+            'Sqrt',             'y = a*sqrt(x) + b',         2, {'a','b'},         [1, 0], ...
+                @(p,x) p(1)*sqrt(abs(x)) + p(2);
+        };
+
+        modelNames = models(:,1);
+        nModels = size(models, 1);
+
+        % ── Build dialog ─────────────────────────────────────────────
+        cfFig = uifigure('Name', 'Curve Fit', ...
+            'Position', [250 120 560 560], 'Resize', 'on');
+
+        cfRootGL = uigridlayout(cfFig, [5 1], ...
+            'RowHeight', {70, 30, '1x', 90, 36}, ...
+            'Padding', [10 8 10 8], 'RowSpacing', 6);
+
+        % ── Row 1: Model selection + channel + range ─────────────────
+        cfTopGL = uigridlayout(cfRootGL, [3 6], ...
+            'RowHeight', {22, 22, 22}, ...
+            'ColumnWidth', {70, '1x', 70, '1x', 45, 45}, ...
+            'Padding', [0 0 0 0], 'RowSpacing', 4);
+        cfTopGL.Layout.Row = 1;
+
+        uilabel(cfTopGL, 'Text', 'Model:', 'HorizontalAlignment', 'right', ...
+            'FontWeight', 'bold');
+        ddCFModel = uidropdown(cfTopGL, 'Items', modelNames, 'Value', modelNames{1}, ...
+            'ValueChangedFcn', @(~,~) onCFModelChanged());
+        ddCFModel.Layout.Row = 1; ddCFModel.Layout.Column = 2;
+
+        uilabel(cfTopGL, 'Text', 'Channel:', 'HorizontalAlignment', 'right');
+        ddCFCh = uidropdown(cfTopGL, 'Items', labels, ...
+            'ItemsData', 1:numel(labels), 'Value', 1);
+        ddCFCh.Layout.Row = 1; ddCFCh.Layout.Column = 4;
+
+        uilabel(cfTopGL, 'Text', 'X min:', 'HorizontalAlignment', 'right');
+        efCFXmin = uieditfield(cfTopGL, 'numeric', 'Value', min(xData));
+        efCFXmin.Layout.Row = 2; efCFXmin.Layout.Column = 2;
+        uilabel(cfTopGL, 'Text', 'X max:', 'HorizontalAlignment', 'right');
+        efCFXmax = uieditfield(cfTopGL, 'numeric', 'Value', max(xData));
+        efCFXmax.Layout.Row = 2; efCFXmax.Layout.Column = 4;
+
+        btnCFPickMin = uibutton(cfTopGL, 'Text', 'Pick', ...
+            'FontSize', 9, ...
+            'BackgroundColor', [0.28 0.28 0.28], 'FontColor', [0.9 0.9 0.9], ...
+            'Tooltip', 'Click on the plot to set X min', ...
+            'ButtonPushedFcn', @(~,~) cfPickXRange('min'));
+        btnCFPickMin.Layout.Row = 2; btnCFPickMin.Layout.Column = 5;
+
+        btnCFPickMax = uibutton(cfTopGL, 'Text', 'Pick', ...
+            'FontSize', 9, ...
+            'BackgroundColor', [0.28 0.28 0.28], 'FontColor', [0.9 0.9 0.9], ...
+            'Tooltip', 'Click on the plot to set X max', ...
+            'ButtonPushedFcn', @(~,~) cfPickXRange('max'));
+        btnCFPickMax.Layout.Row = 2; btnCFPickMax.Layout.Column = 6;
+
+        lblCFEqn = uilabel(cfTopGL, 'Text', models{1,2}, ...
+            'FontSize', 11, 'FontColor', [0.4 0.7 0.4], ...
+            'Interpreter', 'none');
+        lblCFEqn.Layout.Row = 3; lblCFEqn.Layout.Column = [1 6];
+
+        % ── Row 2: Fit button ────────────────────────────────────────
+        btnCFFit = uibutton(cfRootGL, 'Text', 'Fit', ...
+            'BackgroundColor', BTN_PRIMARY, 'FontColor', [1 1 1], ...
+            'FontWeight', 'bold', 'FontSize', 12, ...
+            'ButtonPushedFcn', @(~,~) doCurveFit());
+        btnCFFit.Layout.Row = 2;
+
+        % ── Row 3: Results axes (fit + residuals) ────────────────────
+        cfAxPanel = uigridlayout(cfRootGL, [2 1], ...
+            'RowHeight', {'3x', '1x'}, 'Padding', [0 0 0 0], 'RowSpacing', 4);
+        cfAxPanel.Layout.Row = 3;
+
+        cfAxFit = uiaxes(cfAxPanel);
+        cfAxFit.Layout.Row = 1;
+        title(cfAxFit, 'Fit Result');
+        xlabel(cfAxFit, 'X'); ylabel(cfAxFit, 'Y');
+        cfAxFit.Box = 'on'; grid(cfAxFit, 'on');
+
+        cfAxRes = uiaxes(cfAxPanel);
+        cfAxRes.Layout.Row = 2;
+        title(cfAxRes, 'Residuals');
+        xlabel(cfAxRes, 'X'); ylabel(cfAxRes, 'Residual');
+        cfAxRes.Box = 'on'; grid(cfAxRes, 'on');
+
+        % ── Row 4: Parameter table ───────────────────────────────────
+        tblCFParams = uitable(cfRootGL, ...
+            'ColumnName', {'Parameter', 'Value', 'Initial Guess'}, ...
+            'ColumnEditable', [false, false, true], ...
+            'ColumnFormat', {'char', 'char', 'numeric'}, ...
+            'Data', {});
+        tblCFParams.Layout.Row = 4;
+
+        % ── Row 5: Results + actions ─────────────────────────────────
+        cfBtnGL = uigridlayout(cfRootGL, [1 4], ...
+            'ColumnWidth', {'2x', 80, 80, 80}, ...
+            'Padding', [0 0 0 0], 'ColumnSpacing', 6);
+        cfBtnGL.Layout.Row = 5;
+
+        lblCFStats = uilabel(cfBtnGL, 'Text', '', ...
+            'FontSize', 10, 'FontColor', [0.6 0.6 0.6], ...
+            'Interpreter', 'html');
+        lblCFStats.Layout.Column = 1;
+
+        uibutton(cfBtnGL, 'Text', 'Plot on Main', ...
+            'BackgroundColor', [0.15 0.45 0.75], 'FontColor', [1 1 1], ...
+            'FontSize', 9, ...
+            'Tooltip', 'Overlay fit curve on the main DataPlotter axes', ...
+            'ButtonPushedFcn', @(~,~) onCFPlotOnMain());
+        uibutton(cfBtnGL, 'Text', 'Copy', ...
+            'FontSize', 9, ...
+            'Tooltip', 'Copy fit results to clipboard', ...
+            'ButtonPushedFcn', @(~,~) onCFCopyResults());
+        uibutton(cfBtnGL, 'Text', 'Close', ...
+            'FontSize', 9, ...
+            'ButtonPushedFcn', @(~,~) delete(cfFig));
+
+        % State for fit results
+        cfResult = struct('params', [], 'model', '', 'xFit', [], 'yFit', [], ...
+            'R2', NaN, 'RMSE', NaN, 'paramNames', {{}});
+
+        % Initialize parameter table
+        onCFModelChanged();
+
+        function onCFModelChanged()
+        %ONCFMODELCHANGED  Update equation display and parameter table for selected model.
+            idx = find(strcmp(ddCFModel.Value, modelNames), 1);
+            if isempty(idx), return; end
+            lblCFEqn.Text = models{idx, 2};
+            pNames = models{idx, 4};
+            p0 = models{idx, 5};
+            tblData2 = cell(numel(pNames), 3);
+            for pi = 1:numel(pNames)
+                tblData2{pi, 1} = pNames{pi};
+                tblData2{pi, 2} = '';
+                tblData2{pi, 3} = p0(pi);
+            end
+            tblCFParams.Data = tblData2;
+        end
+
+        function doCurveFit()
+        %DOCURVEFIT  Execute the curve fit using fminsearch.
+            idx = find(strcmp(ddCFModel.Value, modelNames), 1);
+            if isempty(idx), return; end
+
+            ch = ddCFCh.Value;
+            d2 = getPlotData(appData.activeIdx);
+            xAll = d2.time; yAll = d2.values(:, ch);
+
+            % Apply x-range
+            mask2 = xAll >= efCFXmin.Value & xAll <= efCFXmax.Value;
+            xSeg = xAll(mask2);
+            ySeg = yAll(mask2);
+
+            if numel(xSeg) < 3
+                uialert(cfFig, 'Not enough data in range.', 'Fit Error');
+                return;
+            end
+
+            fitFcn = models{idx, 6};
+            pNames = models{idx, 4};
+
+            % Read initial guesses from table (user may have edited)
+            p0 = zeros(1, numel(pNames));
+            for pi = 1:numel(pNames)
+                val = tblCFParams.Data{pi, 3};
+                if isnumeric(val)
+                    p0(pi) = val;
+                else
+                    p0(pi) = str2double(val);
+                end
+            end
+
+            % Auto-guess improvements based on data
+            p0 = autoGuess(idx, p0, xSeg, ySeg);
+
+            % Cost function: sum of squared residuals
+            costFcn = @(p) sum((ySeg - fitFcn(p, xSeg)).^2);
+
+            % Run fminsearch
+            cfFig.Pointer = 'watch'; drawnow;
+            try
+                opts2 = optimset('MaxFunEvals', 10000, 'MaxIter', 5000, ...
+                    'TolFun', 1e-12, 'TolX', 1e-10);
+                [pOpt, fval] = fminsearch(costFcn, p0, opts2);
+
+                % Compute fit curve (dense x for smooth line)
+                xFit = linspace(min(xSeg), max(xSeg), 500)';
+                yFit = fitFcn(pOpt, xFit);
+                yPred = fitFcn(pOpt, xSeg);
+                residuals = ySeg - yPred;
+
+                % R²
+                ssTot = sum((ySeg - mean(ySeg)).^2);
+                ssRes = fval;
+                R2 = 1 - ssRes / max(ssTot, eps);
+                RMSE = sqrt(ssRes / numel(ySeg));
+
+                % Store result
+                cfResult.params = pOpt;
+                cfResult.model = ddCFModel.Value;
+                cfResult.xFit = xFit;
+                cfResult.yFit = yFit;
+                cfResult.R2 = R2;
+                cfResult.RMSE = RMSE;
+                cfResult.paramNames = pNames;
+
+                % Update parameter table
+                for pi = 1:numel(pNames)
+                    tblCFParams.Data{pi, 2} = sprintf('%.6g', pOpt(pi));
+                end
+
+                % Plot fit
+                cla(cfAxFit);
+                plot(cfAxFit, xSeg, ySeg, 'k.', 'MarkerSize', 4);
+                hold(cfAxFit, 'on');
+                plot(cfAxFit, xFit, yFit, 'r-', 'LineWidth', 1.5);
+                hold(cfAxFit, 'off');
+                legend(cfAxFit, {'Data', 'Fit'}, 'Location', 'best');
+                title(cfAxFit, sprintf('%s  (R%s = %.6f)', ddCFModel.Value, char(178), R2));
+                cfAxFit.Box = 'on'; grid(cfAxFit, 'on');
+
+                % Plot residuals
+                cla(cfAxRes);
+                stem(cfAxRes, xSeg, residuals, 'b.', 'MarkerSize', 3);
+                hold(cfAxRes, 'on');
+                yline(cfAxRes, 0, 'k--');
+                hold(cfAxRes, 'off');
+                title(cfAxRes, sprintf('Residuals (RMSE = %.4g)', RMSE));
+                cfAxRes.Box = 'on'; grid(cfAxRes, 'on');
+
+                % Stats label
+                lblCFStats.Text = sprintf('R%s = <b>%.6f</b> &nbsp; RMSE = %.4g &nbsp; N = %d', ...
+                    char(178), R2, RMSE, numel(xSeg));
+
+                cfFig.Pointer = 'arrow';
+            catch ME
+                cfFig.Pointer = 'arrow';
+                uialert(cfFig, sprintf('Fit failed:\n%s', ME.message), 'Error');
+            end
+        end
+
+        function p0 = autoGuess(modelIdx, p0, xS, yS)
+        %AUTOGUESS  Improve initial parameter guesses from data.
+            switch modelIdx
+                case 1  % Linear
+                    p0(1) = (yS(end)-yS(1)) / max(eps, xS(end)-xS(1));
+                    p0(2) = yS(1);
+                case {2,3}  % Polynomial
+                    p0(end) = mean(yS);
+                case 4  % Exp decay
+                    p0(1) = max(yS) - min(yS);
+                    p0(2) = (max(xS) - min(xS)) / 3;
+                    p0(3) = min(yS);
+                case 5  % Exp growth
+                    p0(1) = min(yS);
+                    p0(2) = (max(xS) - min(xS)) / 3;
+                    p0(3) = min(yS);
+                case 7  % Power law
+                    p0(1) = yS(1) / max(eps, abs(xS(1)));
+                    p0(2) = 1;
+                case {8,9,10}  % Gaussian / Lorentzian / Voigt
+                    [~, pkIdx] = max(yS);
+                    p0(1) = yS(pkIdx);
+                    p0(2) = xS(pkIdx);
+                    hm = find(yS >= yS(pkIdx)/2);
+                    if numel(hm) >= 2
+                        p0(3) = (xS(hm(end)) - xS(hm(1))) / 2.355;
+                    else
+                        p0(3) = (max(xS)-min(xS)) / 10;
+                    end
+                case 11  % Sigmoid
+                    p0(1) = max(yS) - min(yS);
+                    p0(2) = mean(xS);
+                    p0(3) = (max(xS) - min(xS)) / 10;
+                case 13  % Langmuir
+                    p0(1) = max(yS);
+                    p0(2) = median(xS);
+            end
+        end
+
+        function onCFPlotOnMain()
+        %ONCFPLOTONMAIN  Overlay the fit curve on the main DataPlotter axes.
+            if isempty(cfResult.xFit), return; end
+            hold(ax, 'on');
+            plot(ax, cfResult.xFit, cfResult.yFit, 'r-', 'LineWidth', 1.5, ...
+                'DisplayName', sprintf('%s fit (R%s=%.4f)', ...
+                    cfResult.model, char(178), cfResult.R2), ...
+                'HandleVisibility', 'on', 'Tag', 'curveFitOverlay');
+            hold(ax, 'off');
+            % Add equation text annotation
+            eqnStr = sprintf('%s  R%s = %.4f', cfResult.model, char(178), cfResult.R2);
+            text(ax, 0.02, 0.95, eqnStr, ...
+                'Units', 'normalized', 'FontSize', 9, ...
+                'Color', [0.9 0.2 0.2], 'BackgroundColor', [1 1 1 0.7], ...
+                'VerticalAlignment', 'top', ...
+                'HandleVisibility', 'off', 'Tag', 'curveFitLabel');
+            setStatus(sprintf('Fit overlaid: %s (R%s=%.6f)', cfResult.model, char(178), cfResult.R2));
+        end
+
+        function onCFCopyResults()
+        %ONCFCOPYRESULTS  Copy fit parameters and stats to clipboard.
+            if isnan(cfResult.R2), return; end
+            lines2 = {};
+            lines2{end+1} = sprintf('Model: %s', cfResult.model);
+            lines2{end+1} = sprintf('R² = %.8f', cfResult.R2);
+            lines2{end+1} = sprintf('RMSE = %.6g', cfResult.RMSE);
+            lines2{end+1} = 'Parameters:';
+            for pi = 1:numel(cfResult.paramNames)
+                lines2{end+1} = sprintf('  %s = %.8g', cfResult.paramNames{pi}, cfResult.params(pi)); %#ok<AGROW>
+            end
+            clipboard('copy', strjoin(lines2, newline));
+            setStatus('Fit results copied to clipboard');
+        end
+
+        function cfPickXRange(which)
+        %CFPICKXRANGE  Click on DataPlotter axes to set X min or max.
+            cfFig.Visible = 'off';
+            fig.Pointer = 'crosshair';
+            setStatus(sprintf('Click on the plot to set X %s...', which));
+            oldBDF = ax.ButtonDownFcn;
+            ax.ButtonDownFcn = @(~,~) cfCaptureX(which, oldBDF);
+            function cfCaptureX(wh, restoreFcn)
+                cp = ax.CurrentPoint;
+                xClick = cp(1,1);
+                switch wh
+                    case 'min', efCFXmin.Value = xClick;
+                    case 'max', efCFXmax.Value = xClick;
+                end
+                ax.ButtonDownFcn = restoreFcn;
+                fig.Pointer = 'arrow';
+                cfFig.Visible = 'on';
+                figure(cfFig);
+                setStatus(sprintf('X %s set to %.4g', wh, xClick));
+            end
+        end
+    end
+
+    % ── Graph Digitizer ────────────────────────────────────────────────
+
+    function onOpenDigitizer(~, ~)
+    %ONOPENDIGITIZER  Extract data points from a graph image.
+    %   Workflow:
+    %     1. Load a graph image (PNG/JPG/TIFF screenshot of a figure)
+    %     2. Set axis calibration by clicking 4 reference points with known values
+    %     3. Click on data points — pixel coords converted to data coords
+    %     4. Export extracted points as CSV or load into DataPlotter
+
+        % ── Build dialog ─────────────────────────────────────────────
+        digFig = uifigure('Name', 'Graph Digitizer', ...
+            'Position', [150 80 820 620], 'Resize', 'on');
+
+        digRootGL = uigridlayout(digFig, [1 2], ...
+            'ColumnWidth', {'1x', 250}, ...
+            'Padding', [4 4 4 4], 'ColumnSpacing', 6);
+
+        % Left: image axes
+        digAxPanel = uipanel(digRootGL, 'Title', 'Graph Image');
+        digAxPanel.Layout.Column = 1;
+        digAxGL = uigridlayout(digAxPanel, [1 1], 'Padding', [2 2 2 2]);
+        digAx = uiaxes(digAxGL);
+        digAx.Box = 'on';
+        digAx.XTick = []; digAx.YTick = [];
+        title(digAx, 'Load a graph image to begin', 'Interpreter', 'none');
+
+        % Right: controls panel
+        ctrlPanel = uipanel(digRootGL, 'Title', 'Controls');
+        ctrlPanel.Layout.Column = 2;
+        ctrlGL = uigridlayout(ctrlPanel, [16 2], ...
+            'RowHeight', {28, 6, 18, 24, 24, 24, 24, 6, 18, 28, 28, 6, '1x', 28, 28, 28}, ...
+            'ColumnWidth', {'1x', '1x'}, ...
+            'Padding', [6 4 6 4], 'RowSpacing', 3);
+
+        % Row 1: Load image
+        btnDigLoad = uibutton(ctrlGL, 'Text', 'Load Image...', ...
+            'BackgroundColor', BTN_PRIMARY, 'FontColor', [1 1 1], ...
+            'FontWeight', 'bold', ...
+            'ButtonPushedFcn', @(~,~) digLoadImage());
+        btnDigLoad.Layout.Row = 1; btnDigLoad.Layout.Column = [1 2];
+
+        % Row 3: Calibration header
+        uilabel(ctrlGL, 'Text', 'AXIS CALIBRATION', 'FontSize', 9, ...
+            'FontWeight', 'bold', 'FontColor', [0.5 0.5 0.5]).Layout.Row = 3;
+
+        % Row 4-7: Reference points
+        uilabel(ctrlGL, 'Text', 'X1 value:', 'HorizontalAlignment', 'right');
+        efDigX1 = uieditfield(ctrlGL, 'numeric', 'Value', 0);
+        efDigX1.Layout.Row = 4; efDigX1.Layout.Column = 2;
+
+        uilabel(ctrlGL, 'Text', 'X2 value:', 'HorizontalAlignment', 'right');
+        efDigX2 = uieditfield(ctrlGL, 'numeric', 'Value', 100);
+        efDigX2.Layout.Row = 5; efDigX2.Layout.Column = 2;
+
+        uilabel(ctrlGL, 'Text', 'Y1 value:', 'HorizontalAlignment', 'right');
+        efDigY1 = uieditfield(ctrlGL, 'numeric', 'Value', 0);
+        efDigY1.Layout.Row = 6; efDigY1.Layout.Column = 2;
+
+        uilabel(ctrlGL, 'Text', 'Y2 value:', 'HorizontalAlignment', 'right');
+        efDigY2 = uieditfield(ctrlGL, 'numeric', 'Value', 100);
+        efDigY2.Layout.Row = 7; efDigY2.Layout.Column = 2;
+
+        % Row 9: Mode header
+        uilabel(ctrlGL, 'Text', 'MODE', 'FontSize', 9, ...
+            'FontWeight', 'bold', 'FontColor', [0.5 0.5 0.5]).Layout.Row = 9;
+
+        % Row 10-11: Mode buttons
+        btnDigCalibrate = uibutton(ctrlGL, 'Text', 'Set Axes (4 clicks)', ...
+            'BackgroundColor', [0.6 0.4 0.1], 'FontColor', [1 1 1], ...
+            'FontWeight', 'bold', ...
+            'ButtonPushedFcn', @(~,~) digStartCalibration(), ...
+            'Tooltip', 'Click 4 points: X1-left, X2-right, Y1-bottom, Y2-top');
+        btnDigCalibrate.Layout.Row = 10; btnDigCalibrate.Layout.Column = [1 2];
+
+        btnDigCollect = uibutton(ctrlGL, 'Text', 'Collect Points (click)', ...
+            'BackgroundColor', [0.15 0.45 0.75], 'FontColor', [1 1 1], ...
+            'FontWeight', 'bold', ...
+            'Enable', 'off', ...
+            'ButtonPushedFcn', @(~,~) digStartCollection(), ...
+            'Tooltip', 'Click on data points in the graph — coordinates computed from calibration');
+        btnDigCollect.Layout.Row = 11; btnDigCollect.Layout.Column = [1 2];
+
+        % Row 13: Points table
+        tblDigPts = uitable(ctrlGL, ...
+            'ColumnName', {'X', 'Y'}, ...
+            'Data', {}, ...
+            'ColumnEditable', [true true], ...
+            'ColumnFormat', {'numeric', 'numeric'}, ...
+            'FontSize', 9);
+        tblDigPts.Layout.Row = 13; tblDigPts.Layout.Column = [1 2];
+
+        % Row 14: Undo last / Clear all
+        btnDigUndo = uibutton(ctrlGL, 'Text', 'Undo Last', ...
+            'ButtonPushedFcn', @(~,~) digUndoLast());
+        btnDigUndo.Layout.Row = 14; btnDigUndo.Layout.Column = 1;
+
+        btnDigClear = uibutton(ctrlGL, 'Text', 'Clear All', ...
+            'BackgroundColor', [0.55 0.15 0.15], 'FontColor', [1 1 1], ...
+            'ButtonPushedFcn', @(~,~) digClearPoints());
+        btnDigClear.Layout.Row = 14; btnDigClear.Layout.Column = 2;
+
+        % Row 15: Export CSV
+        btnDigExport = uibutton(ctrlGL, 'Text', 'Export CSV...', ...
+            'BackgroundColor', [0.15 0.45 0.75], 'FontColor', [1 1 1], ...
+            'ButtonPushedFcn', @(~,~) digExportCSV());
+        btnDigExport.Layout.Row = 15; btnDigExport.Layout.Column = 1;
+
+        % Row 16: Load into DataPlotter
+        btnDigToDP = uibutton(ctrlGL, 'Text', 'Load as Dataset', ...
+            'BackgroundColor', BTN_PRIMARY, 'FontColor', [1 1 1], ...
+            'FontWeight', 'bold', ...
+            'ButtonPushedFcn', @(~,~) digLoadAsDataset());
+        btnDigToDP.Layout.Row = 16; btnDigToDP.Layout.Column = [1 2];
+
+        % ── Digitizer state ──────────────────────────────────────────
+        digState = struct();
+        digState.imgLoaded = false;
+        digState.imgData   = [];       % [H x W x 3] uint8
+        digState.calibrated = false;
+        % Calibration: pixel coords of 4 reference points
+        digState.refPx     = zeros(4, 2);  % [x1px, y1px; x2px, y2px; ...]
+        digState.refClicks = 0;        % 0-4 during calibration
+        digState.mode      = 'idle';   % 'idle' | 'calibrate' | 'collect'
+        % Extracted data points
+        digState.pts       = [];       % [N x 2] data coordinates
+        digState.ptsPx     = [];       % [N x 2] pixel coordinates
+        digState.markers   = {};       % graphics handles for point markers
+
+        % ── Digitizer callbacks ──────────────────────────────────────
+
+        function digLoadImage()
+            [fn2, fp2] = uigetfile( ...
+                {'*.png;*.jpg;*.jpeg;*.tif;*.tiff;*.bmp', 'Image Files'}, ...
+                'Load Graph Image');
+            if isequal(fn2, 0), return; end
+            imgPath = fullfile(fp2, fn2);
+            try
+                digState.imgData = imread(imgPath);
+                digState.imgLoaded = true;
+                digState.calibrated = false;
+                digState.refClicks = 0;
+                digState.pts = [];
+                digState.ptsPx = [];
+                digState.markers = {};
+
+                cla(digAx);
+                image(digAx, digState.imgData);
+                axis(digAx, 'image');
+                digAx.XTick = []; digAx.YTick = [];
+                title(digAx, fn2, 'Interpreter', 'none');
+                digAx.YDir = 'reverse';  % image convention
+            catch ME
+                uialert(digFig, sprintf('Failed to load image:\n%s', ME.message), 'Error');
+            end
+        end
+
+        function digStartCalibration()
+            if ~digState.imgLoaded
+                uialert(digFig, 'Load an image first.', 'Calibrate');
+                return;
+            end
+            digState.mode = 'calibrate';
+            digState.refClicks = 0;
+            digState.calibrated = false;
+            btnDigCollect.Enable = 'off';
+            title(digAx, 'Click X1 (left axis reference point)', 'Color', [0.8 0.4 0]);
+
+            digAx.ButtonDownFcn = @digOnAxesClick;
+            % Make image click-through so axes gets the click
+            imgs = findobj(digAx, 'Type', 'image');
+            for ii = 1:numel(imgs)
+                imgs(ii).HitTest = 'off';
+            end
+        end
+
+        function digStartCollection()
+            if ~digState.calibrated
+                uialert(digFig, 'Calibrate axes first.', 'Collect');
+                return;
+            end
+            digState.mode = 'collect';
+            title(digAx, 'Click on data points (Esc to stop)', 'Color', [0.2 0.5 0.8]);
+
+            digAx.ButtonDownFcn = @digOnAxesClick;
+            imgs = findobj(digAx, 'Type', 'image');
+            for ii = 1:numel(imgs)
+                imgs(ii).HitTest = 'off';
+            end
+        end
+
+        function digOnAxesClick(~, ~)
+            cp = digAx.CurrentPoint;
+            px = cp(1, 1);   % pixel x
+            py = cp(1, 2);   % pixel y
+
+            switch digState.mode
+                case 'calibrate'
+                    digState.refClicks = digState.refClicks + 1;
+                    digState.refPx(digState.refClicks, :) = [px, py];
+
+                    % Mark calibration point
+                    hold(digAx, 'on');
+                    plot(digAx, px, py, 's', 'MarkerSize', 10, 'LineWidth', 2, ...
+                        'Color', [0.9 0.5 0], 'MarkerFaceColor', [1 0.8 0.2], ...
+                        'HandleVisibility', 'off', 'Tag', 'digCalibMark');
+                    hold(digAx, 'off');
+
+                    prompts = {'Click X2 (right axis reference point)', ...
+                               'Click Y1 (bottom axis reference point)', ...
+                               'Click Y2 (top axis reference point)', ...
+                               'Calibration complete!'};
+                    if digState.refClicks < 4
+                        title(digAx, prompts{digState.refClicks}, 'Color', [0.8 0.4 0]);
+                    else
+                        % Calibration done
+                        digState.calibrated = true;
+                        digState.mode = 'idle';
+                        digAx.ButtonDownFcn = [];
+                        btnDigCollect.Enable = 'on';
+                        title(digAx, 'Calibrated — click "Collect Points" to begin', ...
+                            'Color', [0.2 0.7 0.2]);
+                    end
+
+                case 'collect'
+                    % Convert pixel coords to data coords
+                    [dx, dy] = digPixelToData(px, py);
+                    if isnan(dx) || isnan(dy), return; end
+
+                    digState.pts(end+1, :) = [dx, dy];
+                    digState.ptsPx(end+1, :) = [px, py];
+
+                    % Draw marker
+                    hold(digAx, 'on');
+                    hM = plot(digAx, px, py, 'r+', 'MarkerSize', 10, 'LineWidth', 1.5, ...
+                        'HandleVisibility', 'off', 'Tag', 'digDataMark');
+                    hold(digAx, 'off');
+                    digState.markers{end+1} = hM;
+
+                    % Update table
+                    tblDigPts.Data = num2cell(digState.pts);
+                    title(digAx, sprintf('%d points collected', size(digState.pts, 1)), ...
+                        'Color', [0.2 0.5 0.8]);
+            end
+        end
+
+        function [dx, dy] = digPixelToData(px, py)
+        %DIGPIXELTODATA  Convert pixel coordinates to data coordinates.
+        %   Uses bilinear mapping from 4 calibration reference points.
+            if ~digState.calibrated
+                dx = NaN; dy = NaN; return;
+            end
+
+            % Reference pixel positions
+            x1px = digState.refPx(1, 1);  % X1 left
+            x2px = digState.refPx(2, 1);  % X2 right
+            y1px = digState.refPx(3, 2);  % Y1 bottom
+            y2px = digState.refPx(4, 2);  % Y2 top
+
+            % Reference data values
+            x1val = efDigX1.Value;
+            x2val = efDigX2.Value;
+            y1val = efDigY1.Value;
+            y2val = efDigY2.Value;
+
+            % Linear interpolation
+            if abs(x2px - x1px) < 1, dx = NaN; return; end
+            if abs(y2px - y1px) < 1, dy = NaN; return; end
+
+            dx = x1val + (px - x1px) / (x2px - x1px) * (x2val - x1val);
+            dy = y1val + (py - y1px) / (y2px - y1px) * (y2val - y1val);
+        end
+
+        function digUndoLast()
+            if isempty(digState.pts), return; end
+            digState.pts(end, :) = [];
+            digState.ptsPx(end, :) = [];
+            if ~isempty(digState.markers)
+                hM = digState.markers{end};
+                if isvalid(hM), delete(hM); end
+                digState.markers(end) = [];
+            end
+            tblDigPts.Data = num2cell(digState.pts);
+            title(digAx, sprintf('%d points collected', size(digState.pts, 1)), ...
+                'Color', [0.2 0.5 0.8]);
+        end
+
+        function digClearPoints()
+            digState.pts = [];
+            digState.ptsPx = [];
+            for mi = 1:numel(digState.markers)
+                if isvalid(digState.markers{mi})
+                    delete(digState.markers{mi});
+                end
+            end
+            digState.markers = {};
+            tblDigPts.Data = {};
+            title(digAx, 'Points cleared', 'Color', [0.5 0.5 0.5]);
+        end
+
+        function digExportCSV()
+            if isempty(digState.pts)
+                uialert(digFig, 'No points to export.', 'Export');
+                return;
+            end
+            [fn2, fp2] = uiputfile({'*.csv', 'CSV (*.csv)'}, 'Export Digitized Points');
+            if isequal(fn2, 0), return; end
+            outPath = fullfile(fp2, fn2);
+            T2 = array2table(digState.pts, 'VariableNames', {'X', 'Y'});
+            writetable(T2, outPath);
+            setStatus(sprintf('Digitized %d points exported to %s', size(digState.pts, 1), fn2));
+        end
+
+        function digLoadAsDataset()
+            if isempty(digState.pts)
+                uialert(digFig, 'No points to load.', 'Load');
+                return;
+            end
+            % Sort by X
+            sorted = sortrows(digState.pts, 1);
+
+            % Build unified data struct
+            data = parser.createDataStruct( ...
+                sorted(:, 1), ...
+                sorted(:, 2), ...
+                {'Digitized Y'}, ...
+                {'a.u.'}, ...
+                struct('source', 'Graph Digitizer', 'parserName', 'digitizer'));
+
+            % Add as new dataset
+            newDS = buildDs('[Digitized]', data, 'digitizer');
+            appData.datasets{end+1} = newDS;
+            appData.activeIdx = numel(appData.datasets);
+            updateFileList();
+            updateControlsForActiveDataset();
+            onPlot([], []);
+            setStatus(sprintf('Loaded %d digitized points as new dataset', size(sorted, 1)));
+            delete(digFig);
+        end
+    end
+
     % ── Multi-Dataset Overlay ──────────────────────────────────────────
 
     function onOverlayModeChanged(~,~)
@@ -12402,7 +13961,7 @@ function varargout = DataPlotter()
         uilabel(typeGL,'Text','Figure type:','FontSize',11, ...
             'FontWeight','bold','HorizontalAlignment','right');
         ddFigType = uidropdown(typeGL, ...
-            'Items', {'Multi-Panel','Quick Grid','Waterfall','Overlay + Residual','Normalized Overlay','Before / After','Parameter Evolution','Broken Axis','Confidence Band'}, ...
+            'Items', {'Multi-Panel','Quick Grid','Waterfall','Overlay + Residual','Normalized Overlay','Before / After','Parameter Evolution','Broken Axis','Confidence Band','Contour / Heatmap'}, ...
             'Value', 'Multi-Panel', ...
             'ValueChangedFcn', @onTypeChanged);
         uilabel(typeGL,'Text','');  % spacer
@@ -12537,6 +14096,8 @@ function varargout = DataPlotter()
                     buildBrokenAxisConfig();
                 case 'Confidence Band'
                     buildConfidenceBandConfig();
+                case 'Contour / Heatmap'
+                    buildContourConfig();
             end
         end
 
@@ -12917,6 +14478,7 @@ function varargout = DataPlotter()
                 case 'Parameter Evolution', generateParamEvol();
                 case 'Broken Axis',         generateBrokenAxis();
                 case 'Confidence Band',     generateConfidenceBand();
+                case 'Contour / Heatmap',  generateContour();
             end
         end
 
@@ -14529,6 +16091,169 @@ function varargout = DataPlotter()
             if ~isempty(ttl)
                 title(oAx, ttl, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
             end
+
+            addRefLineTools(outFig);
+            figure(outFig);
+            delete(bFig);
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  CONFIG: Contour / Heatmap
+        % ────────────────────────────────────────────────────────────────
+        ctWidgets = struct();
+
+        function buildContourConfig()
+            gl = uigridlayout(configPanel, [7 2], ...
+                'RowHeight', {24, 24, 24, 24, 24, 24, 24}, ...
+                'ColumnWidth', {110, '1x'}, ...
+                'Padding', [8 6 8 6], 'RowSpacing', 4);
+
+            nDS = numel(appData.datasets);
+            dsNames2 = cell(1, nDS);
+            for ki = 1:nDS
+                [~, fn3, fx3] = fileparts(appData.datasets{ki}.filepath);
+                dsNames2{ki} = [fn3, fx3];
+            end
+
+            uilabel(gl, 'Text', 'Dataset:', 'HorizontalAlignment', 'right', 'FontWeight', 'bold');
+            ctWidgets.ddDS = uidropdown(gl, 'Items', dsNames2, 'ItemsData', 1:nDS, ...
+                'Value', min(appData.activeIdx, nDS), ...
+                'ValueChangedFcn', @(~,~) updateContourCols());
+
+            uilabel(gl, 'Text', 'X column:', 'HorizontalAlignment', 'right');
+            ctWidgets.ddXCol = uidropdown(gl, 'Items', {'--'}, 'ItemsData', 0);
+
+            uilabel(gl, 'Text', 'Y column:', 'HorizontalAlignment', 'right');
+            ctWidgets.ddYCol = uidropdown(gl, 'Items', {'--'}, 'ItemsData', 0);
+
+            uilabel(gl, 'Text', 'Z column:', 'HorizontalAlignment', 'right');
+            ctWidgets.ddZCol = uidropdown(gl, 'Items', {'--'}, 'ItemsData', 0);
+
+            uilabel(gl, 'Text', 'Plot style:', 'HorizontalAlignment', 'right');
+            ctWidgets.ddStyle = uidropdown(gl, ...
+                'Items', {'Filled contour', 'Contour lines', 'Pseudocolor (pcolor)', 'Surface (3D)'}, ...
+                'Value', 'Filled contour');
+
+            uilabel(gl, 'Text', 'Colormap:', 'HorizontalAlignment', 'right');
+            ctWidgets.ddCmap = uidropdown(gl, ...
+                'Items', {'parula','viridis','plasma','inferno','hot','jet','turbo','gray','bone','copper'}, ...
+                'Value', 'parula');
+
+            uilabel(gl, 'Text', '');  % spacer
+            btnExportGrid = uibutton(gl, 'Text', 'Export Grid CSV...', ...
+                'BackgroundColor', BTN_EXPORT, 'FontColor', [1 1 1], ...
+                'FontSize', 9, ...
+                'ButtonPushedFcn', @(~,~) exportContourGrid(), ...
+                'Tooltip', 'Export the interpolated grid as XYZ CSV');
+            btnExportGrid.Layout.Row = 7; btnExportGrid.Layout.Column = 2;
+
+            updateContourCols();
+        end
+
+        function updateContourCols()
+            dsIdx2 = ctWidgets.ddDS.Value;
+            d2 = getPlotData(dsIdx2);
+            allCols = [{'X (time/index)'}, d2.labels];
+            idxData = 0:numel(d2.labels);
+            ctWidgets.ddXCol.Items = allCols;  ctWidgets.ddXCol.ItemsData = idxData;
+            ctWidgets.ddYCol.Items = allCols;  ctWidgets.ddYCol.ItemsData = idxData;
+            ctWidgets.ddZCol.Items = allCols;  ctWidgets.ddZCol.ItemsData = idxData;
+            if numel(d2.labels) >= 2
+                ctWidgets.ddXCol.Value = 0;
+                ctWidgets.ddYCol.Value = 1;
+                ctWidgets.ddZCol.Value = min(2, numel(d2.labels));
+            end
+        end
+
+        function exportContourGrid()
+        %EXPORTCONTOURGRID  Interpolate and export XYZ grid as CSV.
+            dsIdx2 = ctWidgets.ddDS.Value;
+            d2 = getPlotData(dsIdx2);
+            xIdx = ctWidgets.ddXCol.Value; yIdx = ctWidgets.ddYCol.Value; zIdx = ctWidgets.ddZCol.Value;
+            if xIdx == 0, xV = d2.time(:); else, xV = d2.values(:,xIdx); end
+            if yIdx == 0, yV = d2.time(:); else, yV = d2.values(:,yIdx); end
+            if zIdx == 0, zV = d2.time(:); else, zV = d2.values(:,zIdx); end
+            ok = ~isnan(xV) & ~isnan(yV) & ~isnan(zV);
+            xV = xV(ok); yV = yV(ok); zV = zV(ok);
+            if numel(xV) < 4, uialert(bFig, 'Not enough data.', 'Export'); return; end
+            nG = 100;
+            xL = linspace(min(xV),max(xV),nG); yL = linspace(min(yV),max(yV),nG);
+            [Xg2, Yg2] = meshgrid(xL, yL);
+            try F3 = scatteredInterpolant(xV,yV,zV,'linear','none'); Zg2 = F3(Xg2,Yg2);
+            catch, Zg2 = griddata(xV,yV,zV,Xg2,Yg2,'linear'); end %#ok<GRIDD>
+            [fn2,fp2] = uiputfile({'*.csv','CSV'},'Export Grid');
+            if isequal(fn2,0), return; end
+            fid = fopen(fullfile(fp2,fn2),'w');
+            fprintf(fid, 'X,Y,Z\n');
+            for ri = 1:nG
+                for ci = 1:nG
+                    if ~isnan(Zg2(ri,ci))
+                        fprintf(fid, '%.6g,%.6g,%.6g\n', Xg2(ri,ci), Yg2(ri,ci), Zg2(ri,ci));
+                    end
+                end
+            end
+            fclose(fid);
+        end
+
+        function generateContour()
+            dsIdx2 = ctWidgets.ddDS.Value;
+            d2 = getPlotData(dsIdx2);
+            fmtOpts = getFormatOpts();
+
+            xIdx = ctWidgets.ddXCol.Value;
+            yIdx = ctWidgets.ddYCol.Value;
+            zIdx = ctWidgets.ddZCol.Value;
+
+            if xIdx == 0, xVec = d2.time(:); else, xVec = d2.values(:, xIdx); end
+            if yIdx == 0, yVec = d2.time(:); else, yVec = d2.values(:, yIdx); end
+            if zIdx == 0, zVec = d2.time(:); else, zVec = d2.values(:, zIdx); end
+
+            valid2 = ~isnan(xVec) & ~isnan(yVec) & ~isnan(zVec);
+            xVec = xVec(valid2); yVec = yVec(valid2); zVec = zVec(valid2);
+
+            if numel(xVec) < 4
+                uialert(bFig, 'Not enough valid data points.', 'Contour Error');
+                return;
+            end
+
+            % Grid scattered data
+            nGrid = min(200, round(sqrt(numel(xVec)) * 2));
+            xLin = linspace(min(xVec), max(xVec), nGrid);
+            yLin = linspace(min(yVec), max(yVec), nGrid);
+            [Xg, Yg] = meshgrid(xLin, yLin);
+            try
+                F2 = scatteredInterpolant(xVec, yVec, zVec, 'linear', 'none');
+                Zg = F2(Xg, Yg);
+            catch
+                Zg = griddata(xVec, yVec, zVec, Xg, Yg, 'linear'); %#ok<GRIDD>
+            end
+
+            outFig = figure('Name', 'Contour / Heatmap', 'NumberTitle', 'off', ...
+                'Units', 'inches', 'Position', [2 2 spBFigW.Value spBFigH.Value]);
+            oAx = axes(outFig);
+
+            cmapFcn = str2func(ctWidgets.ddCmap.Value);
+            switch ctWidgets.ddStyle.Value
+                case 'Filled contour'
+                    contourf(oAx, Xg, Yg, Zg, 20, 'LineStyle', 'none');
+                    colorbar(oAx);
+                case 'Contour lines'
+                    [C2, h2] = contour(oAx, Xg, Yg, Zg, 15);
+                    clabel(C2, h2, 'FontSize', max(6, fmtOpts.fontSize-2));
+                    colorbar(oAx);
+                case 'Pseudocolor (pcolor)'
+                    pcolor(oAx, Xg, Yg, Zg); shading(oAx, 'flat'); colorbar(oAx);
+                case 'Surface (3D)'
+                    surf(oAx, Xg, Yg, Zg, 'EdgeColor', 'none'); colorbar(oAx);
+                    view(oAx, -37.5, 30); rotate3d(outFig, 'on');
+            end
+            colormap(oAx, cmapFcn(256));
+
+            allCols = [{'X'}, d2.labels];
+            xlabel(oAx, allCols{xIdx+1}, 'FontSize', fmtOpts.fontSize, 'Interpreter', 'none');
+            ylabel(oAx, allCols{yIdx+1}, 'FontSize', fmtOpts.fontSize, 'Interpreter', 'none');
+            title(oAx, allCols{zIdx+1}, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
+            oAx.FontSize = fmtOpts.fontSize; oAx.FontName = fmtOpts.fontName; oAx.Box = 'on';
 
             addRefLineTools(outFig);
             figure(outFig);

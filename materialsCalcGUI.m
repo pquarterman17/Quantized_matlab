@@ -58,6 +58,7 @@ lblStatus.Layout.Column = 1;
 appData.history    = {};
 appData.historyMax = 100;
 appData.api        = struct();  % tab builders store callable hooks here
+appData.favorites  = {};        % cell array of favorite structs: .name, .tab, .lastResult, .lastLatex
 
 % ════════════════════════════════════════════════════════════════════════
 % BUILD TABS
@@ -67,15 +68,30 @@ tabs.unitConverter = uitab(tabGroup, 'Title', 'Unit Converter');
 tabs.crystal       = uitab(tabGroup, 'Title', 'Crystal');
 tabs.electrical    = uitab(tabGroup, 'Title', 'Electrical');
 tabs.semiconductor = uitab(tabGroup, 'Title', 'Semiconductor');
-tabs.thinFilm      = uitab(tabGroup, 'Title', 'Thin Film');
-tabs.periodicTable = uitab(tabGroup, 'Title', 'Periodic Table');
+tabs.thinFilm       = uitab(tabGroup, 'Title', 'Thin Film');
+tabs.xrayNeutron    = uitab(tabGroup, 'Title', 'X-ray/Neutron');
+tabs.superconductor  = uitab(tabGroup, 'Title', 'Superconductor');
+tabs.optics          = uitab(tabGroup, 'Title', 'Optics');
+tabs.vacuum          = uitab(tabGroup, 'Title', 'Vacuum');
+tabs.electrochemistry = uitab(tabGroup, 'Title', 'Electrochem');
+tabs.multilayer      = uitab(tabGroup, 'Title', 'Multilayer');
+tabs.periodicTable   = uitab(tabGroup, 'Title', 'Periodic Table');
+tabs.favorites       = uitab(tabGroup, 'Title', char([9733 32 70 97 118 111 114 105 116 101 115])); % ★ Favorites
 
 buildUnitConverterTab(tabs.unitConverter);
 buildCrystalTab(tabs.crystal);
 buildElectricalTab(tabs.electrical);
 buildSemiconductorTab(tabs.semiconductor);
 buildThinFilmTab(tabs.thinFilm);
+buildXrayNeutronTab(tabs.xrayNeutron);
+buildSuperconductorTab(tabs.superconductor);
+buildOpticsTab(tabs.optics);
+buildVacuumTab(tabs.vacuum);
+buildElectrochemistryTab(tabs.electrochemistry);
+buildMultilayerTab(tabs.multilayer);
 buildPeriodicTableTab(tabs.periodicTable);
+buildFavoritesTab(tabs.favorites);
+appData.api.exportReport = @(fp) exportReportToFile(fp);
 
 % ════════════════════════════════════════════════════════════════════════
 % API (headless testing)
@@ -96,6 +112,25 @@ if nargout > 0
     api.getElementDetail   = appData.api.getElementDetail;
     api.calcPlaneSpacings  = appData.api.calcPlaneSpacings;
     api.getMismatchResult   = appData.api.getMismatchResult;
+    % X-ray/Neutron tab API
+    api.calcNeutronSLD     = appData.api.calcNeutronSLD;
+    api.calcXraySLD        = appData.api.calcXraySLD;
+    api.calcQToTwoTheta    = appData.api.calcQToTwoTheta;
+    % Superconductor tab API
+    api.calcLondonDepth    = appData.api.calcLondonDepth;
+    api.calcCriticalFields = appData.api.calcCriticalFields;
+    % Optics/Vacuum/Electrochem API
+    api.calcFresnel      = appData.api.calcFresnel;
+    api.calcMeanFreePath = appData.api.calcMeanFreePath;
+    api.calcNernst       = appData.api.calcNernst;
+    % Multilayer API
+    api.getMultilayerStack = appData.api.getMultilayerStack;
+    api.addLayer           = appData.api.addLayer;
+    % Favorites API
+    api.addFavorite    = appData.api.addFavorite;
+    api.getFavorites   = appData.api.getFavorites;
+    % History export
+    api.exportReport   = appData.api.exportReport;
     varargout{1}       = api;
 end
 
@@ -1589,6 +1624,1215 @@ end
         % API hooks
         appData.api.selectElement = @(sym) doSelectElement(sym);
         appData.api.getElementDetail = @() taDetail.Value;
+    end
+
+% ════════════════════════════════════════════════════════════════════════
+% X-RAY / NEUTRON TAB
+% ════════════════════════════════════════════════════════════════════════
+
+    function buildXrayNeutronTab(tab)
+        outerGL = uigridlayout(tab);
+        outerGL.RowHeight   = {'1x'};
+        outerGL.ColumnWidth = {'1x'};
+        outerGL.Padding     = [6 6 6 6];
+
+        scroll = uipanel(outerGL,'BorderType','none','Scrollable','on');
+        scroll.Layout.Row = 1; scroll.Layout.Column = 1;
+
+        gl = uigridlayout(scroll);
+        gl.RowHeight   = {110, 110, 90, 90};
+        gl.ColumnWidth = {'1x'};
+        gl.Padding     = [4 4 4 4];
+        gl.RowSpacing  = 8;
+
+        % ── Card 1: Neutron SLD ──────────────────────────────────────
+        pNSLD = uipanel(gl,'Title','Neutron Scattering Length Density','FontWeight','bold');
+        pNSLD.Layout.Row = 1; pNSLD.Layout.Column = 1;
+
+        gNSLD = uigridlayout(pNSLD);
+        gNSLD.RowHeight   = {24, 24, 24};
+        gNSLD.ColumnWidth = {90,'1x',90,'1x',90};
+        gNSLD.Padding     = [6 4 6 4];
+        gNSLD.RowSpacing  = 4;
+
+        uilabel(gNSLD,'Text','Formula:','HorizontalAlignment','right');
+        efNSLDFormula = uieditfield(gNSLD,'text','Value','SrTiO3');
+        efNSLDFormula.Layout.Row=1; efNSLDFormula.Layout.Column=2;
+        uilabel(gNSLD,'Text','Density (g/cm³):','HorizontalAlignment','right');
+        efNSLDDensity = uieditfield(gNSLD,'numeric','Value',5.12);
+        efNSLDDensity.Layout.Row=1; efNSLDDensity.Layout.Column=4;
+        btnNSLDCalc = uibutton(gNSLD,'push','Text','Calculate', ...
+            'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
+            'ButtonPushedFcn',@(~,~) doNeutronSLD());
+        btnNSLDCalc.Layout.Row=1; btnNSLDCalc.Layout.Column=5;
+
+        lblNSLDResult = uilabel(gNSLD,'Text','','FontSize',11, ...
+            'Interpreter','html');
+        lblNSLDResult.Layout.Row=2; lblNSLDResult.Layout.Column=[1 5];
+
+        lblNSLDDetail = uilabel(gNSLD,'Text','','FontSize',10, ...
+            'FontColor',[0.5 0.5 0.5],'Interpreter','html');
+        lblNSLDDetail.Layout.Row=3; lblNSLDDetail.Layout.Column=[1 5];
+
+        function doNeutronSLD()
+            try
+                r = calc.xrayNeutron.neutronSLD(efNSLDFormula.Value, efNSLDDensity.Value);
+                desc = sprintf('SLD<sub>n</sub> = %.4g %s 10<sup>-6</sup> %s<sup>-2</sup>', ...
+                    r.SLDe6, char(215), char(197));
+                lblNSLDResult.Text = desc;
+                lblNSLDDetail.Text = sprintf('M = %.2f g/mol, formula: %s', r.M, r.formula);
+                addHistory(desc, r.latex);
+            catch ME
+                lblNSLDResult.Text = ['Error: ' ME.message];
+                setStatus(ME.message);
+            end
+        end
+
+        % ── Card 2: X-ray SLD ────────────────────────────────────────
+        pXSLD = uipanel(gl,'Title','X-ray Scattering Length Density','FontWeight','bold');
+        pXSLD.Layout.Row = 2; pXSLD.Layout.Column = 1;
+
+        gXSLD = uigridlayout(pXSLD);
+        gXSLD.RowHeight   = {24, 24, 24};
+        gXSLD.ColumnWidth = {90,'1x',90,'1x',90};
+        gXSLD.Padding     = [6 4 6 4];
+        gXSLD.RowSpacing  = 4;
+
+        uilabel(gXSLD,'Text','Formula:','HorizontalAlignment','right');
+        efXSLDFormula = uieditfield(gXSLD,'text','Value','SrTiO3');
+        efXSLDFormula.Layout.Row=1; efXSLDFormula.Layout.Column=2;
+        uilabel(gXSLD,'Text','Density (g/cm³):','HorizontalAlignment','right');
+        efXSLDDensity = uieditfield(gXSLD,'numeric','Value',5.12);
+        efXSLDDensity.Layout.Row=1; efXSLDDensity.Layout.Column=4;
+        btnXSLDCalc = uibutton(gXSLD,'push','Text','Calculate', ...
+            'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
+            'ButtonPushedFcn',@(~,~) doXraySLD());
+        btnXSLDCalc.Layout.Row=1; btnXSLDCalc.Layout.Column=5;
+
+        lblXSLDResult = uilabel(gXSLD,'Text','','FontSize',11, ...
+            'Interpreter','html');
+        lblXSLDResult.Layout.Row=2; lblXSLDResult.Layout.Column=[1 5];
+
+        lblXSLDDetail = uilabel(gXSLD,'Text','','FontSize',10, ...
+            'FontColor',[0.5 0.5 0.5],'Interpreter','html');
+        lblXSLDDetail.Layout.Row=3; lblXSLDDetail.Layout.Column=[1 5];
+
+        function doXraySLD()
+            try
+                r = calc.xrayNeutron.xraySLD(efXSLDFormula.Value, efXSLDDensity.Value);
+                desc = sprintf('SLD<sub>x</sub> = %.4g %s 10<sup>-6</sup> %s<sup>-2</sup>', ...
+                    r.SLDe6, char(215), char(197));
+                lblXSLDResult.Text = desc;
+                lblXSLDDetail.Text = sprintf('%s<sub>e</sub> = %.4g e/%s%s', ...
+                    char(961), r.electronDensity, char(197), char(179));
+                addHistory(desc, r.latex);
+            catch ME
+                lblXSLDResult.Text = ['Error: ' ME.message];
+                setStatus(ME.message);
+            end
+        end
+
+        % ── Card 3: Q ↔ 2θ Converter ────────────────────────────────
+        pQ2T = uipanel(gl,'Title','Q / 2\theta Converter','FontWeight','bold');
+        pQ2T.Layout.Row = 3; pQ2T.Layout.Column = 1;
+
+        gQ2T = uigridlayout(pQ2T);
+        gQ2T.RowHeight   = {24, 24};
+        gQ2T.ColumnWidth = {60,'1x',50,'1x',80,80};
+        gQ2T.Padding     = [6 4 6 4];
+        gQ2T.RowSpacing  = 4;
+
+        uilabel(gQ2T,'Text','Value:','HorizontalAlignment','right');
+        efQ2TVal = uieditfield(gQ2T,'numeric','Value',1.0);
+        efQ2TVal.Layout.Row=1; efQ2TVal.Layout.Column=2;
+        uilabel(gQ2T,'Text',[char(955) ' (' char(197) '):'],'HorizontalAlignment','right');
+        efQ2TLam = uieditfield(gQ2T,'numeric','Value',1.5406);
+        efQ2TLam.Layout.Row=1; efQ2TLam.Layout.Column=4;
+
+        btnQTo2T = uibutton(gQ2T,'push','Text',['Q' char(8594) '2' char(952)], ...
+            'BackgroundColor',BTN_TOOL, ...
+            'ButtonPushedFcn',@(~,~) doQTo2Theta());
+        btnQTo2T.Layout.Row=1; btnQTo2T.Layout.Column=5;
+        btnTwoTToQ = uibutton(gQ2T,'push','Text',['2' char(952) char(8594) 'Q'], ...
+            'BackgroundColor',BTN_TOOL, ...
+            'ButtonPushedFcn',@(~,~) do2ThetaToQ());
+        btnTwoTToQ.Layout.Row=1; btnTwoTToQ.Layout.Column=6;
+
+        lblQ2TResult = uilabel(gQ2T,'Text','','FontSize',11, ...
+            'Interpreter','html');
+        lblQ2TResult.Layout.Row=2; lblQ2TResult.Layout.Column=[1 6];
+
+        function doQTo2Theta()
+            try
+                r = calc.xrayNeutron.qToTwoTheta(efQ2TVal.Value, Lambda=efQ2TLam.Value);
+                desc = sprintf('Q = %.4g %s<sup>-1</sup>  %s  2%s = %.4f%s', ...
+                    r.Q, char(197), char(8594), char(952), r.twoTheta, char(176));
+                lblQ2TResult.Text = desc;
+                addHistory(desc, r.latex);
+            catch ME
+                lblQ2TResult.Text = ['Error: ' ME.message];
+                setStatus(ME.message);
+            end
+        end
+
+        function do2ThetaToQ()
+            try
+                r = calc.xrayNeutron.twoThetaToQ(efQ2TVal.Value, Lambda=efQ2TLam.Value);
+                desc = sprintf('2%s = %.4f%s  %s  Q = %.4g %s<sup>-1</sup>', ...
+                    char(952), r.twoTheta, char(176), char(8594), r.Q, char(197));
+                lblQ2TResult.Text = desc;
+                addHistory(desc, r.latex);
+            catch ME
+                lblQ2TResult.Text = ['Error: ' ME.message];
+                setStatus(ME.message);
+            end
+        end
+
+        % ── Card 4: Molecular Weight ─────────────────────────────────
+        pMW = uipanel(gl,'Title','Molecular Weight','FontWeight','bold');
+        pMW.Layout.Row = 4; pMW.Layout.Column = 1;
+
+        gMW = uigridlayout(pMW);
+        gMW.RowHeight   = {24, 24};
+        gMW.ColumnWidth = {70,'1x',90};
+        gMW.Padding     = [6 4 6 4];
+        gMW.RowSpacing  = 4;
+
+        uilabel(gMW,'Text','Formula:','HorizontalAlignment','right');
+        efMWFormula = uieditfield(gMW,'text','Value','Fe2O3');
+        efMWFormula.Layout.Row=1; efMWFormula.Layout.Column=2;
+        btnMWCalc = uibutton(gMW,'push','Text','Calculate', ...
+            'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
+            'ButtonPushedFcn',@(~,~) doMolWeight());
+        btnMWCalc.Layout.Row=1; btnMWCalc.Layout.Column=3;
+
+        lblMWResult = uilabel(gMW,'Text','','FontSize',11, ...
+            'Interpreter','html');
+        lblMWResult.Layout.Row=2; lblMWResult.Layout.Column=[1 3];
+
+        function doMolWeight()
+            try
+                r = calc.xrayNeutron.molecularWeight(efMWFormula.Value);
+                desc = sprintf('M(%s) = %.4f g/mol', r.formula, r.M);
+                lblMWResult.Text = desc;
+                addHistory(desc, r.latex);
+            catch ME
+                lblMWResult.Text = ['Error: ' ME.message];
+                setStatus(ME.message);
+            end
+        end
+
+        % ── Register API ─────────────────────────────────────────────
+        appData.api.calcNeutronSLD = @(formula, density) apiNeutronSLD(formula, density);
+        appData.api.calcXraySLD    = @(formula, density) apiXraySLD(formula, density);
+        appData.api.calcQToTwoTheta = @(Q, lam) apiQTo2T(Q, lam);
+
+        function result = apiNeutronSLD(formula, density)
+            efNSLDFormula.Value = formula;
+            efNSLDDensity.Value = density;
+            doNeutronSLD();
+            result = lblNSLDResult.Text;
+        end
+
+        function result = apiXraySLD(formula, density)
+            efXSLDFormula.Value = formula;
+            efXSLDDensity.Value = density;
+            doXraySLD();
+            result = lblXSLDResult.Text;
+        end
+
+        function result = apiQTo2T(Q, lam)
+            efQ2TVal.Value = Q;
+            efQ2TLam.Value = lam;
+            doQTo2Theta();
+            result = lblQ2TResult.Text;
+        end
+    end
+
+% ════════════════════════════════════════════════════════════════════════
+% SUPERCONDUCTOR TAB
+% ════════════════════════════════════════════════════════════════════════
+
+    function buildSuperconductorTab(tab)
+        outerGL = uigridlayout(tab);
+        outerGL.RowHeight   = {'1x'};
+        outerGL.ColumnWidth = {'1x'};
+        outerGL.Padding     = [6 6 6 6];
+
+        scroll = uipanel(outerGL,'BorderType','none','Scrollable','on');
+        scroll.Layout.Row = 1; scroll.Layout.Column = 1;
+
+        gl = uigridlayout(scroll);
+        gl.RowHeight   = {130, 100, 100, 130};
+        gl.ColumnWidth = {'1x'};
+        gl.Padding     = [4 4 4 4];
+        gl.RowSpacing  = 8;
+
+        % Material presets
+        scMats = {'Nb','NbN','YBCO','MgB2','Al','Pb','In','Sn'};
+
+        % ── Card 1: London Penetration Depth ─────────────────────────
+        pLondon = uipanel(gl,'Title','London Penetration Depth','FontWeight','bold');
+        pLondon.Layout.Row = 1; pLondon.Layout.Column = 1;
+
+        gLondon = uigridlayout(pLondon);
+        gLondon.RowHeight   = {24, 24, 24, 24};
+        gLondon.ColumnWidth = {90,'1x',70,'1x',90};
+        gLondon.Padding     = [6 4 6 4];
+        gLondon.RowSpacing  = 4;
+
+        uilabel(gLondon,'Text','Material:','HorizontalAlignment','right');
+        ddLondonMat = uidropdown(gLondon, ...
+            'Items',['(custom)',scMats],'Value','Nb', ...
+            'ValueChangedFcn',@(~,~) fillLondonFromPreset());
+        ddLondonMat.Layout.Row=1; ddLondonMat.Layout.Column=2;
+
+        uilabel(gLondon,'Text',[char(955) char(8320) ' (nm):'],'HorizontalAlignment','right');
+        efLondonLam0 = uieditfield(gLondon,'numeric','Value',39);
+        efLondonLam0.Layout.Row=1; efLondonLam0.Layout.Column=4;
+
+        uilabel(gLondon,'Text','T<sub>c</sub> (K):','HorizontalAlignment','right', ...
+            'Interpreter','html');
+        efLondonTc = uieditfield(gLondon,'numeric','Value',9.25);
+        efLondonTc.Layout.Row=2; efLondonTc.Layout.Column=2;
+        uilabel(gLondon,'Text','T (K):','HorizontalAlignment','right');
+        efLondonT = uieditfield(gLondon,'numeric','Value',4.2);
+        efLondonT.Layout.Row=2; efLondonT.Layout.Column=4;
+
+        btnLondonCalc = uibutton(gLondon,'push','Text','Calculate', ...
+            'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
+            'ButtonPushedFcn',@(~,~) doLondonDepth());
+        btnLondonCalc.Layout.Row=2; btnLondonCalc.Layout.Column=5;
+
+        lblLondonResult = uilabel(gLondon,'Text','','FontSize',11, ...
+            'Interpreter','html');
+        lblLondonResult.Layout.Row=3; lblLondonResult.Layout.Column=[1 5];
+
+        lblLondonDetail = uilabel(gLondon,'Text','','FontSize',10, ...
+            'FontColor',[0.5 0.5 0.5],'Interpreter','html');
+        lblLondonDetail.Layout.Row=4; lblLondonDetail.Layout.Column=[1 5];
+
+        function fillLondonFromPreset()
+            mat = ddLondonMat.Value;
+            if strcmp(mat,'(custom)'), return; end
+            try
+                presets = calc.superconductor.materialPresets();
+                p = presets.(mat);
+                efLondonLam0.Value = p.lambda0;
+                efLondonTc.Value   = p.Tc;
+            catch; end
+        end
+
+        function doLondonDepth()
+            try
+                r = calc.superconductor.londonDepth( ...
+                    lambda0=efLondonLam0.Value, T=efLondonT.Value, Tc=efLondonTc.Value);
+                desc = sprintf('%s(%.1f K) = %.2f nm', char(955), r.T, r.lambda);
+                lblLondonResult.Text = desc;
+                lblLondonDetail.Text = sprintf('%s<sub>0</sub> = %.1f nm, T<sub>c</sub> = %.2f K', ...
+                    char(955), r.lambda0, r.Tc);
+                addHistory(desc, r.latex);
+            catch ME
+                lblLondonResult.Text = ['Error: ' ME.message];
+                setStatus(ME.message);
+            end
+        end
+
+        % ── Card 2: Coherence Length ─────────────────────────────────
+        pXi = uipanel(gl,'Title','Coherence Length','FontWeight','bold');
+        pXi.Layout.Row = 2; pXi.Layout.Column = 1;
+
+        gXi = uigridlayout(pXi);
+        gXi.RowHeight   = {24, 24, 24};
+        gXi.ColumnWidth = {90,'1x',70,'1x',90};
+        gXi.Padding     = [6 4 6 4];
+        gXi.RowSpacing  = 4;
+
+        uilabel(gXi,'Text','Material:','HorizontalAlignment','right');
+        ddXiMat = uidropdown(gXi, ...
+            'Items',['(custom)',scMats],'Value','Nb', ...
+            'ValueChangedFcn',@(~,~) fillXiFromPreset());
+        ddXiMat.Layout.Row=1; ddXiMat.Layout.Column=2;
+
+        uilabel(gXi,'Text',[char(958) char(8320) ' (nm):'],'HorizontalAlignment','right');
+        efXi0 = uieditfield(gXi,'numeric','Value',38);
+        efXi0.Layout.Row=1; efXi0.Layout.Column=4;
+
+        uilabel(gXi,'Text','T<sub>c</sub> (K):','HorizontalAlignment','right','Interpreter','html');
+        efXiTc = uieditfield(gXi,'numeric','Value',9.25);
+        efXiTc.Layout.Row=2; efXiTc.Layout.Column=2;
+        uilabel(gXi,'Text','T (K):','HorizontalAlignment','right');
+        efXiT = uieditfield(gXi,'numeric','Value',4.2);
+        efXiT.Layout.Row=2; efXiT.Layout.Column=4;
+        btnXiCalc = uibutton(gXi,'push','Text','Calculate', ...
+            'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
+            'ButtonPushedFcn',@(~,~) doCoherenceLength());
+        btnXiCalc.Layout.Row=2; btnXiCalc.Layout.Column=5;
+
+        lblXiResult = uilabel(gXi,'Text','','FontSize',11,'Interpreter','html');
+        lblXiResult.Layout.Row=3; lblXiResult.Layout.Column=[1 5];
+
+        function fillXiFromPreset()
+            mat = ddXiMat.Value;
+            if strcmp(mat,'(custom)'), return; end
+            try
+                presets = calc.superconductor.materialPresets();
+                p = presets.(mat);
+                efXi0.Value = p.xi0;
+                efXiTc.Value = p.Tc;
+            catch; end
+        end
+
+        function doCoherenceLength()
+            try
+                r = calc.superconductor.coherenceLength( ...
+                    xi0=efXi0.Value, T=efXiT.Value, Tc=efXiTc.Value);
+                desc = sprintf('%s(%.1f K) = %.2f nm', char(958), r.T, r.xi);
+                lblXiResult.Text = desc;
+                addHistory(desc, r.latex);
+            catch ME
+                lblXiResult.Text = ['Error: ' ME.message];
+                setStatus(ME.message);
+            end
+        end
+
+        % ── Card 3: GL Parameter ─────────────────────────────────────
+        pGL = uipanel(gl,'Title','Ginzburg-Landau Parameter','FontWeight','bold');
+        pGL.Layout.Row = 3; pGL.Layout.Column = 1;
+
+        gGL = uigridlayout(pGL);
+        gGL.RowHeight   = {24, 24, 24};
+        gGL.ColumnWidth = {90,'1x',70,'1x',90};
+        gGL.Padding     = [6 4 6 4];
+        gGL.RowSpacing  = 4;
+
+        uilabel(gGL,'Text',[char(955) ' (nm):'],'HorizontalAlignment','right');
+        efGLLam = uieditfield(gGL,'numeric','Value',39);
+        efGLLam.Layout.Row=1; efGLLam.Layout.Column=2;
+        uilabel(gGL,'Text',[char(958) ' (nm):'],'HorizontalAlignment','right');
+        efGLXi = uieditfield(gGL,'numeric','Value',38);
+        efGLXi.Layout.Row=1; efGLXi.Layout.Column=4;
+        btnGLCalc = uibutton(gGL,'push','Text','Calculate', ...
+            'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
+            'ButtonPushedFcn',@(~,~) doGLParam());
+        btnGLCalc.Layout.Row=1; btnGLCalc.Layout.Column=5;
+
+        lblGLResult = uilabel(gGL,'Text','','FontSize',11,'Interpreter','html');
+        lblGLResult.Layout.Row=2; lblGLResult.Layout.Column=[1 5];
+
+        lblGLType = uilabel(gGL,'Text','','FontSize',10, ...
+            'FontColor',[0.5 0.5 0.5],'Interpreter','html');
+        lblGLType.Layout.Row=3; lblGLType.Layout.Column=[1 5];
+
+        function doGLParam()
+            try
+                r = calc.superconductor.glParameter(lambda=efGLLam.Value, xi=efGLXi.Value);
+                desc = sprintf('%s = %.3f', char(954), r.kappa);
+                lblGLResult.Text = desc;
+                lblGLType.Text = sprintf('Type %s (1/%s2 = %.3f)', ...
+                    r.type, char(8730), 1/sqrt(2));
+                addHistory(desc, r.latex);
+            catch ME
+                lblGLResult.Text = ['Error: ' ME.message];
+                setStatus(ME.message);
+            end
+        end
+
+        % ── Card 4: Critical Fields ──────────────────────────────────
+        pHc = uipanel(gl,'Title','Critical Fields','FontWeight','bold');
+        pHc.Layout.Row = 4; pHc.Layout.Column = 1;
+
+        gHc = uigridlayout(pHc);
+        gHc.RowHeight   = {24, 24, 24, 24, 24};
+        gHc.ColumnWidth = {90,'1x',70,'1x',90};
+        gHc.Padding     = [6 4 6 4];
+        gHc.RowSpacing  = 4;
+
+        uilabel(gHc,'Text','Material:','HorizontalAlignment','right');
+        ddHcMat = uidropdown(gHc, ...
+            'Items',['(custom)',scMats],'Value','Nb', ...
+            'ValueChangedFcn',@(~,~) fillHcFromPreset());
+        ddHcMat.Layout.Row=1; ddHcMat.Layout.Column=2;
+
+        uilabel(gHc,'Text','H<sub>c0</sub> (Oe):','HorizontalAlignment','right','Interpreter','html');
+        efHcHc0 = uieditfield(gHc,'numeric','Value',1980);
+        efHcHc0.Layout.Row=1; efHcHc0.Layout.Column=4;
+
+        uilabel(gHc,'Text','T<sub>c</sub> (K):','HorizontalAlignment','right','Interpreter','html');
+        efHcTc = uieditfield(gHc,'numeric','Value',9.25);
+        efHcTc.Layout.Row=2; efHcTc.Layout.Column=2;
+        uilabel(gHc,'Text','T (K):','HorizontalAlignment','right');
+        efHcT = uieditfield(gHc,'numeric','Value',4.2);
+        efHcT.Layout.Row=2; efHcT.Layout.Column=4;
+        btnHcCalc = uibutton(gHc,'push','Text','Calculate', ...
+            'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
+            'ButtonPushedFcn',@(~,~) doCriticalFields());
+        btnHcCalc.Layout.Row=2; btnHcCalc.Layout.Column=5;
+
+        lblHcResult = uilabel(gHc,'Text','','FontSize',11,'Interpreter','html');
+        lblHcResult.Layout.Row=3; lblHcResult.Layout.Column=[1 5];
+
+        lblHcResult2 = uilabel(gHc,'Text','','FontSize',11,'Interpreter','html');
+        lblHcResult2.Layout.Row=4; lblHcResult2.Layout.Column=[1 5];
+
+        lblHcType = uilabel(gHc,'Text','','FontSize',10, ...
+            'FontColor',[0.5 0.5 0.5],'Interpreter','html');
+        lblHcType.Layout.Row=5; lblHcType.Layout.Column=[1 5];
+
+        function fillHcFromPreset()
+            mat = ddHcMat.Value;
+            if strcmp(mat,'(custom)'), return; end
+            try
+                presets = calc.superconductor.materialPresets();
+                p = presets.(mat);
+                efHcHc0.Value = p.Hc0;
+                efHcTc.Value  = p.Tc;
+            catch; end
+        end
+
+        function doCriticalFields()
+            try
+                r = calc.superconductor.criticalFields( ...
+                    Hc0=efHcHc0.Value, Tc=efHcTc.Value, T=efHcT.Value);
+                desc = sprintf('H<sub>c</sub>(%.1f K) = %.1f Oe', r.T, r.Hc);
+                lblHcResult.Text = desc;
+                if isfield(r,'Hc1') && ~isnan(r.Hc1)
+                    lblHcResult2.Text = sprintf( ...
+                        'H<sub>c1</sub> = %.1f Oe, H<sub>c2</sub> = %.1f Oe', r.Hc1, r.Hc2);
+                else
+                    lblHcResult2.Text = '';
+                end
+                lblHcType.Text = sprintf('Type %s superconductor', r.type);
+                addHistory(desc, r.latex);
+            catch ME
+                lblHcResult.Text = ['Error: ' ME.message];
+                setStatus(ME.message);
+            end
+        end
+
+        % ── Register API ─────────────────────────────────────────────
+        appData.api.calcLondonDepth = @(mat, T) apiLondon(mat, T);
+        appData.api.calcCriticalFields = @(mat, T) apiCritFields(mat, T);
+
+        function result = apiLondon(mat, T)
+            ddLondonMat.Value = mat;
+            fillLondonFromPreset();
+            efLondonT.Value = T;
+            doLondonDepth();
+            result = lblLondonResult.Text;
+        end
+
+        function result = apiCritFields(mat, T)
+            ddHcMat.Value = mat;
+            fillHcFromPreset();
+            efHcT.Value = T;
+            doCriticalFields();
+            result = lblHcResult.Text;
+        end
+    end
+
+% ════════════════════════════════════════════════════════════════════════
+% OPTICS TAB
+% ════════════════════════════════════════════════════════════════════════
+
+    function buildOpticsTab(tab)
+        outerGL = uigridlayout(tab);
+        outerGL.RowHeight = {'1x'}; outerGL.ColumnWidth = {'1x'}; outerGL.Padding = [6 6 6 6];
+        scroll = uipanel(outerGL,'BorderType','none','Scrollable','on');
+        scroll.Layout.Row = 1; scroll.Layout.Column = 1;
+        gl = uigridlayout(scroll);
+        gl.RowHeight = {110, 90, 90, 90}; gl.ColumnWidth = {'1x'};
+        gl.Padding = [4 4 4 4]; gl.RowSpacing = 8;
+
+        % Card 1: Fresnel Coefficients
+        pFres = uipanel(gl,'Title','Fresnel Coefficients','FontWeight','bold');
+        pFres.Layout.Row = 1; pFres.Layout.Column = 1;
+        gFres = uigridlayout(pFres);
+        gFres.RowHeight = {24,24,24}; gFres.ColumnWidth = {60,'1x',60,'1x',60,'1x',90};
+        gFres.Padding = [6 4 6 4]; gFres.RowSpacing = 4;
+        uilabel(gFres,'Text','n1:','HorizontalAlignment','right');
+        efFN1 = uieditfield(gFres,'numeric','Value',1.0); efFN1.Layout.Row=1; efFN1.Layout.Column=2;
+        uilabel(gFres,'Text','n2:','HorizontalAlignment','right');
+        efFN2 = uieditfield(gFres,'numeric','Value',1.5); efFN2.Layout.Row=1; efFN2.Layout.Column=4;
+        uilabel(gFres,'Text',[char(952) ' (' char(176) '):'],'HorizontalAlignment','right');
+        efFTh = uieditfield(gFres,'numeric','Value',45); efFTh.Layout.Row=1; efFTh.Layout.Column=6;
+        btnFres = uibutton(gFres,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doFresnel()); btnFres.Layout.Row=1; btnFres.Layout.Column=7;
+        lblFresR = uilabel(gFres,'Text','','FontSize',11,'Interpreter','html');
+        lblFresR.Layout.Row=2; lblFresR.Layout.Column=[1 7];
+        lblFresD = uilabel(gFres,'Text','','FontSize',10,'FontColor',[.5 .5 .5],'Interpreter','html');
+        lblFresD.Layout.Row=3; lblFresD.Layout.Column=[1 7];
+        function doFresnel()
+            try
+                r = calc.optics.fresnelCoefficients(efFN1.Value,efFN2.Value,efFTh.Value);
+                desc = sprintf('R<sub>s</sub> = %.4f, R<sub>p</sub> = %.4f', r.Rs, r.Rp);
+                lblFresR.Text = desc;
+                lblFresD.Text = sprintf('T<sub>s</sub> = %.4f, T<sub>p</sub> = %.4f', r.Ts, r.Tp);
+                addHistory(desc, r.latex);
+            catch ME, lblFresR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            end
+        end
+
+        % Card 2: Critical / Brewster Angle
+        pAng = uipanel(gl,'Title','Critical / Brewster Angle','FontWeight','bold');
+        pAng.Layout.Row = 2; pAng.Layout.Column = 1;
+        gAng = uigridlayout(pAng);
+        gAng.RowHeight = {24,24}; gAng.ColumnWidth = {50,'1x',50,'1x',90};
+        gAng.Padding = [6 4 6 4]; gAng.RowSpacing = 4;
+        uilabel(gAng,'Text','n1:','HorizontalAlignment','right');
+        efAN1 = uieditfield(gAng,'numeric','Value',1.5); efAN1.Layout.Row=1; efAN1.Layout.Column=2;
+        uilabel(gAng,'Text','n2:','HorizontalAlignment','right');
+        efAN2 = uieditfield(gAng,'numeric','Value',1.0); efAN2.Layout.Row=1; efAN2.Layout.Column=4;
+        btnAng = uibutton(gAng,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doAngles()); btnAng.Layout.Row=1; btnAng.Layout.Column=5;
+        lblAngR = uilabel(gAng,'Text','','FontSize',11,'Interpreter','html');
+        lblAngR.Layout.Row=2; lblAngR.Layout.Column=[1 5];
+        function doAngles()
+            try
+                rc = calc.optics.criticalAngle(efAN1.Value,efAN2.Value);
+                rb = calc.optics.brewsterAngle(efAN1.Value,efAN2.Value);
+                desc = sprintf('%s<sub>c</sub> = %.2f%s, %s<sub>B</sub> = %.2f%s', ...
+                    char(952),rc.thetaC,char(176),char(952),rb.thetaB,char(176));
+                lblAngR.Text = desc;
+                addHistory(desc, rc.latex);
+            catch ME, lblAngR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            end
+        end
+
+        % Card 3: Penetration Depth
+        pPen = uipanel(gl,'Title','Penetration Depth','FontWeight','bold');
+        pPen.Layout.Row = 3; pPen.Layout.Column = 1;
+        gPen = uigridlayout(pPen);
+        gPen.RowHeight = {24,24}; gPen.ColumnWidth = {30,'1x',30,'1x',50,'1x',90};
+        gPen.Padding = [6 4 6 4]; gPen.RowSpacing = 4;
+        uilabel(gPen,'Text','n:','HorizontalAlignment','right');
+        efPN = uieditfield(gPen,'numeric','Value',1.0); efPN.Layout.Row=1; efPN.Layout.Column=2;
+        uilabel(gPen,'Text','k:','HorizontalAlignment','right');
+        efPK = uieditfield(gPen,'numeric','Value',0.001); efPK.Layout.Row=1; efPK.Layout.Column=4;
+        uilabel(gPen,'Text',[char(955) ':'],'HorizontalAlignment','right');
+        efPLam = uieditfield(gPen,'numeric','Value',1.5406); efPLam.Layout.Row=1; efPLam.Layout.Column=6;
+        btnPen = uibutton(gPen,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doPenDepth()); btnPen.Layout.Row=1; btnPen.Layout.Column=7;
+        lblPenR = uilabel(gPen,'Text','','FontSize',11,'Interpreter','html');
+        lblPenR.Layout.Row=2; lblPenR.Layout.Column=[1 7];
+        function doPenDepth()
+            try
+                r = calc.optics.penetrationDepth(efPN.Value,efPK.Value,efPLam.Value);
+                desc = sprintf('Depth = %.4g (same unit as %s)', r.depth, char(955));
+                lblPenR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblPenR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            end
+        end
+
+        % Card 4: Skin Depth
+        pSkin = uipanel(gl,'Title','Skin Depth','FontWeight','bold');
+        pSkin.Layout.Row = 4; pSkin.Layout.Column = 1;
+        gSkin = uigridlayout(pSkin);
+        gSkin.RowHeight = {24,24}; gSkin.ColumnWidth = {80,'1x',80,'1x',90};
+        gSkin.Padding = [6 4 6 4]; gSkin.RowSpacing = 4;
+        uilabel(gSkin,'Text',[char(961) ' (' char(937) char(183) 'm):'],'HorizontalAlignment','right');
+        efSRho = uieditfield(gSkin,'numeric','Value',1.7e-8); efSRho.Layout.Row=1; efSRho.Layout.Column=2;
+        uilabel(gSkin,'Text','f (Hz):','HorizontalAlignment','right');
+        efSFreq = uieditfield(gSkin,'numeric','Value',1e9); efSFreq.Layout.Row=1; efSFreq.Layout.Column=4;
+        btnSkin = uibutton(gSkin,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doSkinDepth()); btnSkin.Layout.Row=1; btnSkin.Layout.Column=5;
+        lblSkinR = uilabel(gSkin,'Text','','FontSize',11,'Interpreter','html');
+        lblSkinR.Layout.Row=2; lblSkinR.Layout.Column=[1 5];
+        function doSkinDepth()
+            try
+                r = calc.optics.skinDepth(efSRho.Value,efSFreq.Value);
+                desc = sprintf('%s = %.4g %sm', char(948), r.deltaUm, char(956));
+                lblSkinR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblSkinR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            end
+        end
+
+        appData.api.calcFresnel = @(n1,n2,th) apiFresnel(n1,n2,th);
+        function result = apiFresnel(n1,n2,th)
+            efFN1.Value=n1; efFN2.Value=n2; efFTh.Value=th; doFresnel(); result=lblFresR.Text;
+        end
+    end
+
+% ════════════════════════════════════════════════════════════════════════
+% VACUUM TAB
+% ════════════════════════════════════════════════════════════════════════
+
+    function buildVacuumTab(tab)
+        outerGL = uigridlayout(tab);
+        outerGL.RowHeight = {'1x'}; outerGL.ColumnWidth = {'1x'}; outerGL.Padding = [6 6 6 6];
+        scroll = uipanel(outerGL,'BorderType','none','Scrollable','on');
+        scroll.Layout.Row = 1; scroll.Layout.Column = 1;
+        gl = uigridlayout(scroll);
+        gl.RowHeight = {90, 90, 110, 90}; gl.ColumnWidth = {'1x'};
+        gl.Padding = [4 4 4 4]; gl.RowSpacing = 8;
+
+        % Card 1: Mean Free Path
+        pMFP = uipanel(gl,'Title','Mean Free Path','FontWeight','bold');
+        pMFP.Layout.Row = 1; pMFP.Layout.Column = 1;
+        gMFP = uigridlayout(pMFP);
+        gMFP.RowHeight = {24,24}; gMFP.ColumnWidth = {80,'1x',60,'1x',90};
+        gMFP.Padding = [6 4 6 4]; gMFP.RowSpacing = 4;
+        uilabel(gMFP,'Text','P (Pa):','HorizontalAlignment','right');
+        efMFPP = uieditfield(gMFP,'numeric','Value',1e-4); efMFPP.Layout.Row=1; efMFPP.Layout.Column=2;
+        uilabel(gMFP,'Text','T (K):','HorizontalAlignment','right');
+        efMFPT = uieditfield(gMFP,'numeric','Value',300); efMFPT.Layout.Row=1; efMFPT.Layout.Column=4;
+        btnMFP = uibutton(gMFP,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doMFP()); btnMFP.Layout.Row=1; btnMFP.Layout.Column=5;
+        lblMFPR = uilabel(gMFP,'Text','','FontSize',11,'Interpreter','html');
+        lblMFPR.Layout.Row=2; lblMFPR.Layout.Column=[1 5];
+        function doMFP()
+            try
+                r = calc.vacuum.meanFreePath(efMFPP.Value, T=efMFPT.Value);
+                desc = sprintf('MFP = %.4g m (%.4g mm)', r.mfp, r.mfpMm);
+                lblMFPR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblMFPR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            end
+        end
+
+        % Card 2: Monolayer Time
+        pMono = uipanel(gl,'Title','Monolayer Formation Time','FontWeight','bold');
+        pMono.Layout.Row = 2; pMono.Layout.Column = 1;
+        gMono = uigridlayout(pMono);
+        gMono.RowHeight = {24,24}; gMono.ColumnWidth = {80,'1x',90};
+        gMono.Padding = [6 4 6 4]; gMono.RowSpacing = 4;
+        uilabel(gMono,'Text','P (Pa):','HorizontalAlignment','right');
+        efMonoP = uieditfield(gMono,'numeric','Value',1.33e-4); efMonoP.Layout.Row=1; efMonoP.Layout.Column=2;
+        btnMono = uibutton(gMono,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doMono()); btnMono.Layout.Row=1; btnMono.Layout.Column=3;
+        lblMonoR = uilabel(gMono,'Text','','FontSize',11,'Interpreter','html');
+        lblMonoR.Layout.Row=2; lblMonoR.Layout.Column=[1 3];
+        function doMono()
+            try
+                r = calc.vacuum.monolayerTime(efMonoP.Value);
+                desc = sprintf('t<sub>mono</sub> = %.3g s', r.tMono);
+                lblMonoR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblMonoR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            end
+        end
+
+        % Card 3: Sputter Yield
+        pSY = uipanel(gl,'Title','Sputter Yield (Lookup)','FontWeight','bold');
+        pSY.Layout.Row = 3; pSY.Layout.Column = 1;
+        gSY = uigridlayout(pSY);
+        gSY.RowHeight = {24,24,24}; gSY.ColumnWidth = {70,'1x',70,'1x',90};
+        gSY.Padding = [6 4 6 4]; gSY.RowSpacing = 4;
+        uilabel(gSY,'Text','Target:','HorizontalAlignment','right');
+        efSYMat = uieditfield(gSY,'text','Value','Si'); efSYMat.Layout.Row=1; efSYMat.Layout.Column=2;
+        uilabel(gSY,'Text','Ion:','HorizontalAlignment','right');
+        efSYIon = uieditfield(gSY,'text','Value','Ar'); efSYIon.Layout.Row=1; efSYIon.Layout.Column=4;
+        uilabel(gSY,'Text','E (eV):','HorizontalAlignment','right');
+        efSYE = uieditfield(gSY,'numeric','Value',500); efSYE.Layout.Row=2; efSYE.Layout.Column=2;
+        btnSY = uibutton(gSY,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doSputterYield()); btnSY.Layout.Row=2; btnSY.Layout.Column=5;
+        lblSYR = uilabel(gSY,'Text','','FontSize',11,'Interpreter','html');
+        lblSYR.Layout.Row=3; lblSYR.Layout.Column=[1 5];
+        function doSputterYield()
+            try
+                r = calc.vacuum.sputterYield(efSYMat.Value, efSYIon.Value, efSYE.Value);
+                desc = sprintf('Y(%s/%s, %g eV) = %.2f atoms/ion', efSYMat.Value, efSYIon.Value, efSYE.Value, r.Y);
+                lblSYR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblSYR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            end
+        end
+
+        % Card 4: Pump-Down Time
+        pPump = uipanel(gl,'Title','Pump-Down Estimate','FontWeight','bold');
+        pPump.Layout.Row = 4; pPump.Layout.Column = 1;
+        gPump = uigridlayout(pPump);
+        gPump.RowHeight = {24,24}; gPump.ColumnWidth = {60,'1x',60,'1x',60,'1x',60,'1x',90};
+        gPump.Padding = [6 4 6 4]; gPump.RowSpacing = 4;
+        uilabel(gPump,'Text','V (L):','HorizontalAlignment','right');
+        efPV = uieditfield(gPump,'numeric','Value',50); efPV.Layout.Row=1; efPV.Layout.Column=2;
+        uilabel(gPump,'Text','S (L/s):','HorizontalAlignment','right');
+        efPS = uieditfield(gPump,'numeric','Value',100); efPS.Layout.Row=1; efPS.Layout.Column=4;
+        uilabel(gPump,'Text','P0 (Pa):','HorizontalAlignment','right');
+        efPP0 = uieditfield(gPump,'numeric','Value',1e5); efPP0.Layout.Row=1; efPP0.Layout.Column=6;
+        uilabel(gPump,'Text','Pf (Pa):','HorizontalAlignment','right');
+        efPPf = uieditfield(gPump,'numeric','Value',1e-4); efPPf.Layout.Row=1; efPPf.Layout.Column=8;
+        btnPump = uibutton(gPump,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doPump()); btnPump.Layout.Row=1; btnPump.Layout.Column=9;
+        lblPumpR = uilabel(gPump,'Text','','FontSize',11,'Interpreter','html');
+        lblPumpR.Layout.Row=2; lblPumpR.Layout.Column=[1 9];
+        function doPump()
+            try
+                r = calc.vacuum.pumpDownTime(efPV.Value,efPS.Value,efPP0.Value,efPPf.Value);
+                desc = sprintf('t = %.1f s (%.1f min), %s = %.2f s', r.time, r.timeMin, char(964), r.tau);
+                lblPumpR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblPumpR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            end
+        end
+
+        appData.api.calcMeanFreePath = @(P,T) apiMFP(P,T);
+        function result = apiMFP(P,T)
+            efMFPP.Value=P; efMFPT.Value=T; doMFP(); result=lblMFPR.Text;
+        end
+    end
+
+% ════════════════════════════════════════════════════════════════════════
+% ELECTROCHEMISTRY TAB
+% ════════════════════════════════════════════════════════════════════════
+
+    function buildElectrochemistryTab(tab)
+        outerGL = uigridlayout(tab);
+        outerGL.RowHeight = {'1x'}; outerGL.ColumnWidth = {'1x'}; outerGL.Padding = [6 6 6 6];
+        scroll = uipanel(outerGL,'BorderType','none','Scrollable','on');
+        scroll.Layout.Row = 1; scroll.Layout.Column = 1;
+        gl = uigridlayout(scroll);
+        gl.RowHeight = {110, 90, 90, 90}; gl.ColumnWidth = {'1x'};
+        gl.Padding = [4 4 4 4]; gl.RowSpacing = 8;
+
+        % Card 1: Nernst Potential
+        pNer = uipanel(gl,'Title','Nernst Potential','FontWeight','bold');
+        pNer.Layout.Row = 1; pNer.Layout.Column = 1;
+        gNer = uigridlayout(pNer);
+        gNer.RowHeight = {24,24,24}; gNer.ColumnWidth = {70,'1x',30,'1x',50,'1x',90};
+        gNer.Padding = [6 4 6 4]; gNer.RowSpacing = 4;
+        uilabel(gNer,'Text','E0 (V):','HorizontalAlignment','right');
+        efNerE0 = uieditfield(gNer,'numeric','Value',0.77); efNerE0.Layout.Row=1; efNerE0.Layout.Column=2;
+        uilabel(gNer,'Text','n:','HorizontalAlignment','right');
+        efNerN = uieditfield(gNer,'numeric','Value',1); efNerN.Layout.Row=1; efNerN.Layout.Column=4;
+        uilabel(gNer,'Text','Q:','HorizontalAlignment','right');
+        efNerQ = uieditfield(gNer,'numeric','Value',0.01); efNerQ.Layout.Row=1; efNerQ.Layout.Column=6;
+        btnNer = uibutton(gNer,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doNernst()); btnNer.Layout.Row=1; btnNer.Layout.Column=7;
+        lblNerR = uilabel(gNer,'Text','','FontSize',11,'Interpreter','html');
+        lblNerR.Layout.Row=2; lblNerR.Layout.Column=[1 7];
+        lblNerD = uilabel(gNer,'Text','','FontSize',10,'FontColor',[.5 .5 .5],'Interpreter','html');
+        lblNerD.Layout.Row=3; lblNerD.Layout.Column=[1 7];
+        function doNernst()
+            try
+                r = calc.electrochemistry.nernstPotential(efNerE0.Value,efNerN.Value,efNerQ.Value);
+                desc = sprintf('E = %.4f V', r.E);
+                lblNerR.Text = desc;
+                lblNerD.Text = sprintf('E%s = %.3f V, n = %d, Q = %.4g', char(8320), r.E0, r.n, r.Q);
+                addHistory(desc, r.latex);
+            catch ME, lblNerR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            end
+        end
+
+        % Card 2: Butler-Volmer
+        pBV = uipanel(gl,'Title','Butler-Volmer','FontWeight','bold');
+        pBV.Layout.Row = 2; pBV.Layout.Column = 1;
+        gBV = uigridlayout(pBV);
+        gBV.RowHeight = {24,24}; gBV.ColumnWidth = {60,'1x',60,'1x',60,'1x',90};
+        gBV.Padding = [6 4 6 4]; gBV.RowSpacing = 4;
+        uilabel(gBV,'Text','j0:','HorizontalAlignment','right');
+        efBVJ0 = uieditfield(gBV,'numeric','Value',1e-3); efBVJ0.Layout.Row=1; efBVJ0.Layout.Column=2;
+        uilabel(gBV,'Text',[char(951) ' (V):'],'HorizontalAlignment','right');
+        efBVEta = uieditfield(gBV,'numeric','Value',0.1); efBVEta.Layout.Row=1; efBVEta.Layout.Column=4;
+        uilabel(gBV,'Text',[char(945) ':'],'HorizontalAlignment','right');
+        efBVAlpha = uieditfield(gBV,'numeric','Value',0.5); efBVAlpha.Layout.Row=1; efBVAlpha.Layout.Column=6;
+        btnBV = uibutton(gBV,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doBV()); btnBV.Layout.Row=1; btnBV.Layout.Column=7;
+        lblBVR = uilabel(gBV,'Text','','FontSize',11,'Interpreter','html');
+        lblBVR.Layout.Row=2; lblBVR.Layout.Column=[1 7];
+        function doBV()
+            try
+                r = calc.electrochemistry.butlerVolmer(efBVJ0.Value,efBVEta.Value,alpha=efBVAlpha.Value);
+                desc = sprintf('j = %.4g A/cm%s', r.j, char(178));
+                lblBVR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblBVR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            end
+        end
+
+        % Card 3: Tafel Slope
+        pTaf = uipanel(gl,'Title','Tafel Slope','FontWeight','bold');
+        pTaf.Layout.Row = 3; pTaf.Layout.Column = 1;
+        gTaf = uigridlayout(pTaf);
+        gTaf.RowHeight = {24,24}; gTaf.ColumnWidth = {60,'1x',60,'1x',90};
+        gTaf.Padding = [6 4 6 4]; gTaf.RowSpacing = 4;
+        uilabel(gTaf,'Text',[char(945) ':'],'HorizontalAlignment','right');
+        efTafA = uieditfield(gTaf,'numeric','Value',0.5); efTafA.Layout.Row=1; efTafA.Layout.Column=2;
+        uilabel(gTaf,'Text','T (K):','HorizontalAlignment','right');
+        efTafT = uieditfield(gTaf,'numeric','Value',298.15); efTafT.Layout.Row=1; efTafT.Layout.Column=4;
+        btnTaf = uibutton(gTaf,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doTafel()); btnTaf.Layout.Row=1; btnTaf.Layout.Column=5;
+        lblTafR = uilabel(gTaf,'Text','','FontSize',11,'Interpreter','html');
+        lblTafR.Layout.Row=2; lblTafR.Layout.Column=[1 5];
+        function doTafel()
+            try
+                r = calc.electrochemistry.tafelSlope(alpha=efTafA.Value,T=efTafT.Value);
+                desc = sprintf('b = %.1f mV/decade', r.bMv);
+                lblTafR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblTafR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            end
+        end
+
+        % Card 4: Double Layer Capacitance
+        pDLC = uipanel(gl,'Title','Double Layer Capacitance','FontWeight','bold');
+        pDLC.Layout.Row = 4; pDLC.Layout.Column = 1;
+        gDLC = uigridlayout(pDLC);
+        gDLC.RowHeight = {24,24}; gDLC.ColumnWidth = {60,'1x',60,'1x',60,'1x',90};
+        gDLC.Padding = [6 4 6 4]; gDLC.RowSpacing = 4;
+        uilabel(gDLC,'Text',[char(949) '_r:'],'HorizontalAlignment','right');
+        efDLCE = uieditfield(gDLC,'numeric','Value',78); efDLCE.Layout.Row=1; efDLCE.Layout.Column=2;
+        uilabel(gDLC,'Text','d (nm):','HorizontalAlignment','right');
+        efDLCD = uieditfield(gDLC,'numeric','Value',0.5); efDLCD.Layout.Row=1; efDLCD.Layout.Column=4;
+        uilabel(gDLC,'Text','A (cm2):','HorizontalAlignment','right');
+        efDLCA = uieditfield(gDLC,'numeric','Value',1.0); efDLCA.Layout.Row=1; efDLCA.Layout.Column=6;
+        btnDLC = uibutton(gDLC,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doDLC()); btnDLC.Layout.Row=1; btnDLC.Layout.Column=7;
+        lblDLCR = uilabel(gDLC,'Text','','FontSize',11,'Interpreter','html');
+        lblDLCR.Layout.Row=2; lblDLCR.Layout.Column=[1 7];
+        function doDLC()
+            try
+                r = calc.electrochemistry.doubleLayerCapacitance(efDLCE.Value,efDLCD.Value,efDLCA.Value);
+                desc = sprintf('C = %.4g %sF (%.1f %sF/cm%s)', r.CuF, char(956), r.Cspec*1e6, char(956), char(178));
+                lblDLCR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblDLCR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            end
+        end
+
+        appData.api.calcNernst = @(E0,n,Q) apiNernst(E0,n,Q);
+        function result = apiNernst(E0,n,Q)
+            efNerE0.Value=E0; efNerN.Value=n; efNerQ.Value=Q; doNernst(); result=lblNerR.Text;
+        end
+    end
+
+% ════════════════════════════════════════════════════════════════════════
+% MULTILAYER BUILDER TAB
+% ════════════════════════════════════════════════════════════════════════
+
+    function buildMultilayerTab(tab)
+        outerGL = uigridlayout(tab);
+        outerGL.RowHeight = {'1x'}; outerGL.ColumnWidth = {'1x'}; outerGL.Padding = [6 6 6 6];
+        scroll = uipanel(outerGL,'BorderType','none','Scrollable','on');
+        scroll.Layout.Row = 1; scroll.Layout.Column = 1;
+        gl = uigridlayout(scroll);
+        gl.RowHeight = {200, 60, 130}; gl.ColumnWidth = {'1x'};
+        gl.Padding = [4 4 4 4]; gl.RowSpacing = 8;
+
+        % Multilayer state
+        mlStack = {};  % cell array of layer structs
+
+        % Default stack: air / film / substrate
+        mlStack{1} = struct('name','Ambient','formula','','thickness',0,'density',0,'roughness',0);
+        mlStack{2} = struct('name','Film','formula','Fe','thickness',200,'density',7.874,'roughness',5);
+        mlStack{3} = struct('name','Si (substrate)','formula','Si','thickness',0,'density',2.329,'roughness',2);
+
+        % Card 1: Layer Stack Table
+        pStack = uipanel(gl,'Title','Layer Stack (top to bottom)','FontWeight','bold');
+        pStack.Layout.Row = 1; pStack.Layout.Column = 1;
+        gStack = uigridlayout(pStack);
+        gStack.RowHeight = {'1x', 28}; gStack.ColumnWidth = {'1x'};
+        gStack.Padding = [4 4 4 4]; gStack.RowSpacing = 4;
+
+        tblML = uitable(gStack, ...
+            'ColumnName', {'Name','Formula','t (Å)','ρ (g/cm³)','σ (Å)'}, ...
+            'ColumnEditable', [true true true true true], ...
+            'ColumnFormat', {'char','char','numeric','numeric','numeric'}, ...
+            'CellEditCallback', @onMLCellEdit);
+        tblML.Layout.Row = 1;
+
+        btnRowGL = uigridlayout(gStack, [1 5]);
+        btnRowGL.ColumnWidth = {80, 80, 70, 70, '1x'}; btnRowGL.Layout.Row = 2;
+        btnAddLyr = uibutton(btnRowGL,'push','Text','Add Layer','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) onAddLayer()); btnAddLyr.Layout.Column = 1;
+        btnRemLyr = uibutton(btnRowGL,'push','Text','Remove','BackgroundColor',[.7 .2 .2],'FontColor',[1 1 1],...
+            'ButtonPushedFcn',@(~,~) onRemoveLayer()); btnRemLyr.Layout.Column = 2;
+        btnMoveUp = uibutton(btnRowGL,'push','Text','Move Up','BackgroundColor',BTN_TOOL,...
+            'ButtonPushedFcn',@(~,~) onMoveLayer(-1)); btnMoveUp.Layout.Column = 3;
+        btnMoveDn = uibutton(btnRowGL,'push','Text','Move Down','BackgroundColor',BTN_TOOL,...
+            'ButtonPushedFcn',@(~,~) onMoveLayer(1)); btnMoveDn.Layout.Column = 4;
+
+        % Card 2: Computed Properties
+        pProps = uipanel(gl,'Title','Computed Properties','FontWeight','bold');
+        pProps.Layout.Row = 2; pProps.Layout.Column = 1;
+        gProps = uigridlayout(pProps);
+        gProps.RowHeight = {20,20}; gProps.ColumnWidth = {'1x'};
+        gProps.Padding = [6 4 6 4];
+        lblMLProps = uilabel(gProps,'Text','','FontSize',11,'Interpreter','html');
+        lblMLProps.Layout.Row = 1;
+        lblMLFringe = uilabel(gProps,'Text','','FontSize',11,'Interpreter','html');
+        lblMLFringe.Layout.Row = 2;
+
+        % Card 3: SLD Profile + Export
+        pSLD = uipanel(gl,'Title','SLD Profile','FontWeight','bold');
+        pSLD.Layout.Row = 3; pSLD.Layout.Column = 1;
+        gSLD = uigridlayout(pSLD);
+        gSLD.RowHeight = {28, '1x'}; gSLD.ColumnWidth = {90, 90, '1x'};
+        gSLD.Padding = [4 4 4 4]; gSLD.RowSpacing = 4;
+
+        btnCalcSLD = uibutton(gSLD,'push','Text','Neutron SLD','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doCalcSLD('neutron')); btnCalcSLD.Layout.Row=1; btnCalcSLD.Layout.Column=1;
+        btnCalcXSLD = uibutton(gSLD,'push','Text','X-ray SLD','BackgroundColor',BTN_TOOL,...
+            'ButtonPushedFcn',@(~,~) doCalcSLD('xray')); btnCalcXSLD.Layout.Row=1; btnCalcXSLD.Layout.Column=2;
+        btnExportCSV = uibutton(gSLD,'push','Text','Export CSV','BackgroundColor',BTN_EXPORT,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doExportMLCSV()); btnExportCSV.Layout.Row=1; btnExportCSV.Layout.Column=3;
+
+        axSLD = uiaxes(gSLD);
+        axSLD.Layout.Row = 2; axSLD.Layout.Column = [1 3];
+        axSLD.XLabel.String = 'Depth (Å)';
+        axSLD.YLabel.String = 'SLD (10^{-6} Å^{-2})';
+
+        refreshMLTable();
+        updateMLProperties();
+
+        function refreshMLTable()
+            nLayers = numel(mlStack);
+            data = cell(nLayers, 5);
+            for li = 1:nLayers
+                s = mlStack{li};
+                data{li,1} = s.name;
+                data{li,2} = s.formula;
+                data{li,3} = s.thickness;
+                data{li,4} = s.density;
+                data{li,5} = s.roughness;
+            end
+            tblML.Data = data;
+        end
+
+        function onMLCellEdit(~, evt)
+            r2 = evt.Indices(1); c2 = evt.Indices(2);
+            if r2 > numel(mlStack), return; end
+            switch c2
+                case 1, mlStack{r2}.name = evt.NewData;
+                case 2, mlStack{r2}.formula = evt.NewData;
+                case 3, mlStack{r2}.thickness = evt.NewData;
+                case 4, mlStack{r2}.density = evt.NewData;
+                case 5, mlStack{r2}.roughness = evt.NewData;
+            end
+            updateMLProperties();
+        end
+
+        function onAddLayer()
+            nL = numel(mlStack);
+            newLayer = struct('name','New Layer','formula','','thickness',100,'density',1,'roughness',3);
+            if nL >= 2
+                mlStack = [mlStack(1:nL-1), {newLayer}, mlStack(nL)];
+            else
+                mlStack{end+1} = newLayer;
+            end
+            refreshMLTable(); updateMLProperties();
+        end
+
+        function onRemoveLayer()
+            if numel(mlStack) <= 2, return; end  % keep at least ambient + substrate
+            sel = tblML.Selection;
+            if isempty(sel), return; end
+            idx = sel(1);
+            if idx == 1 || idx == numel(mlStack), return; end  % can't remove ambient/substrate
+            mlStack(idx) = [];
+            refreshMLTable(); updateMLProperties();
+        end
+
+        function onMoveLayer(dir)
+            sel = tblML.Selection;
+            if isempty(sel), return; end
+            idx = sel(1); nL = numel(mlStack);
+            newIdx = idx + dir;
+            if newIdx < 2 || newIdx > nL-1, return; end  % keep ambient first, substrate last
+            if idx < 2 || idx > nL-1, return; end
+            tmp = mlStack{idx}; mlStack{idx} = mlStack{newIdx}; mlStack{newIdx} = tmp;
+            refreshMLTable(); updateMLProperties();
+        end
+
+        function updateMLProperties()
+            nL = numel(mlStack);
+            totalT = 0; weightedD = 0;
+            for li = 2:nL-1
+                totalT = totalT + mlStack{li}.thickness;
+                weightedD = weightedD + mlStack{li}.density * mlStack{li}.thickness;
+            end
+            avgD = 0; if totalT > 0, avgD = weightedD / totalT; end
+            deltaQ = 0; if totalT > 0, deltaQ = 2*pi / totalT; end
+            lblMLProps.Text = sprintf('Total thickness: %.1f %s, Avg density: %.3f g/cm%s', ...
+                totalT, char(197), avgD, char(179));
+            lblMLFringe.Text = sprintf('%sQ (Kiessig) = %.5f %s<sup>-1</sup>', ...
+                char(916), deltaQ, char(197));
+        end
+
+        function doCalcSLD(mode)
+            cla(axSLD);
+            nL = numel(mlStack);
+            depth = 0; depths = []; slds = [];
+            for li = 1:nL
+                s = mlStack{li};
+                sldVal = 0;
+                if ~isempty(s.formula) && s.density > 0
+                    try
+                        if strcmp(mode, 'neutron')
+                            sr = calc.xrayNeutron.neutronSLD(s.formula, s.density);
+                        else
+                            sr = calc.xrayNeutron.xraySLD(s.formula, s.density);
+                        end
+                        sldVal = sr.SLDe6;
+                    catch
+                    end
+                end
+                t = s.thickness;
+                if t == 0, t = 50; end  % draw ambient/substrate as 50 Å
+                depths = [depths, depth, depth + t]; %#ok<AGROW>
+                slds = [slds, sldVal, sldVal]; %#ok<AGROW>
+                depth = depth + t;
+            end
+            plot(axSLD, depths, slds, 'b-', 'LineWidth', 1.5);
+            axSLD.XLabel.String = ['Depth (' char(197) ')'];
+            axSLD.YLabel.String = ['SLD (10^{-6} ' char(197) '^{-2})'];
+            title(axSLD, [upper(mode(1)) mode(2:end) ' SLD Profile']);
+            setStatus(sprintf('SLD profile computed (%s)', mode));
+        end
+
+        function doExportMLCSV()
+            [fn, fp] = uiputfile({'*.csv','CSV (*.csv)'}, 'Export Layer Stack');
+            if isequal(fn, 0), return; end
+            fid = fopen(fullfile(fp, fn), 'w');
+            fprintf(fid, 'Name,Formula,Thickness_Ang,Density_g_cm3,Roughness_Ang\n');
+            for li = 1:numel(mlStack)
+                s = mlStack{li};
+                fprintf(fid, '%s,%s,%.2f,%.4f,%.2f\n', s.name, s.formula, s.thickness, s.density, s.roughness);
+            end
+            fclose(fid);
+            setStatus(sprintf('Exported stack to %s', fn));
+        end
+
+        appData.api.getMultilayerStack = @() mlStack;
+        appData.api.addLayer = @(name, formula, t, rho, sigma) apiAddLayer(name, formula, t, rho, sigma);
+        function apiAddLayer(name, formula, t, rho, sigma)
+            nL = numel(mlStack);
+            newLayer = struct('name',name,'formula',formula,'thickness',t,'density',rho,'roughness',sigma);
+            if nL >= 2
+                mlStack = [mlStack(1:nL-1), {newLayer}, mlStack(nL)];
+            else
+                mlStack{end+1} = newLayer;
+            end
+            refreshMLTable(); updateMLProperties();
+        end
+    end
+
+% ════════════════════════════════════════════════════════════════════════
+% EXPORT REPORT & HISTORY ENHANCEMENTS
+% ════════════════════════════════════════════════════════════════════════
+
+    function exportReportToFile(outPath)
+    %EXPORTREPORTTOFILE  Dump session history to formatted text file.
+        fid = fopen(outPath, 'w');
+        if fid == -1
+            error('calc:exportReport:fileOpen', 'Cannot open %s for writing.', outPath);
+        end
+        fprintf(fid, '============================================================\n');
+        fprintf(fid, 'Materials Calculator — Session Report\n');
+        fprintf(fid, 'Date: %s\n', datestr(now, 'yyyy-mm-dd HH:MM:SS'));
+        fprintf(fid, '============================================================\n\n');
+        for hi = 1:numel(appData.history)
+            entry = appData.history{hi};
+            fprintf(fid, '[%s] %s\n', entry{1}, entry{2});
+        end
+        fprintf(fid, '\n============================================================\n');
+        fprintf(fid, 'Total calculations: %d\n', numel(appData.history));
+        fclose(fid);
+    end
+
+% ════════════════════════════════════════════════════════════════════════
+% FAVORITES TAB
+% ════════════════════════════════════════════════════════════════════════
+
+    function buildFavoritesTab(tab)
+        outerGL = uigridlayout(tab);
+        outerGL.RowHeight   = {28, '1x'};
+        outerGL.ColumnWidth = {'1x'};
+        outerGL.Padding     = [6 6 6 6];
+
+        % Header row with instructions
+        lblFavHeader = uilabel(outerGL, ...
+            'Text', 'Pin calculations from any tab using the history log. Pinned items appear here for quick access.', ...
+            'FontSize', 11, 'FontColor', [0.5 0.5 0.5], ...
+            'WordWrap', 'on');
+        lblFavHeader.Layout.Row = 1;
+
+        % Favorites list + detail panel
+        favGL = uigridlayout(outerGL, [1 2]);
+        favGL.ColumnWidth = {'1x', '1x'};
+        favGL.Layout.Row = 2;
+
+        % Left: pinned favorites list
+        leftGL = uigridlayout(favGL, [2 1]);
+        leftGL.RowHeight = {'1x', 30};
+        leftGL.Layout.Column = 1;
+
+        lbFavorites = uilistbox(leftGL, ...
+            'Items', {'(no favorites pinned)'}, ...
+            'ItemsData', 0, ...
+            'ValueChangedFcn', @(~,~) onFavSelected());
+        lbFavorites.Layout.Row = 1;
+
+        btnRemFav = uibutton(leftGL, 'push', 'Text', 'Remove Selected', ...
+            'BackgroundColor', [0.7 0.2 0.2], 'FontColor', [1 1 1], ...
+            'ButtonPushedFcn', @(~,~) removeFavorite());
+        btnRemFav.Layout.Row = 2;
+
+        % Right: detail display
+        taFavDetail = uitextarea(favGL, ...
+            'Value', {'Select a favorite to see details.'}, ...
+            'Editable', 'off', ...
+            'FontName', 'Courier New', ...
+            'FontSize', 11);
+        taFavDetail.Layout.Column = 2;
+
+        function onFavSelected()
+            idx = lbFavorites.Value;
+            if isempty(idx) || idx == 0, return; end
+            if idx > numel(appData.favorites), return; end
+            fav = appData.favorites{idx};
+            taFavDetail.Value = { ...
+                sprintf('Name: %s', fav.name), ...
+                sprintf('Tab:  %s', fav.tab), ...
+                '', ...
+                'Last result:', ...
+                fav.lastResult, ...
+                '', ...
+                'LaTeX:', ...
+                fav.lastLatex};
+        end
+
+        function removeFavorite()
+            idx = lbFavorites.Value;
+            if isempty(idx) || idx == 0, return; end
+            if idx > numel(appData.favorites), return; end
+            appData.favorites(idx) = [];
+            refreshFavoritesList();
+        end
+
+        function refreshFavoritesList()
+            if isempty(appData.favorites)
+                lbFavorites.Items = {'(no favorites pinned)'};
+                lbFavorites.ItemsData = 0;
+                return;
+            end
+            items = cell(1, numel(appData.favorites));
+            idata = zeros(1, numel(appData.favorites));
+            for fi2 = 1:numel(appData.favorites)
+                fav = appData.favorites{fi2};
+                items{fi2} = sprintf('[%s] %s', fav.tab, fav.name);
+                idata(fi2) = fi2;
+            end
+            lbFavorites.Items = items;
+            lbFavorites.ItemsData = idata;
+        end
+
+        % Public refresh hook (called by addFavorite)
+        appData.api.refreshFavorites = @() refreshFavoritesList();
+        appData.api.addFavorite = @(name, tabName, result, latex) doAddFavorite(name, tabName, result, latex);
+        appData.api.getFavorites = @() appData.favorites;
+
+        function doAddFavorite(name, tabName, result, latex)
+            % Check if already pinned (update instead)
+            for fi2 = 1:numel(appData.favorites)
+                if strcmp(appData.favorites{fi2}.name, name) && ...
+                        strcmp(appData.favorites{fi2}.tab, tabName)
+                    appData.favorites{fi2}.lastResult = result;
+                    appData.favorites{fi2}.lastLatex = latex;
+                    refreshFavoritesList();
+                    return;
+                end
+            end
+            fav.name       = name;
+            fav.tab        = tabName;
+            fav.lastResult = result;
+            fav.lastLatex  = latex;
+            appData.favorites{end+1} = fav;
+            refreshFavoritesList();
+        end
     end
 
 % ════════════════════════════════════════════════════════════════════════
