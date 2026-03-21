@@ -439,7 +439,7 @@ OriginPro's "Quick Peaks" tracks a peak across a series:
 
 ---
 
-## Phase 8 — Quality-of-Life & Polish
+## Phase 8 — Quality-of-Life & Polish ✅ IMPLEMENTED
 
 ### 8.1 Figure composition / report sheet
 
@@ -479,7 +479,7 @@ OriginPro's "Quick Peaks" tracks a peak across a series:
 | 5 | Phase 5: Analysis Gadgets | Medium | Medium | ✅ ROI done — `+dataplotter/roiAnalysis.m` |
 | 6 | Phase 6: Multi-Panel Plots | Medium | Medium | ✅ Done — `+dataplotter/multiPanel.m` |
 | 7 | Phase 4: Statistics Panel | Small | Medium | ✅ Core done (no GUI yet) |
-| 8 | Phase 8: QoL & Polish | Large | Medium | Phases 1-7 benefit from these |
+| 8 | Phase 8: QoL & Polish | Large | Medium | ✅ Done — composer, action log, 3D surface, groups |
 
 ---
 
