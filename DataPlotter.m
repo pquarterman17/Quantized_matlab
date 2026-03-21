@@ -268,6 +268,8 @@ function varargout = DataPlotter()
     appData.bgFile            = '';        % short filename of background dataset for display
     appData.axisPrefixX       = struct('symbol','','factor',1);  % SI prefix for X-axis
     appData.axisPrefixY       = struct('symbol','','factor',1);  % SI prefix for Y-axis
+    appData.macroLog          = dataplotter.actionLog();  % macro recorder
+    appData.macroRecording    = false;                   % true when recording
     appData.showFitCurves     = true;               % toggle Lorentzian fit overlay on/off
     appData.showSnipBg        = true;               % toggle SNIP background overlay on/off
     appData.fitCurveColor     = [0.85 0.20 0.00];   % default warm red-orange
@@ -713,10 +715,29 @@ function varargout = DataPlotter()
         'Visible',            'off');
 
     % ── Status bar (row 3 of rootGL) ──────────────────────────────────────
-    lblStatusBar = uilabel(rootGL, 'Text', 'Ready', ...
+    statusGL = uigridlayout(rootGL, [1 3], ...
+        'ColumnWidth', {'1x', 80, 80}, ...
+        'Padding', [0 0 0 0], 'ColumnSpacing', 4);
+    statusGL.Layout.Row = 3; statusGL.Layout.Column = 1;
+
+    lblStatusBar = uilabel(statusGL, 'Text', 'Ready', ...
         'FontSize', 9, 'FontColor', [0.5 0.5 0.5], ...
         'HorizontalAlignment', 'left');
-    lblStatusBar.Layout.Row = 3; lblStatusBar.Layout.Column = 1;
+    lblStatusBar.Layout.Column = 1;
+
+    btnMacroRecord = uibutton(statusGL, 'Text', char(9210), ...  % ⏺ record symbol
+        'FontSize', 9, 'FontColor', [0.6 0.6 0.6], ...
+        'BackgroundColor', [0.18 0.18 0.18], ...
+        'Tooltip', 'Start recording GUI actions as a MATLAB script', ...
+        'ButtonPushedFcn', @onToggleMacroRecord);
+    btnMacroRecord.Layout.Column = 2;
+
+    btnMacroExport = uibutton(statusGL, 'Text', 'Save Script', ...
+        'FontSize', 8, 'FontColor', [0.5 0.5 0.5], ...
+        'Tooltip', 'Export recorded macro as .m script', ...
+        'Enable', 'off', ...
+        'ButtonPushedFcn', @onExportMacro);
+    btnMacroExport.Layout.Column = 3;
 
     % ── Analysis & Corrections panel (row 2, full width, scrollable) ──────
     analysisPanel = uipanel(rootGL,'Title','Analysis & Corrections','FontSize',11, ...
@@ -767,7 +788,7 @@ function varargout = DataPlotter()
     corrGL = uigridlayout(corrPanel,[26 4], ...
         'RowHeight',    {24, 24, 20, 22,22,22,22, 20, 22,22,22,22, 20, 0,0, 0,0, ...
                          0,0,0,0,0,0, 24,22, 22}, ...
-        'ColumnWidth',  {72,'1x',80,'1x'}, ...
+        'ColumnWidth',  {80,'1x',80,'1x'}, ...
         'Padding',      [4 4 4 4], ...
         'RowSpacing',   2, ...
         'ColumnSpacing', 3);
@@ -2197,6 +2218,10 @@ function varargout = DataPlotter()
     % ── Testability API (headless test hooks) ──────────────────────────
     api.getPlotData         = @(idx) getPlotData(idx);
     api.refreshDataTable    = @() refreshDataTable();
+    api.getMacroLog         = @() appData.macroLog;
+    api.isMacroRecording    = @() appData.macroRecording;
+    api.startMacroRecord    = @() onToggleMacroRecord([], []);
+    api.stopMacroRecord     = @() onToggleMacroRecord([], []);
     api.toggleAxAppearance  = @() onToggleAxAppearance();
     api.getAxAppearanceState = @() struct( ...
         'collapsed',        appData.sectionCollapsed.axAppearance, ...
@@ -2414,6 +2439,10 @@ function varargout = DataPlotter()
         updateControlsForActiveDataset();
         setStatus(sprintf('Loaded %d file(s) — %d dataset(s) total.', ...
             nLoaded, numel(appData.datasets)));
+        % Record loaded files in macro
+        for fj = 1:numel(fpaths)
+            recordAction(sprintf("data = parser.importAuto('%s');", fpaths{fj}));
+        end
         onPlot([],[]);
     end
 
@@ -7180,6 +7209,11 @@ function varargout = DataPlotter()
         btnApply.Text      = 'Apply Corrections';
         btnApply.FontColor = BTN_FG;
 
+        % Record correction parameters in macro
+        recordAction(sprintf("%% Apply corrections: XOff=%.6g YOff=%.6g BGSlope=%.6g BGInt=%.6g Smooth=%s Norm=%s Deriv=%s", ...
+            xOff, yOff, bgSlope, bgIntcpt, ...
+            string(cbSmooth.Value), ddNormalize.Value, ddDerivative.Value));
+
         onPlot([],[]);
     end
 
@@ -7218,6 +7252,54 @@ function varargout = DataPlotter()
         if isvalid(lblStatusBar)
             lblStatusBar.Text = msg;
             drawnow limitrate;
+        end
+    end
+
+    function recordAction(cmd)
+    %RECORDACTION  Append a MATLAB command to the macro log (if recording).
+        if appData.macroRecording
+            appData.macroLog.record(cmd);
+            % Update record button text with entry count
+            btnMacroRecord.Text = sprintf('%s %d', char(9632), appData.macroLog.nEntries());
+        end
+    end
+
+    function onToggleMacroRecord(~, ~)
+    %ONTOGGLEMACRORECORD  Start/stop macro recording.
+        if appData.macroRecording
+            % Stop recording
+            appData.macroRecording = false;
+            btnMacroRecord.Text = char(9210);  % ⏺
+            btnMacroRecord.FontColor = [0.6 0.6 0.6];
+            btnMacroExport.Enable = 'on';
+            n = appData.macroLog.nEntries();
+            setStatus(sprintf('Macro recording stopped (%d commands).', n));
+        else
+            % Start recording (clear previous log)
+            appData.macroLog.clear();
+            appData.macroRecording = true;
+            btnMacroRecord.Text = [char(9632) ' 0'];  % ■ stop symbol + count
+            btnMacroRecord.FontColor = [0.9 0.2 0.2];  % red = recording
+            btnMacroExport.Enable = 'off';
+            setStatus('Macro recording started — GUI actions will be captured.');
+        end
+    end
+
+    function onExportMacro(~, ~)
+    %ONEXPORTMACRO  Save the recorded macro to a .m file.
+        if appData.macroLog.nEntries() == 0
+            uialert(fig, 'No commands recorded.', 'Export Macro');
+            return;
+        end
+        [fn, fp] = uiputfile({'*.m', 'MATLAB Script (*.m)'}, ...
+            'Save Macro Script', 'analysis_macro.m');
+        if isequal(fn, 0), return; end
+        outPath = fullfile(fp, fn);
+        try
+            appData.macroLog.exportScript(outPath);
+            setStatus(sprintf('Macro exported: %s (%d commands)', fn, appData.macroLog.nEntries()));
+        catch ME
+            uialert(fig, sprintf('Export failed:\n%s', ME.message), 'Export Error');
         end
     end
 
@@ -8157,6 +8239,7 @@ function varargout = DataPlotter()
                     guiSaveCSV(exportData, fp, [], [], fmt);
                 end
             end
+            recordAction(sprintf("%% Exported CSV: %s", fp));
             uialert(fig, sprintf('Saved:\n%s', fp), 'Saved');
         catch ME
             fprintf(2, '\n[DataPlotter] Save error: %s\n', ME.message);

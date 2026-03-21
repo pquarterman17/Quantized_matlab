@@ -4,30 +4,10 @@ Remaining improvements for `DataPlotter.m` and the `+dataplotter/` package.
 
 ---
 
-## GUI Layout: Corrections Panel Restructure
+## GUI Layout: Corrections Panel ✅ DONE
 
-**Source:** GUI-revamp.md (all 5 phases unstarted)
-**Priority:** Medium — improves usability on 1080p displays
-**Effort:** Large (3+ hours, high-risk row renumbering)
-
-### Summary
-
-The Corrections panel has 20 rows (~570px), overflowing on 1080p. Planned restructure:
-
-1. **Min-width constraints** — prevent panels from being dragged too narrow (~30 min)
-2. **Corrections panel restructure** — reduce from 20 to 16 visible rows:
-   - Merge Live Preview into row 1
-   - Merge Normalize + Derivative into one row
-   - Merge Apply-to-All + Undo + Hide into one row
-   - Collapse BG File Subtraction section by default
-   - Add collapsible section headers (Offsets & Background, Processing, BG File)
-3. **Button styling consistency** — audit accent/tool color usage
-4. **Axes panel separator** — visual clarity between panels
-5. **Peak panel collapsible** — advanced peak buttons behind toggle
-
-### Key constraint
-
-Row renumbering in `corrGL` affects dozens of `.Layout.Row` assignments and callbacks. Must be done carefully with full `runAllTests(Group="gui")` verification.
+Collapsible sections, merged rows, min-width constraints, and label
+truncation fix all implemented. Column 1 widened from 72→80px.
 
 ---
 
@@ -63,16 +43,11 @@ Row renumbering in `corrGL` affects dozens of `.Layout.Row` assignments and call
 
 ---
 
-## Scripting / Macro Recorder Integration
+## Scripting / Macro Recorder ✅ INTEGRATED
 
-**Source:** backlog.md
-**Priority:** Low — `+dataplotter/actionLog.m` class exists but is not wired into DataPlotter GUI
-
-### Remaining work
-- Add "Record Macro" toggle button to DataPlotter toolbar
-- Wire key GUI actions (load file, apply correction, run fit, export) to `actionLog.record()`
-- Add "Stop Recording" → writes `.m` file via `actionLog.exportScript()`
-- Verify the API is complete enough for replay
+Record button in status bar, wired to file load, corrections, and CSV
+export. Toggle record/stop, export as .m script. API: `getMacroLog`,
+`startMacroRecord`, `stopMacroRecord`.
 
 ---
 
