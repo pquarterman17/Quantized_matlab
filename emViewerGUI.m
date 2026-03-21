@@ -2950,7 +2950,7 @@ function varargout = emViewerGUI()
                         loadedAny = true;
 
                     case '.dm4'
-                        data = parser.importDM4(fp);
+                        data = parser.importDM3(fp);
                         appendImage(data);
                         addToRecentFiles(fp);
                         loadedAny = true;
@@ -3122,7 +3122,7 @@ function varargout = emViewerGUI()
                             appendImage(data);
                             loadedAny = true;
                         case '.dm4'
-                            data = parser.importDM4(fp);
+                            data = parser.importDM3(fp);
                             appendImage(data);
                             loadedAny = true;
                         case '.ser'
