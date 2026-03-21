@@ -172,18 +172,22 @@ end
 
         % Row 1: Value + From
         uilabel(gl, 'Text', 'Value:', 'HorizontalAlignment', 'right');
-        efValue = uieditfield(gl, 'numeric', 'Value', 1);
+        efValue = uieditfield(gl, 'numeric', 'Value', 1, ...
+            'BackgroundColor', [0.18 0.18 0.18], 'FontColor', [0.9 0.9 0.9]);
         efValue.Layout.Row = 1; efValue.Layout.Column = 2;
         uilabel(gl, 'Text', 'From:', 'HorizontalAlignment', 'right');
-        efFrom = uieditfield(gl, 'text', 'Value', 'Oe');
+        efFrom = uieditfield(gl, 'text', 'Value', 'Oe', ...
+            'BackgroundColor', [0.18 0.18 0.18], 'FontColor', [0.9 0.9 0.9]);
         efFrom.Layout.Row = 1; efFrom.Layout.Column = 4;
 
         % Row 2: Result + To
         uilabel(gl, 'Text', 'Result:', 'HorizontalAlignment', 'right');
-        efResult = uieditfield(gl, 'text', 'Editable', 'off', 'Value', '');
+        efResult = uieditfield(gl, 'text', 'Editable', 'off', 'Value', '', ...
+            'BackgroundColor', [0.18 0.18 0.18], 'FontColor', [0.9 0.9 0.9]);
         efResult.Layout.Row = 2; efResult.Layout.Column = 2;
         uilabel(gl, 'Text', 'To:', 'HorizontalAlignment', 'right');
-        efTo = uieditfield(gl, 'text', 'Value', 'T');
+        efTo = uieditfield(gl, 'text', 'Value', 'T', ...
+            'BackgroundColor', [0.18 0.18 0.18], 'FontColor', [0.9 0.9 0.9]);
         efTo.Layout.Row = 2; efTo.Layout.Column = 4;
 
         % Row 3: Buttons
@@ -794,7 +798,7 @@ end
         scroll.Layout.Row = 1; scroll.Layout.Column = 1;
 
         gl = uigridlayout(scroll);
-        gl.RowHeight   = {90, 72, 72, 72};
+        gl.RowHeight   = {120, 72, 72, 72};
         gl.ColumnWidth = {'1x'};
         gl.Padding     = [4 4 4 4];
         gl.RowSpacing  = 8;
@@ -1504,37 +1508,58 @@ end
 % ════════════════════════════════════════════════════════════════════════
 
     function buildPeriodicTableTab(tab)
-        % Main layout: toolbar row + table area + detail panel
+        % Main layout: toolbar + display options + table + detail panel
         gl = uigridlayout(tab);
-        gl.RowHeight   = {28, '1x', 110};
+        gl.RowHeight   = {28, 24, '1x', 140};
         gl.ColumnWidth = {'1x'};
         gl.Padding     = [6 4 6 4];
         gl.RowSpacing  = 4;
 
-        % ── Toolbar ───────────────────────────────────────────────────
+        % ── Row 1: Toolbar ────────────────────────────────────────────
         tbGL = uigridlayout(gl);
         tbGL.Layout.Row = 1; tbGL.Layout.Column = 1;
         tbGL.RowHeight   = {22};
-        tbGL.ColumnWidth = {70, '1x', 80, '1x'};
+        tbGL.ColumnWidth = {60, '1x', 60, '1x'};
         tbGL.Padding     = [0 0 0 0];
         tbGL.RowSpacing  = 0;
 
-        uilabel(tbGL,'Text','Property:','HorizontalAlignment','right');
+        uilabel(tbGL,'Text','Color by:','HorizontalAlignment','right');
         ddProp = uidropdown(tbGL, 'Items', { ...
-            'Atomic Mass','Density','Electronegativity', ...
+            'Category','Atomic Mass','Density','Electronegativity', ...
             'Atomic Radius (pm)','Ionization Energy (eV)', ...
-            'Melting Point (K)','Electron Affinity (eV)' ...
-            }, 'Value', 'Atomic Mass', ...
-            'ValueChangedFcn', @(~,~) refreshPTColors());
+            'Melting Point (K)','Electron Affinity (eV)', ...
+            'Thermal Cond. (W/mK)','b_coh (fm)' ...
+            }, 'Value', 'Category', ...
+            'ValueChangedFcn', @(~,~) onPropChanged());
         ddProp.Layout.Row = 1; ddProp.Layout.Column = 2;
         uilabel(tbGL,'Text','Search:','HorizontalAlignment','right');
         efSearch = uieditfield(tbGL,'text','Value','', ...
+            'BackgroundColor', [0.18 0.18 0.18], 'FontColor', [0.9 0.9 0.9], ...
             'ValueChangedFcn',@(~,~) doSearch());
         efSearch.Layout.Row = 1; efSearch.Layout.Column = 4;
 
-        % ── Periodic Table Grid ───────────────────────────────────────
+        % ── Row 2: Display Options ────────────────────────────────────
+        dispGL = uigridlayout(gl);
+        dispGL.Layout.Row = 2; dispGL.Layout.Column = 1;
+        dispGL.RowHeight   = {20};
+        dispGL.ColumnWidth = {55, 40, 55, 100, '1x'};
+        dispGL.Padding     = [0 0 0 0];
+        dispGL.RowSpacing  = 0;
+
+        uilabel(dispGL,'Text','Show:','HorizontalAlignment','right','FontSize',10);
+        cbShowZ = uicheckbox(dispGL,'Text','Z','Value',true,'FontSize',10, ...
+            'ValueChangedFcn',@(~,~) refreshPTText());
+        cbShowZ.Layout.Row=1; cbShowZ.Layout.Column=2;
+        cbShowMass = uicheckbox(dispGL,'Text','Mass','Value',false,'FontSize',10, ...
+            'ValueChangedFcn',@(~,~) refreshPTText());
+        cbShowMass.Layout.Row=1; cbShowMass.Layout.Column=3;
+        cbShowPropVal = uicheckbox(dispGL,'Text','Property Value','Value',false,'FontSize',10, ...
+            'ValueChangedFcn',@(~,~) refreshPTText());
+        cbShowPropVal.Layout.Row=1; cbShowPropVal.Layout.Column=4;
+
+        % ── Row 3: Periodic Table Grid ────────────────────────────────
         tablePanel = uipanel(gl,'BorderType','none');
-        tablePanel.Layout.Row = 2; tablePanel.Layout.Column = 1;
+        tablePanel.Layout.Row = 3; tablePanel.Layout.Column = 1;
 
         ptGL = uigridlayout(tablePanel);
         ptGL.RowHeight   = repmat({'1x'}, 1, 10);
@@ -1543,13 +1568,13 @@ end
         ptGL.RowSpacing  = 1;
         ptGL.ColumnSpacing = 1;
 
-        % ── Detail Panel ──────────────────────────────────────────────
+        % ── Row 4: Detail Panel ───────────────────────────────────────
         taDetail = uitextarea(gl,'Editable','off','FontSize',10, ...
             'FontName','Courier New');
-        taDetail.Layout.Row = 3; taDetail.Layout.Column = 1;
-        taDetail.Value = {'Click an element to see properties.'};
+        taDetail.Layout.Row = 4; taDetail.Layout.Column = 1;
+        taDetail.Value = {'Click an element to see all properties.'};
 
-        % ── Element Color Map ─────────────────────────────────────────
+        % ── Category Color Map ────────────────────────────────────────
         catColors = containers.Map({ ...
             'alkali metal','alkaline earth metal','transition metal', ...
             'post-transition metal','metalloid','nonmetal','noble gas', ...
@@ -1561,12 +1586,27 @@ end
             [0.85 0.85 0.85], [0.65 0.85 0.65], [0.65 0.85 0.65], ...
             [0.65 0.85 0.65]});
 
+        % ── Dropdown name → elementData field mapping ─────────────────
+        propFieldMap = containers.Map( ...
+            {'Atomic Mass','Density','Electronegativity', ...
+             'Atomic Radius (pm)','Ionization Energy (eV)', ...
+             'Melting Point (K)','Electron Affinity (eV)', ...
+             'Thermal Cond. (W/mK)','b_coh (fm)'}, ...
+            {'mass','density','electronegativity', ...
+             'atomicRadius','ionizationEnergy', ...
+             'meltingPoint','electronAffinity', ...
+             'thermalConductivity','bCoherent'});
+
         % ── Periodic Table Layout ─────────────────────────────────────
-        % [symbol, Z, row, col]  (1-indexed grid)
         ptLayout = buildPTLayout();
 
-        % Load element data once
+        % Load element data once — shared by all callbacks
         allEls = calc.elementData();
+        % Build symbol → index map for fast lookup
+        elIdxMap = containers.Map('KeyType','char','ValueType','double');
+        for ii = 1:numel(allEls)
+            elIdxMap(allEls(ii).symbol) = ii;
+        end
 
         % Build buttons
         ptBtns = containers.Map('KeyType','char','ValueType','any');
@@ -1574,33 +1614,32 @@ end
         for ei = 1:numel(ptLayout)
             entry = ptLayout(ei);
             sym   = entry.symbol;
-            elIdx = find(strcmp({allEls.symbol}, sym), 1);
-            if isempty(elIdx), continue; end
-            el    = allEls(elIdx);
-
-            % Category color
-            cat = lower(el.category);
-            if catColors.isKey(cat)
-                bgCol = catColors(cat);
-            else
-                bgCol = [0.85 0.85 0.85];
-            end
+            if ~elIdxMap.isKey(sym), continue; end
+            el = allEls(elIdxMap(sym));
 
             btnText = sprintf('%d\n%s', el.Z, el.symbol);
             btn = uibutton(ptGL, 'push', 'Text', btnText, ...
                 'FontSize', 8, 'FontWeight', 'normal', ...
-                'BackgroundColor', bgCol, ...
+                'BackgroundColor', [0.85 0.85 0.85], ...
                 'ButtonPushedFcn', @(~,~) doSelectElement(sym));
             btn.Layout.Row    = entry.row;
             btn.Layout.Column = entry.col;
             ptBtns(sym) = btn;
         end
 
+        % Apply initial colors and text
+        refreshPTColors();
+
         % ── CALLBACKS ─────────────────────────────────────────────────
+
+        function onPropChanged()
+            refreshPTColors();
+            refreshPTText();
+        end
 
         function doSelectElement(sym)
             try
-                el = calc.elementData('bySymbol', sym);
+                el = allEls(elIdxMap(sym));
                 lines = formatElementDetail(el);
                 taDetail.Value = lines;
                 setStatus(sprintf('%s (%s) — Z=%d', el.name, el.symbol, el.Z));
@@ -1610,16 +1649,94 @@ end
         end
 
         function refreshPTColors()
-            % Called when property dropdown changes — no color re-mapping needed
-            % (category colors are fixed; property selection only affects detail)
-            setStatus(sprintf('Property: %s', ddProp.Value));
+            propName = ddProp.Value;
+            syms = ptBtns.keys;
+
+            if strcmp(propName, 'Category')
+                % Use category color map
+                for ki = 1:numel(syms)
+                    s = syms{ki};
+                    b = ptBtns(s);
+                    if ~isvalid(b), continue; end
+                    el = allEls(elIdxMap(s));
+                    cat = lower(el.category);
+                    if catColors.isKey(cat)
+                        bgCol = catColors(cat);
+                    else
+                        bgCol = [0.85 0.85 0.85];
+                    end
+                    b.BackgroundColor = bgCol;
+                    b.FontColor = autoFontColor(bgCol);
+                end
+            else
+                % Property-based gradient coloring
+                fieldName = propFieldMap(propName);
+                vals = nan(1, numel(syms));
+                for ki = 1:numel(syms)
+                    el = allEls(elIdxMap(syms{ki}));
+                    vals(ki) = el.(fieldName);
+                end
+                vMin = min(vals(~isnan(vals)));
+                vMax = max(vals(~isnan(vals)));
+                cmap = viridisMap(256);
+
+                for ki = 1:numel(syms)
+                    b = ptBtns(syms{ki});
+                    if ~isvalid(b), continue; end
+                    v = vals(ki);
+                    if isnan(v) || vMin == vMax
+                        bgCol = [0.3 0.3 0.3];
+                    else
+                        t = (v - vMin) / (vMax - vMin);
+                        idx = max(1, min(256, round(t * 255) + 1));
+                        bgCol = cmap(idx, :);
+                    end
+                    b.BackgroundColor = bgCol;
+                    b.FontColor = autoFontColor(bgCol);
+                end
+            end
+        end
+
+        function refreshPTText()
+            showZ    = cbShowZ.Value;
+            showMass = cbShowMass.Value;
+            showProp = cbShowPropVal.Value;
+            propName = ddProp.Value;
+
+            % Resolve property field (if showing property value)
+            hasPropField = ~strcmp(propName, 'Category') && propFieldMap.isKey(propName);
+
+            syms = ptBtns.keys;
+            for ki = 1:numel(syms)
+                s = syms{ki};
+                b = ptBtns(s);
+                if ~isvalid(b), continue; end
+                el = allEls(elIdxMap(s));
+
+                parts = {};
+                if showZ
+                    parts{end+1} = sprintf('%d', el.Z); %#ok<AGROW>
+                end
+                parts{end+1} = el.symbol; %#ok<AGROW>
+                if showMass
+                    parts{end+1} = sprintf('%.1f', el.mass); %#ok<AGROW>
+                end
+                if showProp && hasPropField
+                    pv = el.(propFieldMap(propName));
+                    if isnan(pv)
+                        parts{end+1} = '-'; %#ok<AGROW>
+                    else
+                        parts{end+1} = sprintf('%.3g', pv); %#ok<AGROW>
+                    end
+                end
+                b.Text = strjoin(parts, newline);
+            end
         end
 
         function doSearch()
             query = lower(strtrim(efSearch.Value));
+            k = ptBtns.keys;
             if isempty(query)
-                % Reset all to normal weight
-                k = ptBtns.keys;
                 for ki = 1:numel(k)
                     b = ptBtns(k{ki});
                     if isvalid(b)
@@ -1629,58 +1746,55 @@ end
                 end
                 return
             end
-            k = ptBtns.keys;
             for ki = 1:numel(k)
                 sym = k{ki};
                 b = ptBtns(sym);
                 if ~isvalid(b), continue; end
-                try
-                    el = calc.elementData('bySymbol', sym);
-                    match = contains(lower(el.name), query) || ...
-                            contains(lower(el.symbol), query);
-                    if match
-                        b.FontWeight = 'bold';
-                        b.FontSize   = 9;
-                    else
-                        b.FontWeight = 'normal';
-                        b.FontSize   = 8;
-                    end
-                catch; end
+                el = allEls(elIdxMap(sym));
+                match = contains(lower(el.name), query) || ...
+                        contains(lower(el.symbol), query);
+                if match
+                    b.FontWeight = 'bold';
+                    b.FontSize   = 9;
+                else
+                    b.FontWeight = 'normal';
+                    b.FontSize   = 8;
+                end
             end
         end
 
         function lines = formatElementDetail(el)
-            propName = ddProp.Value;
-            switch propName
-                case 'Atomic Mass',             propVal = el.mass;             propUnit = 'u';
-                case 'Density',                 propVal = el.density;          propUnit = 'g/cm³';
-                case 'Electronegativity',       propVal = el.electronegativity; propUnit = '(Pauling)';
-                case 'Atomic Radius (pm)',      propVal = el.atomicRadius;     propUnit = 'pm';
-                case 'Ionization Energy (eV)',  propVal = el.ionizationEnergy; propUnit = 'eV';
-                case 'Melting Point (K)',        propVal = el.meltingPoint;     propUnit = 'K';
-                case 'Electron Affinity (eV)',  propVal = el.electronAffinity; propUnit = 'eV';
-                otherwise,                      propVal = NaN;                 propUnit = '';
-            end
-
-            if isnan(propVal)
-                propStr = sprintf('%s: N/A', propName);
-            else
-                propStr = sprintf('%s: %.4g %s', propName, propVal, propUnit);
-            end
-
             lines = { ...
                 sprintf('%-4s  %s  (Z = %d)', el.symbol, el.name, el.Z), ...
                 sprintf('Category: %s  |  Period %d, Group %d', el.category, el.period, el.group), ...
-                sprintf('Atomic Mass: %.4f u', el.mass), ...
-                propStr, ...
                 sprintf('Config: %s', el.electronConfig), ...
-                sprintf('Melting: %s K    Boiling: %s K', ...
-                    numOrNA(el.meltingPoint), numOrNA(el.boilingPoint)), ...
-                sprintf('Density: %s g/cm³    Elect.: %s (Pauling)', ...
-                    numOrNA(el.density), numOrNA(el.electronegativity)), ...
-                sprintf('Ioniz. E: %s eV    Electron Affinity: %s eV', ...
-                    numOrNA(el.ionizationEnergy), numOrNA(el.electronAffinity)), ...
+                '', ...
+                sprintf('Mass:       %-12s  Density:       %s g/cm%s', ...
+                    sprintf('%.4f u', el.mass), numOrNA(el.density), char(179)), ...
+                sprintf('Radius:     %-12s  Electroneg.:   %s (Pauling)', ...
+                    [numOrNA(el.atomicRadius) ' pm'], numOrNA(el.electronegativity)), ...
+                sprintf('Ioniz. E:   %-12s  E. Affinity:   %s eV', ...
+                    [numOrNA(el.ionizationEnergy) ' eV'], numOrNA(el.electronAffinity)), ...
+                sprintf('Melting:    %-12s  Boiling:       %s K', ...
+                    [numOrNA(el.meltingPoint) ' K'], numOrNA(el.boilingPoint)), ...
+                sprintf('Therm.Cond: %-12s  b_coh:         %s fm', ...
+                    [numOrNA(el.thermalConductivity) ' W/(m' char(183) 'K)'], numOrNA(el.bCoherent)), ...
             };
+            % X-ray edges (if available)
+            if isstruct(el.xrayEdges) && ~isempty(fieldnames(el.xrayEdges))
+                xe = el.xrayEdges;
+                fn = fieldnames(xe);
+                parts = {};
+                for fi = 1:numel(fn)
+                    v = xe.(fn{fi});
+                    if ~isnan(v)
+                        parts{end+1} = sprintf('%s=%.0f', fn{fi}, v); %#ok<AGROW>
+                    end
+                end
+                if ~isempty(parts)
+                    lines{end+1} = sprintf('X-ray edges (eV): %s', strjoin(parts, '  '));
+                end
+            end
         end
 
         function s = numOrNA(v)
@@ -1688,6 +1802,15 @@ end
                 s = 'N/A';
             else
                 s = sprintf('%.4g', v);
+            end
+        end
+
+        function fc = autoFontColor(bgCol)
+            lum = 0.299*bgCol(1) + 0.587*bgCol(2) + 0.114*bgCol(3);
+            if lum < 0.5
+                fc = [1 1 1];
+            else
+                fc = [0 0 0];
             end
         end
 
@@ -1947,7 +2070,7 @@ end
 
         gLondon = uigridlayout(pLondon);
         gLondon.RowHeight   = {24, 24, 24, 24};
-        gLondon.ColumnWidth = {90,'1x',70,'1x',90};
+        gLondon.ColumnWidth = {130,'1x',110,'1x',90};
         gLondon.Padding     = [6 4 6 4];
         gLondon.RowSpacing  = 4;
 
@@ -1957,15 +2080,16 @@ end
             'ValueChangedFcn',@(~,~) fillLondonFromPreset());
         ddLondonMat.Layout.Row=1; ddLondonMat.Layout.Column=2;
 
-        uilabel(gLondon,'Text',[char(955) char(8320) ' (nm):'],'HorizontalAlignment','right');
+        uilabel(gLondon,'Text','<html>&lambda;<sub>0</sub> depth (nm):</html>', ...
+            'HorizontalAlignment','right','Interpreter','html');
         efLondonLam0 = uieditfield(gLondon,'numeric','Value',39);
         efLondonLam0.Layout.Row=1; efLondonLam0.Layout.Column=4;
 
-        uilabel(gLondon,'Text','T<sub>c</sub> (K):','HorizontalAlignment','right', ...
-            'Interpreter','html');
+        uilabel(gLondon,'Text','Crit. temp T<sub>c</sub> (K):', ...
+            'HorizontalAlignment','right','Interpreter','html');
         efLondonTc = uieditfield(gLondon,'numeric','Value',9.25);
         efLondonTc.Layout.Row=2; efLondonTc.Layout.Column=2;
-        uilabel(gLondon,'Text','T (K):','HorizontalAlignment','right');
+        uilabel(gLondon,'Text','Meas. temp (K):','HorizontalAlignment','right');
         efLondonT = uieditfield(gLondon,'numeric','Value',4.2);
         efLondonT.Layout.Row=2; efLondonT.Layout.Column=4;
 
@@ -2014,7 +2138,7 @@ end
 
         gXi = uigridlayout(pXi);
         gXi.RowHeight   = {24, 24, 24};
-        gXi.ColumnWidth = {90,'1x',70,'1x',90};
+        gXi.ColumnWidth = {130,'1x',110,'1x',90};
         gXi.Padding     = [6 4 6 4];
         gXi.RowSpacing  = 4;
 
@@ -2024,14 +2148,16 @@ end
             'ValueChangedFcn',@(~,~) fillXiFromPreset());
         ddXiMat.Layout.Row=1; ddXiMat.Layout.Column=2;
 
-        uilabel(gXi,'Text',[char(958) char(8320) ' (nm):'],'HorizontalAlignment','right');
+        uilabel(gXi,'Text','<html>&xi;<sub>0</sub> length (nm):</html>', ...
+            'HorizontalAlignment','right','Interpreter','html');
         efXi0 = uieditfield(gXi,'numeric','Value',38);
         efXi0.Layout.Row=1; efXi0.Layout.Column=4;
 
-        uilabel(gXi,'Text','T<sub>c</sub> (K):','HorizontalAlignment','right','Interpreter','html');
+        uilabel(gXi,'Text','Crit. temp T<sub>c</sub> (K):', ...
+            'HorizontalAlignment','right','Interpreter','html');
         efXiTc = uieditfield(gXi,'numeric','Value',9.25);
         efXiTc.Layout.Row=2; efXiTc.Layout.Column=2;
-        uilabel(gXi,'Text','T (K):','HorizontalAlignment','right');
+        uilabel(gXi,'Text','Meas. temp (K):','HorizontalAlignment','right');
         efXiT = uieditfield(gXi,'numeric','Value',4.2);
         efXiT.Layout.Row=2; efXiT.Layout.Column=4;
         btnXiCalc = uibutton(gXi,'push','Text','Calculate', ...
@@ -2072,14 +2198,16 @@ end
 
         gGL = uigridlayout(pGL);
         gGL.RowHeight   = {24, 24, 24};
-        gGL.ColumnWidth = {90,'1x',70,'1x',90};
+        gGL.ColumnWidth = {130,'1x',110,'1x',90};
         gGL.Padding     = [6 4 6 4];
         gGL.RowSpacing  = 4;
 
-        uilabel(gGL,'Text',[char(955) ' (nm):'],'HorizontalAlignment','right');
+        uilabel(gGL,'Text','<html>Pen. depth &lambda; (nm):</html>', ...
+            'HorizontalAlignment','right','Interpreter','html');
         efGLLam = uieditfield(gGL,'numeric','Value',39);
         efGLLam.Layout.Row=1; efGLLam.Layout.Column=2;
-        uilabel(gGL,'Text',[char(958) ' (nm):'],'HorizontalAlignment','right');
+        uilabel(gGL,'Text','<html>Coher. &xi; (nm):</html>', ...
+            'HorizontalAlignment','right','Interpreter','html');
         efGLXi = uieditfield(gGL,'numeric','Value',38);
         efGLXi.Layout.Row=1; efGLXi.Layout.Column=4;
         btnGLCalc = uibutton(gGL,'push','Text','Calculate', ...
@@ -2114,7 +2242,7 @@ end
 
         gHc = uigridlayout(pHc);
         gHc.RowHeight   = {24, 24, 24, 24, 24};
-        gHc.ColumnWidth = {90,'1x',70,'1x',90};
+        gHc.ColumnWidth = {130,'1x',110,'1x',90};
         gHc.Padding     = [6 4 6 4];
         gHc.RowSpacing  = 4;
 
@@ -2124,14 +2252,16 @@ end
             'ValueChangedFcn',@(~,~) fillHcFromPreset());
         ddHcMat.Layout.Row=1; ddHcMat.Layout.Column=2;
 
-        uilabel(gHc,'Text','H<sub>c0</sub> (Oe):','HorizontalAlignment','right','Interpreter','html');
+        uilabel(gHc,'Text','Crit. field H<sub>c0</sub> (Oe):', ...
+            'HorizontalAlignment','right','Interpreter','html');
         efHcHc0 = uieditfield(gHc,'numeric','Value',1980);
         efHcHc0.Layout.Row=1; efHcHc0.Layout.Column=4;
 
-        uilabel(gHc,'Text','T<sub>c</sub> (K):','HorizontalAlignment','right','Interpreter','html');
+        uilabel(gHc,'Text','Crit. temp T<sub>c</sub> (K):', ...
+            'HorizontalAlignment','right','Interpreter','html');
         efHcTc = uieditfield(gHc,'numeric','Value',9.25);
         efHcTc.Layout.Row=2; efHcTc.Layout.Column=2;
-        uilabel(gHc,'Text','T (K):','HorizontalAlignment','right');
+        uilabel(gHc,'Text','Meas. temp (K):','HorizontalAlignment','right');
         efHcT = uieditfield(gHc,'numeric','Value',4.2);
         efHcT.Layout.Row=2; efHcT.Layout.Column=4;
         btnHcCalc = uibutton(gHc,'push','Text','Calculate', ...
@@ -2942,6 +3072,27 @@ for k = 1:n
     entries(k).row    = raw{k,2};
     entries(k).col    = raw{k,3};
 end
+end
+
+
+function cmap = viridisMap(n)
+%VIRIDISMAP  Perceptually uniform colormap (viridis) without toolbox.
+%   Returns an [n x 3] matrix interpolated from anchor colors.
+anchors = [ ...
+    0.267 0.004 0.329;  % dark purple
+    0.283 0.141 0.458;  % purple
+    0.254 0.265 0.530;  % blue-purple
+    0.164 0.471 0.558;  % teal
+    0.128 0.567 0.551;  % green-teal
+    0.134 0.658 0.517;  % green
+    0.477 0.821 0.318;  % lime
+    0.741 0.873 0.150;  % yellow-green
+    0.993 0.906 0.144;  % yellow
+];
+t = linspace(0, 1, size(anchors,1));
+ti = linspace(0, 1, n);
+cmap = interp1(t, anchors, ti, 'pchip');
+cmap = max(0, min(1, cmap));
 end
 
 
