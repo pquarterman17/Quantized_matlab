@@ -2437,18 +2437,7 @@ function varargout = DataPlotter()
         if nargin < 1 || isempty(outPath)
             error('outPath required');
         end
-
-        % Guard against accidental overwrite (#22)
-        if isfile(outPath)
-            warning('DataPlotter:sessionOverwrite', ...
-                'Overwriting existing session file: %s', outPath);
-        end
-
-        % Save datasets with all their state
-        savedDatasets = appData.datasets;
-
-        % Save GUI state
-        savedState = struct( ...
+        guiState = struct( ...
             'colormap', ddColormap.Value, ...
             'xCol', ddX.Value, ...
             'yCol', lbY.Value, ...
@@ -2456,8 +2445,7 @@ function varargout = DataPlotter()
             'logX', strcmp(ddScaleX.Value, 'Log'), ...
             'logY', strcmp(ddScaleY.Value, 'Log'), ...
             'logY2', strcmp(ddScaleY2.Value, 'Log'));
-
-        save(outPath, 'savedDatasets', 'savedState');
+        dataplotter.sessionManager.save(outPath, appData, guiState);
     end
 
     function loadSessionDirect(matPath)
@@ -2465,42 +2453,18 @@ function varargout = DataPlotter()
         if nargin < 1 || isempty(matPath)
             error('matPath required');
         end
+        guiState = dataplotter.sessionManager.load(matPath, appData);
 
-        if ~isfile(matPath)
-            error('Session file not found: %s', matPath);
-        end
-
-        s = load(matPath);
-        if ~isfield(s, 'savedDatasets')
-            error('Invalid session file: missing savedDatasets field');
-        end
-
-        % Restore datasets
-        appData.datasets  = s.savedDatasets;
-        appData.activeIdx = 0;
-
-        % parserVersion compatibility check (#18)
-        nLegacy = sum(cellfun(@(ds) ...
-            ~isfield(ds.data.metadata, 'parserVersion'), appData.datasets));
-        if nLegacy > 0
-            warning('DataPlotter:legacySession', ...
-                '%d dataset(s) lack parserVersion; re-import files to attach version metadata.', ...
-                nLegacy);
-        end
-
-        % Restore GUI state if available
-        if isfield(s, 'savedState')
-            try
-                ddColormap.Value = s.savedState.colormap;
-                ddX.Value = s.savedState.xCol;
-                lbY.Value = s.savedState.yCol;
-                lbY2.Value = s.savedState.y2Col;
-                if s.savedState.logX, ddScaleX.Value = 'Log'; else, ddScaleX.Value = 'Linear'; end
-                if s.savedState.logY, ddScaleY.Value = 'Log'; else, ddScaleY.Value = 'Linear'; end
-                if s.savedState.logY2, ddScaleY2.Value = 'Log'; else, ddScaleY2.Value = 'Linear'; end
-            catch
-                % Ignore state restoration errors; dataset structure is sufficient
-            end
+        % Restore GUI widget state
+        try
+            ddColormap.Value = guiState.colormap;
+            ddX.Value = guiState.xCol;
+            lbY.Value = guiState.yCol;
+            lbY2.Value = guiState.y2Col;
+            if guiState.logX, ddScaleX.Value = 'Log'; else, ddScaleX.Value = 'Linear'; end
+            if guiState.logY, ddScaleY.Value = 'Log'; else, ddScaleY.Value = 'Linear'; end
+            if guiState.logY2, ddScaleY2.Value = 'Log'; else, ddScaleY2.Value = 'Linear'; end
+        catch
         end
 
         cancelInteractions();
