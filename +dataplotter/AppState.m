@@ -117,6 +117,7 @@ classdef AppState < handle
         tableMask       logical = logical([])
         tableEdited     logical = false
         tableRowCap     double  = 500
+        tableSelection  double  = []   % [Nx2] selected cells from CellSelectionCallback
 
         % ── Collapsible sections ───────────────────────────────────
         sectionCollapsed struct = struct( ...

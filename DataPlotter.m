@@ -1299,8 +1299,10 @@ function varargout = DataPlotter()
         'Data', {}, ...
         'ColumnEditable', true, ...
         'CellEditCallback', @onTableCellEdit, ...
+        'CellSelectionCallback', @onTableSelectionChanged, ...
         'FontSize', 9);
     tblData.Layout.Row = 3;
+    appData.tableSelection = [];  % [Nx2] matrix of [row col] pairs
 
     axLimGL = uigridlayout(axLimPanel,[5 6], ...
         'RowHeight',    {22, 22, 0, 22, 0}, ...
@@ -12383,10 +12385,16 @@ function varargout = DataPlotter()
         end
     end
 
+    function onTableSelectionChanged(~, evt)
+    %ONTABLESELECTIONCHANGED  Track selected cells for mask/sort operations.
+    %   Stores selection in appData (compatible with all MATLAB versions).
+        appData.tableSelection = evt.Indices;
+    end
+
     function onTableMaskSelected(~, ~)
     %ONTABLEMASKSELECTED  Mask the currently selected rows in the table.
     %   Skips row 1 (units row). Data rows start at table row 2.
-        sel = tblData.Selection;
+        sel = appData.tableSelection;
         if isempty(sel), return; end
         tableRows = unique(sel(:, 1));
         tableRows(tableRows < 2) = [];  % skip units row
@@ -12521,7 +12529,7 @@ function varargout = DataPlotter()
     function onTableSort(direction)
     %ONTABLESORT  Sort the data table by the selected column.
         if isempty(appData.tableWorkingCopy), return; end
-        sel = tblData.Selection;
+        sel = appData.tableSelection;
         if isempty(sel)
             % Default: sort by first column (X)
             sortCol = 1;
