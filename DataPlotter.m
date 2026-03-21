@@ -635,6 +635,7 @@ function varargout = DataPlotter()
     appData.tableUnits       = {};
     appData.tableMask       = [];
     appData.tableEdited     = false;
+    appData.tableRowCap     = 500;    % max rows displayed in uitable (perf cap)
     fig.WindowButtonDownFcn   = @onAxesButtonDown;  % normal mode; special modes overwrite this
     fig.WindowButtonMotionFcn = @onMouseHover;      % idle hover; drags overwrite and restore this
 
@@ -12418,8 +12419,10 @@ function varargout = DataPlotter()
             end
 
             % Build cell data: units row + data rows + mask column
+            % ── Performance: cap displayed rows (full data in tableWorkingCopy) ──
+            cap = min(nRows, appData.tableRowCap);
             unitsRow = [unitCells(1:end-1), {false}];
-            dataRows = [num2cell(dataMat), num2cell(appData.tableMask)];
+            dataRows = [num2cell(dataMat(1:cap, :)), num2cell(appData.tableMask(1:cap))];
             tableData = [unitsRow; dataRows];
 
             tblData.ColumnName = colNames;
@@ -12456,12 +12459,14 @@ function varargout = DataPlotter()
             unitCells = [{xUnit}, d.units, {''}];
 
             % Build cell data: units row (row 1) + data rows
+            % ── Performance: cap displayed rows (full data in tableWorkingCopy) ──
+            cap = min(nRows, appData.tableRowCap);
             unitsRow = [num2cell([NaN, NaN(1, nCols)]), {false}];
             % Fill units as strings in row 1
             for ui = 1:numel(unitCells)
                 unitsRow{ui} = unitCells{ui};
             end
-            dataRows = [num2cell([xCol, yMat]), num2cell(appData.tableMask)];
+            dataRows = [num2cell([xCol(1:cap), yMat(1:cap, :)]), num2cell(appData.tableMask(1:cap))];
             tableData = [unitsRow; dataRows];
 
             tblData.ColumnName = colNames;
@@ -12482,8 +12487,13 @@ function varargout = DataPlotter()
         % Stats summary
         nMasked = sum(appData.tableMask);
         nDataCols2 = size(appData.tableWorkingCopy, 2);
-        lblTableStats.Text = sprintf('%d rows, %d cols, %d masked  ', ...
-            nRows, nDataCols2, nMasked);
+        if nRows > appData.tableRowCap
+            lblTableStats.Text = sprintf('Showing %d of %d rows, %d cols, %d masked  ', ...
+                min(nRows, appData.tableRowCap), nRows, nDataCols2, nMasked);
+        else
+            lblTableStats.Text = sprintf('%d rows, %d cols, %d masked  ', ...
+                nRows, nDataCols2, nMasked);
+        end
     end
 
     function onTableCellEdit(~, evt)
