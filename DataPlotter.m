@@ -632,6 +632,7 @@ function varargout = DataPlotter()
     % Table state (UI built later in dataTablePanel after analysisGL is created)
     appData.tableVisible    = true;   % visible by default in analysis area
     appData.tableWorkingCopy = [];
+    appData.tableUnits       = {};
     appData.tableMask       = [];
     appData.tableEdited     = false;
     fig.WindowButtonDownFcn   = @onAxesButtonDown;  % normal mode; special modes overwrite this
@@ -2203,7 +2204,8 @@ function varargout = DataPlotter()
     api.getTableData        = @() struct( ...
         'data',     {tblData.Data}, ...
         'colNames', {tblData.ColumnName}, ...
-        'working',  appData.tableWorkingCopy);
+        'working',  appData.tableWorkingCopy, ...
+        'units',    {appData.tableUnits});
     api.descriptiveStats    = @() onDescriptiveStats([],[]);
 
     % ════════════════════════════════════════════════════════════════════
@@ -10776,18 +10778,23 @@ function varargout = DataPlotter()
             case 'y', targetAx.YLimMode = 'auto';
         end
 
-        % Update axis label: insert prefix before the unit inside parentheses
-        % e.g. "Magnetic Field (Oe)" → "Magnetic Field (kOe)"
+        % Update axis label: strip any existing SI prefix from the unit
+        % and replace with the new one.
+        % e.g. "Depth (um)" + nano → "Depth (nm)"  (not "Depth (num)")
         switch whichAxis
             case 'x', lbl = targetAx.XLabel.String;
             case 'y', lbl = targetAx.YLabel.String;
         end
         if ~isempty(lbl)
-            % Try to find "(unit)" pattern and insert prefix
-            newLbl = regexprep(lbl, '\(([^)]+)\)', ['(' sym '$1)'], 'once');
-            if strcmp(newLbl, lbl)
+            tok = regexp(lbl, '^(.*)\(([^)]+)\)(.*)', 'tokens', 'once');
+            if ~isempty(tok)
+                unitStr  = tok{2};
+                baseUnit = stripSIPrefix(unitStr);
+                newUnit  = [sym baseUnit];
+                newLbl   = [tok{1} '(' newUnit ')' tok{3}];
+            else
                 % No parenthesised unit found — append prefix notation
-                newLbl = sprintf('%s  [×%s]', lbl, sym);
+                newLbl = sprintf('%s  [%s%s]', lbl, sym, char(215));
             end
             switch whichAxis
                 case 'x', xlabel(targetAx, newLbl);
@@ -12333,6 +12340,9 @@ function varargout = DataPlotter()
 
     function refreshDataTable()
     %REFRESHDATATABLE  Populate the table from the active dataset.
+    %   Row 1 is an editable units row (green text). Rows 2+ are data.
+    %   SIMS datasets with per-element original depths get paired
+    %   Depth/Conc columns instead of a single shared X column.
         if appData.activeIdx < 1 || isempty(appData.datasets)
             tblData.ColumnName = {'(no data)'};
             tblData.Data = {};
@@ -12342,91 +12352,188 @@ function varargout = DataPlotter()
         end
 
         d = getPlotData(appData.activeIdx);
-        xName = 'X';
-        if isfield(d.metadata, 'parserSpecific') && isfield(d.metadata.parserSpecific, 'xLabel')
-            xName = d.metadata.parserSpecific.xLabel;
-        elseif ~isempty(d.labels)
-            xName = 'X';
-        end
-
-        % Build column names: X + all Y channels + Masked
-        colNames = [{xName}, d.labels, {'Masked'}];
-        nRows = numel(d.time);
-        nCols = size(d.values, 2);
-
-        % Build data matrix (working copy)
-        xCol = d.time(:);
-        yMat = d.values;
-        % Initialize table mask from ds.mask (inverted convention)
         ds2 = appData.datasets{appData.activeIdx};
-        if isfield(ds2, 'mask') && numel(ds2.mask) == nRows
-            appData.tableMask = ~ds2.mask;  % ds.mask true=included → tableMask true=excluded
-        elseif isempty(appData.tableMask) || numel(appData.tableMask) ~= nRows
-            appData.tableMask = false(nRows, 1);
+        nRows = numel(d.time);
+
+        % ── Detect SIMS per-element depth mode ────────────────────────
+        isSIMSMultiDepth = false;
+        if isfield(d.metadata, 'parserSpecific') ...
+                && isfield(d.metadata.parserSpecific, 'originalDepths') ...
+                && iscell(d.metadata.parserSpecific.originalDepths)
+            origD = d.metadata.parserSpecific.originalDepths;
+            origC = d.metadata.parserSpecific.originalConcentrations;
+            if numel(origD) == size(d.values, 2) && numel(origD) > 1
+                isSIMSMultiDepth = true;
+            end
         end
 
-        % Store working copy
-        appData.tableWorkingCopy = [xCol, yMat];
-        appData.tableEdited = false;
+        if isSIMSMultiDepth
+            % ── SIMS paired columns: Depth_A | A | Depth_B | B | ... ──
+            nElem = numel(origD);
+            depthUnit = '';
+            if isfield(d.metadata.parserSpecific, 'depthUnit')
+                depthUnit = d.metadata.parserSpecific.depthUnit;
+            end
 
-        % Build table data as cell for mixed types
-        tableData = num2cell([xCol, yMat]);
-        % Add mask column (logical checkbox)
-        maskCol = num2cell(appData.tableMask);
-        tableData = [tableData, maskCol];
+            % Find max rows across all elements
+            maxPts = max(cellfun(@numel, origD));
 
-        tblData.ColumnName = colNames;
-        tblData.Data = tableData;
-        tblData.ColumnEditable = [true(1, 1 + nCols), true];  % all editable including mask
+            % Build column names and units
+            colNames = {};
+            unitCells = {};
+            for ei = 1:nElem
+                colNames{end+1}  = ['Depth_' d.labels{ei}]; %#ok<AGROW>
+                colNames{end+1}  = d.labels{ei}; %#ok<AGROW>
+                unitCells{end+1} = depthUnit; %#ok<AGROW>
+                if ei <= numel(d.units)
+                    unitCells{end+1} = d.units{ei}; %#ok<AGROW>
+                else
+                    unitCells{end+1} = ''; %#ok<AGROW>
+                end
+            end
+            colNames{end+1} = 'Masked';
+            unitCells{end+1} = '';
 
-        % Units row
+            % Build data matrix with NaN padding
+            nDataCols = nElem * 2;
+            dataMat = NaN(maxPts, nDataCols);
+            for ei = 1:nElem
+                dVec = origD{ei}(:);
+                cVec = origC{ei}(:);
+                nPts = numel(dVec);
+                dataMat(1:nPts, 2*ei-1) = dVec;
+                dataMat(1:nPts, 2*ei)   = cVec;
+            end
+
+            % Store working copy (without mask column)
+            appData.tableWorkingCopy = dataMat;
+            appData.tableEdited = false;
+            nRows = maxPts;
+
+            % Initialize mask
+            if isfield(ds2, 'mask') && numel(ds2.mask) == nRows
+                appData.tableMask = ~ds2.mask;
+            elseif isempty(appData.tableMask) || numel(appData.tableMask) ~= nRows
+                appData.tableMask = false(nRows, 1);
+            end
+
+            % Build cell data: units row + data rows + mask column
+            unitsRow = [unitCells(1:end-1), {false}];
+            dataRows = [num2cell(dataMat), num2cell(appData.tableMask)];
+            tableData = [unitsRow; dataRows];
+
+            tblData.ColumnName = colNames;
+            tblData.Data = tableData;
+            tblData.ColumnEditable = true(1, nDataCols + 1);
+
+        else
+            % ── Standard layout: single X + Y channels ────────────────
+            xName = 'X';
+            if isfield(d.metadata, 'parserSpecific') && isfield(d.metadata.parserSpecific, 'xLabel')
+                xName = d.metadata.parserSpecific.xLabel;
+            end
+
+            colNames = [{xName}, d.labels, {'Masked'}];
+            nCols = size(d.values, 2);
+
+            xCol = d.time(:);
+            yMat = d.values;
+
+            if isfield(ds2, 'mask') && numel(ds2.mask) == nRows
+                appData.tableMask = ~ds2.mask;
+            elseif isempty(appData.tableMask) || numel(appData.tableMask) ~= nRows
+                appData.tableMask = false(nRows, 1);
+            end
+
+            appData.tableWorkingCopy = [xCol, yMat];
+            appData.tableEdited = false;
+
+            % Units row: X unit + Y units + mask placeholder
+            xUnit = '';
+            if isfield(d.metadata, 'xColumnUnit')
+                xUnit = d.metadata.xColumnUnit;
+            end
+            unitCells = [{xUnit}, d.units, {''}];
+
+            % Build cell data: units row (row 1) + data rows
+            unitsRow = [num2cell([NaN, NaN(1, nCols)]), {false}];
+            % Fill units as strings in row 1
+            for ui = 1:numel(unitCells)
+                unitsRow{ui} = unitCells{ui};
+            end
+            dataRows = [num2cell([xCol, yMat]), num2cell(appData.tableMask)];
+            tableData = [unitsRow; dataRows];
+
+            tblData.ColumnName = colNames;
+            tblData.Data = tableData;
+            tblData.ColumnEditable = [true(1, 1 + nCols), true];
+        end
+
+        % Store units for editing and export
+        appData.tableUnits = unitCells(1:end-1);  % exclude mask column
+
+        % Update units label (summary)
         if ~isempty(d.units)
-            unitStr = strjoin([{'—'}, d.units, {'—'}], '  |  ');
-            lblTableUnits.Text = ['  Units: ' unitStr];
+            lblTableUnits.Text = '  Row 1 = editable units (green)';
         else
             lblTableUnits.Text = '';
         end
 
         % Stats summary
         nMasked = sum(appData.tableMask);
+        nDataCols2 = size(appData.tableWorkingCopy, 2);
         lblTableStats.Text = sprintf('%d rows, %d cols, %d masked  ', ...
-            nRows, nCols + 1, nMasked);
+            nRows, nDataCols2, nMasked);
     end
 
     function onTableCellEdit(~, evt)
     %ONTABLECELLEDIT  Handle cell edits in the data table.
+    %   Row 1 is the units row (string edits update appData.tableUnits).
+    %   Rows 2+ are data (numeric edits update appData.tableWorkingCopy).
         row = evt.Indices(1);
         col = evt.Indices(2);
         nDataCols = size(appData.tableWorkingCopy, 2);
 
-        if col <= nDataCols
-            % Data column edit
+        if row == 1 && col <= nDataCols
+            % Units row edit — store updated unit string
             newVal = evt.NewData;
-            if isnumeric(newVal)
-                appData.tableWorkingCopy(row, col) = newVal;
+            if ischar(newVal) || isstring(newVal)
+                appData.tableUnits{col} = char(newVal);
                 appData.tableEdited = true;
             end
-        elseif col == nDataCols + 1
-            % Mask column toggle
-            appData.tableMask(row) = logical(evt.NewData);
+        elseif row >= 2 && col <= nDataCols
+            % Data row edit (offset by 1 for units row)
+            dataRow = row - 1;
+            newVal = evt.NewData;
+            if isnumeric(newVal)
+                appData.tableWorkingCopy(dataRow, col) = newVal;
+                appData.tableEdited = true;
+            end
+        elseif col == nDataCols + 1 && row >= 2
+            % Mask column toggle (data rows only)
+            dataRow = row - 1;
+            appData.tableMask(dataRow) = logical(evt.NewData);
             nMasked = sum(appData.tableMask);
             nRows = size(appData.tableWorkingCopy, 1);
-            nCols = nDataCols;
             lblTableStats.Text = sprintf('%d rows, %d cols, %d masked  ', ...
-                nRows, nCols, nMasked);
+                nRows, nDataCols, nMasked);
             syncTableMaskToDataset();
         end
     end
 
     function onTableMaskSelected(~, ~)
     %ONTABLEMASKSELECTED  Mask the currently selected rows in the table.
+    %   Skips row 1 (units row). Data rows start at table row 2.
         sel = tblData.Selection;
         if isempty(sel), return; end
-        rows = unique(sel(:, 1));
-        appData.tableMask(rows) = true;
+        tableRows = unique(sel(:, 1));
+        tableRows(tableRows < 2) = [];  % skip units row
+        if isempty(tableRows), return; end
+        dataRows = tableRows - 1;  % offset for units row
+        appData.tableMask(dataRows) = true;
         % Update mask column in table display
-        for ri = 1:numel(rows)
-            tblData.Data{rows(ri), end} = true;
+        for ri = 1:numel(tableRows)
+            tblData.Data{tableRows(ri), end} = true;
         end
         nMasked = sum(appData.tableMask);
         nRows = size(appData.tableWorkingCopy, 1);
@@ -12434,7 +12541,7 @@ function varargout = DataPlotter()
         lblTableStats.Text = sprintf('%d rows, %d cols, %d masked  ', ...
             nRows, nCols, nMasked);
         syncTableMaskToDataset();
-        setStatus(sprintf('Masked %d rows (%d total masked)', numel(rows), nMasked));
+        setStatus(sprintf('Masked %d rows (%d total masked)', numel(dataRows), nMasked));
     end
 
     function onTableUnmaskAll(~, ~)
@@ -12573,6 +12680,8 @@ function varargout = DataPlotter()
 
     function onTableSaveAs(~, ~)
     %ONTABLESAVEAS  Save the working copy (with edits) to a new file.
+    %   Includes editable units row and column names. Exports with the
+    %   units as row 1, matching what the user sees in the data table.
         if isempty(appData.tableWorkingCopy)
             uialert(fig, 'No data to save.', 'Save As');
             return;
@@ -12585,9 +12694,11 @@ function varargout = DataPlotter()
         outPath = fullfile(fp, fn);
 
         try
-            d = getPlotData(appData.activeIdx);
-            xName = 'X';
-            colNames = [{xName}, d.labels];
+            % Get column names from the table (excluding Masked column)
+            colNames = tblData.ColumnName;
+            if strcmp(colNames{end}, 'Masked')
+                colNames = colNames(1:end-1);
+            end
 
             % Get working copy, excluding masked rows if desired
             wc = appData.tableWorkingCopy;
@@ -12600,16 +12711,36 @@ function varargout = DataPlotter()
                 end
             end
 
-            T = array2table(wc, 'VariableNames', ...
-                matlab.lang.makeValidName(colNames));
-
+            % Build export: header row + units row + data
+            validNames = matlab.lang.makeValidName(colNames);
             [~, ~, ext] = fileparts(outPath);
+
             if strcmpi(ext, '.xlsx')
-                writetable(T, outPath);
+                % Excel: write header, units, then data as separate rows
+                headerCell = colNames(:)';
+                unitsCell  = appData.tableUnits(:)';
+                dataCell   = num2cell(wc);
+                allCell    = [headerCell; unitsCell; dataCell];
+                writecell(allCell, outPath);
             else
-                writetable(T, outPath, 'Delimiter', ',');
+                % CSV: write header, units, then data
+                fidOut = fopen(outPath, 'w');
+                if fidOut == -1
+                    error('Cannot open file: %s', outPath);
+                end
+                cleanF = onCleanup(@() fclose(fidOut));
+                % Header row
+                fprintf(fidOut, '%s\n', strjoin(colNames, ','));
+                % Units row
+                fprintf(fidOut, '%s\n', strjoin(appData.tableUnits, ','));
+                % Data rows
+                for ri = 1:size(wc, 1)
+                    vals = arrayfun(@(v) sprintf('%.10g', v), wc(ri, :), ...
+                        'UniformOutput', false);
+                    fprintf(fidOut, '%s\n', strjoin(vals, ','));
+                end
             end
-            setStatus(sprintf('Table saved: %s (%d rows)', fn, size(wc, 1)));
+            setStatus(sprintf('Table saved: %s (%d rows + units)', fn, size(wc, 1)));
         catch ME
             uialert(fig, sprintf('Save failed:\n%s', ME.message), 'Error');
         end
@@ -16390,6 +16521,65 @@ end  % DataPlotter
 % ════════════════════════════════════════════════════════════════════════
 %  Module-level helpers  (stateless — no access to GUI handles)
 % ════════════════════════════════════════════════════════════════════════
+
+function baseUnit = stripSIPrefix(unitStr)
+%STRIPSIPREFIX  Remove a leading SI prefix from a unit string.
+%   'um' → 'm', 'nm' → 'm', 'kOe' → 'Oe', 'mV' → 'V', 'MeV' → 'eV'
+%   Handles µ (char 956), and common multi-char units (emu, eV, Ang).
+%   Returns the base unit with prefix stripped. If no recognised prefix,
+%   returns the input unchanged.
+    mu = char(956);  % µ
+    % Ordered longest-first to avoid partial matches (e.g. 'meV' vs 'm'+'eV')
+    knownPrefixes = {'G','M','k','m',mu,'u','n','p','f','a'};
+    unitStr = strtrim(unitStr);
+    if isempty(unitStr)
+        baseUnit = unitStr;
+        return;
+    end
+    for kp = 1:numel(knownPrefixes)
+        pfx = knownPrefixes{kp};
+        if startsWith(unitStr, pfx) && numel(unitStr) > numel(pfx)
+            candidate = unitStr(numel(pfx)+1 : end);
+            % Reject if stripping creates a non-unit (e.g. stripping 'k' from 'kg')
+            % Accept if the remainder starts with an uppercase letter or known unit
+            if isKnownBaseUnit(candidate)
+                baseUnit = candidate;
+                return;
+            end
+        end
+    end
+    % No prefix found — return as-is
+    baseUnit = unitStr;
+end
+
+
+function tf = isKnownBaseUnit(s)
+%ISKNOWNBASEUNIT  Check if a string looks like a valid base unit.
+%   Matches common lab units: m, V, A, Oe, T, eV, emu, Hz, s, K, Pa,
+%   Ang, W, J, N, bar, counts, cps, mol, g, and multi-char compound units.
+    known = {'m','V','A','Oe','T','eV','emu','Hz','s','K','Pa', ...
+             'Ang','W','J','N','bar','counts','cps','mol','g','B', ...
+             char(197), 'rad', 'deg', 'arb'};  % Å = char(197)
+    % Direct match
+    for ki = 1:numel(known)
+        if strcmp(s, known{ki})
+            tf = true;
+            return;
+        end
+    end
+    % Also accept if starts with uppercase (likely a unit like Ohm, Siemens)
+    if ~isempty(s) && s(1) >= 'A' && s(1) <= 'Z'
+        tf = true;
+        return;
+    end
+    % Accept compound units with / or ^
+    if contains(s, '/') || contains(s, '^') || contains(s, char(183))
+        tf = true;
+        return;
+    end
+    tf = false;
+end
+
 
 function idx = findErrorColumn(labels, yLabel)
 %FINDERRORCOLUMN  Find an error/uncertainty column matching a given y-channel label.
