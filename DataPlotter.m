@@ -965,9 +965,10 @@ function varargout = DataPlotter()
     efSmoothWin.Layout.Row = CROW.SMOOTH; efSmoothWin.Layout.Column = 2;
 
     ddSmoothMethod = uidropdown(corrGL, ...
-        'Items',   {'Moving', 'Gaussian'}, ...
+        'Items',   {'Moving', 'Gaussian', 'Savitzky-Golay'}, ...
         'Value',   'Moving', ...
-        'Tooltip', 'Moving: uniform average  |  Gaussian: bell-curve weighted average', ...
+        'Tooltip', ['Moving: uniform average  |  Gaussian: bell-curve weighted  |  ' ...
+                    'Savitzky-Golay: polynomial fit (preserves peak shapes)'], ...
         'ValueChangedFcn', @onSmoothingChanged);
     ddSmoothMethod.Layout.Row = CROW.SMOOTH; ddSmoothMethod.Layout.Column = [3 4];
 
@@ -13856,9 +13857,9 @@ function varargout = DataPlotter()
             uialert(fig, 'Load a file first.', 'No data'); return;
         end
 
-        tplFig = uifigure('Name', 'Plot Templates', 'Position', [350 300 360 200], 'Resize', 'off');
-        tplGL = uigridlayout(tplFig, [3 2], ...
-            'RowHeight', {30, 30, '1x'}, 'ColumnWidth', {'1x', '1x'}, ...
+        tplFig = uifigure('Name', 'Plot Templates', 'Position', [350 300 360 260], 'Resize', 'off');
+        tplGL = uigridlayout(tplFig, [4 2], ...
+            'RowHeight', {30, 30, 30, '1x'}, 'ColumnWidth', {'1x', '1x'}, ...
             'Padding', [15 15 15 15], 'RowSpacing', 10);
 
         uibutton(tplGL, 'Text', 'Save Template...', ...
@@ -13875,9 +13876,18 @@ function varargout = DataPlotter()
         uibutton(tplGL, 'Text', 'Cancel', ...
             'ButtonPushedFcn', @(~,~) delete(tplFig));
 
-        lblInfo = uilabel(tplGL, 'Text', 'Templates save axis limits, corrections, normalization, labels, and scale settings.', ...
+        btnBatchApply = uibutton(tplGL, 'Text', 'Batch Apply...', ...
+            'BackgroundColor', [0.18 0.55 0.34], 'FontColor', BTN_FG, ...
+            'FontWeight', 'bold', ...
+            'Tooltip', 'Apply a saved template to a folder of files (import + correct + export CSV)', ...
+            'ButtonPushedFcn', @(~,~) doBatchApplyTemplate());
+        btnBatchApply.Layout.Row = 3; btnBatchApply.Layout.Column = [1 2];
+
+        lblInfo = uilabel(tplGL, 'Text', ...
+            ['Templates save corrections, normalization, labels, and scale settings. ' ...
+             'Use "Batch Apply" to process a folder of files with the same pipeline.'], ...
             'WordWrap', 'on', 'FontSize', 9, 'FontColor', [0.4 0.4 0.4]);
-        lblInfo.Layout.Row = 3; lblInfo.Layout.Column = [1 2];
+        lblInfo.Layout.Row = 4; lblInfo.Layout.Column = [1 2];
 
         function doSaveTemplate()
             [fname, fpath] = uiputfile('*.mat', 'Save Plot Template');
@@ -13962,6 +13972,43 @@ function varargout = DataPlotter()
             if isequal(fname, 0), return; end
             delete(fullfile(fpath, fname));
             setStatus(sprintf('Template deleted: %s', fname));
+        end
+
+        function doBatchApplyTemplate()
+        %DOBATCHAPPLYTEMPLATE  Pick a template + folder, run analysis pipeline.
+            % Select template
+            [tplName, tplPath] = uigetfile('*.mat', 'Select Template to Apply');
+            if isequal(tplName, 0), return; end
+            tplFile = fullfile(tplPath, tplName);
+
+            % Select input folder
+            inputDir = uigetdir(startDir, 'Select folder of data files');
+            if isequal(inputDir, 0), return; end
+
+            % Select output folder
+            outputDir = uigetdir(inputDir, 'Select output folder for corrected CSVs');
+            if isequal(outputDir, 0), return; end
+
+            setStatus('Batch applying template...');
+            delete(tplFig);
+            drawnow;
+
+            try
+                res = scripts.applyAnalysisTemplate(tplFile, inputDir, ...
+                    'OutputDir', outputDir, 'Recursive', true, ...
+                    'ExportCSV', true, 'ExportPeaks', false);
+                nOk  = sum(cellfun(@isempty, {res.error}));
+                nErr = numel(res) - nOk;
+                msg = sprintf('Batch complete: %d processed, %d failed.\nOutput: %s', ...
+                    nOk, nErr, outputDir);
+                setStatus(sprintf('Batch template: %d ok, %d failed', nOk, nErr));
+                uialert(fig, msg, 'Batch Apply Complete');
+            catch ME
+                setStatus('Batch apply failed.');
+                logGUIError('Batch Apply Error', ME.message, ME);
+                uialert(fig, sprintf('Batch apply failed:\n%s', ME.message), ...
+                    'Batch Apply Error');
+            end
         end
     end
 

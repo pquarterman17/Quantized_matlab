@@ -86,7 +86,7 @@ thin_film_toolkit_matlab/
 │   └── default.m           # Default visual theme struct (colours, widths, font sizes)
 ├── +utilities/             # General-purpose data helpers
 │   ├── normalize.m         # Normalise columns: range / peak / z-score
-│   ├── smoothData.m        # Moving-average or Gaussian smoothing (no toolbox)
+│   ├── smoothData.m        # Moving-average, Gaussian, or Savitzky-Golay smoothing (no toolbox)
 │   ├── convertUnits.m      # Convert between common lab units (field, moment, temp, …)
 │   ├── writeXRDcsv.m       # Write XRD data to CSV (standard or Origin ASCII format)
 │   ├── estimateBackground.m # Polynomial background estimation for XRD/spectroscopy data
@@ -99,6 +99,7 @@ thin_film_toolkit_matlab/
 │   └── confidenceBand.m    # Mean±std or median±IQR from N repeat datasets
 └── +scripts/
     ├── batchImport.m       # Walk a directory, call importAuto on each supported file
+    ├── applyAnalysisTemplate.m # Batch-apply a saved DataPlotter template (corrections pipeline) to files
     ├── batchConvertXRD.m   # Batch-convert XRD files (.xrdml/.raw/.brml) to CSV via writeXRDcsv
     └── quickPlot.m        # Auto-detect & plot one or more data files (type-aware defaults)
 ```
@@ -216,6 +217,31 @@ results = scripts.batchImport('measurements/', 'Recursive', true);
 good = results(cellfun(@isempty, {results.error}));
 ```
 
+### Analysis Templates (reproducible batch pipelines)
+```matlab
+% 1. Set up corrections in DataPlotter on a reference file
+% 2. Save template: Templates... > Save Template...
+% 3. Batch-apply to all files in a folder:
+results = scripts.applyAnalysisTemplate('xrd_template.mat', 'measurements/', ...
+    'OutputDir', 'corrected/', 'Recursive', true);
+
+% Or apply to specific files
+results = scripts.applyAnalysisTemplate('mag_template.mat', ...
+    {'sample1.dat', 'sample2.dat', 'sample3.dat'}, ...
+    'OutputDir', 'processed/');
+
+% With peak detection
+results = scripts.applyAnalysisTemplate('xrd_template.mat', 'scans/', ...
+    'ExportPeaks', true, 'OutputDir', 'results/');
+% Creates: *_corrected.csv + *_peaks.csv for each file
+
+% Check results
+ok = results(cellfun(@isempty, {results.error}));
+fprintf('Processed %d / %d files\n', numel(ok), numel(results));
+```
+
+Also available from the GUI: DataPlotter > Templates... > **Batch Apply...**
+
 ### Batch XRD conversion (XRDML → CSV)
 ```matlab
 % Convert all XRD files in a folder to CSV
@@ -273,6 +299,9 @@ plotting.saveFigure(fig, 'scan.pdf');
 ```matlab
 normI  = utilities.normalize(data.values);               % [0,1] range
 smI    = utilities.smoothData(data.values, 'Window', 9); % Gaussian smooth
+sgI    = utilities.smoothData(data.values, 'Method', 'savitzky-golay'); % peak-preserving
+sgI    = utilities.smoothData(data.values, 'Method', 'savitzky-golay', ...
+                              'Window', 7, 'PolyOrder', 3); % custom SG params
 [H_T, u] = utilities.convertUnits(data.time, 'Oe', 'T');
 
 % Derivatives and transforms
