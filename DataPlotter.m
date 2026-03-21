@@ -2319,6 +2319,29 @@ function varargout = DataPlotter()
         if isempty(fpaths), return; end
         appData.lastDir = fileparts(fpaths{1});
 
+        % File size warning for very large files (>50 MB)
+        for wfi = 1:numel(fpaths)
+            try
+                fInfo = dir(fpaths{wfi});
+                if ~isempty(fInfo) && fInfo(1).bytes > 50e6
+                    [~, wfn, wfx] = fileparts(fpaths{wfi});
+                    sizeMB = fInfo(1).bytes / 1e6;
+                    answer = uiconfirm(fig, ...
+                        sprintf('%s%s is %.0f MB.\nLarge files may use significant memory. Continue?', ...
+                            wfn, wfx, sizeMB), ...
+                        'Large File Warning', ...
+                        'Options', {'Continue', 'Skip'}, ...
+                        'DefaultOption', 'Continue');
+                    if strcmp(answer, 'Skip')
+                        fpaths{wfi} = '';  % mark for skip
+                    end
+                end
+            catch
+            end
+        end
+        fpaths = fpaths(~cellfun(@isempty, fpaths));
+        if isempty(fpaths), return; end
+
         % Progress indicator for file loading (#6)
         fig.Pointer = 'watch';
         nTotal = numel(fpaths);
@@ -2437,8 +2460,9 @@ function varargout = DataPlotter()
 
         rebuildDatasetList(true);
         updateControlsForActiveDataset();
-        setStatus(sprintf('Loaded %d file(s) — %d dataset(s) total.', ...
-            nLoaded, numel(appData.datasets)));
+        memMB = estimateDatasetMemoryMB();
+        setStatus(sprintf('Loaded %d file(s) — %d dataset(s) total (~%.0f MB).', ...
+            nLoaded, numel(appData.datasets), memMB));
         % Record loaded files in macro
         for fj = 1:numel(fpaths)
             recordAction(sprintf("data = parser.importAuto('%s');", fpaths{fj}));
@@ -7252,6 +7276,36 @@ function varargout = DataPlotter()
         if isvalid(lblStatusBar)
             lblStatusBar.Text = msg;
             drawnow limitrate;
+        end
+    end
+
+    function mb = estimateDatasetMemoryMB()
+    %ESTIMATEDATASETMEMORYMB  Rough estimate of total dataset memory in MB.
+        mb = 0;
+        for di = 1:numel(appData.datasets)
+            dsi = appData.datasets{di};
+            % Raw data
+            if isfield(dsi, 'data') && ~isempty(dsi.data)
+                mb = mb + numel(dsi.data.time) * 8 / 1e6;
+                mb = mb + numel(dsi.data.values) * 8 / 1e6;
+            end
+            % Corrected data
+            if isfield(dsi, 'corrData') && ~isempty(dsi.corrData)
+                mb = mb + numel(dsi.corrData.time) * 8 / 1e6;
+                mb = mb + numel(dsi.corrData.values) * 8 / 1e6;
+            end
+            % 2D map
+            if isfield(dsi, 'data') && isfield(dsi.data, 'metadata') && ...
+                    isfield(dsi.data.metadata, 'parserSpecific')
+                ps = dsi.data.metadata.parserSpecific;
+                if isfield(ps, 'map2D') && isfield(ps.map2D, 'intensity')
+                    mb = mb + numel(ps.map2D.intensity) * 8 / 1e6;
+                    if isfield(ps.map2D, 'Qx')
+                        mb = mb + numel(ps.map2D.Qx) * 8 / 1e6;
+                        mb = mb + numel(ps.map2D.Qz) * 8 / 1e6;
+                    end
+                end
+            end
         end
     end
 

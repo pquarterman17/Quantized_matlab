@@ -1,0 +1,122 @@
+function R = parrattRefl(Q, layers, options)
+%PARRATTREFL  Specular reflectivity via Parratt recursion.
+%
+%   R = fitting.parrattRefl(Q, layers)
+%   R = fitting.parrattRefl(Q, layers, Roughness=true)
+%
+%   Computes specular reflectivity R(Q) for a multilayer thin-film stack
+%   using the recursive Parratt formalism with optional Névot-Croce
+%   interfacial roughness.
+%
+%   Inputs:
+%       Q      — [N×1] momentum transfer vector (Å⁻¹), Q = 4π sin(θ)/λ
+%       layers — [M×4] matrix where each row defines a layer:
+%                  [thickness(Å), SLD_real(Å⁻²), SLD_imag(Å⁻²), roughness(Å)]
+%                Row 1 = incident medium (thickness ignored, usually air/vacuum)
+%                Row M = substrate (thickness ignored, semi-infinite)
+%                Rows 2..M-1 = thin film layers (top to bottom)
+%
+%   Options:
+%       Roughness — apply Névot-Croce roughness (default: true)
+%       Scale     — overall scale factor (default: 1.0)
+%       Background— constant background added to R (default: 0)
+%
+%   Output:
+%       R — [N×1] reflectivity (|r|²), same size as Q
+%
+%   Layer convention:
+%       Layer 1: incident medium (air: SLD ≈ 0, thickness = 0)
+%       Layer 2: top film layer
+%       ...
+%       Layer M-1: bottom film layer
+%       Layer M: substrate (Si: SLD ≈ 2.07e-6 Å⁻², thickness = 0)
+%
+%   Examples:
+%       % Bare silicon in air
+%       Q = linspace(0.005, 0.3, 500)';
+%       layers = [0 0 0 0; 0 2.07e-6 0 3];
+%       R = fitting.parrattRefl(Q, layers);
+%       semilogy(Q, R);
+%
+%       % 200 Å SiO₂ on Si
+%       layers = [0 0 0 0; 200 3.47e-6 0 5; 0 2.07e-6 0 3];
+%       R = fitting.parrattRefl(Q, layers);
+%
+%   See also fitting.sldProfile, fitting.reflSLDPresets, fitting.curveFit
+
+arguments
+    Q      (:,1) double
+    layers (:,4) double
+    options.Roughness  (1,1) logical = true
+    options.Scale      (1,1) double = 1.0
+    options.Background (1,1) double = 0
+end
+
+nLayers = size(layers, 1);
+if nLayers < 2
+    error('fitting:parrattRefl:tooFewLayers', ...
+        'Need at least 2 layers (incident medium + substrate).');
+end
+
+N = numel(Q);
+
+% Extract layer parameters
+d     = layers(:, 1);   % thickness (Å)
+sldR  = layers(:, 2);   % SLD real (Å⁻²)
+sldI  = layers(:, 3);   % SLD imag (Å⁻²)
+sigma = layers(:, 4);   % roughness (Å)
+
+% Complex SLD
+sld = sldR + 1i * sldI;
+
+% ════════════════════════════════════════════════════════════════════════
+% Compute k_z in each layer: k_z,j = sqrt((Q/2)² - 4π·SLD_j)
+% ════════════════════════════════════════════════════════════════════════
+
+% Q is [N×1], sld is [1×M] → kz is [N×M]
+Q2 = Q(:);
+Qsq_over4 = (Q2 / 2).^2;  % [N×1]
+sldRow = sld(:)';           % [1×M]
+
+kz = sqrt(Qsq_over4 - 4*pi*sldRow);  % [N×M] complex
+
+% ════════════════════════════════════════════════════════════════════════
+% Parratt recursion (bottom-up)
+% ════════════════════════════════════════════════════════════════════════
+
+% Start from the substrate (layer M) — no reflection below it
+r = zeros(N, 1);  % reflectance ratio at substrate bottom = 0
+
+for j = nLayers:-1:2
+    % Fresnel coefficient at interface between layer j-1 and layer j
+    kz_above = kz(:, j-1);
+    kz_below = kz(:, j);
+
+    fj = (kz_above - kz_below) ./ (kz_above + kz_below);
+
+    % Névot-Croce roughness
+    if options.Roughness && sigma(j) > 0
+        fj = fj .* exp(-2 * kz_above .* kz_below * sigma(j)^2);
+    end
+
+    % Phase factor for layer j (skip for substrate, d=0)
+    if j < nLayers && d(j) > 0
+        phase = exp(2i * kz_below * d(j));
+    else
+        phase = ones(N, 1);
+    end
+
+    % Parratt recursion: combine reflectance from below with this interface
+    r = (fj + r .* phase) ./ (1 + fj .* r .* phase);
+end
+
+% Reflectivity = |r|²
+R = abs(r).^2;
+
+% Apply scale and background
+R = options.Scale * R + options.Background;
+
+% Clamp to physical range
+R = max(R, 0);
+
+end

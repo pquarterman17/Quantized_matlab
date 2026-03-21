@@ -104,6 +104,7 @@ SUITES = {
     T('fitting','test_batch_roi'),       'fitting', 'Batch fitting, peak tracking'
     T('fitting','test_multipanel'),      'fitting', 'Multi-panel figure builder'
     T('fitting','test_phase8_qol'),      'fitting', 'Phase 8: composer, action log, 3D surface, dataset groups'
+    T('fitting','test_reflectivity'),    'fitting', 'Parratt reflectivity, SLD profile, material presets'
 };
 
 % Filter by group

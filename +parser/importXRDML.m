@@ -233,12 +233,13 @@ function data = importXRDML(filepath, options)
     endTimeStamp      = NaT;
     intensityTag      = '';
 
-    % Per-scan data storage for 2D area-detector detection
-    scanTTRanges = {};   % {[start, end]} per completed scan
-    scanTTLists  = {};   % {[1×M] double} explicit position lists (from listPositions)
-    scanCounts   = {};   % {[1×M] double} raw count vector per completed scan
-    scanSecVals  = [];   % fixed secondary-axis position per scan (NaN if absent)
-    scanSecName  = '';   % secondary axis name established from first valid scan
+    % Per-scan data storage for 2D area-detector detection (pre-allocated)
+    scanTTRanges = cell(1, nScans);    % {[start, end]} per completed scan
+    scanTTLists  = cell(1, nScans);    % {[1×M] double} explicit position lists
+    scanCounts   = cell(1, nScans);    % {[1×M] double} raw count vector per scan
+    scanSecVals  = NaN(1, nScans);     % fixed secondary-axis position per scan
+    scanSecName  = '';                  % secondary axis name from first valid scan
+    nValid2D     = 0;                   % count of valid scans (for trimming)
 
     for si = 1:nScans
         sb = scanBlocks{sortIdx(si)};
@@ -311,31 +312,32 @@ function data = importXRDML(filepath, options)
         if nPts < 1; continue; end
 
         % ── Collect per-scan data for 2D area-detector classification ──────
+        nValid2D = nValid2D + 1;
         if isempty(scanSecName)
             % First valid scan: discover which secondary axis is fixed
             for axN = ["Omega", "Chi", "Phi"]
                 [pos2, ~] = rxPositions(dpBlock, char(axN));
                 if ~isempty(pos2) && pos2(1) == pos2(2)
                     scanSecName = char(axN);
-                    scanSecVals(end+1) = pos2(1);  %#ok<AGROW>
+                    scanSecVals(nValid2D) = pos2(1);
                     break;
                 end
             end
             if isempty(scanSecName)
-                scanSecVals(end+1) = NaN;  %#ok<AGROW>
+                scanSecVals(nValid2D) = NaN;
             end
         else
             % Subsequent scans: read the established secondary axis
             [pos2, ~] = rxPositions(dpBlock, scanSecName);
             if ~isempty(pos2) && pos2(1) == pos2(2)
-                scanSecVals(end+1) = pos2(1);  %#ok<AGROW>
+                scanSecVals(nValid2D) = pos2(1);
             else
-                scanSecVals(end+1) = NaN;      %#ok<AGROW>
+                scanSecVals(nValid2D) = NaN;
             end
         end
-        scanTTRanges{end+1} = ttRange;    %#ok<AGROW>
-        scanTTLists{end+1}  = ttPosList; %#ok<AGROW>
-        scanCounts{end+1}   = cntVals;   %#ok<AGROW>
+        scanTTRanges{nValid2D} = ttRange;
+        scanTTLists{nValid2D}  = ttPosList;
+        scanCounts{nValid2D}   = cntVals;
 
         % Build 2θ vector; use explicit listPositions if available,
         % otherwise generate evenly spaced from range endpoints
@@ -361,7 +363,12 @@ function data = importXRDML(filepath, options)
     % ════════════════════════════════════════════════════════════════════════
     %  4b. 2D area-detector detection and matrix assembly
     % ════════════════════════════════════════════════════════════════════════
-    nValid       = numel(scanTTRanges);
+    % Trim pre-allocated arrays to actual valid count
+    scanTTRanges = scanTTRanges(1:nValid2D);
+    scanTTLists  = scanTTLists(1:nValid2D);
+    scanCounts   = scanCounts(1:nValid2D);
+    scanSecVals  = scanSecVals(1:nValid2D);
+    nValid       = nValid2D;
     is2D         = false;
     intensityMap = [];
     twoThetaVec  = [];
