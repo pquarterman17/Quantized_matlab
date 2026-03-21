@@ -116,7 +116,8 @@ for gi = 1:nGroups
     multOut(gi) = numel(members);
     dOut(gi)    = mean(dAll(members));
 
-    % Pick lowest lexicographic positive representative
+    % Pick canonical representative: prefer all-nonneg indices, then
+    % fewest negatives, then largest sum, then lexicographic on abs values.
     memberHKL = hklAll(members,:);
     % Filter to positive-first entries (h>0, or h==0&k>0, or h==0&k==0&l>0)
     posIdx = (memberHKL(:,1) > 0) | ...
@@ -127,8 +128,11 @@ for gi = 1:nGroups
     else
         posHKL = memberHKL;
     end
-    % Sort lexicographically and take first
-    [~, si] = sortrows(posHKL);
+    % Rank: fewest negative indices first, then largest sum, then lex on abs
+    nNegs = sum(posHKL < 0, 2);
+    hklSum = sum(posHKL, 2);
+    absHKL = abs(posHKL);
+    [~, si] = sortrows([nNegs, -hklSum, absHKL]);
     hklOut(gi,:) = posHKL(si(1),:);
 end
 

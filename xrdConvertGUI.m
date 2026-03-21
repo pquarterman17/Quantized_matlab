@@ -14,6 +14,12 @@ function xrdConvertGUI()
 %
 % ════════════════════════════════════════════════════════════════════════
 
+% ════════════════════════════════════════════════════════════════════════
+% DARK THEME COLORS
+% ════════════════════════════════════════════════════════════════════════
+INPUT_BG = [0.18 0.18 0.18];
+INPUT_FG = [0.90 0.90 0.90];
+
 % Create main figure
 fig = uifigure('Name', 'XRD Batch Converter', 'Position', [100 100 600 720]);
 fig.CloseRequestFcn = @onFigureClose;
@@ -220,6 +226,12 @@ handles.taLog            = taLog;
 handles.lblStatus        = lblStatus;
 
 fig.UserData = struct('appData', appData, 'handles', handles);
+
+% Apply dark theme to all input widgets
+applyDarkInputTheme(fig, INPUT_BG, INPUT_FG);
+
+% Also style the convert button text for readability
+btnConvert.FontColor = [1 1 1];
 
 % ════════════════════════════════════════════════════════════════════════
 % CALLBACK: Set folder (replace entire list)
@@ -698,4 +710,36 @@ end
 
 function closeIfValid(dlg)
     if isvalid(dlg); close(dlg); end
+end
+
+% ════════════════════════════════════════════════════════════════════════
+% UTILITY: Apply dark theme to all input widgets in a container tree
+% ════════════════════════════════════════════════════════════════════════
+
+function applyDarkInputTheme(parent, bg, fg)
+    children = findall(parent, 'Type', 'uieditfield');
+    for i = 1:numel(children)
+        children(i).BackgroundColor = bg;
+        children(i).FontColor = fg;
+    end
+    children = findall(parent, 'Type', 'uinumericeditfield');
+    for i = 1:numel(children)
+        children(i).BackgroundColor = bg;
+        children(i).FontColor = fg;
+    end
+    children = findall(parent, 'Type', 'uidropdown');
+    for i = 1:numel(children)
+        children(i).BackgroundColor = bg;
+        children(i).FontColor = fg;
+    end
+    children = findall(parent, 'Type', 'uitextarea');
+    for i = 1:numel(children)
+        children(i).BackgroundColor = bg;
+        children(i).FontColor = fg;
+    end
+    children = findall(parent, 'Type', 'uilistbox');
+    for i = 1:numel(children)
+        children(i).BackgroundColor = bg;
+        children(i).FontColor = fg;
+    end
 end
