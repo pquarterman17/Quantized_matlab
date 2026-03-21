@@ -78,39 +78,77 @@ function out = smoothData(y, options)
             continue;
         end
 
-        % Build convolution kernel (inside loop to use clamped hwc)
-        wLen = 2*hwc + 1;
-        switch options.Method
-            case 'moving'
-                kernel = ones(wLen, 1) / wLen;
-            case 'gaussian'
-                sigma  = hwc / 2;
-                t      = (-hwc:hwc)';
-                kernel = exp(-t.^2 / (2*sigma^2));
-                kernel = kernel / sum(kernel);
-            case 'savitzky-golay'
-                % Savitzky-Golay coefficients via Vandermonde pseudoinverse.
-                % The center row of (V'V)^{-1} V' gives the convolution
-                % weights that fit a polynomial of degree p to 2*hwc+1 points
-                % and evaluate it at the center.
-                polyOrd = min(options.PolyOrder, wLen - 1);
-                t = (-hwc:hwc)';
-                V = zeros(wLen, polyOrd + 1);
-                for p = 0:polyOrd
-                    V(:, p+1) = t .^ p;
-                end
-                % Coefficients matrix: each row gives weights for a derivative
-                % Row 1 (index 1) = smoothing (0th derivative)
-                C = (V' * V) \ V';
-                kernel = C(1, :)';
-        end
-
         if strcmp(options.Method, 'savitzky-golay')
-            % SG kernel is applied directly (not normalized like avg kernels)
-            padded = [col(hwc+1:-1:2); col; col(end-1:-1:end-hwc)];
-            smoothed = conv(padded, kernel(end:-1:1), 'valid');
-            out(:, c) = smoothed(1:n);
+            % Savitzky-Golay: use local polynomial fitting with proper edge
+            % handling. Interior points use the standard symmetric kernel.
+            % Edge points use asymmetric windows that still preserve polynomials.
+            polyOrd = min(options.PolyOrder, 2*hwc);
+
+            % Precompute interior kernel (symmetric window)
+            wLen = 2*hwc + 1;
+            t = (-hwc:hwc)';
+            V = zeros(wLen, polyOrd + 1);
+            for p = 0:polyOrd
+                V(:, p+1) = t .^ p;
+            end
+            C = (V' * V) \ V';
+            intKernel = C(1, :);
+
+            % Apply interior kernel via convolution (fast path)
+            if n > 2*hwc
+                smoothed = conv(col, intKernel(end:-1:1), 'same');
+                out(:, c) = smoothed;
+            else
+                out(:, c) = col;
+            end
+
+            % Fix edge points with asymmetric SG coefficients
+            for i = 1:hwc
+                % Left edge: fit polynomial to first (hwc+i) points,
+                % evaluate at position i (1-indexed)
+                nPts = min(wLen, n);
+                localY = col(1:nPts);
+                t_local = (0:nPts-1)';
+                evalPt = i - 1;  % 0-indexed position within the window
+                Vl = zeros(nPts, polyOrd + 1);
+                for p = 0:polyOrd
+                    Vl(:, p+1) = t_local .^ p;
+                end
+                coeffs = Vl \ localY;
+                val = 0;
+                for p = 0:polyOrd
+                    val = val + coeffs(p+1) * evalPt^p;
+                end
+                out(i, c) = val;
+
+                % Right edge: mirror logic
+                localY = col(n-nPts+1:n);
+                t_local = (0:nPts-1)';
+                evalPt = nPts - 1 - (i - 1);  % position from start of local window
+                Vr = zeros(nPts, polyOrd + 1);
+                for p = 0:polyOrd
+                    Vr(:, p+1) = t_local .^ p;
+                end
+                coeffs = Vr \ localY;
+                val = 0;
+                for p = 0:polyOrd
+                    val = val + coeffs(p+1) * evalPt^p;
+                end
+                out(n - i + 1, c) = val;
+            end
         else
+            % Moving average or Gaussian
+            wLen = 2*hwc + 1;
+            switch options.Method
+                case 'moving'
+                    kernel = ones(wLen, 1) / wLen;
+                case 'gaussian'
+                    sigma  = hwc / 2;
+                    t      = (-hwc:hwc)';
+                    kernel = exp(-t.^2 / (2*sigma^2));
+                    kernel = kernel / sum(kernel);
+            end
+
             % Mirror-pad to reduce edge effects
             padded = [col(hwc+1:-1:2); col; col(end-1:-1:end-hwc)];
 
