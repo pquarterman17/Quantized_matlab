@@ -19,7 +19,8 @@ thin_film_toolkit_matlab/
 │   ├── gui/                  # DataPlotter headless API tests
 │   ├── imaging/              # EM parsers, imaging utils, EM GUI, EDS, EELS, diffraction
 │   ├── calc/                 # Calculator module tests (xray, superconductor, CIF, optics, ...)
-│   └── batch/                # Batch import and XRD converter tests
+│   ├── batch/                # Batch import and XRD converter tests
+│   └── fitting/              # Curve fitting engine, models, auto-guess, equation parser
 ├── +parser/                  # Data import (see +parser/README.md)
 ├── +imaging/                 # EM image processing (see +imaging/README.md)
 ├── +calc/                    # Calculator backend (see +calc/README.md)
@@ -27,6 +28,7 @@ thin_film_toolkit_matlab/
 ├── +plotting/                # Plot formatting and export
 ├── +styles/                  # Visual themes
 ├── +scripts/                 # Batch workflows (see +scripts/README.md)
+├── +fitting/                 # General curve fitting engine, model library, equation parser
 ├── +dataplotter/             # Extracted DataPlotter subsystems
 ├── docs/                     # Detailed feature documentation
 │   ├── gui_dataplotter.md    # DataPlotter features, tools, figure builder
@@ -70,9 +72,10 @@ runAllTests(Group="gui")             % headless DataPlotter API tests
 runAllTests(Group="em")              % EM parsers + imaging utilities
 runAllTests(Group="emgui")           % EM Viewer GUI API tests
 runAllTests(Group="batch")           % batch import + XRD converter
+runAllTests(Group="fitting")         % curve fitting engine + models + parser
 ```
 
-Groups: `parser`, `batch`, `xrd2d`, `gui`, `sims`, `em`, `emgui`, `eds`, `xrayneutron`, `superconductor`, `cif`, `optics`, `vacuum`, `electrochemistry`, `eels`, `eels_adv`, `diffindex`, `diff_sim`, `edsquant`, `contour`
+Groups: `parser`, `batch`, `xrd2d`, `gui`, `sims`, `em`, `emgui`, `eds`, `xrayneutron`, `superconductor`, `cif`, `optics`, `vacuum`, `electrochemistry`, `eels`, `eels_adv`, `diffindex`, `diff_sim`, `edsquant`, `contour`, `fitting`
 
 ## Key Design Decisions
 
@@ -80,6 +83,9 @@ Groups: `parser`, `batch`, `xrd2d`, `gui`, `sims`, `em`, `emgui`, `eds`, `xrayne
 - **Auto-detection heuristics** — delimiter, header row, data start, units all inferred
 - **Unified data struct** — parser-agnostic GUI and plotting code
 - **Peak fitting** — Lorentzian model (appropriate for XRD Bragg peaks)
+- **General curve fitting** — `+fitting/` package with 23 models, bounds, parameter errors, custom equations, batch fitting, peak tracking
+- **Publication templates** — `styles.template('aps')` etc. for journal-ready figures
+- **Statistics** — t-tests, linear regression, descriptive stats (no Statistics Toolbox)
 
 ## 2D Area-Detector Extension (`importXRDML`)
 

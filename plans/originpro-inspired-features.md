@@ -42,7 +42,7 @@ BTN_FG     = [1 1 1];           % white text on dark buttons
 
 ### Status
 - **Plan written:** 2026-03-17
-- **Implementation:** Not started.
+- **Phase 1 (Curve Fitting Engine):** Implemented 2026-03-21.
 
 ---
 
@@ -55,7 +55,7 @@ thin-film / magnetometry / XRD researchers.
 
 ---
 
-## Phase 1 — General Curve Fitting Engine
+## Phase 1 — General Curve Fitting Engine ✅ IMPLEMENTED
 
 **Priority:** Highest. This is the single biggest capability gap vs. OriginPro.
 
@@ -237,7 +237,7 @@ Or use a tabbed view: "Plot" | "Table" | "Both" radio buttons.
 
 ---
 
-## Phase 3 — Publication Graph Templates
+## Phase 3 — Publication Graph Templates ✅ IMPLEMENTED
 
 **Priority:** High. Researchers spend significant time reformatting plots
 for different journals.
@@ -296,7 +296,7 @@ t = styles.template('aps');
 
 ---
 
-## Phase 4 — Statistical Analysis Panel
+## Phase 4 — Statistical Analysis Panel ✅ CORE IMPLEMENTED
 
 **Priority:** Medium. Fills a significant gap for users who currently
 export to Origin just for basic statistics.
@@ -332,7 +332,7 @@ When a dataset has multiple Y columns:
 
 ---
 
-## Phase 5 — Interactive Analysis Gadgets
+## Phase 5 — Interactive Analysis Gadgets ✅ ROI IMPLEMENTED
 
 **Priority:** Medium. OriginPro's gadgets are floating tools that operate
 on a selected region. These would add significant interactivity.
@@ -402,7 +402,7 @@ Enhance the existing inset feature:
 
 ---
 
-## Phase 7 — Batch Parameter Extraction
+## Phase 7 — Batch Parameter Extraction ✅ IMPLEMENTED
 
 **Priority:** Medium-high. This is the workflow that makes Origin
 indispensable for systematic studies.
@@ -472,13 +472,13 @@ OriginPro's "Quick Peaks" tracks a peak across a series:
 
 | Order | Phase | Effort | Impact | Dependencies |
 |-------|-------|--------|--------|--------------|
-| 1 | Phase 1: Curve Fitting Engine | Large | Highest | None — standalone `+fitting/` package |
-| 2 | Phase 3: Graph Templates | Small | High | None — extends `+styles/` |
-| 3 | Phase 7: Batch Parameter Extraction | Medium | High | Phase 1 (needs fitting engine) |
+| 1 | Phase 1: Curve Fitting Engine | Large | Highest | ✅ Done — `+fitting/` package |
+| 2 | Phase 3: Graph Templates | Small | High | ✅ Done — `+styles/template.m` |
+| 3 | Phase 7: Batch Parameter Extraction | Medium | High | ✅ Done — `+fitting/batchFit.m`, `trackPeak.m` |
 | 4 | Phase 2: Worksheet View | Medium | High | None |
-| 5 | Phase 5: Analysis Gadgets | Medium | Medium | None |
+| 5 | Phase 5: Analysis Gadgets | Medium | Medium | ✅ ROI done — `+dataplotter/roiAnalysis.m` |
 | 6 | Phase 6: Multi-Panel Plots | Medium | Medium | None |
-| 7 | Phase 4: Statistics Panel | Small | Medium | None |
+| 7 | Phase 4: Statistics Panel | Small | Medium | ✅ Core done (no GUI yet) |
 | 8 | Phase 8: QoL & Polish | Large | Medium | Phases 1-7 benefit from these |
 
 ---

@@ -8,7 +8,7 @@ function runAllTests(options)
 %   Name-Value Options:
 %       Group    "all" (default) | "parser" | "batch" | "gui" | "xrd2d" |
 %                "sims" | "em" | "emgui" | "eds" | "eels" | "diffindex" |
-%                "edsquant" | "eels_adv" | "diff_sim"
+%                "edsquant" | "eels_adv" | "diff_sim" | "fitting"
 %                Run only the specified group of test suites.
 %
 %   Groups:
@@ -51,7 +51,7 @@ end
 options.Group = validatestring(options.Group, ...
     ["all", "parser", "batch", "xrd2d", "gui", "calcgui", "sims", "em", "emgui", "eds", ...
      "xrayneutron", "superconductor", "cif", "optics", "vacuum", "electrochemistry", ...
-     "eels", "eels_adv", "diffindex", "diff_sim", "edsquant", "contour"]);
+     "eels", "eels_adv", "diffindex", "diff_sim", "edsquant", "contour", "fitting"]);
 
 % Build absolute paths to test scripts so `run` works regardless of CWD.
 % Tests are organized into subdirectories: parser/, gui/, imaging/, calc/, batch/
@@ -97,6 +97,11 @@ SUITES = {
     T('calc','test_calc_optics'),          'optics', 'Optics module: Fresnel, angles, depths'
     T('calc','test_calc_vacuum'),          'vacuum', 'Vacuum module: MFP, sputter yield, pump-down'
     T('calc','test_calc_electrochemistry'),'electrochemistry', 'Electrochemistry: Nernst, BV, Tafel'
+    % ── Fitting tests ────────────────────────────────────────────────────
+    T('fitting','test_curve_fitting'),    'fitting', 'Curve fitting engine, models, autoGuess, parseEquation'
+    T('fitting','test_templates_fft'),   'fitting', 'Publication templates and FFT filtering'
+    T('fitting','test_resample_stats'),  'fitting', 'Resampling, descriptive stats, t-test, linear regression'
+    T('fitting','test_batch_roi'),       'fitting', 'Batch fitting, peak tracking'
 };
 
 % Filter by group

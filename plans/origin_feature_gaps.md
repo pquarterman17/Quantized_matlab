@@ -57,87 +57,81 @@ The single most-used smoothing method in experimental science. Polynomial-preser
 
 ---
 
-## Priority 3: Levenberg-Marquardt Fitting with Parameter Errors
+## Priority 3: General Curve Fitting Engine with Parameter Errors ✅ IMPLEMENTED
+
+**Status:** Implemented as `+fitting/` package (2026-03-21).
 
 **What Origin has:** LM optimizer with covariance matrix → parameter standard errors, confidence intervals, correlation matrix. This is what makes fitting results publishable — you need σ on every parameter.
 
-**What we have:** Nelder-Mead (`fminsearch`) — robust but gives no uncertainty estimates. Already flagged as "Future" in CLAUDE.md.
+**What we had:** Nelder-Mead (`fminsearch`) — robust but gave no uncertainty estimates.
 
-**Implementation plan:**
-- Write `+utilities/lmFit.m` using Gauss-Newton with Marquardt damping (no toolbox)
-- Return: parameters, standard errors, covariance matrix, chi², reduced chi², R²
-- Integrate into DataPlotter curve fitting dialog as optimizer option
-- Add confidence band overlay on fitted curves
-
-**Effort:** Medium (core algorithm ~150 lines, integration ~100 lines)
+**Implementation (chose different approach than original plan):**
+- `+fitting/curveFit.m` — fminsearch with logit bound transforms, parameter errors via numerical Hessian
+- `+fitting/models.m` — 23 built-in models (decay, growth, peaks, power, sigmoid, magnetic, thermal)
+- `+fitting/autoGuess.m` — heuristic initial parameter estimation from data shape
+- `+fitting/parseEquation.m` — safe RPN-based custom equation parser (no eval)
+- Refactored `+dataplotter/curveFitting.m` dialog: category/model dropdowns, bounds, fixed params, weights, simulate, auto-guess, error display, chi²/AIC stats
+- Returns: params ± errors, covariance matrix, R², χ²_red, RMSE, AIC
+- 35 unit tests (all passing)
 
 ---
 
-## Priority 4: Savitzky-Golay + FFT-Based Filtering
+## Priority 4: FFT-Based Filtering ✅ IMPLEMENTED
 
-### FFT Filtering (bandpass/lowpass/highpass/notch)
+**Status:** Implemented as `+utilities/fftFilter.m` (2026-03-21).
 
 **What Origin has:** Full frequency-domain filter suite. Essential for removing periodic noise (60 Hz pickup, mechanical vibrations) from transport/magnetometry measurements.
 
-**What we have:** Nothing in frequency domain for 1D data (emViewerGUI has FFT for images).
+**What we had:** Nothing in frequency domain for 1D data (emViewerGUI has FFT for images).
 
-**Implementation plan:**
-- `+utilities/fftFilter.m` — apply frequency-domain filters to 1D data
+**Implementation:**
+- `+utilities/fftFilter.m` — Butterworth-based frequency-domain filters for 1D data
 - Filter types: lowpass, highpass, bandpass, notch (band-reject)
-- Window functions: Hamming, Hanning, Blackman (reduce spectral leakage)
-- Optional: power spectrum display for choosing cutoff frequencies
-- GUI integration: add to corrections panel or as Advanced tool
-
-**Effort:** Medium (~120 lines for core, ~80 for GUI integration)
-
----
-
-## Priority 5: Interpolation / Resampling as Standalone Operations
-
-**What Origin has:** Named interpolation operations (linear, cubic, spline, Akima) that output to new columns. Resample-to-common-grid for comparing datasets measured on different x-axes.
-
-**What we have:** Internal interpolation in `datasetAlgebra.m` when combining datasets, but no standalone resample tool.
-
-**Implementation plan:**
-- `+utilities/resampleData.m` — resample data struct to a new x-grid
-- Methods: linear, pchip, spline, makima
-- Modes: uniform grid (specify N or step), match another dataset's grid, custom grid
-- GUI: "Resample..." in Advanced menu
-
-**Effort:** Small (~60 lines)
+- Window functions: none, Hamming, Hanning, Blackman
+- Optional detrend (removes/restores linear trend across filtering)
+- Returns: filtered data + power spectrum + transfer function for diagnostics
+- 10 unit tests (all passing)
+- GUI integration: not yet wired into DataPlotter corrections panel
 
 ---
 
-## Priority 6: Statistics Module
+## Priority 5: Interpolation / Resampling ✅ IMPLEMENTED
 
-**What Origin has:** Descriptive stats, hypothesis testing (t-test, paired t-test, ANOVA), linear/polynomial regression with full diagnostics (R², adjusted R², F-statistic, p-values, residual normality tests).
+**Status:** Implemented as `+utilities/resampleData.m` (2026-03-21).
 
-**What we have:** Basic column stats in Data Table (mean, std, min, max). No hypothesis testing.
-
-**Implementation plan:**
-- `+utilities/tTest.m` — one-sample, two-sample, paired t-tests
-- `+utilities/linRegress.m` — linear regression with R², adjusted R², F-stat, p-values, residual plots
-- `+utilities/anova1way.m` — one-way ANOVA (F-test)
-- GUI: "Statistics..." dialog accessible from Advanced menu
-- All using MATLAB built-ins (no Statistics Toolbox)
-
-**Effort:** Large (~400 lines total across functions + GUI)
+**Implementation:**
+- Methods: linear, pchip, spline, makima (default)
+- Modes: NPoints, Step, Grid, MatchDataset
+- Preserves labels, units, metadata; adds resampling metadata
+- 8 unit tests (all passing)
 
 ---
 
-## Priority 7: Interactive On-Graph Analysis (Origin "Gadgets")
+## Priority 6: Statistics Module ✅ IMPLEMENTED
 
-**What Origin has:** Drag a region-of-interest on a plot and instantly compute: integral over region, statistics in region, interpolated values, rise/fall time, baseline. Results update as you drag the ROI.
+**Status:** Core statistics implemented (2026-03-21). GUI dialog not yet wired.
 
-**What we have:** Data Cursor (snap to point, delta between two clicks). Not interactive ROI-based.
+**Implementation:**
+- `+utilities/descriptiveStats.m` — N, mean, median, std, SEM, var, min, max, range, Q1, Q3, IQR, skewness, kurtosis (with NaN handling)
+- `+utilities/tTest.m` — one-sample, two-sample (Welch), paired t-tests with p-values via betainc (no Statistics Toolbox)
+- `+utilities/linRegress.m` — OLS polynomial regression with R², R²adj, F-stat, p-values, coefficient SEs, confidence/prediction bands
+- All use MATLAB built-ins only (t-CDF via regularized incomplete beta function)
+- 23 unit tests (all passing)
+- Still TODO: ANOVA, GUI dialog
 
-**Implementation plan:**
-- Interactive shaded ROI on main axes (drag edges to resize)
-- Live readout panel: integral, mean, std, min, max, N points, FWHM if peak
-- "Lock region" to persist the analysis
-- Export region data to new dataset
+---
 
-**Effort:** Large (significant GUI work, ~300 lines)
+## Priority 7: Interactive On-Graph Analysis (Origin "Gadgets") ✅ IMPLEMENTED
+
+**Status:** Implemented as `+dataplotter/roiAnalysis.m` (2026-03-21).
+
+**Implementation:**
+- `+dataplotter/roiAnalysis.m` — Interactive ROI gadget dialog
+- Click two points on the main axes to define region (shaded patch overlay)
+- Live readout: N, integral (trapz), mean, std, min/max with x-positions, median, FWHM
+- Copy stats to clipboard
+- Export region as new dataset (callback or workspace variable)
+- Channel selector, numeric bound fields, visual overlay with boundary lines
 
 ---
 
@@ -147,8 +141,8 @@ The single most-used smoothing method in experimental science. Polynomial-preser
 |---|---------|--------|--------|--------|
 | 1 | Savitzky-Golay filter | High | Small | ✅ Done |
 | 2 | Analysis Templates (batch pipeline) | Very High | Medium | ✅ Done |
-| 3 | Levenberg-Marquardt + param errors | Very High | Medium | Planned |
-| 4 | FFT filtering (bandpass/notch) | High | Medium | Planned |
-| 5 | Interpolation / resampling | Medium | Small | Planned |
-| 6 | Statistics module | Medium | Large | Planned |
-| 7 | Interactive ROI analysis | Medium | Large | Planned |
+| 3 | General curve fitting + param errors | Very High | Medium | ✅ Done |
+| 4 | FFT filtering (bandpass/notch) | High | Medium | ✅ Done |
+| 5 | Interpolation / resampling | Medium | Small | ✅ Done |
+| 6 | Statistics module | Medium | Large | ✅ Done (core) |
+| 7 | Interactive ROI analysis | Medium | Large | ✅ Done |
