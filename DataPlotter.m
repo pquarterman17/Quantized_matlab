@@ -11200,6 +11200,7 @@ function varargout = DataPlotter()
 
         % Validate required field
         if ~isfield(S, 'savedDatasets')
+            fig.Pointer = 'arrow';
             uialert(fig, 'File does not appear to be a valid session file.', 'Load Error');
             return;
         end
@@ -11910,7 +11911,7 @@ function varargout = DataPlotter()
             % Deactivate cursor
             appData.cursorActive = false;
             btnDataCursor.BackgroundColor = BTN_TOOL;
-            fig.WindowButtonDownFcn = '';
+            fig.WindowButtonDownFcn = @onAxesButtonDown;
             % Remove cursor graphics
             if isfield(appData, 'cursorMarker') && isvalid(appData.cursorMarker)
                 delete(appData.cursorMarker);
