@@ -634,6 +634,7 @@ function varargout = DataPlotter()
     appData.tableWorkingCopy = [];
     appData.tableMask       = [];
     appData.tableEdited     = false;
+    appData.tableRowCap     = 500;    % max rows displayed in uitable (perf cap)
     fig.WindowButtonDownFcn   = @onAxesButtonDown;  % normal mode; special modes overwrite this
     fig.WindowButtonMotionFcn = @onMouseHover;      % idle hover; drags overwrite and restore this
 
@@ -12345,19 +12346,30 @@ function varargout = DataPlotter()
             appData.tableMask = false(nRows, 1);
         end
 
-        % Store working copy
+        % Store working copy (full data — always kept for export/sort)
         appData.tableWorkingCopy = [xCol, yMat];
         appData.tableEdited = false;
 
-        % Build table data as cell for mixed types
-        tableData = num2cell([xCol, yMat]);
-        % Add mask column (logical checkbox)
-        maskCol = num2cell(appData.tableMask);
+        % ── Performance: cap displayed rows ──
+        % uitable renders all rows in the DOM (no virtual scroll), so large
+        % datasets (>1000 rows) cause visible lag.  We display at most
+        % tableRowCap rows; the full data stays in tableWorkingCopy.
+        cap = appData.tableRowCap;
+        isTruncated = nRows > cap;
+        if isTruncated
+            dispRows = cap;
+        else
+            dispRows = nRows;
+        end
+
+        % Build table data as cell for mixed types (capped)
+        tableData = num2cell([xCol(1:dispRows), yMat(1:dispRows, :)]);
+        maskCol   = num2cell(appData.tableMask(1:dispRows));
         tableData = [tableData, maskCol];
 
-        tblData.ColumnName = colNames;
-        tblData.Data = tableData;
-        tblData.ColumnEditable = [true(1, 1 + nCols), true];  % all editable including mask
+        tblData.ColumnName    = colNames;
+        tblData.Data          = tableData;
+        tblData.ColumnEditable = [true(1, 1 + nCols), true];
 
         % Units row
         if ~isempty(d.units)
@@ -12369,8 +12381,13 @@ function varargout = DataPlotter()
 
         % Stats summary
         nMasked = sum(appData.tableMask);
-        lblTableStats.Text = sprintf('%d rows, %d cols, %d masked  ', ...
-            nRows, nCols + 1, nMasked);
+        if isTruncated
+            lblTableStats.Text = sprintf('Showing %d of %d rows, %d cols, %d masked  ', ...
+                dispRows, nRows, nCols + 1, nMasked);
+        else
+            lblTableStats.Text = sprintf('%d rows, %d cols, %d masked  ', ...
+                nRows, nCols + 1, nMasked);
+        end
     end
 
     function onTableCellEdit(~, evt)
