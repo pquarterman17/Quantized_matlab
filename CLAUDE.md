@@ -32,7 +32,7 @@ thin_film_toolkit_matlab/
 │   ├── gui_dataplotter.md    # DataPlotter features, tools, figure builder
 │   ├── gui_emviewer.md       # emViewerGUI features, EELS, EDS, diffraction
 │   └── architecture.md       # Data flow, state management, design patterns
-└── planning/                 # Feature and organization plans
+└── plans/                    # Feature roadmaps and organization plans
 ```
 
 ## Conventions
