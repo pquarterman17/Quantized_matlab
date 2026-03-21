@@ -94,7 +94,11 @@ function result = resolveParser(filepath)
             result.name = 'importMRC';
 
         case {'.xlsx', '.xls', '.xlsm', '.xlsb', '.ods'}
-            result.name = 'importExcel';
+            if looksLikeSIMSExcel(filepath)
+                result.name = 'importSIMS';
+            else
+                result.name = 'importExcel';
+            end
 
         case {'.csv', '.tsv', '.txt'}
             % Check for SIMS paired-column layout before falling back to CSV
@@ -168,6 +172,65 @@ function tf = looksLikeSIMS(filepath)
         ln = lower(lines{i});
         nDepth = numel(regexp(ln, '\bdepth\b'));
         nConc  = numel(regexp(ln, '\bconc'));
+        if nDepth >= 3 && nConc >= 3
+            tf = true;
+            return;
+        end
+    end
+end
+
+
+% ────────────────────────────────────────────────────────────────────
+function tf = looksLikeSIMSExcel(filepath)
+%LOOKSSLIMSIMEXCEL  Quick content scan: does an Excel file look like SIMS data?
+%   Reads the first 15 rows of the first sheet and checks for:
+%     (a) Vendor signature: "Evans Analytical", "EAG", "SIMS" in early rows
+%     (b) Repeated "Depth" + "CONC" column pairs (≥3 pairs) in any row
+    tf = false;
+    try
+        raw = readcell(filepath, 'Range', '1:15');
+    catch
+        return;
+    end
+    if isempty(raw), return; end
+
+    % Flatten all text content from the first 15 rows
+    allText = '';
+    [nR, nC] = size(raw);
+    for r = 1:nR
+        for c = 1:nC
+            v = raw{r, c};
+            if ischar(v)
+                allText = [allText, ' ', v]; %#ok<AGROW>
+            elseif isstring(v)
+                allText = [allText, ' ', char(v)]; %#ok<AGROW>
+            end
+        end
+    end
+    allLower = lower(allText);
+
+    % (a) Vendor signature check
+    if contains(allLower, 'sims') || ...
+       contains(allLower, 'evans analytical') || ...
+       (contains(allLower, 'eurofins') && contains(allLower, 'eag'))
+        tf = true;
+        return;
+    end
+
+    % (b) Repeated Depth + CONC pairs in any single row
+    for r = 1:nR
+        rowText = '';
+        for c = 1:nC
+            v = raw{r, c};
+            if ischar(v)
+                rowText = [rowText, ' ', v]; %#ok<AGROW>
+            elseif isstring(v)
+                rowText = [rowText, ' ', char(v)]; %#ok<AGROW>
+            end
+        end
+        rowLower = lower(rowText);
+        nDepth = numel(regexp(rowLower, '\bdepth\b'));
+        nConc  = numel(regexp(rowLower, '\bconc'));
         if nDepth >= 3 && nConc >= 3
             tf = true;
             return;

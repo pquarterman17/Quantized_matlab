@@ -3668,7 +3668,8 @@ function varargout = DataPlotter()
         if strcmp(ddCorrStyle.Value, 'SIMS Depth Profile') && ...
                 appData.activeIdx >= 1 && ~isempty(appData.datasets)
             ds = appData.datasets{appData.activeIdx};
-            if isfield(ds, 'parserName') && strcmp(ds.parserName, 'importCSV')
+            if isfield(ds, 'parserName') && ...
+                    (strcmp(ds.parserName, 'importCSV') || strcmp(ds.parserName, 'importExcel'))
                 try
                     newData = parser.importSIMS(ds.filepath);
                     ds.data       = newData;

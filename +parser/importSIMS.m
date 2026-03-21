@@ -1,22 +1,30 @@
 function data = importSIMS(filepath, options)
-%IMPORTSIMS Import a SIMS depth profile CSV into a unified data struct.
+%IMPORTSIMS Import a SIMS depth profile into a unified data struct.
 %
 %   data = parser.importSIMS('profile.csv')
+%   data = parser.importSIMS('profile.xlsx')
 %   data = parser.importSIMS('profile.csv', 'DepthUnit', 'nm')
-%   data = parser.importSIMS('profile.csv', 'Verbose', true)
+%   data = parser.importSIMS('profile.xlsx', 'Sheet', 'Data')
 %
 %   Reads SIMS (Secondary Ion Mass Spectrometry) depth profile data from
-%   delimited text files. Handles the common paired-column layout where
-%   each element has its own (depth, concentration) column pair, optionally
-%   separated by empty columns.
+%   delimited text files or Excel spreadsheets. Handles the common
+%   paired-column layout where each element has its own (depth,
+%   concentration) column pair, optionally separated by empty columns.
 %
 %   AUTO-DETECTION:
-%     - Delimiter: comma, tab, semicolon, or space
+%     - Delimiter: comma, tab, semicolon, or space (text files)
 %     - Header row and data start row
 %     - Paired vs shared depth column layout
+%     - Element names from vendor "comment" row above headers
 %     - Element names cleaned from mass numbers, charge states, unit suffixes
 %     - Depth unit (nm or µm) from headers or metadata
 %     - Concentration units from headers
+%
+%   EXCEL FILES (.xlsx, .xls, .xlsm, .ods):
+%     Excel files with SIMS paired-column layout are supported. The parser
+%     reads the sheet via readcell, converts to the same token format used
+%     for CSV files, and applies identical paired-column detection, element
+%     name recovery from vendor rows, and depth grid merging.
 %
 %   PAIRED-COLUMN LAYOUT (most common):
 %     After removing all-empty separator columns, the parser checks whether
@@ -31,13 +39,15 @@ function data = importSIMS(filepath, options)
 %     regions outside the element's measured range.
 %
 %   INPUTS:
-%       filepath - Path to the SIMS data file.
+%       filepath - Path to the SIMS data file (.csv, .tsv, .txt,
+%                  .xlsx, .xls, .xlsm, .ods).
 %
 %   OPTIONAL NAME-VALUE PAIRS:
-%       Delimiter    - Delimiter character. Default: auto-detect.
+%       Delimiter    - Delimiter character (text files only). Default: auto.
 %       HeaderRow    - Row number containing column headers (-1 = auto).
 %       DataStartRow - Row where numeric data begins (-1 = auto).
 %       DepthUnit    - 'nm', 'um', or 'auto' (detect from headers).
+%       Sheet        - Sheet name or 1-based index (Excel only). Default: 1.
 %       Verbose      - Print summary after import. Default: false.
 %
 %   OUTPUT:
@@ -56,6 +66,9 @@ function data = importSIMS(filepath, options)
 %       % Basic import — auto-detect everything
 %       data = parser.importSIMS('sims_profile.csv');
 %
+%       % Excel SIMS file
+%       data = parser.importSIMS('sims_data.xlsx');
+%
 %       % Force nanometer depth units
 %       data = parser.importSIMS('sims_profile.csv', 'DepthUnit', 'nm');
 %
@@ -63,7 +76,7 @@ function data = importSIMS(filepath, options)
 %       origD = data.metadata.parserSpecific.originalDepths;
 %       origC = data.metadata.parserSpecific.originalConcentrations;
 %
-%   See also CREATEDATASTRUCT, IMPORTCSV, IMPORTAUTO
+%   See also CREATEDATASTRUCT, IMPORTCSV, IMPORTEXCEL, IMPORTAUTO
 
     arguments
         filepath         (1,1) string {mustBeFile}
@@ -71,31 +84,39 @@ function data = importSIMS(filepath, options)
         options.HeaderRow    (1,1) double  = -1       % auto-detect
         options.DataStartRow (1,1) double  = -1       % auto-detect
         options.DepthUnit    (1,1) string  = "auto"   % "nm", "um", "auto"
+        options.Sheet                      = 1        % Excel only: sheet name or index
         options.Verbose      (1,1) logical = false
     end
 
     % ════════════════════════════════════════════════════════════════
-    %  STEP 1: Read raw lines
+    %  STEP 1: Read raw data — branch on file type
     % ════════════════════════════════════════════════════════════════
-    rawLines = readRawLines(filepath);
-    if isempty(rawLines)
-        error('parser:importSIMS:emptyFile', ...
-            'File is empty or contains only comments: %s', filepath);
-    end
+    [~, ~, ext] = fileparts(filepath);
+    isExcel = ismember(lower(ext), {'.xlsx', '.xls', '.xlsm', '.xlsb', '.ods'});
 
-    % ════════════════════════════════════════════════════════════════
-    %  STEP 2: Detect delimiter
-    % ════════════════════════════════════════════════════════════════
-    if options.Delimiter == ""
-        delim = detectDelimiter(rawLines);
+    if isExcel
+        % ── Excel path: readcell → convert to token format ──
+        tokens = readExcelAsTokens(filepath, options.Sheet);
+        if isempty(tokens)
+            error('parser:importSIMS:emptyFile', ...
+                'Excel sheet is empty: %s', filepath);
+        end
     else
-        delim = options.Delimiter;
-    end
+        % ── Text path: read lines → detect delimiter → split ──
+        rawLines = readRawLines(filepath);
+        if isempty(rawLines)
+            error('parser:importSIMS:emptyFile', ...
+                'File is empty or contains only comments: %s', filepath);
+        end
 
-    % ════════════════════════════════════════════════════════════════
-    %  STEP 3: Split lines into tokens
-    % ════════════════════════════════════════════════════════════════
-    tokens = splitLines(rawLines, delim);
+        if options.Delimiter == ""
+            delim = detectDelimiter(rawLines);
+        else
+            delim = options.Delimiter;
+        end
+
+        tokens = splitLines(rawLines, delim);
+    end
 
     % ════════════════════════════════════════════════════════════════
     %  STEP 4: Detect header row and data start
@@ -132,8 +153,13 @@ function data = importSIMS(filepath, options)
     % Capture pre-header metadata
     headerMetadata = {};
     if headerRow > 1
+        if isExcel
+            joinChar = sprintf('\t');
+        else
+            joinChar = char(delim);
+        end
         for mi = 1:headerRow-1
-            headerMetadata{end+1} = strjoin(strtrim(tokens{mi}), char(delim)); %#ok<AGROW>
+            headerMetadata{end+1} = strjoin(strtrim(tokens{mi}), joinChar); %#ok<AGROW>
         end
     end
 
@@ -228,7 +254,9 @@ function data = importSIMS(filepath, options)
     % ════════════════════════════════════════════════════════════════
     if isPaired && any(cellfun(@isempty, elemNames)) && headerRow > 1
         nE = numel(elemNames);
-        for mi = 1:headerRow-1
+        % Scan bottom-up: closest row to header is most likely the element
+        % name row (avoids picking up vendor name from row 1).
+        for mi = headerRow-1 : -1 : 1
             rowToks = tokens{mi};
             % Pad to match original data width, then apply emptyMask
             if numel(rowToks) < numel(emptyMask)
@@ -619,5 +647,73 @@ function name = cleanVendorElement(raw)
     name = strtrim(name);
     if ~isempty(name) && all(isstrprop(name, 'alpha'))
         name = [upper(name(1)), lower(name(2:end))];
+    end
+end
+
+
+function tokens = readExcelAsTokens(filepath, sheetSpec)
+%READEXCELASTOKENS  Read an Excel file and convert to the token format
+%   used by the rest of importSIMS.
+%
+%   Returns a cell array of rows, where each row is a cell array of
+%   character strings — identical to what splitLines() produces from CSV.
+
+    % Resolve sheet
+    if ischar(sheetSpec) || isstring(sheetSpec)
+        readArgs = {'Sheet', char(sheetSpec)};
+    else
+        sheets = sheetnames(filepath);
+        if sheetSpec < 1 || sheetSpec > numel(sheets)
+            error('parser:importSIMS:sheetOutOfRange', ...
+                'Sheet index %d out of range (1-%d).', sheetSpec, numel(sheets));
+        end
+        readArgs = {'Sheet', sheets(sheetSpec)};
+    end
+
+    raw = readcell(filepath, readArgs{:});
+
+    % Replace <missing> with empty
+    for k = 1:numel(raw)
+        if isa(raw{k}, 'missing')
+            raw{k} = '';
+        end
+    end
+
+    % Trim trailing empty rows and columns
+    isEmpty = cellfun(@(v) isempty(v) || ...
+        (isnumeric(v) && isscalar(v) && isnan(v)), raw);
+    lastRow = find(~all(isEmpty, 2), 1, 'last');
+    lastCol = find(~all(isEmpty, 1), 1, 'last');
+    if isempty(lastRow) || isempty(lastCol)
+        tokens = {};
+        return;
+    end
+    raw = raw(1:lastRow, 1:lastCol);
+    [nRows, nCols] = size(raw);
+
+    % Convert each cell to a string and package as row tokens
+    tokens = cell(nRows, 1);
+    for r = 1:nRows
+        rowToks = cell(1, nCols);
+        for c = 1:nCols
+            v = raw{r, c};
+            if ischar(v)
+                rowToks{c} = v;
+            elseif isstring(v)
+                rowToks{c} = char(v);
+            elseif isnumeric(v) && isscalar(v)
+                if isnan(v)
+                    rowToks{c} = '';
+                else
+                    % Preserve full precision for scientific notation values
+                    rowToks{c} = num2str(v, '%.15g');
+                end
+            elseif isdatetime(v)
+                rowToks{c} = char(string(v));
+            else
+                rowToks{c} = '';
+            end
+        end
+        tokens{r} = rowToks;
     end
 end
