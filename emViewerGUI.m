@@ -2085,6 +2085,10 @@ function varargout = emViewerGUI()
             'weightPct', {appData.edsWeightPct}, 'elements', {appData.edsElements});
         api.edsQuantifyZAF       = @(t, angle) quantifyZAFAPI(t, angle);
 
+        % ── Testability API (headless test hooks) ──────────────────────
+        api.getPixels          = @getPixelsAPI;
+        api.getImageDimensions = @getImageDimensionsAPI;
+
         api.close          = @() close(fig);
         varargout{1}       = api;
     end
@@ -2103,9 +2107,11 @@ function varargout = emViewerGUI()
     % ════════════════════════════════════════════════════════════════════
     function onOpenFiles(~, ~)
         filterSpec = { ...
-            '*.tif;*.tiff;*.raw;*.dm3;*.dm4;*.ser;*.mrc;*.mrcs', 'Image Files (*.tif, *.tiff, *.raw, *.dm3, *.dm4, *.ser, *.mrc)'; ...
+            '*.tif;*.tiff;*.jpg;*.jpeg;*.png;*.bmp;*.raw;*.dm3;*.dm4;*.bcf;*.ser;*.mrc;*.mrcs', 'All Supported Images'; ...
             '*.tif;*.tiff',                   'TIFF Files (*.tif, *.tiff)'; ...
+            '*.jpg;*.jpeg;*.png;*.bmp',       'Common Images (*.jpg, *.png, *.bmp)'; ...
             '*.dm3;*.dm4',                    'Gatan Files (*.dm3, *.dm4)'; ...
+            '*.bcf',                          'Bruker EDS Files (*.bcf)'; ...
             '*.ser',                          'FEI SER Files (*.ser)'; ...
             '*.mrc;*.mrcs',                   'MRC Files (*.mrc, *.mrcs)'; ...
             '*.raw',                          'RAW Binary Files (*.raw)'; ...
@@ -2116,8 +2122,15 @@ function varargout = emViewerGUI()
             startDir = pwd;
         end
 
-        [files, folder] = uigetfile(filterSpec, 'Select Image File(s)', ...
-            startDir, 'MultiSelect', 'on');
+        try
+            [files, folder] = uigetfile(filterSpec, 'Select Image File(s)', ...
+                startDir, 'MultiSelect', 'on');
+        catch ME
+            % uigetfile can fail on unreachable network paths or user interrupt
+            fig.Pointer = 'arrow';
+            setStatus('File browser cancelled or failed.');
+            return;
+        end
 
         if isequal(files, 0)
             return;   % user cancelled
@@ -2133,7 +2146,15 @@ function varargout = emViewerGUI()
         % Build full paths
         fpaths = cellfun(@(f) fullfile(folder, f), files, 'UniformOutput', false);
 
-        loadImagesFromPaths(fpaths);
+        fig.Pointer = 'watch';
+        drawnow;
+        try
+            loadImagesFromPaths(fpaths);
+        catch ME
+            uialert(fig, sprintf('Error loading files:\n%s', ME.message), ...
+                'Load Error', 'Icon', 'error');
+        end
+        fig.Pointer = 'arrow';
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2888,6 +2909,18 @@ function varargout = emViewerGUI()
                         addToRecentFiles(fp);
                         loadedAny = true;
 
+                    case {'.jpg', '.jpeg', '.png', '.bmp', '.gif'}
+                        data = parser.importImage(fp);
+                        appendImage(data);
+                        addToRecentFiles(fp);
+                        loadedAny = true;
+
+                    case '.bcf'
+                        data = parser.importBCF(fp);
+                        appendImage(data);
+                        addToRecentFiles(fp);
+                        loadedAny = true;
+
                     case '.raw'
                         % RAW files need dimensions from user
                         data = promptAndLoadRaw(fp);
@@ -2905,7 +2938,7 @@ function varargout = emViewerGUI()
 
                     otherwise
                         uialert(fig, ...
-                            sprintf('Unsupported file format: "%s"\n\nSupported: .tif, .tiff, .raw, .dm3, .dm4', ext), ...
+                            sprintf('Unsupported file format: "%s"\n\nSupported: .tif, .tiff, .jpg, .png, .bcf, .raw, .dm3, .dm4', ext), ...
                             'Unsupported Format', 'Icon', 'warning');
                 end
             catch ME
@@ -2979,6 +3012,34 @@ function varargout = emViewerGUI()
         idx = appData.activeIdx;
     end
 
+    function s = getPixelsAPI()
+    %GETPIXELSAPI  Return current pixel arrays. Falls back to image struct.
+        s.raw      = appData.rawPixels;
+        s.filtered = appData.filteredPixels;
+        s.display  = appData.displayImg;
+        % If filteredPixels is empty but we have images, force displayImage
+        if isempty(s.filtered) && appData.activeIdx > 0 && ...
+                appData.activeIdx <= numel(appData.images)
+            displayImage();
+            s.raw      = appData.rawPixels;
+            s.filtered = appData.filteredPixels;
+            s.display  = appData.displayImg;
+        end
+    end
+
+    function dims = getImageDimensionsAPI()
+    %GETIMAGEDIMENSIONSAPI  Return [height, width] of active image.
+        if ~isempty(appData.filteredPixels)
+            dims = [size(appData.filteredPixels, 1), size(appData.filteredPixels, 2)];
+        elseif appData.activeIdx > 0 && appData.activeIdx <= numel(appData.images)
+            % Force displayImage to populate pixels
+            displayImage();
+            dims = [size(appData.filteredPixels, 1), size(appData.filteredPixels, 2)];
+        else
+            dims = [0, 0];
+        end
+    end
+
     % ════════════════════════════════════════════════════════════════════
     %  API: loadImagesAPI — Programmatic image loading (for testing)
     % ════════════════════════════════════════════════════════════════════
@@ -3011,6 +3072,14 @@ function varargout = emViewerGUI()
                     switch ext
                         case {'.tif', '.tiff'}
                             data = parser.importTIFF(fp);
+                            appendImage(data);
+                            loadedAny = true;
+                        case {'.jpg', '.jpeg', '.png', '.bmp', '.gif'}
+                            data = parser.importImage(fp);
+                            appendImage(data);
+                            loadedAny = true;
+                        case '.bcf'
+                            data = parser.importBCF(fp);
                             appendImage(data);
                             loadedAny = true;
                         case {'.dm3', '.dm4'}

@@ -464,6 +464,81 @@ catch ME
     nFail = nFail + 1;
 end
 
+% ════════════════════════════════════════════════════════════════════
+%  Test 15: Different depth step sizes per element (grid merging)
+%  Verifies that buildUnionGrid uses the finest step and interpolates
+%  coarser elements onto the union grid.
+% ════════════════════════════════════════════════════════════════════
+fprintf('   Test 15: Different depth step sizes per element\n');
+tmpStepCSV = fullfile(tempdir, 'test_sims_diff_steps.csv');
+tmpFiles{end+1} = tmpStepCSV;
+try
+    % Element A: coarse 2 nm steps (6 points)
+    % Element B: fine 1 nm steps (11 points)
+    lines = {
+        'Depth,CONC.,Depth,CONC.';
+        '(nm),(atoms/cm3),(nm),(atoms/cm3)';
+        '0,1e20,0,2e20';
+        '2,9e19,1,1.9e20';
+        '4,8e19,2,1.8e20';
+        '6,7e19,3,1.7e20';
+        '8,6e19,4,1.6e20';
+        '10,5e19,5,1.5e20';
+        ',,6,1.4e20';
+        ',,7,1.3e20';
+        ',,8,1.2e20';
+        ',,9,1.1e20';
+        ',,10,1.0e20'
+    };
+    fp = writeTempCSV('test_sims_diff_steps', lines);
+
+    d = parser.importSIMS(fp);
+
+    % Union grid should use 1 nm step (the finest)
+    gridStep = diff(d.time);
+    uniqueSteps = unique(round(gridStep, 6));
+    assert(numel(uniqueSteps) == 1 && abs(uniqueSteps - 1.0) < 0.01, ...
+        'Union grid step should be ~1.0 nm (finest), got: %s', mat2str(uniqueSteps));
+    fprintf('     Grid step: %.2f nm (finest of 1 and 2 nm)\n', uniqueSteps);
+
+    % Grid should span 0-10 nm with ~11 points
+    assert(numel(d.time) >= 10, ...
+        'Expected >= 10 grid points, got %d', numel(d.time));
+    assert(abs(d.time(1)) < 0.01, 'Grid should start near 0');
+    assert(abs(d.time(end) - 10) < 0.1, 'Grid should end near 10');
+    fprintf('     Grid: %d points, %.1f to %.1f nm\n', numel(d.time), d.time(1), d.time(end));
+
+    % Element A (coarse) should be interpolated: value at depth=1 nm
+    % should be ~9.5e19 (linear interp between 1e20 at 0 and 9e19 at 2)
+    idx1 = find(abs(d.time - 1.0) < 0.1, 1);
+    if ~isempty(idx1)
+        interpVal = d.values(idx1, 1);
+        assert(interpVal > 9e19 && interpVal < 1e20, ...
+            'Interpolated A at 1 nm should be ~9.5e19, got %.2e', interpVal);
+        fprintf('     Element A interpolated at 1nm: %.2e (expected ~9.5e19)\n', interpVal);
+    end
+
+    % Element B (fine) should be exact at integer depths
+    idx5 = find(abs(d.time - 5.0) < 0.1, 1);
+    if ~isempty(idx5)
+        exactVal = d.values(idx5, 2);
+        assert(abs(exactVal - 1.5e20) < 1e18, ...
+            'Element B at 5 nm should be ~1.5e20, got %.2e', exactVal);
+        fprintf('     Element B exact at 5nm: %.2e (expected 1.5e20)\n', exactVal);
+    end
+
+    % Original depths should be preserved in metadata
+    orig = d.metadata.parserSpecific.originalDepths;
+    assert(numel(orig{1}) == 6, 'Original A should have 6 points');
+    assert(numel(orig{2}) == 11, 'Original B should have 11 points');
+    fprintf('     Original depths preserved: A=%d pts, B=%d pts\n', numel(orig{1}), numel(orig{2}));
+
+    nPass = nPass + 1;
+catch ME
+    fprintf('     FAIL: %s\n', ME.message);
+    nFail = nFail + 1;
+end
+
 % ── Cleanup temp files ────────────────────────────────────────────────
 for k = 1:numel(tmpFiles)
     if isfile(tmpFiles{k})

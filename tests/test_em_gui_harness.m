@@ -365,6 +365,245 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  13. Failed file load keeps GUI functional (error recovery)
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 13: Failed file load recovery ══\n');
+try
+    safeClose(api);
+    api = launchHeadless();
+
+    % Try loading a non-existent file
+    api.loadImages({'C:\nonexistent_test_image.tif'});
+    drawnow;
+
+    imgs = api.getImages();
+    assert(isempty(imgs), ...
+        sprintf('Expected 0 images from bad path, got %d', numel(imgs)));
+    assert(api.getActiveIdx() == 0, 'Active index should be 0');
+    assert(isvalid(api.fig), 'Figure should still be valid');
+    fprintf('  Images after bad load: %d (expected 0)\n', numel(imgs));
+
+    % Now load a valid file — GUI should still work
+    api.loadImages({tiffPath1});
+    drawnow;
+    imgs = api.getImages();
+    assert(numel(imgs) == 1, 'Should load valid image after failed one');
+    assert(api.getActiveIdx() == 1, 'Active index should be 1');
+    fprintf('  Valid image loaded after failure: yes\n');
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  14. Corrupted TIFF load keeps GUI functional
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 14: Corrupted TIFF load recovery ══\n');
+try
+    safeClose(api);
+    api = launchHeadless();
+
+    % Create a garbage file with .tif extension
+    corruptTiff = fullfile(tmpDir, 'corrupt_test.tif');
+    fid = fopen(corruptTiff, 'wb');
+    fwrite(fid, uint8(randi([0 255], 1, 100)), 'uint8');
+    fclose(fid);
+
+    api.loadImages({corruptTiff});
+    drawnow;
+
+    imgs = api.getImages();
+    assert(isempty(imgs), ...
+        sprintf('Expected 0 images from corrupt TIFF, got %d', numel(imgs)));
+    assert(isvalid(api.fig), 'Figure should still be valid');
+    fprintf('  Images after corrupt load: %d (expected 0)\n', numel(imgs));
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  15. Rotate 90 CW changes dimensions
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 15: Rotate 90 CW changes dimensions ══\n');
+try
+    % Use a fresh visible instance for rotation/flip tests
+    % (displayImage needs UI elements accessible to populate pixels)
+    safeClose(api);
+    api = emViewerGUI();
+    drawnow;
+    api.loadImages({tiffPath1});
+    drawnow;
+
+    dimsBefore = api.getImageDimensions();
+    fprintf('  Before: %dx%d\n', dimsBefore(1), dimsBefore(2));
+    assert(all(dimsBefore > 0), 'Image should have non-zero dimensions after load');
+
+    api.rotateFlip('rot90cw');
+    drawnow;
+
+    dimsAfter = api.getImageDimensions();
+    fprintf('  After:  %dx%d\n', dimsAfter(1), dimsAfter(2));
+    assert(dimsAfter(1) == dimsBefore(2) && dimsAfter(2) == dimsBefore(1), ...
+        sprintf('Expected %dx%d after CW rotation, got %dx%d', ...
+        dimsBefore(2), dimsBefore(1), dimsAfter(1), dimsAfter(2)));
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  16. Rotate 90 CCW changes dimensions
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 16: Rotate 90 CCW changes dimensions ══\n');
+try
+    safeClose(api);
+    api = emViewerGUI();
+    drawnow;
+    api.loadImages({tiffPath1});
+    drawnow;
+
+    dimsBefore = api.getImageDimensions();
+    api.rotateFlip('rot90ccw');
+    drawnow;
+
+    dimsAfter = api.getImageDimensions();
+    assert(dimsAfter(1) == dimsBefore(2) && dimsAfter(2) == dimsBefore(1), ...
+        sprintf('Expected %dx%d after CCW rotation, got %dx%d', ...
+        dimsBefore(2), dimsBefore(1), dimsAfter(1), dimsAfter(2)));
+    fprintf('  Dims swapped: %dx%d -> %dx%d\n', dimsBefore(1), dimsBefore(2), dimsAfter(1), dimsAfter(2));
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  17. Flip horizontal preserves dimensions
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 17: Flip horizontal preserves dimensions ══\n');
+try
+    safeClose(api);
+    api = emViewerGUI();
+    drawnow;
+    api.loadImages({tiffPath1});
+    drawnow;
+
+    dimsBefore = api.getImageDimensions();
+    pxBefore = api.getPixels();
+
+    api.rotateFlip('fliph');
+    drawnow;
+
+    dimsAfter = api.getImageDimensions();
+    pxAfter = api.getPixels();
+    assert(isequal(dimsBefore, dimsAfter), 'Flip should preserve dimensions');
+    assert(~isequal(pxBefore.filtered, pxAfter.filtered), 'Flip should change pixel data');
+    fprintf('  Dims preserved: %dx%d, pixels changed: yes\n', dimsAfter(1), dimsAfter(2));
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  18. Double rotation is reversible
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 18: Double rotation is reversible ══\n');
+try
+    safeClose(api);
+    api = emViewerGUI();
+    drawnow;
+    api.loadImages({tiffPath1});
+    drawnow;
+
+    pxOriginal = api.getPixels().filtered;
+    assert(~isempty(pxOriginal), 'Pixels should be populated after load');
+
+    api.rotateFlip('rot90cw');
+    drawnow;
+    api.rotateFlip('rot90ccw');
+    drawnow;
+
+    pxRestored = api.getPixels().filtered;
+    assert(isequal(pxOriginal, pxRestored), ...
+        'CW then CCW rotation should restore original pixels');
+    fprintf('  Round-trip rotation: pixels match original\n');
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  19. Mix of valid and invalid files in one load
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 19: Mix of valid and invalid files ══\n');
+try
+    safeClose(api);
+    api = launchHeadless();
+
+    api.loadImages({tiffPath1, fullfile(tmpDir, 'does_not_exist.tif'), tiffPath2});
+    drawnow;
+
+    imgs = api.getImages();
+    assert(numel(imgs) == 2, ...
+        sprintf('Expected 2 valid images loaded, got %d', numel(imgs)));
+    fprintf('  Images loaded: %d (expected 2, skipped 1 bad)\n', numel(imgs));
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  20. Flip vertical preserves dimensions
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 20: Flip vertical preserves dimensions ══\n');
+try
+    safeClose(api);
+    api = emViewerGUI();
+    drawnow;
+    api.loadImages({tiffPath1});
+    drawnow;
+
+    dimsBefore = api.getImageDimensions();
+    pxBefore = api.getPixels();
+
+    api.rotateFlip('flipv');
+    drawnow;
+
+    dimsAfter = api.getImageDimensions();
+    pxAfter = api.getPixels();
+    assert(isequal(dimsBefore, dimsAfter), 'Flip should preserve dimensions');
+    assert(~isequal(pxBefore.filtered, pxAfter.filtered), 'Flip should change pixel data');
+    fprintf('  Dims preserved: %dx%d, pixels changed: yes\n', dimsAfter(1), dimsAfter(2));
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  SUMMARY
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n%s\n', repmat(char(9552), 1, 72));

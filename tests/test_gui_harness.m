@@ -613,6 +613,298 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  19. Data table refresh exercises getPlotData (Bug regression)
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 19: Data table refresh exercises getPlotData ══\n');
+try
+    api.reset();
+    api.addFiles({XRDML_F});
+    drawnow;
+
+    % Explicitly call refreshDataTable — this exercises getPlotData
+    api.refreshDataTable();
+    drawnow;
+
+    td = api.getTableData();
+    assert(~isempty(td.colNames), 'Column names should be populated');
+    % Working copy is populated by refreshDataTable if data loaded
+    datasets = api.getDatasets();
+    nExpected = numel(datasets{1}.data.time);
+    if ~isempty(td.working)
+        nRows = size(td.working, 1);
+        assert(nRows == nExpected, ...
+            sprintf('Working copy rows (%d) should match data.time length (%d)', nRows, nExpected));
+        fprintf('  Table rows: %d, columns: %d\n', nRows, numel(td.colNames));
+    else
+        fprintf('  Table working copy empty (UI hidden) — getPlotData path verified\n');
+    end
+
+    % Verify getPlotData itself works (the core regression test)
+    d = api.getPlotData(1);
+    assert(~isempty(d.time), 'getPlotData should return data');
+    assert(numel(d.time) == nExpected, 'getPlotData data size should match');
+    fprintf('  getPlotData(1): %d points — OK\n', numel(d.time));
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  20. Data table refresh with corrections (getPlotData returns corrData)
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 20: getPlotData with corrections ══\n');
+try
+    api.reset();
+    api.addFiles({XRDML_F});
+    drawnow;
+
+    % Get raw data via API
+    dRaw = api.getPlotData(1);
+    rawVal1 = dRaw.values(1, 1);
+
+    % Apply Y offset (setCorrections takes 4 args: xOff, yOff, bgSlope, bgInt)
+    api.setCorrections(0, 100, 0, 0);
+    api.applyCorrections();
+    drawnow;
+
+    dCorr = api.getPlotData(1);
+    corrVal1 = dCorr.values(1, 1);
+    % y_corrected = y_raw - yBG - yOff = y_raw - 0 - 100
+    assert(abs(corrVal1 - (rawVal1 - 100)) < 1e-6, ...
+        sprintf('getPlotData should return corrected values (got %.4g, expected %.4g)', ...
+        corrVal1, rawVal1 - 100));
+    fprintf('  Raw value(1,1): %.4g, Corrected: %.4g (yOff=100 subtracted)\n', rawVal1, corrVal1);
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  21. Axes "More" toggle expand/collapse (layout regression)
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 21: Axes "More" toggle expand/collapse ══\n');
+try
+    api.reset();
+    api.addFiles({XRDML_F});
+    drawnow;
+
+    % Initial state: collapsed — verify heights (the actual bug was about heights)
+    s1 = api.getAxAppearanceState();
+    assert(s1.advRowHeight == 0, 'Advanced row should be 0 when collapsed');
+    assert(s1.analysisRow1Height == 110, 'Analysis row 1 should be 110 when collapsed');
+    fprintf('  Collapsed: advRow=%g, analysisRow1=%g\n', s1.advRowHeight, s1.analysisRow1Height);
+
+    % Expand — make fig visible briefly so layout engine processes changes
+    api.fig.Visible = 'on';
+    drawnow;
+    api.toggleAxAppearance();
+    drawnow;
+    s2 = api.getAxAppearanceState();
+    assert(s2.advRowHeight > 0, ...
+        sprintf('Advanced row should be > 0 when expanded (got %g)', s2.advRowHeight));
+    assert(s2.analysisRow1Height > 110, ...
+        sprintf('Analysis row 1 should grow when expanded (got %g)', s2.analysisRow1Height));
+    fprintf('  Expanded:  advRow=%g, analysisRow1=%g\n', s2.advRowHeight, s2.analysisRow1Height);
+
+    % Collapse again
+    api.toggleAxAppearance();
+    drawnow;
+    s3 = api.getAxAppearanceState();
+    assert(s3.advRowHeight == 0, 'Advanced row should return to 0');
+    assert(s3.analysisRow1Height == 110, ...
+        sprintf('Analysis row 1 should return to 110 (got %g)', s3.analysisRow1Height));
+    fprintf('  Re-collapsed: advRow=%g, analysisRow1=%g\n', s3.advRowHeight, s3.analysisRow1Height);
+
+    api.fig.Visible = 'off';
+    drawnow;
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    try; api.fig.Visible = 'off'; catch; end
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  22. Peak decomposition exercises getPlotData
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 22: Peak decomposition ══\n');
+try
+    api.reset();
+    api.addFiles({XRDML_F});
+    drawnow;
+
+    % Peak operations need visible figure for fitting
+    api.fig.Visible = 'on';
+    drawnow;
+
+    api.autoPeaks();
+    drawnow;
+
+    % Attempt fit — may not converge for all peaks, that's OK
+    api.fitPeaks();
+    drawnow;
+
+    % Show decomposition — exercises getPlotData from decomposition path
+    api.showDecomposition();
+    drawnow;
+    fprintf('  showDecomposition() completed without error\n');
+
+    api.fig.Visible = 'off';
+    drawnow;
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    try; api.fig.Visible = 'off'; catch; end
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  23. Descriptive stats exercises getPlotData
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 23: Descriptive statistics ══\n');
+try
+    api.reset();
+    api.addFiles({XRDML_F});
+    drawnow;
+
+    % Refresh table first (stats reads from tableWorkingCopy)
+    api.refreshDataTable();
+    drawnow;
+
+    % Call descriptive stats — opens a popup figure
+    api.descriptiveStats();
+    drawnow;
+    fprintf('  descriptiveStats() completed without error\n');
+
+    % Close the stats popup
+    statsFigs = findall(groot, 'Type', 'figure', 'Tag', 'dpDescStats');
+    for k = 1:numel(statsFigs)
+        try; close(statsFigs(k)); catch; end
+    end
+    fprintf('  Stats popup closed: %d figure(s)\n', numel(statsFigs));
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  24. Failed file load keeps GUI functional
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 24: Failed file load recovery ══\n');
+try
+    api.reset();
+    drawnow;
+
+    % uialert needs visible figure for error reporting
+    api.fig.Visible = 'on';
+    drawnow;
+
+    % Try loading a non-existent file followed by a valid one
+    api.addFiles({fullfile('C:\', 'nonexistent_test_file.xrdml'), XRDML_F});
+    drawnow;
+
+    datasets = api.getDatasets();
+    assert(numel(datasets) == 1, ...
+        sprintf('Expected 1 dataset (valid file), got %d', numel(datasets)));
+    assert(api.getActiveIdx() == 1, 'Active index should be 1');
+    assert(isvalid(api.fig), 'Figure should still be valid');
+    fprintf('  Datasets after mixed load: %d (expected 1)\n', numel(datasets));
+    fprintf('  GUI still valid: yes\n');
+
+    api.fig.Visible = 'off';
+    drawnow;
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    try; api.fig.Visible = 'off'; catch; end
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  25. Corrupted file load keeps GUI functional
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 25: Corrupted file load recovery ══\n');
+try
+    api.reset();
+    drawnow;
+
+    % Create a garbage file with .xrdml extension
+    corruptFile = fullfile(tmpDir, 'corrupt_test.xrdml');
+    fid = fopen(corruptFile, 'w');
+    fprintf(fid, 'THIS IS NOT VALID XML OR XRDML DATA');
+    fclose(fid);
+
+    % uialert needs visible figure for error reporting
+    api.fig.Visible = 'on';
+    drawnow;
+
+    api.addFiles({corruptFile});
+    drawnow;
+
+    datasets = api.getDatasets();
+    assert(isempty(datasets), ...
+        sprintf('Expected 0 datasets from corrupt file, got %d', numel(datasets)));
+    assert(isvalid(api.fig), 'Figure should still be valid after corrupt load');
+    fprintf('  Datasets after corrupt load: %d (expected 0)\n', numel(datasets));
+
+    % Now load a valid file to prove GUI still works
+    api.addFiles({XRDML_F});
+    drawnow;
+    datasets = api.getDatasets();
+    assert(numel(datasets) == 1, 'Should load valid file after corrupt one');
+    fprintf('  Valid file loaded after corrupt: yes (%d dataset)\n', numel(datasets));
+
+    api.fig.Visible = 'off';
+    drawnow;
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    try; api.fig.Visible = 'off'; catch; end
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  26. getPlotData returns correct data for multiple datasets
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 26: getPlotData multi-dataset ══\n');
+try
+    api.reset();
+    api.addFiles({XRDML_F, VSM_F});
+    drawnow;
+
+    d1 = api.getPlotData(1);
+    d2 = api.getPlotData(2);
+    assert(~isempty(d1.time), 'Dataset 1 should have data');
+    assert(~isempty(d2.time), 'Dataset 2 should have data');
+    assert(numel(d1.time) ~= numel(d2.time) || ~isequal(d1.values, d2.values), ...
+        'Two different files should return different data');
+    fprintf('  Dataset 1: %d points, Dataset 2: %d points\n', numel(d1.time), numel(d2.time));
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  SUMMARY
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n%s\n', repmat(char(9552), 1, 72));
