@@ -366,6 +366,178 @@ catch ME
     nFail = nFail + 1;
 end
 
+% ════════════════════════════════════════════════════════════════════
+%  Test 13: Excel SIMS — realistic Evans Analytical Group format
+%
+%  Matches the real vendor file structure exactly:
+%   Row 1: "Evans Analytical Group"
+%   Row 2: "Sample : ID W2834"
+%   Row 3: "3/10/2026"
+%   Row 4: "Drawn Curves" | 8               (metadata with numeric in B)
+%   Row 5: "Num of Cycles" | 222            (metadata with numeric in B)
+%   Row 6: blank
+%   Row 7: Element names at column 1 of each 3-col group
+%           H | | | C | | | O | | | F | | | N | | | AL-> | | | SI-> | | | TA->
+%   Row 8: Depth | CONC. | blank | Depth | CONC. | blank | ...
+%   Row 9: (nm) | (atoms/cc) | blank | ... | (nm) | (atom%) | ...
+%   Row 10: blank
+%   Row 11+: data — 3 columns per element (depth, conc, blank separator)
+% ════════════════════════════════════════════════════════════════════
+fprintf('   Test 13: Excel SIMS file (full Evans Analytical format)\n');
+tmpXlsx = fullfile(tempdir, 'test_sims_excel.xlsx');
+tmpFiles{end+1} = tmpXlsx;
+try
+    % 8 elements × 3 cols each = 24 cols (last element has no trailing blank = 23)
+    % Using actual data values from a real Evans Analytical file
+    nC = 23;  % total columns
+    blk = [];  % blank cell shorthand
+
+    % Rows 1-6: metadata block + blank
+    r1 = [{'Evans Analytical Group'}, repmat({blk}, 1, nC-1)];
+    r2 = [{'Sample : ID W2834'},     repmat({blk}, 1, nC-1)];
+    r3 = [{'3/10/2026'},             repmat({blk}, 1, nC-1)];
+    r4 = [{'Drawn Curves', 8},       repmat({blk}, 1, nC-2)];
+    r5 = [{'Num of Cycles', 222},    repmat({blk}, 1, nC-2)];
+    r6 = repmat({blk}, 1, nC);
+
+    % Row 7: element names at col 1 of each 3-col group
+    r7 = repmat({blk}, 1, nC);
+    elemCols = 1:3:nC;  % 1, 4, 7, 10, 13, 16, 19, 22
+    elemNames = {'H', 'C', 'O', 'F', 'N', 'AL->', 'SI->', 'TA->'};
+    for k = 1:numel(elemNames)
+        r7{elemCols(k)} = elemNames{k};
+    end
+
+    % Row 8: Depth | CONC. | blank (repeating)
+    r8 = repmat({blk}, 1, nC);
+    for k = 1:8
+        r8{elemCols(k)}   = 'Depth';
+        r8{elemCols(k)+1} = 'CONC.';
+    end
+
+    % Row 9: units — first 5 elements (atoms/cc), last 3 (atom%)
+    r9 = repmat({blk}, 1, nC);
+    for k = 1:8
+        r9{elemCols(k)} = '(nm)';
+        if k <= 5
+            r9{elemCols(k)+1} = '(atoms/cc)';
+        else
+            r9{elemCols(k)+1} = '(atom%)';
+        end
+    end
+
+    % Row 10: blank
+    r10 = repmat({blk}, 1, nC);
+
+    % Rows 11-14: data (from screenshot)
+    % Columns: H(d,c,_) C(d,c,_) O(d,c,_) F(d,c,_) N(d,c,_) Al(d,c,_) Si(d,c,_) Ta(d,c)
+    d11 = {0.35661,2.65e22,blk, 0.41977,1.6e20,blk, 0.49557,3.24e22,blk, ...
+           0.63453,2.1e19,blk,  0.71033,5.48e18,blk, 0.0471,0.350898,blk, ...
+           0.15278,94.97478,blk, 0.64946,8.993688};
+    d12 = {1.19038,2.15e22,blk, 1.26617,1.96e19,blk, 1.34197,3.56e22,blk, ...
+           1.48093,5.07e18,blk, 1.5441,2.86e17,blk,  0.87138,0.132672,blk, ...
+           0.97706,58.08073,blk, 1.47374,66.86718};
+    d13 = {2.03678,3.41e22,blk, 2.11258,1.21e19,blk, 2.17574,2.69e22,blk, ...
+           2.3147,1.14e18,blk,  2.3905,1.02e17,blk,  1.69566,0.147769,blk, ...
+           1.80133,13.51894,blk, 2.29801,93.93995};
+    d14 = {2.88318,4.37e22,blk, 2.94634,1.28e19,blk, 3.02214,1.03e22,blk, ...
+           3.1611,4.72e17,blk,  3.2369,1.02e17,blk,  2.50937,0.014993,blk, ...
+           2.62561,3.19098,blk, 3.12229,98.32604};
+
+    rawCell = [r1; r2; r3; r4; r5; r6; r7; r8; r9; r10; d11; d12; d13; d14];
+    writecell(rawCell, tmpXlsx);
+
+    % Test 1: resolveParser should detect SIMS
+    res = parser.resolveParser(tmpXlsx);
+    assert(strcmp(res.name, 'importSIMS'), ...
+        'resolveParser should route Excel SIMS to importSIMS, got: %s', res.name);
+
+    % Test 2: importSIMS should parse it correctly
+    d = parser.importSIMS(tmpXlsx);
+    assert(isstruct(d), 'output must be a struct');
+    assert(size(d.values, 2) == 8, ...
+        'expected 8 elements, got: %d', size(d.values, 2));
+
+    % Test 3: Element names recovered from vendor row (with arrow cleaning)
+    expected = {'H', 'C', 'O', 'F', 'N', 'Al', 'Si', 'Ta'};
+    for ei = 1:8
+        assert(strcmp(d.labels{ei}, expected{ei}), ...
+            'element %d should be %s, got: %s', ei, expected{ei}, d.labels{ei});
+    end
+
+    % Test 4: Mixed units — first 5 atoms/cc, last 3 atom%
+    for ei = 1:5
+        assert(contains(d.units{ei}, 'atoms'), ...
+            'element %d unit should contain atoms, got: %s', ei, d.units{ei});
+    end
+    for ei = 6:8
+        assert(contains(d.units{ei}, 'atom'), ...
+            'element %d unit should contain atom, got: %s', ei, d.units{ei});
+    end
+
+    % Test 5: Depth values are reasonable (nm range)
+    assert(min(d.time) < 1, 'min depth should be < 1 nm');
+    assert(max(d.time) > 2, 'max depth should be > 2 nm');
+
+    % Test 6: Concentration values are in the right order of magnitude
+    % H should be ~1e22 atoms/cc
+    hCol = find(strcmp(d.labels, 'H'));
+    hMax = max(d.values(:, hCol));
+    assert(hMax > 1e20, 'H concentration too low: %g', hMax);
+
+    % Test 7: importAuto dispatch works
+    d2 = parser.importAuto(tmpXlsx);
+    assert(strcmp(d2.metadata.parserName, 'importSIMS'), ...
+        'importAuto should dispatch to importSIMS for SIMS xlsx');
+
+    fprintf('     resolveParser: %s (correct)\n', res.name);
+    fprintf('     Elements: %s\n', strjoin(d.labels, ', '));
+    fprintf('     Units: %s\n', strjoin(d.units, ', '));
+    fprintf('     Depth points: %d, data cols: %d\n', numel(d.time), size(d.values,2));
+    nPass = nPass + 1;
+catch ME
+    fprintf('     FAIL: %s\n', ME.message);
+    nFail = nFail + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════
+%  Test 14: Excel SIMS — minimal format (no separators, fewer rows)
+%  Verifies the parser handles a simpler Excel layout without the
+%  blank separator columns between element groups.
+% ════════════════════════════════════════════════════════════════════
+fprintf('   Test 14: Excel SIMS minimal (no separator columns)\n');
+tmpXlsx2 = fullfile(tempdir, 'test_sims_excel_minimal.xlsx');
+tmpFiles{end+1} = tmpXlsx2;
+try
+    rawCell2 = {
+        'Evans Analytical Group', [], [], [], [], [], [], [];
+        'Sample : ID T9999',     [], [], [], [], [], [], [];
+        [],                       [], [], [], [], [], [], [];
+        'H',   [],  'AL->',  [],  'SI->',  [],  'TA->',  [];
+        'Depth', 'CONC.', 'Depth', 'CONC.', 'Depth', 'CONC.', 'Depth', 'CONC.';
+        '(nm)', '(atom%)', '(nm)', '(atom%)', '(nm)', '(atom%)', '(nm)', '(atom%)';
+        [],  [],  [],  [],  [],  [],  [],  [];
+        0.15, 94.97, 0.05, 0.35, 0.06, 0.005, 0.65, 8.99;
+        0.98, 58.08, 0.87, 0.13, 0.97, 0.003, 1.47, 66.87;
+        1.80, 13.52, 1.70, 0.15, 1.80, 0.004, 2.30, 93.94;
+    };
+    writecell(rawCell2, tmpXlsx2);
+
+    d = parser.importSIMS(tmpXlsx2);
+    assert(strcmp(d.labels{1}, 'H'),  'expected H, got: %s', d.labels{1});
+    assert(strcmp(d.labels{2}, 'Al'), 'expected Al, got: %s', d.labels{2});
+    assert(strcmp(d.labels{3}, 'Si'), 'expected Si, got: %s', d.labels{3});
+    assert(strcmp(d.labels{4}, 'Ta'), 'expected Ta, got: %s', d.labels{4});
+    assert(contains(d.units{1}, 'atom'), 'unit should contain atom');
+    assert(size(d.values, 2) == 4, 'expected 4 elements');
+
+    fprintf('     Elements: %s\n', strjoin(d.labels, ', '));
+    nPass = nPass + 1;
+catch ME
+    fprintf('     FAIL: %s\n', ME.message);
+    nFail = nFail + 1;
+end
+
 % ── Cleanup temp files ────────────────────────────────────────────────
 for k = 1:numel(tmpFiles)
     if isfile(tmpFiles{k})
