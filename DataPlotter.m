@@ -2191,6 +2191,21 @@ function varargout = DataPlotter()
     api.clearFringe         = @clearFringeMarkers;
     api.reset               = @resetGUIDirect;
 
+    % ── Testability API (headless test hooks) ──────────────────────────
+    api.getPlotData         = @(idx) getPlotData(idx);
+    api.refreshDataTable    = @() refreshDataTable();
+    api.toggleAxAppearance  = @() onToggleAxAppearance();
+    api.getAxAppearanceState = @() struct( ...
+        'collapsed',        appData.sectionCollapsed.axAppearance, ...
+        'advRowHeight',     axLimGL.RowHeight{AXLIM_ADV_ROW}, ...
+        'analysisRow1Height', analysisGL.RowHeight{1});
+    api.showDecomposition   = @() onShowDecomposition([],[]);
+    api.getTableData        = @() struct( ...
+        'data',     {tblData.Data}, ...
+        'colNames', {tblData.ColumnName}, ...
+        'working',  appData.tableWorkingCopy);
+    api.descriptiveStats    = @() onDescriptiveStats([],[]);
+
     % ════════════════════════════════════════════════════════════════════
     %  NESTED CALLBACKS  (share appData + all control handles via closure)
     % ════════════════════════════════════════════════════════════════════
@@ -2201,8 +2216,8 @@ function varargout = DataPlotter()
     %ONADDFILES  Open a multi-select file dialog; load every chosen file.
         startDir = guiTernary(isempty(appData.lastDir), pwd, appData.lastDir);
         [fnames, fpath] = uigetfile( ...
-            {'*.dat;*.csv;*.tsv;*.txt;*.xlsx;*.xls;*.xlsm;*.xlsb;*.ods;*.raw;*.xrdml;*.refl;*.pnr;*.datA;*.datB;*.datC;*.datD;*.data;*.datb;*.datc;*.datd', ...
-             'Supported data files (*.dat, *.csv, *.xlsx, *.raw, *.xrdml, *.refl, *.pnr, *.datA/B/C/D)'; ...
+            {'*.dat;*.csv;*.tsv;*.txt;*.xlsx;*.xls;*.xlsm;*.xlsb;*.ods;*.raw;*.xrdml;*.refl;*.pnr;*.datA;*.datB;*.datC;*.datD;*.data;*.datb;*.datc;*.datd;*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.bcf', ...
+             'Supported data files (*.dat, *.csv, *.xlsx, *.raw, *.xrdml, *.refl, *.pnr, *.datA/B/C/D, *.jpg, *.png, *.bmp, *.gif, *.bcf)'; ...
              '*.*','All files (*.*)'}, ...
             'Select data file(s)', startDir, ...
             'MultiSelect', 'on');
@@ -3713,15 +3728,20 @@ function varargout = DataPlotter()
     end
 
     function onToggleAxAppearance()
-    %ONTOGGLEAXAPPEARANCE  Toggle the appearance extras row in axLimGL.
+    %ONTOGGLEAXAPPEARANCE  Toggle the appearance extras row in axLimGL
+    %  and resize the parent analysisGL row so the expanded content is
+    %  not clipped by the Data Table panel below.
         collapsed = ~appData.sectionCollapsed.axAppearance;
         appData.sectionCollapsed.axAppearance = collapsed;
+        AXLIM_BASE_H = 110;   % matches analysisGL RowHeight{1}
         if collapsed
             btnAxMore.Text = [char(9654) ' More'];  % ▶
             axLimGL.RowHeight{AXLIM_ADV_ROW} = 0;
+            analysisGL.RowHeight{1} = AXLIM_BASE_H;
         else
             btnAxMore.Text = [char(9660) ' More'];  % ▼
             axLimGL.RowHeight{AXLIM_ADV_ROW} = AXLIM_ADV_HEIGHT;
+            analysisGL.RowHeight{1} = AXLIM_BASE_H + AXLIM_ADV_HEIGHT;
         end
     end
 
@@ -13914,6 +13934,18 @@ function varargout = DataPlotter()
         end
     end
 
+    % ── Shared Data Helper ─────────────────────────────────────────────
+
+    function d = getPlotData(dsIdx)
+    %GETPLOTDATA  Return corrected data if available, else raw.
+        ds = appData.datasets{dsIdx};
+        if ~isempty(ds.corrData)
+            d = ds.corrData;
+        else
+            d = ds.data;
+        end
+    end
+
     % ── Advanced Figure Builder ────────────────────────────────────────
 
     function onAdvancedFigureBuilder(~,~)
@@ -16534,11 +16566,18 @@ function [data, parserName] = guiImport(fp)
         case 'importPPMS'
             data = parser.importPPMS(fp, 'YAxis', 'all');
 
+        case 'importImage'
+            data = parser.importImage(fp);
+
+        case 'importBCF'
+            data = parser.importBCF(fp);
+
         otherwise
             error('DataPlotter:unknownExt', ...
                 ['No parser for extension "%s" (resolved as "%s").\n' ...
                  'Supported: .raw, .xrdml, .brml, .xlsx/.xls/.xlsm/.xlsb/.ods, ' ...
-                 '.csv/.tsv/.txt, .refl, .pnr, .datA/B/C/D, .dat'], ...
+                 '.csv/.tsv/.txt, .refl, .pnr, .datA/B/C/D, .dat, ' ...
+                 '.jpg/.jpeg/.png/.bmp/.gif, .bcf'], ...
                 extractFileExt(fp), parserName);
     end
 end
