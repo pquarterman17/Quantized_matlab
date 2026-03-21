@@ -102,6 +102,7 @@ SUITES = {
     T('fitting','test_templates_fft'),   'fitting', 'Publication templates and FFT filtering'
     T('fitting','test_resample_stats'),  'fitting', 'Resampling, descriptive stats, t-test, linear regression'
     T('fitting','test_batch_roi'),       'fitting', 'Batch fitting, peak tracking'
+    T('fitting','test_multipanel'),      'fitting', 'Multi-panel figure builder'
 };
 
 % Filter by group

@@ -368,7 +368,7 @@ Upgrade from the current linear background subtraction:
 
 ---
 
-## Phase 6 — Multi-Panel / Linked Plots
+## Phase 6 — Multi-Panel / Linked Plots ✅ IMPLEMENTED
 
 **Priority:** Medium. Essential for publication figures and fitting
 diagnostics.
@@ -475,9 +475,9 @@ OriginPro's "Quick Peaks" tracks a peak across a series:
 | 1 | Phase 1: Curve Fitting Engine | Large | Highest | ✅ Done — `+fitting/` package |
 | 2 | Phase 3: Graph Templates | Small | High | ✅ Done — `+styles/template.m` |
 | 3 | Phase 7: Batch Parameter Extraction | Medium | High | ✅ Done — `+fitting/batchFit.m`, `trackPeak.m` |
-| 4 | Phase 2: Worksheet View | Medium | High | None |
+| 4 | Phase 2: Worksheet View | Medium | High | ✅ Already existed in DataPlotter |
 | 5 | Phase 5: Analysis Gadgets | Medium | Medium | ✅ ROI done — `+dataplotter/roiAnalysis.m` |
-| 6 | Phase 6: Multi-Panel Plots | Medium | Medium | None |
+| 6 | Phase 6: Multi-Panel Plots | Medium | Medium | ✅ Done — `+dataplotter/multiPanel.m` |
 | 7 | Phase 4: Statistics Panel | Small | Medium | ✅ Core done (no GUI yet) |
 | 8 | Phase 8: QoL & Polish | Large | Medium | Phases 1-7 benefit from these |
 
