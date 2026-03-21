@@ -42,7 +42,7 @@ arguments
     opts.lambda   (1,1) double {mustBePositive} = NaN
     opts.xi       (1,1) double {mustBePositive} = NaN
     opts.Material (1,:) char = ''
-    opts.T        (1,1) double {mustBeNonnegative} = NaN
+    opts.T        (1,1) double = NaN
 end
 
 lambda = opts.lambda;

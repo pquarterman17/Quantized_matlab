@@ -1,8 +1,27 @@
-# +parser — Data Import Package
+# +parser/ — Data Import Package
 
-All parsers return the same **unified data struct** so GUI and plotting code is
-parser-agnostic.  This document describes the canonical schema and the
-parser-specific metadata each function adds.
+All parsers return the same **unified data struct** via `parser.createDataStruct()` so GUI and plotting code is parser-agnostic. This document describes the canonical schema and the parser-specific metadata each function adds.
+
+## Supported Formats (Quick Reference)
+
+| Format | Function | Extensions | Description |
+|--------|----------|------------|-------------|
+| Quantum Design VSM | `importQDVSM` | `.dat` | Magnetometry; [Header]/[Data] markers |
+| QD PPMS (legacy) | `importPPMS` | `.dat` | Older PPMS CSV/TSV; auto-detects delimiter |
+| QD MPMS | `importMPMS` | `.dat` | SQUID magnetometry; wrapper over `importQDVSM` |
+| Lake Shore | `importLakeShore` | `.dat`, `.csv` | VSM/cryostat; auto-detect header block |
+| CSV / TSV / TXT | `importCSV` | `.csv`, `.tsv`, `.txt` | Generic lab data with auto-detection |
+| Excel | `importExcel` | `.xlsx`, `.xls`, `.ods` | Spreadsheet with unit row support |
+| Rigaku SmartLab | `importRigaku_raw` | `.raw` | Binary XRD (magic "FI") |
+| PANalytical XRDML | `importXRDML` | `.xrdml` | XML XRD; 1D + 2D area-detector; Q-space |
+| Bruker | `importBruker` | `.brml`, `.raw` | ZIP+XML or v3 binary (magic "RAW1.01") |
+| NCNR reflectometry | `importNCNRRefl` | `.refl` | Polarized neutron R vs Q with error bars |
+| NCNR PNR | `importNCNRPNR` | `.pnr` | Cross-section resolved (R+, R−) |
+| NCNR fit output | `importNCNRDat` | `.datA`–`.datD` | refl1d theory + data overlay |
+| SIMS depth profile | `importSIMS` | `.csv` | Paired/shared-depth columns; grid merging |
+| TIFF image | `importTIFF` | `.tif`, `.tiff` | 8/16/32-bit; multi-page; FEI metadata |
+| RAW image | `importRawImage` | `.raw` | Headerless binary (not auto-dispatchable) |
+| Gatan DM3/DM4 | `importDM3` | `.dm3`, `.dm4` | Recursive tagged binary; pixel calibration |
 
 ---
 

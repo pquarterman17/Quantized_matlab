@@ -1,4 +1,4 @@
-function result = doubleLayerCapacitance(epsilon, d, A, opts)
+function result = doubleLayerCapacitance(epsilon, d, A)
 %DOUBLELAYERCAPACITANCE  Compute double-layer capacitance using a parallel-plate model.
 %
 %   Syntax
