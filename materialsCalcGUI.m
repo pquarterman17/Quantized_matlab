@@ -333,56 +333,122 @@ end
         pD.Layout.Row = 1; pD.Layout.Column = 1;
 
         gD = uigridlayout(pD);
-        gD.RowHeight   = {24, 24, 24};
-        gD.ColumnWidth = {40,'1x',40,'1x',40,'1x',40,'1x',80};
+        gD.RowHeight   = {24, 24, 24, 24};
+        gD.ColumnWidth = {50,'1x',30,'1x',30,'1x',30,'1x',80};
         gD.Padding     = [6 4 6 4];
         gD.RowSpacing  = 4;
 
-        % Row 1: a, h, k, l, substrate dropdown
-        uilabel(gD,'Text','a (Å):','HorizontalAlignment','right');
-        efDa = uieditfield(gD,'numeric','Value',3.905);
-        efDa.Layout.Row=1; efDa.Layout.Column=2;
-        uilabel(gD,'Text','h:','HorizontalAlignment','right');
-        efDh = uieditfield(gD,'numeric','Value',0);
-        efDh.Layout.Row=1; efDh.Layout.Column=4;
-        uilabel(gD,'Text','k:','HorizontalAlignment','right');
-        efDk = uieditfield(gD,'numeric','Value',0);
-        efDk.Layout.Row=1; efDk.Layout.Column=6;
-        uilabel(gD,'Text','l:','HorizontalAlignment','right');
-        efDl = uieditfield(gD,'numeric','Value',1);
-        efDl.Layout.Row=1; efDl.Layout.Column=8;
-
-        % Substrate auto-fill
+        % Row 1: Crystal system, (hkl) preset, substrate
+        uilabel(gD,'Text','System:','HorizontalAlignment','right','FontSize',9);
+        crystalSystems = {'Cubic','Tetragonal','Orthorhombic','Hexagonal', ...
+                          'Trigonal','Monoclinic','Triclinic'};
+        ddDSystem = uidropdown(gD, 'Items', crystalSystems, 'Value', 'Cubic', ...
+            'ValueChangedFcn', @(~,~) onCrystalSystemChanged(), 'FontSize', 9);
+        ddDSystem.Layout.Row=1; ddDSystem.Layout.Column=2;
+        uilabel(gD,'Text','(hkl):','HorizontalAlignment','right','FontSize',9);
+        hklPresets = {'Custom','(001)','(100)','(010)','(110)','(111)', ...
+                      '(200)','(211)','(220)','(311)','(222)','(002)'};
+        ddDHkl = uidropdown(gD, 'Items', hklPresets, 'Value', '(001)', ...
+            'ValueChangedFcn', @(~,~) onHklPresetChanged(), 'FontSize', 9);
+        ddDHkl.Layout.Row=1; ddDHkl.Layout.Column=[4 6];
         subNames = calc.substrates.listSubstrates();
         ddDSub = uidropdown(gD, 'Items', ['(none)', subNames], 'Value', '(none)', ...
-            'ValueChangedFcn', @(~,~) fillDSpacingFromSubstrate());
-        ddDSub.Layout.Row = 1; ddDSub.Layout.Column = 9;
+            'ValueChangedFcn', @(~,~) fillDSpacingFromSubstrate(), 'FontSize', 9);
+        ddDSub.Layout.Row=1; ddDSub.Layout.Column=[7 9];
 
-        % Row 2: b, c, alpha, beta, gamma
-        uilabel(gD,'Text','b (Å):','HorizontalAlignment','right');
-        efDb = uieditfield(gD,'numeric','Value',3.905);
-        efDb.Layout.Row=2; efDb.Layout.Column=2;
-        uilabel(gD,'Text','c (Å):','HorizontalAlignment','right');
-        efDc = uieditfield(gD,'numeric','Value',3.905);
-        efDc.Layout.Row=2; efDc.Layout.Column=4;
-        uilabel(gD,'Text','\alpha:','HorizontalAlignment','right');
-        efDal = uieditfield(gD,'numeric','Value',90);
-        efDal.Layout.Row=2; efDal.Layout.Column=6;
-        uilabel(gD,'Text','\beta:','HorizontalAlignment','right');
-        efDbe = uieditfield(gD,'numeric','Value',90);
-        efDbe.Layout.Row=2; efDbe.Layout.Column=8;
-
-        % Row 3: gamma, result, calculate button
-        uilabel(gD,'Text','\gamma:','HorizontalAlignment','right');
-        efDga = uieditfield(gD,'numeric','Value',90);
-        efDga.Layout.Row=3; efDga.Layout.Column=2;
-        lblDResult = uilabel(gD,'Text','','FontSize',11, ...
-            'Interpreter','html');
-        lblDResult.Layout.Row=3; lblDResult.Layout.Column=[3 8];
+        % Row 2: a, b, c, h, k, l
+        uilabel(gD,'Text',['a(' char(197) '):'],'HorizontalAlignment','right','FontSize',9);
+        efDa = uieditfield(gD,'numeric','Value',3.905);
+        efDa.Layout.Row=2; efDa.Layout.Column=2;
+        uilabel(gD,'Text','h:','HorizontalAlignment','right');
+        efDh = uieditfield(gD,'numeric','Value',0);
+        efDh.Layout.Row=2; efDh.Layout.Column=4;
+        uilabel(gD,'Text','k:','HorizontalAlignment','right');
+        efDk = uieditfield(gD,'numeric','Value',0);
+        efDk.Layout.Row=2; efDk.Layout.Column=6;
+        uilabel(gD,'Text','l:','HorizontalAlignment','right');
+        efDl = uieditfield(gD,'numeric','Value',1);
+        efDl.Layout.Row=2; efDl.Layout.Column=8;
         btnDCalc = uibutton(gD,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
             'ButtonPushedFcn',@(~,~) doDSpacing());
-        btnDCalc.Layout.Row=3; btnDCalc.Layout.Column=9;
+        btnDCalc.Layout.Row=2; btnDCalc.Layout.Column=9;
+
+        % Row 3: b, c, alpha, beta
+        uilabel(gD,'Text',['b(' char(197) '):'],'HorizontalAlignment','right','FontSize',9);
+        efDb = uieditfield(gD,'numeric','Value',3.905);
+        efDb.Layout.Row=3; efDb.Layout.Column=2;
+        uilabel(gD,'Text',['c(' char(197) '):'],'HorizontalAlignment','right','FontSize',9);
+        efDc = uieditfield(gD,'numeric','Value',3.905);
+        efDc.Layout.Row=3; efDc.Layout.Column=4;
+        uilabel(gD,'Text',[char(945) ':'],'HorizontalAlignment','right');
+        efDal = uieditfield(gD,'numeric','Value',90);
+        efDal.Layout.Row=3; efDal.Layout.Column=6;
+        uilabel(gD,'Text',[char(946) ':'],'HorizontalAlignment','right');
+        efDbe = uieditfield(gD,'numeric','Value',90);
+        efDbe.Layout.Row=3; efDbe.Layout.Column=8;
+
+        % Row 4: gamma, result
+        uilabel(gD,'Text',[char(947) ':'],'HorizontalAlignment','right');
+        efDga = uieditfield(gD,'numeric','Value',90);
+        efDga.Layout.Row=4; efDga.Layout.Column=2;
+        lblDResult = uilabel(gD,'Text','','FontSize',11, ...
+            'Interpreter','html');
+        lblDResult.Layout.Row=4; lblDResult.Layout.Column=[3 9];
+
+        % Apply default constraints for Cubic
+        onCrystalSystemChanged();
+
+        function onCrystalSystemChanged()
+        %ONCRYSTALSYSTEMCHANGED  Constrain lattice parameters for selected system.
+            sys = ddDSystem.Value;
+            % Reset enables
+            efDb.Enable = 'on'; efDc.Enable = 'on';
+            efDal.Enable = 'on'; efDbe.Enable = 'on'; efDga.Enable = 'on';
+            switch sys
+                case 'Cubic'
+                    efDb.Value = efDa.Value; efDc.Value = efDa.Value;
+                    efDal.Value = 90; efDbe.Value = 90; efDga.Value = 90;
+                    efDb.Enable = 'off'; efDc.Enable = 'off';
+                    efDal.Enable = 'off'; efDbe.Enable = 'off'; efDga.Enable = 'off';
+                case 'Tetragonal'
+                    efDb.Value = efDa.Value;
+                    efDal.Value = 90; efDbe.Value = 90; efDga.Value = 90;
+                    efDb.Enable = 'off';
+                    efDal.Enable = 'off'; efDbe.Enable = 'off'; efDga.Enable = 'off';
+                case 'Orthorhombic'
+                    efDal.Value = 90; efDbe.Value = 90; efDga.Value = 90;
+                    efDal.Enable = 'off'; efDbe.Enable = 'off'; efDga.Enable = 'off';
+                case 'Hexagonal'
+                    efDb.Value = efDa.Value;
+                    efDal.Value = 90; efDbe.Value = 90; efDga.Value = 120;
+                    efDb.Enable = 'off';
+                    efDal.Enable = 'off'; efDbe.Enable = 'off'; efDga.Enable = 'off';
+                case 'Trigonal'
+                    efDb.Value = efDa.Value; efDc.Value = efDa.Value;
+                    efDbe.Value = efDal.Value; efDga.Value = efDal.Value;
+                    efDb.Enable = 'off'; efDc.Enable = 'off';
+                    efDbe.Enable = 'off'; efDga.Enable = 'off';
+                case 'Monoclinic'
+                    efDal.Value = 90; efDga.Value = 90;
+                    efDal.Enable = 'off'; efDga.Enable = 'off';
+                case 'Triclinic'
+                    % All parameters free
+            end
+        end
+
+        function onHklPresetChanged()
+        %ONHKLPRESETCHANGED  Fill h, k, l from the selected preset.
+            sel = ddDHkl.Value;
+            if strcmp(sel, 'Custom'), return; end
+            % Parse (hkl) string: "(110)" → h=1, k=1, l=0
+            digits = sel(sel >= '0' & sel <= '9');
+            if numel(digits) >= 3
+                efDh.Value = str2double(digits(1));
+                efDk.Value = str2double(digits(2));
+                efDl.Value = str2double(digits(3));
+            end
+        end
 
         function fillDSpacingFromSubstrate()
             sel = ddDSub.Value;
@@ -395,6 +461,10 @@ end
                 efDal.Value = s.alpha;
                 efDbe.Value = s.beta;
                 efDga.Value = s.gamma;
+                % Auto-detect crystal system from loaded parameters
+                sys = inferCrystalSystem(s.a, s.b, s.c, s.alpha, s.beta, s.gamma);
+                ddDSystem.Value = sys;
+                onCrystalSystemChanged();
             catch; end
         end
 
@@ -414,7 +484,7 @@ end
         end
 
         % ── Card 2: 2θ ↔ d ────────────────────────────────────────────
-        p2T = uipanel(gl, 'Title', '2\theta \leftrightarrow d', 'FontWeight', 'bold');
+        p2T = uipanel(gl, 'Title', ['2' char(952) ' ' char(8596) ' d'], 'FontWeight', 'bold');
         p2T.Layout.Row = 2; p2T.Layout.Column = 1;
 
         g2T = uigridlayout(p2T);
@@ -426,15 +496,15 @@ end
         uilabel(g2T,'Text','Value:','HorizontalAlignment','right');
         ef2TVal = uieditfield(g2T,'numeric','Value',20);
         ef2TVal.Layout.Row=1; ef2TVal.Layout.Column=2;
-        uilabel(g2T,'Text','\lambda (Å):','HorizontalAlignment','right');
+        uilabel(g2T,'Text',[char(955) ' (' char(197) '):'],'HorizontalAlignment','right');
         ef2TLam = uieditfield(g2T,'numeric','Value',1.5406);
         ef2TLam.Layout.Row=1; ef2TLam.Layout.Column=4;
-        btn2TtoD = uibutton(g2T,'push','Text','2\theta \rightarrow d', ...
-            'BackgroundColor',BTN_TOOL, ...
+        btn2TtoD = uibutton(g2T,'push','Text',['2' char(952) ' ' char(8594) ' d'], ...
+            'BackgroundColor',[0.28 0.28 0.28],'FontColor',[0.9 0.9 0.9], ...
             'ButtonPushedFcn',@(~,~) do2ThetaToD());
         btn2TtoD.Layout.Row=1; btn2TtoD.Layout.Column=5;
-        btnDTo2T = uibutton(g2T,'push','Text','d \rightarrow 2\theta', ...
-            'BackgroundColor',BTN_TOOL, ...
+        btnDTo2T = uibutton(g2T,'push','Text',['d ' char(8594) ' 2' char(952)], ...
+            'BackgroundColor',[0.28 0.28 0.28],'FontColor',[0.9 0.9 0.9], ...
             'ButtonPushedFcn',@(~,~) doDTo2Theta());
         btnDTo2T.Layout.Row=1; btnDTo2T.Layout.Column=6;
 
@@ -739,7 +809,7 @@ end
         gRS.Padding     = [6 4 6 4];
         gRS.RowSpacing  = 4;
 
-        uilabel(gRS,'Text','R_s (\Omega/\sq):','HorizontalAlignment','right');
+        uilabel(gRS,'Text',['Rs (' char(937) '/sq):'],'HorizontalAlignment','right');
         efRsVal = uieditfield(gRS,'numeric','Value',100);
         efRsVal.Layout.Row=1; efRsVal.Layout.Column=2;
         uilabel(gRS,'Text','t (nm):','HorizontalAlignment','right');
@@ -750,12 +820,12 @@ end
             'Interpreter','html');
         lblRsResult.Layout.Row=2; lblRsResult.Layout.Column=[1 4];
 
-        btnRsToRho = uibutton(gRS,'push','Text','R_s \rightarrow \rho', ...
-            'BackgroundColor',BTN_TOOL, ...
+        btnRsToRho = uibutton(gRS,'push','Text',['Rs ' char(8594) ' ' char(961)], ...
+            'BackgroundColor',[0.28 0.28 0.28],'FontColor',[0.9 0.9 0.9], ...
             'ButtonPushedFcn',@(~,~) doRsToRho());
         btnRsToRho.Layout.Row=2; btnRsToRho.Layout.Column=5;
 
-        uilabel(gRS,'Text','\rho (\Omega\cdotcm):','HorizontalAlignment','right');
+        uilabel(gRS,'Text',[char(961) ' (' char(937) char(183) 'cm):'],'HorizontalAlignment','right');
         efRhoVal = uieditfield(gRS,'numeric','Value',1e-4);
         efRhoVal.Layout.Row=3; efRhoVal.Layout.Column=2;
 
@@ -763,8 +833,8 @@ end
             'Interpreter','html');
         lblRhoResult.Layout.Row=3; lblRhoResult.Layout.Column=[3 4];
 
-        btnRhoToRs = uibutton(gRS,'push','Text','\rho \rightarrow R_s', ...
-            'BackgroundColor',BTN_TOOL, ...
+        btnRhoToRs = uibutton(gRS,'push','Text',[char(961) ' ' char(8594) ' Rs'], ...
+            'BackgroundColor',[0.28 0.28 0.28],'FontColor',[0.9 0.9 0.9], ...
             'ButtonPushedFcn',@(~,~) doRhoToRs());
         btnRhoToRs.Layout.Row=3; btnRhoToRs.Layout.Column=5;
 
@@ -805,7 +875,7 @@ end
         gCond.Padding     = [6 4 6 4];
         gCond.RowSpacing  = 4;
 
-        uilabel(gCond,'Text','\rho (\Omega\cdotcm):','HorizontalAlignment','right');
+        uilabel(gCond,'Text',[char(961) ' (' char(937) char(183) 'cm):'],'HorizontalAlignment','right');
         efCondRho = uieditfield(gCond,'numeric','Value',1e-4);
         efCondRho.Layout.Row=1; efCondRho.Layout.Column=2;
         btnCondCalc = uibutton(gCond,'push','Text','Calculate', ...
@@ -840,7 +910,7 @@ end
         gMob.Padding     = [6 4 6 4];
         gMob.RowSpacing  = 4;
 
-        uilabel(gMob,'Text','\rho (\Omega\cdotcm):','HorizontalAlignment','right');
+        uilabel(gMob,'Text',[char(961) ' (' char(937) char(183) 'cm):'],'HorizontalAlignment','right');
         efMobRho = uieditfield(gMob,'numeric','Value',1e-2);
         efMobRho.Layout.Row=1; efMobRho.Layout.Column=2;
         uilabel(gMob,'Text','n (cm\^-3):','HorizontalAlignment','right');
@@ -1059,7 +1129,7 @@ end
         uilabel(gDep,'Text','Material:','HorizontalAlignment','right');
         ddDepMat = uidropdown(gDep,'Items',['(manual)',matNames],'Value','Si');
         ddDepMat.Layout.Row=1; ddDepMat.Layout.Column=2;
-        uilabel(gDep,'Text','\epsilon_r:','HorizontalAlignment','right');
+        uilabel(gDep,'Text',[char(949) char(8339) ':'],'HorizontalAlignment','right');
         efDepEps = uieditfield(gDep,'numeric','Value',11.7);
         efDepEps.Layout.Row=1; efDepEps.Layout.Column=4;
 
@@ -1124,7 +1194,7 @@ end
         gTrans.Padding     = [6 4 6 4];
         gTrans.RowSpacing  = 4;
 
-        uilabel(gTrans,'Text','\mu (cm\xb2/V\xb7s):','HorizontalAlignment','right');
+        uilabel(gTrans,'Text',[char(956) ' (cm' char(178) '/V' char(183) 's):'],'HorizontalAlignment','right');
         efTransMu = uieditfield(gTrans,'numeric','Value',1400);
         efTransMu.Layout.Row=1; efTransMu.Layout.Column=2;
         uilabel(gTrans,'Text','\tau (s):','HorizontalAlignment','right');
@@ -1238,7 +1308,7 @@ end
         gKT.Padding     = [6 4 6 4];
         gKT.RowSpacing  = 4;
 
-        uilabel(gKT,'Text','\DeltaQ (Å\^{-1}):','HorizontalAlignment','right');
+        uilabel(gKT,'Text',[char(916) 'Q (' char(197) char(8315) char(185) '):'],'HorizontalAlignment','right');
         efKTdQ = uieditfield(gKT,'numeric','Value',0.1);
         efKTdQ.Layout.Row=1; efKTdQ.Layout.Column=2;
         btnKTCalc = uibutton(gKT,'push','Text','Calculate', ...
@@ -1276,10 +1346,10 @@ end
         uilabel(gSS,'Text','Es (GPa):','HorizontalAlignment','right');
         efSSEs = uieditfield(gSS,'numeric','Value',130);
         efSSEs.Layout.Row=1; efSSEs.Layout.Column=2;
-        uilabel(gSS,'Text','\nus:','HorizontalAlignment','right');
+        uilabel(gSS,'Text',[char(957) 's:'],'HorizontalAlignment','right');
         efSSNus = uieditfield(gSS,'numeric','Value',0.28);
         efSSNus.Layout.Row=1; efSSNus.Layout.Column=4;
-        uilabel(gSS,'Text','ts (\mum):','HorizontalAlignment','right');
+        uilabel(gSS,'Text',['ts (' char(956) 'm):'],'HorizontalAlignment','right');
         efSSts = uieditfield(gSS,'numeric','Value',500);
         efSSts.Layout.Row=1; efSSts.Layout.Column=6;
 
@@ -1326,10 +1396,10 @@ end
         gTM.Padding     = [6 4 6 4];
         gTM.RowSpacing  = 4;
 
-        uilabel(gTM,'Text','\alpha film (1/K):','HorizontalAlignment','right');
+        uilabel(gTM,'Text',[char(945) ' film (1/K):'],'HorizontalAlignment','right');
         efTMAlF = uieditfield(gTM,'numeric','Value',17e-6);
         efTMAlF.Layout.Row=1; efTMAlF.Layout.Column=2;
-        uilabel(gTM,'Text','\alpha sub (1/K):','HorizontalAlignment','right');
+        uilabel(gTM,'Text',[char(945) ' sub (1/K):'],'HorizontalAlignment','right');
         efTMAlS = uieditfield(gTM,'numeric','Value',3e-6);
         efTMAlS.Layout.Row=1; efTMAlS.Layout.Column=4;
 
@@ -1337,13 +1407,13 @@ end
             'ValueChangedFcn',@(~,~) fillTMSubstrate());
         ddTMSub.Layout.Row=1; ddTMSub.Layout.Column=6;
 
-        uilabel(gTM,'Text','\DeltaT (K):','HorizontalAlignment','right');
+        uilabel(gTM,'Text',[char(916) 'T (K):'],'HorizontalAlignment','right');
         efTMdT = uieditfield(gTM,'numeric','Value',-500);
         efTMdT.Layout.Row=2; efTMdT.Layout.Column=2;
         uilabel(gTM,'Text','E (GPa):','HorizontalAlignment','right');
         efTME = uieditfield(gTM,'numeric','Value',200);
         efTME.Layout.Row=2; efTME.Layout.Column=4;
-        uilabel(gTM,'Text','\nu:','HorizontalAlignment','right');
+        uilabel(gTM,'Text',[char(957) ':'],'HorizontalAlignment','right');
         efTMNu = uieditfield(gTM,'numeric','Value',0.28);
         efTMNu.Layout.Row=2; efTMNu.Layout.Column=6;
 
@@ -1733,7 +1803,7 @@ end
         end
 
         % ── Card 3: Q ↔ 2θ Converter ────────────────────────────────
-        pQ2T = uipanel(gl,'Title','Q / 2\theta Converter','FontWeight','bold');
+        pQ2T = uipanel(gl,'Title',['Q / 2' char(952) ' Converter'],'FontWeight','bold');
         pQ2T.Layout.Row = 3; pQ2T.Layout.Column = 1;
 
         gQ2T = uigridlayout(pQ2T);
@@ -2872,4 +2942,26 @@ for k = 1:n
     entries(k).row    = raw{k,2};
     entries(k).col    = raw{k,3};
 end
+end
+
+
+function sys = inferCrystalSystem(a, b, c, alpha, beta, gamma)
+%INFERCRYSTALSYSTEM  Determine crystal system from lattice parameters.
+    tol = 0.01;  % tolerance for float comparison
+    eq = @(x, y) abs(x - y) < tol;
+    if eq(a,b) && eq(b,c) && eq(alpha,90) && eq(beta,90) && eq(gamma,90)
+        sys = 'Cubic';
+    elseif eq(a,b) && eq(alpha,90) && eq(beta,90) && eq(gamma,120)
+        sys = 'Hexagonal';
+    elseif eq(a,b) && eq(b,c) && eq(alpha,beta) && eq(beta,gamma) && ~eq(alpha,90)
+        sys = 'Trigonal';
+    elseif eq(a,b) && eq(alpha,90) && eq(beta,90) && eq(gamma,90)
+        sys = 'Tetragonal';
+    elseif eq(alpha,90) && eq(beta,90) && eq(gamma,90)
+        sys = 'Orthorhombic';
+    elseif eq(alpha,90) && eq(gamma,90)
+        sys = 'Monoclinic';
+    else
+        sys = 'Triclinic';
+    end
 end
