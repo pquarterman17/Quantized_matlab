@@ -2955,9 +2955,21 @@ function varargout = emViewerGUI()
                         addToRecentFiles(fp);
                         loadedAny = true;
 
+                    case '.ser'
+                        data = parser.importSER(fp);
+                        appendImage(data);
+                        addToRecentFiles(fp);
+                        loadedAny = true;
+
+                    case {'.mrc', '.mrcs'}
+                        data = parser.importMRC(fp);
+                        appendImage(data);
+                        addToRecentFiles(fp);
+                        loadedAny = true;
+
                     otherwise
                         uialert(fig, ...
-                            sprintf('Unsupported file format: "%s"\n\nSupported: .tif, .tiff, .jpg, .png, .bcf, .raw, .dm3, .dm4', ext), ...
+                            sprintf('Unsupported file format: "%s"\n\nSupported: .tif, .tiff, .jpg, .png, .bcf, .raw, .dm3, .dm4, .ser, .mrc', ext), ...
                             'Unsupported Format', 'Icon', 'warning');
                 end
             catch ME
@@ -3111,6 +3123,14 @@ function varargout = emViewerGUI()
                             loadedAny = true;
                         case '.dm4'
                             data = parser.importDM4(fp);
+                            appendImage(data);
+                            loadedAny = true;
+                        case '.ser'
+                            data = parser.importSER(fp);
+                            appendImage(data);
+                            loadedAny = true;
+                        case {'.mrc', '.mrcs'}
+                            data = parser.importMRC(fp);
                             appendImage(data);
                             loadedAny = true;
                         case '.raw'
