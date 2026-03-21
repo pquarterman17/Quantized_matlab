@@ -137,6 +137,9 @@ classdef AppState < handle
         % ── Overlay mode ───────────────────────────────────────────
         overlayMode      char   = 'overlay'
 
+        % ── Waterfall gradient ─────────────────────────────────────
+        wfGradient       logical = false
+
         % ── Animation timer ────────────────────────────────────────
         animTimer                 = []
 

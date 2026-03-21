@@ -107,6 +107,7 @@ SUITES = {
     T('fitting','test_reflectivity'),    'fitting', 'Parratt reflectivity, SLD profile, material presets'
     T('fitting','test_hysteresis'),     'fitting', 'Hysteresis loop analysis: Hc, Mr, Ms, SFD, models'
     T('fitting','test_polar'),          'fitting', 'Polar plots for angular-dependent measurements'
+    T('fitting','test_globalfit'),      'fitting', 'Global/shared-parameter fitting'
 };
 
 % Filter by group

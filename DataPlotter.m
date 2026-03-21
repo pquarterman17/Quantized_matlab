@@ -533,9 +533,9 @@ function varargout = DataPlotter()
     wfGL.Layout.Row = 6;
 
     cbWaterfall = uicheckbox(wfGL, ...
-        'Text',    'Waterfall', ...
+        'Text',    'WF', ...
         'Value',   false, ...
-        'Tooltip', 'Stack datasets vertically with a uniform Y offset between them', ...
+        'Tooltip', 'Waterfall: stack datasets vertically with a uniform Y offset', ...
         'ValueChangedFcn', @(~,~) onWaterfallToggled());
     cbWaterfall.Layout.Column = 1;
 
@@ -544,6 +544,9 @@ function varargout = DataPlotter()
         'Tooltip',         'Spacing between stacked traces in data units — blank = auto (1.1× max data range)', ...
         'ValueChangedFcn', @(~,~) onPlot([],[]));
     efWaterfallSpacing.Layout.Column = 2;
+
+    % Waterfall gradient coloring (stored in appData, no separate widget)
+    appData.wfGradient = false;
 
     % Row 7: Cts/s + Refresh
     miscGL = uigridlayout(ctrlGL,[1 2], ...
@@ -641,7 +644,9 @@ function varargout = DataPlotter()
             'MenuSelectedFcn', @(~,~) onCopyDataToClipboard([], []));
         uimenu(cmAxes, 'Text', 'Export Visible Range...', ...
             'MenuSelectedFcn', @(~,~) onExportVisibleRange());
-        uimenu(cmAxes, 'Text', 'Clear Fit Overlays', 'Separator', 'on', ...
+        uimenu(cmAxes, 'Text', 'Toggle Waterfall Gradient', 'Separator', 'on', ...
+            'MenuSelectedFcn', @(~,~) toggleWfGradient());
+        uimenu(cmAxes, 'Text', 'Clear Fit Overlays', ...
             'MenuSelectedFcn', @(~,~) onClearFitOverlays());
 
         ax.ContextMenu = cmAxes;
@@ -9025,7 +9030,25 @@ function varargout = DataPlotter()
             % Right-axis indices: nDS*nY     + (si-1)*nY2 + k
             colormapName = ddColormap.Value;
             nColors = max(nDS * (nY + nY2), 1);
-            colors = getColorsFromMap(colormapName, nColors);
+            useWfGradient = cbWaterfall.Value && appData.wfGradient && nDS > 1;
+            if useWfGradient
+                % Gradient mode: one color per dataset from cool→warm colormap
+                gradCmap = interp1([0 0.5 1], ...
+                    [0.23 0.30 0.75; 0.87 0.87 0.87; 0.71 0.02 0.15], ...
+                    linspace(0, 1, nDS)', 'pchip');  % coolwarm diverging
+                % Expand: each dataset's nY channels get the same color
+                colors = zeros(nColors, 3);
+                for gi = 1:nDS
+                    for gk = 1:nY
+                        colors((gi-1)*nY + gk, :) = gradCmap(gi, :);
+                    end
+                    for gk = 1:nY2
+                        colors(nDS*nY + (gi-1)*nY2 + gk, :) = gradCmap(gi, :);
+                    end
+                end
+            else
+                colors = getColorsFromMap(colormapName, nColors);
+            end
 
             % ── Draw ──────────────────────────────────────────────────────
             % Peak markers and zoom rect use HandleVisibility='off' so ax.Children may
@@ -9414,7 +9437,7 @@ function varargout = DataPlotter()
                         end
                         % Auto-detect error column for this y-channel (#4, #17)
                         errIdx = findErrorColumn(primaryD.labels, ySel{k});
-                        if ~isempty(errIdx) && ~waterfallOn
+                        if ~isempty(errIdx)
                             yErr = primaryD.values(:, errIdx);
                             if ctFactor > 0, yErr = yErr / ctFactor; end
                             yErrGood = yErr(good);
@@ -11456,6 +11479,17 @@ function varargout = DataPlotter()
     end
 
     % ── Waterfall helpers ────────────────────────────────────────────────
+
+    function toggleWfGradient()
+    %TOGGLEWFGRADIENT  Toggle waterfall gradient coloring on/off.
+        appData.wfGradient = ~appData.wfGradient;
+        if appData.wfGradient
+            setStatus('Waterfall gradient: ON (blue→red by dataset position)');
+        else
+            setStatus('Waterfall gradient: OFF');
+        end
+        onPlot([],[]);
+    end
 
     function onWaterfallToggled()
     %ONWATERFALLTOGGLED  When waterfall is checked, seed the spacing field
