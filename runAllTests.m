@@ -106,6 +106,7 @@ SUITES = {
     T('fitting','test_phase8_qol'),      'fitting', 'Phase 8: composer, action log, 3D surface, dataset groups'
     T('fitting','test_reflectivity'),    'fitting', 'Parratt reflectivity, SLD profile, material presets'
     T('fitting','test_hysteresis'),     'fitting', 'Hysteresis loop analysis: Hc, Mr, Ms, SFD, models'
+    T('fitting','test_polar'),          'fitting', 'Polar plots for angular-dependent measurements'
 };
 
 % Filter by group
