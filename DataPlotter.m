@@ -231,71 +231,19 @@ function varargout = DataPlotter()
 %   parser.importAuto, parser.resolveParser, +parser/README.md,
 %   xrdConvertGUI, test_gui_harness
 
-    % ── Shared application state ─────────────────────────────────────────
-    % Each element of appData.datasets is a struct with fields:
-    %   .data       — parsed data struct (from guiImport)
-    %   .filepath   — full path to the source file
-    %   .parserName — name of the parser that was used
-    %   .corrData   — corrected data struct ([] = not yet applied)
-    %   .xOff / .yOff / .bgSlope / .bgInt — stored correction params
-    appData.datasets   = {};   % cell array of dataset structs
-    appData.activeIdx  = 0;    % 1-based index into datasets; 0 = none loaded
-    appData.style      = 'Line';
-    appData.bgXVecRaw   = [];
-    appData.bgStartPt   = [];
-    appData.bgRectPatch = [];
-    appData.lastDir       = '';
-    appData.yOriginClickCount = 0;
-    appData.yOriginPt1        = [];
-    appData.yOriginMarker     = [];
-    appData.yTranslateY0      = [];   % y-coord of mouse-down during Y-translate drag
-    appData.yTranslateOff0    = 0;    % efYOffset value at start of drag
-    appData.peakPickMode      = false;
-    appData.peakRemoveMode    = false;
-    appData.selectedPeakIdx   = 0;    % row highlighted in peakTable (0 = none)
-    appData.zoomStartPt       = [];        % [x y] data coords where drag-zoom began
-    appData.zoomRectPatch     = [];        % patch handle for the rubber-band rectangle
-    appData.maskStartPt       = [];        % [x y] data coords where mask drag began
-    appData.maskRectPatch     = [];        % patch handle for mask rubber-band rectangle
-    appData.fringeClickCount  = 0;         % 0, 1, or 2 — fringe thickness pick state
-    appData.fringeMarkers     = [];        % [2x1] line handles for draggable markers
-    appData.fringeAnnotation  = [];        % text handle showing thickness readout
-    appData.fringeQ           = [NaN NaN]; % Q values of the two picked fringe peaks
-    appData.fringeDragIdx     = 0;         % which marker (1 or 2) is being dragged
-    appData.lastClickTic      = uint64(0); % tic timestamp of last ax click (double-click detection)
-    appData.cursorText        = [];        % text handle for x,y hover readout (top-right of axes)
-    appData.bgDataset         = [];        % background data struct loaded via importAuto (or [])
-    appData.bgFile            = '';        % short filename of background dataset for display
-    appData.axisPrefixX       = struct('symbol','','factor',1);  % SI prefix for X-axis
-    appData.axisPrefixY       = struct('symbol','','factor',1);  % SI prefix for Y-axis
-    appData.macroLog          = dataplotter.actionLog();  % macro recorder
-    appData.macroRecording    = false;                   % true when recording
-    appData.showFitCurves     = true;               % toggle Lorentzian fit overlay on/off
-    appData.showSnipBg        = true;               % toggle SNIP background overlay on/off
-    appData.fitCurveColor     = [0.85 0.20 0.00];   % default warm red-orange
-    appData.kFactor           = 0.9;                % Scherrer shape factor K (0.9 spherical default)
-    appData.instBroadening_deg = 0;                 % Instrument broadening FWHM (°); 0 = uncorrected
-    appData.peakMode          = 'none';  % 'xrd' | 'reflectometry' | 'none'
-    appData.panelResizeDir    = '';   % '' | 'h_row12' | 'v_col12'
-    appData.panelResizeStart  = [];   % [mousePixX, mousePixY] at resize drag start
-    appData.panelResizeOrig   = [];   % panel dimension (px) at resize drag start
-    appData.corrPanelWidth    = 320;  % user-resized corrections column width (px)
-    appData.axLimPanelWidth   = 200;  % user-resized axes+appearance column width (px)
+    % ── Shared application state (handle class — pass-by-reference) ──────
+    % Using a handle class enables extracted +dataplotter/ functions to
+    % mutate state without return-value gymnastics.  All existing
+    % appData.X references work unchanged (same dot-syntax as struct).
+    appData = dataplotter.AppState();
 
-    % ── Minimum panel dimensions for drag-resize ──
-    appData.MIN_CORR_W     = 280;   % corrections panel minimum width (px)
-    appData.MIN_AXLIM_W    = 180;   % axes & appearance panel minimum width
-    % (MIN_SAVE_W removed — save panel is now in rootGL row 3, not analysisGL)
-    appData.MIN_PREVIEW_H  = 150;   % preview row (rootGL row 1) minimum height
-    appData.MIN_ANALYSIS_H = 180;   % analysis row (rootGL row 2) minimum height
-    appData.listDragSrcIdx    = 0;    % source row being dragged in lbDatasets (0 = none)
-    appData.listDragActive    = false; % true once mouse has moved > threshold after listbox down
-    appData.listDragStartPt   = [];   % [x y] fig-pixel position at listbox mouse-down
-    appData.searchFilter      = '';   % dataset list search string (empty = show all)
-    % ── Line caching for performance (soft-update path for color/visibility) ──
-    appData.lineCache.valid   = false; % false = cache stale, use full redraw
-    appData.lineCache.left    = {};    % {nDS × nY} line handles (left axis)
-    appData.lineCache.right   = {};    % {nDS × nY2} line handles (right axis)
+    % Fields with non-default values (overriding AppState property defaults)
+    appData.style      = 'Line';
+    appData.fringeQ    = [NaN NaN];
+    appData.macroLog   = dataplotter.actionLog();
+
+    % ── Line caching for performance (nested struct as property) ──
+    appData.lineCache  = struct('valid', false, 'left', {{}}, 'right', {{}});
 
     % ── Figure ───────────────────────────────────────────────────────────
     % Detect available screen size and fit the window to it
@@ -3058,7 +3006,7 @@ function varargout = DataPlotter()
     function onToggleAnimation(~,~)
     %ONTOGGLEANIMATION  Start/stop cycling through datasets as animation frames.
     %  Uses a MATLAB timer at ~2 fps to step through each dataset in sequence.
-        if isfield(appData, 'animTimer') && ~isempty(appData.animTimer) && isvalid(appData.animTimer)
+        if isprop(appData, 'animTimer') && ~isempty(appData.animTimer) && isvalid(appData.animTimer)
             % Stop animation
             stop(appData.animTimer);
             delete(appData.animTimer);
@@ -9020,7 +8968,7 @@ function varargout = DataPlotter()
 
         if cbCalculateAsymmetry.Value
             % Asymmetry enabled: store previous log state and hide PNR data
-            if ~isfield(appData, 'asymmetryPrevLogY')
+            if ~isprop(appData, 'asymmetryPrevLogY')
                 appData.asymmetryPrevLogY = strcmp(ddScaleY.Value, 'Log');
             end
             ddScaleY.Value = 'Linear';  % Switch to linear scale
@@ -9043,7 +8991,7 @@ function varargout = DataPlotter()
             end
 
             % Restore previous log Y state if we stored it
-            if isfield(appData, 'asymmetryPrevLogY')
+            if isprop(appData, 'asymmetryPrevLogY')
                 if appData.asymmetryPrevLogY, ddScaleY.Value = 'Log'; else, ddScaleY.Value = 'Linear'; end
             end
         end
@@ -11016,7 +10964,7 @@ function varargout = DataPlotter()
     function onFigureClose(~,~)
     %ONFIGURECLOSE  Clean up resources before closing the GUI figure.
         % Stop and delete animation timer if running
-        if isfield(appData, 'animTimer') && ~isempty(appData.animTimer)
+        if isprop(appData, 'animTimer') && ~isempty(appData.animTimer)
             if isvalid(appData.animTimer)
                 stop(appData.animTimer);
                 delete(appData.animTimer);
@@ -12022,7 +11970,7 @@ function varargout = DataPlotter()
         insetW = axPos(3) * 0.35;
         insetH = axPos(4) * 0.35;
         insetPos = [axPos(1)+axPos(3)-insetW-20, axPos(2)+axPos(4)-insetH-20, insetW, insetH];
-        if isfield(appData, 'insetAx') && ~isempty(appData.insetAx) && isvalid(appData.insetAx)
+        if isprop(appData, 'insetAx') && ~isempty(appData.insetAx) && isvalid(appData.insetAx)
             delete(appData.insetAx);
         end
         insetAx = axes(fig, 'Units', 'pixels', 'Position', insetPos);
@@ -12043,26 +11991,26 @@ function varargout = DataPlotter()
     %ONTOGGLEDATACURSOR  Toggle interactive data cursor mode.
     %  Click on plot to snap to nearest data point and show (x,y).
     %  Click a second point to show delta.  Click button again to exit.
-        if ~isfield(appData, 'cursorActive'), appData.cursorActive = false; end
+        if ~isprop(appData, 'cursorActive'), appData.cursorActive = false; end
         if appData.cursorActive
             % Deactivate cursor
             appData.cursorActive = false;
             btnDataCursor.BackgroundColor = BTN_TOOL;
             fig.WindowButtonDownFcn = @onAxesButtonDown;
             % Remove cursor graphics
-            if isfield(appData, 'cursorMarker') && isvalid(appData.cursorMarker)
+            if isprop(appData, 'cursorMarker') && isvalid(appData.cursorMarker)
                 delete(appData.cursorMarker);
             end
-            if isfield(appData, 'cursorLabel') && isvalid(appData.cursorLabel)
+            if isprop(appData, 'cursorLabel') && isvalid(appData.cursorLabel)
                 delete(appData.cursorLabel);
             end
-            if isfield(appData, 'cursorMarker2') && isvalid(appData.cursorMarker2)
+            if isprop(appData, 'cursorMarker2') && isvalid(appData.cursorMarker2)
                 delete(appData.cursorMarker2);
             end
-            if isfield(appData, 'cursorDeltaLabel') && isvalid(appData.cursorDeltaLabel)
+            if isprop(appData, 'cursorDeltaLabel') && isvalid(appData.cursorDeltaLabel)
                 delete(appData.cursorDeltaLabel);
             end
-            if isfield(appData, 'cursorLine') && isvalid(appData.cursorLine)
+            if isprop(appData, 'cursorLine') && isvalid(appData.cursorLine)
                 delete(appData.cursorLine);
             end
             appData.cursorClickCount = 0;
@@ -12118,20 +12066,20 @@ function varargout = DataPlotter()
 
         if appData.cursorClickCount == 1
             % First click: show point
-            if isfield(appData, 'cursorMarker') && isvalid(appData.cursorMarker)
+            if isprop(appData, 'cursorMarker') && isvalid(appData.cursorMarker)
                 delete(appData.cursorMarker);
             end
-            if isfield(appData, 'cursorLabel') && isvalid(appData.cursorLabel)
+            if isprop(appData, 'cursorLabel') && isvalid(appData.cursorLabel)
                 delete(appData.cursorLabel);
             end
             % Clean up any previous second-click graphics
-            if isfield(appData, 'cursorMarker2') && isvalid(appData.cursorMarker2)
+            if isprop(appData, 'cursorMarker2') && isvalid(appData.cursorMarker2)
                 delete(appData.cursorMarker2);
             end
-            if isfield(appData, 'cursorDeltaLabel') && isvalid(appData.cursorDeltaLabel)
+            if isprop(appData, 'cursorDeltaLabel') && isvalid(appData.cursorDeltaLabel)
                 delete(appData.cursorDeltaLabel);
             end
-            if isfield(appData, 'cursorLine') && isvalid(appData.cursorLine)
+            if isprop(appData, 'cursorLine') && isvalid(appData.cursorLine)
                 delete(appData.cursorLine);
             end
 
@@ -13254,7 +13202,7 @@ function varargout = DataPlotter()
     %ONOVERLAYCHANGED  Toggle multi-dataset overlay mode.
     %  When enabled, selects ALL loaded datasets in the listbox so they
     %  are all plotted simultaneously with a unified legend.
-        if ~isfield(appData, 'overlayMode'), appData.overlayMode = false; end
+        if ~isprop(appData, 'overlayMode'), appData.overlayMode = false; end
         appData.overlayMode = cbOverlayMode.Value;
         if appData.overlayMode && numel(appData.datasets) > 1
             % Select all datasets in the listbox
