@@ -2395,7 +2395,16 @@ function varargout = emViewerGUI()
         deselectMeasurement();
 
         dataStruct = appData.images{appData.activeIdx};
-        imgInfo    = dataStruct.metadata.parserSpecific.imageData;
+        ps = dataStruct.metadata.parserSpecific;
+
+        % Skip non-image data (e.g. 1D spectra from DM3/DM4)
+        if ~isfield(ps, 'imageData') || ~isfield(ps, 'isImage') || ~ps.isImage
+            clearDisplay();
+            setStatus('Selected file is a spectrum, not an image.');
+            return;
+        end
+
+        imgInfo    = ps.imageData;
         pixels     = imgInfo.pixels;
 
         % Convert to grayscale double (raw, unprocessed)
