@@ -49,6 +49,22 @@ fid = fopen(cifPath, 'w');
 fprintf(fid, cifText);
 fclose(fid);
 
+% ── Smoke test: verify importCIF completes (detects infinite-loop bugs) ──
+fprintf('== SMOKE: importCIF completes ==\n');
+cifSmokeT0 = tic;
+try
+    r0 = calc.importCIF(cifPath);
+    smokeTime = toc(cifSmokeT0);
+    if smokeTime > 5
+        error('test_cif_parser:timeout', 'importCIF took %.1f s (>5 s limit).', smokeTime);
+    end
+    fprintf('  OK (%.2f s)\n', smokeTime);
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    fprintf('\n=== Results: 0 passed, 1 failed ===\n');
+    error('test_cif_parser:smokeTestFailed', 'importCIF smoke test failed: %s', ME.message);
+end
+
 % ── TEST 1: Parse CIF file ──────────────────────────────────────────
 fprintf('== TEST 1: Parse CIF file ==\n');
 try

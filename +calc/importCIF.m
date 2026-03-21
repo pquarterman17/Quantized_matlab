@@ -216,8 +216,6 @@ function [tag, value, i] = parseTagValue(lines, i, nLines)
                     line2 = strtrim(line2(1:commentPos-1));
                 end
                 value = extractSingleValue(line2);
-                % i will be incremented by caller after return
-                i = i - 1;  % caller does i+1, so pre-decrement
             end
         end
     elseif ~isempty(value) && value(1) == ';'
@@ -225,7 +223,6 @@ function [tag, value, i] = parseTagValue(lines, i, nLines)
         [value, i] = readSemicolonBlock(lines, i, nLines);
     else
         value = extractSingleValue(value);
-        i = i - 1;  % caller does i+1
     end
 end
 
@@ -255,21 +252,32 @@ end
 % ────────────────────────────────────────────────────────────────────
 
 function val = extractSingleValue(token)
-%EXTRACTSINGLEVALUE  Strip surrounding quotes from a CIF token.
+%EXTRACTSINGLEVALUE  Strip surrounding quotes from a CIF value string.
+%   Handles quoted strings that may contain spaces (e.g. 'O3 Sr Ti').
     token = strtrim(token);
     if isempty(token)
         val = '';
         return
     end
-    % Take only the first whitespace-delimited token
-    parts = strsplit(token);
-    token = parts{1};
-    if numel(token) >= 2 && token(1) == '''' && token(end) == ''''
-        val = token(2:end-1);
-    elseif numel(token) >= 2 && token(1) == '"' && token(end) == '"'
-        val = token(2:end-1);
+    % If starts with a quote, find the matching closing quote
+    if token(1) == ''''
+        closeIdx = find(token(2:end) == '''', 1, 'last') + 1;
+        if ~isempty(closeIdx)
+            val = token(2:closeIdx-1);
+        else
+            val = token(2:end);  % no closing quote — take everything
+        end
+    elseif token(1) == '"'
+        closeIdx = find(token(2:end) == '"', 1, 'last') + 1;
+        if ~isempty(closeIdx)
+            val = token(2:closeIdx-1);
+        else
+            val = token(2:end);
+        end
     else
-        val = token;
+        % Unquoted: take only the first whitespace-delimited token
+        parts = strsplit(token);
+        val = parts{1};
     end
 end
 
