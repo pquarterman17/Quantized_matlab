@@ -235,6 +235,7 @@ function data = importXRDML(filepath, options)
 
     % Per-scan data storage for 2D area-detector detection
     scanTTRanges = {};   % {[start, end]} per completed scan
+    scanTTLists  = {};   % {[1×M] double} explicit position lists (from listPositions)
     scanCounts   = {};   % {[1×M] double} raw count vector per completed scan
     scanSecVals  = [];   % fixed secondary-axis position per scan (NaN if absent)
     scanSecName  = '';   % secondary axis name established from first valid scan
@@ -292,7 +293,7 @@ function data = importXRDML(filepath, options)
         end
 
         % 2θ positions: find the <positions axis="2Theta"> block
-        ttRange = rxPositions(dpBlock, '2Theta');
+        [ttRange, ttPosList] = rxPositions(dpBlock, '2Theta');
         if isempty(ttRange); continue; end
 
         % Intensity data — schema 2.x: <counts>, schema 1.x: <intensities>
@@ -313,7 +314,7 @@ function data = importXRDML(filepath, options)
         if isempty(scanSecName)
             % First valid scan: discover which secondary axis is fixed
             for axN = ["Omega", "Chi", "Phi"]
-                pos2 = rxPositions(dpBlock, char(axN));
+                [pos2, ~] = rxPositions(dpBlock, char(axN));
                 if ~isempty(pos2) && pos2(1) == pos2(2)
                     scanSecName = char(axN);
                     scanSecVals(end+1) = pos2(1);  %#ok<AGROW>
@@ -325,18 +326,28 @@ function data = importXRDML(filepath, options)
             end
         else
             % Subsequent scans: read the established secondary axis
-            pos2 = rxPositions(dpBlock, scanSecName);
+            [pos2, ~] = rxPositions(dpBlock, scanSecName);
             if ~isempty(pos2) && pos2(1) == pos2(2)
                 scanSecVals(end+1) = pos2(1);  %#ok<AGROW>
             else
                 scanSecVals(end+1) = NaN;      %#ok<AGROW>
             end
         end
-        scanTTRanges{end+1} = ttRange;   %#ok<AGROW>
+        scanTTRanges{end+1} = ttRange;    %#ok<AGROW>
+        scanTTLists{end+1}  = ttPosList; %#ok<AGROW>
         scanCounts{end+1}   = cntVals;   %#ok<AGROW>
 
-        % Build 2θ vector; trim overlap at range boundaries
-        ttVec = linspace(ttRange(1), ttRange(2), nPts);
+        % Build 2θ vector; use explicit listPositions if available,
+        % otherwise generate evenly spaced from range endpoints
+        if ~isempty(ttPosList) && numel(ttPosList) == nPts
+            ttVec = ttPosList;
+        elseif ~isempty(ttPosList) && numel(ttPosList) ~= nPts
+            % listPositions length mismatch: fall back to linspace
+            ttVec = linspace(ttRange(1), ttRange(2), nPts);
+        else
+            ttVec = linspace(ttRange(1), ttRange(2), nPts);
+        end
+        % Trim overlap at range boundaries
         if ~isempty(twoTheta_all) && ttVec(1) == twoTheta_all(end)
             ttVec   = ttVec(2:end);
             cntVals = cntVals(2:end);
@@ -373,7 +384,12 @@ function data = importXRDML(filepath, options)
     if is2D
         [secSorted, secOrder] = sort(scanSecVals);
         nPtsPerScan  = numel(scanCounts{1});
-        twoThetaVec  = linspace(scanTTRanges{1}(1), scanTTRanges{1}(2), nPtsPerScan)';
+        % Use explicit listPositions if available; otherwise linspace
+        if ~isempty(scanTTLists{1}) && numel(scanTTLists{1}) == nPtsPerScan
+            twoThetaVec = scanTTLists{1}(:);
+        else
+            twoThetaVec = linspace(scanTTRanges{1}(1), scanTTRanges{1}(2), nPtsPerScan)';
+        end
         intensityMap = zeros(nValid, nPtsPerScan);
         for i = 1:nValid
             vals = scanCounts{secOrder(i)};
@@ -651,11 +667,15 @@ function val = rxMatch(xml, pat)
     end
 end
 
-function range = rxPositions(dpBlock, axisName)
+function [range, posList] = rxPositions(dpBlock, axisName)
 %RXPOSITIONS  Extract [startPos, endPos] for the named axis from a dataPoints block.
-%   Handles both scanned axes (startPosition/endPosition) and fixed axes
-%   (commonPosition).
+%   Handles scanned axes (startPosition/endPosition), fixed axes
+%   (commonPosition), and explicit per-pixel position lists (listPositions).
+%   Returns:
+%     range   — [start, end] two-element vector (empty if not found)
+%     posList — full position vector from listPositions (empty if not available)
     range = [];
+    posList = [];
     % Find all <positions ...>...</positions> blocks
     posBlocks = extractBlocks(dpBlock, 'positions');
     for k = 1:numel(posBlocks)
@@ -663,12 +683,25 @@ function range = rxPositions(dpBlock, axisName)
         axVal = rxAttr(pb, 'positions', 'axis');
         if ~strcmpi(axVal, axisName); continue; end
 
+        % Try startPosition/endPosition first (standard scans)
         s = rxDouble(pb, 'startPosition');
         e = rxDouble(pb, 'endPosition');
         if ~isnan(s) && ~isnan(e)
             range = [s, e];
             return;
         end
+
+        % Try listPositions (mesh/RSM scans with explicit pixel positions)
+        lpStr = rxText(pb, 'listPositions');
+        if ~isempty(lpStr)
+            posList = sscanf(lpStr, '%f')';
+            if numel(posList) >= 1
+                range = [posList(1), posList(end)];
+                return;
+            end
+        end
+
+        % Try commonPosition (fixed axis)
         c = rxDouble(pb, 'commonPosition');
         if ~isnan(c)
             range = [c, c];

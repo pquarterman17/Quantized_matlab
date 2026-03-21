@@ -2402,12 +2402,14 @@ function varargout = DataPlotter()
         end
 
         fig.Pointer = 'arrow';
+        cancelInteractions();   % always clean up — even if no files loaded
+        drawnow;                % flush pending UI events (e.g. uialert) so
+                                % subsequent tool popups get clean focus
         if nLoaded == 0, return; end
 
         % Make the last successfully loaded file the active dataset
         appData.activeIdx = numel(appData.datasets);
 
-        cancelInteractions();
         rebuildDatasetList(true);
         updateControlsForActiveDataset();
         setStatus(sprintf('Loaded %d file(s) — %d dataset(s) total.', ...
