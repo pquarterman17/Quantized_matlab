@@ -2151,6 +2151,10 @@ function varargout = emViewerGUI()
         try
             loadImagesFromPaths(fpaths);
         catch ME
+            fprintf(2, '\n[emViewerGUI] Error loading files: %s\n', ME.message);
+            for si = 1:numel(ME.stack)
+                fprintf(2, '  at %s (line %d)\n', ME.stack(si).name, ME.stack(si).line);
+            end
             uialert(fig, sprintf('Error loading files:\n%s', ME.message), ...
                 'Load Error', 'Icon', 'error');
         end
@@ -2942,6 +2946,10 @@ function varargout = emViewerGUI()
                             'Unsupported Format', 'Icon', 'warning');
                 end
             catch ME
+                fprintf(2, '\n[emViewerGUI] Load error (%s): %s\n', fp, ME.message);
+                for si = 1:numel(ME.stack)
+                    fprintf(2, '  at %s (line %d)\n', ME.stack(si).name, ME.stack(si).line);
+                end
                 uialert(fig, ...
                     sprintf('Failed to load "%s":\n\n%s', fp, ME.message), ...
                     'Load Error', 'Icon', 'error');
