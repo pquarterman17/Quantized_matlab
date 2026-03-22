@@ -63,7 +63,7 @@ All parsers return the same unified struct with fields `.time`, `.values`, `.lab
 ## Documentation
 
 - [CLAUDE.md](CLAUDE.md) — full developer reference: conventions, struct layout, GUI internals, design decisions
-- [Batch XRD Converter Guide](doc/BATCH_XRD_CONVERTER_README.md)
+- [Batch XRD Converter Guide](docs/BATCH_XRD_CONVERTER_README.md)
 - [Parser Reference](+parser/README.md)
 - [Test Suite](tests/README.md)
 
@@ -84,4 +84,8 @@ run tests/test_gui_harness      % automated GUI API tests
 
 ## License
 
-*(Add MIT / your license here)*
+This software is released under a **source-available license**. It is free to use for personal, academic, and non-commercial research purposes.
+
+**Commercial and government use require prior written permission** from the copyright holder. See [LICENSE](LICENSE) for full terms.
+
+To request permission, contact: [github.com/pquarterman17](https://github.com/pquarterman17)
