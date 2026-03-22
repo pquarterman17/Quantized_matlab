@@ -1,0 +1,79 @@
+Thin Film Toolkit (MATLAB) — Source-Available License
+
+Copyright (c) 2026 Paige Quarterman. All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to use,
+copy, modify, and distribute the Software for personal, academic, and
+non-commercial research purposes, subject to the following conditions:
+
+
+1. DEFINITIONS
+
+   "Commercial use" means any use of the Software that is primarily intended
+   for or directed toward commercial advantage or monetary compensation. This
+   includes, but is not limited to:
+   (a) incorporation into commercial products or services;
+   (b) use in revenue-generating activities, including paid consulting;
+   (c) use within or on behalf of any for-profit organization, regardless of
+       whether the specific use directly generates revenue;
+   (d) use by a non-profit organization in connection with revenue-generating
+       activities;
+   (e) use by a university spinoff, startup, or similar entity engaged in
+       commercialization of research.
+
+   "Government use" means any use of the Software by, on behalf of, or under
+   contract to any government entity at any level (federal, state, local, or
+   foreign), including use by government employees acting in their official
+   capacity and use by contractors or subcontractors performing work under a
+   government contract or grant.
+
+2. COMMERCIAL USE PROHIBITED WITHOUT PERMISSION
+   Commercial use of the Software requires prior written permission from the
+   copyright holder. Any commercial use without such permission is a violation
+   of this license and of applicable copyright law.
+
+3. GOVERNMENT USE PROHIBITED WITHOUT PERMISSION
+   Government use of the Software requires prior written permission from the
+   copyright holder. Any government use without such permission is a violation
+   of this license and of applicable copyright law.
+
+4. ATTRIBUTION
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+5. NO SUBLICENSING
+   You may not sublicense the Software or grant additional rights beyond those
+   specified in this license.
+
+6. TERMINATION
+   (a) Any use of the Software in violation of this license automatically and
+       immediately terminates all rights granted to the violating party.
+   (b) Upon termination, the violating party must immediately cease all use of
+       the Software and destroy all copies in their possession or control.
+   (c) Termination does not limit the copyright holder's right to seek any and
+       all available legal remedies for the violation, including but not limited
+       to injunctive relief, damages, and recovery of legal fees.
+   (d) Sections 6, 7, and 8 survive termination.
+
+7. GOVERNING LAW AND JURISDICTION
+   This license shall be governed by and construed in accordance with the laws
+   of the United States and the State of Maryland, without regard to conflict
+   of law principles. Any legal action arising under this license shall be
+   brought exclusively in the federal or state courts located in the State of
+   Maryland, and all parties consent to the jurisdiction of such courts.
+
+8. SEVERABILITY
+   If any provision of this license is held to be unenforceable or invalid,
+   that provision shall be enforced to the maximum extent possible, and the
+   remaining provisions shall remain in full force and effect.
+
+To request permission for commercial or government use, contact the copyright
+holder at: https://github.com/pquarterman17
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
