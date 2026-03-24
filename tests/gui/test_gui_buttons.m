@@ -1338,6 +1338,7 @@ try
     btn = findobj(api.fig, 'Type', 'uibutton', ...
         'Text', [char(9881) ' Advanced Analysis ' char(9662)]);
     assert(~isempty(btn), 'Advanced Analysis button not found');
+    btn = btn(1);  % may match in multiple panels
 
     try
         btn.ButtonPushedFcn(btn, []);

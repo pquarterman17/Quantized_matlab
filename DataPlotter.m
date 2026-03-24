@@ -7636,12 +7636,12 @@ function varargout = DataPlotter()
     %   Right-click on an annotation deletes it.
         if cbAnnotationMode.Value
             % Enable annotation mode
-            appData.annotationMode = true;
+            appData.annotationMode = 'crosshair';
             fig.WindowButtonDownFcn = @onAnnotationClick;
             fig.Pointer = 'crosshair';
         else
             % Disable annotation mode
-            appData.annotationMode = false;
+            appData.annotationMode = 'none';
             fig.WindowButtonDownFcn = @onAxesButtonDown;
             fig.Pointer = 'arrow';
         end
