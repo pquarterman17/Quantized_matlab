@@ -12827,6 +12827,14 @@ function varargout = DataPlotter()
 
     plotOptFig = [];  % persistent handle to the plot options popup
 
+    function closePlotOptMenu()
+    %CLOSEPLOTOPTMENU  Close the plot options popup if open.
+        if ~isempty(plotOptFig) && isvalid(plotOptFig)
+            delete(plotOptFig);
+        end
+        plotOptFig = [];
+    end
+
     function onShowPlotOptionsMenu(~, ~)
     %ONSHOWPLOTOPTIONSMENU  Show a popup menu of plot types and visualization tools.
 
@@ -12898,13 +12906,6 @@ function varargout = DataPlotter()
 
         function onPlotOptKey(evt)
             if strcmp(evt.Key, 'escape'), closePlotOptMenu(); end
-        end
-
-        function closePlotOptMenu()
-            if ~isempty(plotOptFig) && isvalid(plotOptFig)
-                delete(plotOptFig);
-            end
-            plotOptFig = [];
         end
     end
 
@@ -13164,6 +13165,14 @@ function varargout = DataPlotter()
 
     advMenuFig = [];  % persistent handle to the popup menu figure
 
+    function closeAdvMenu()
+    %CLOSEADVMENU  Close the advanced tools popup if open.
+        if ~isempty(advMenuFig) && isvalid(advMenuFig)
+            delete(advMenuFig);
+        end
+        advMenuFig = [];
+    end
+
     function onShowAdvancedMenu(~, ~)
     %ONSHOWADVANCEDMENU  Show a popup menu of advanced analysis tools.
     %   Opens a 2-column floating figure with sectioned actions. Clicking an
@@ -13299,13 +13308,6 @@ function varargout = DataPlotter()
 
         function onAdvMenuKey(evt)
             if strcmp(evt.Key, 'escape'), closeAdvMenu(); end
-        end
-
-        function closeAdvMenu()
-            if ~isempty(advMenuFig) && isvalid(advMenuFig)
-                delete(advMenuFig);
-            end
-            advMenuFig = [];
         end
     end
 
