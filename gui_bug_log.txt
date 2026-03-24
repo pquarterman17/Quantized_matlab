@@ -218,3 +218,3927 @@ Stack:
   run  (line 112)
   runSuite  (line 181)
   runAllTests  (line 139)
+
+====================================================================
+[2026-03-21 15:23:47]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13712)
+  DataPlotter/loadFilePaths  (line 2386)
+  DataPlotter/addFilesDirect  (line 2432)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 181)
+  runAllTests  (line 139)
+
+====================================================================
+[2026-03-21 15:23:54]  Import error
+Message: nonexistent_test_file.xrdml  Invalid argument at position 1. These files do not exist: 'C:\nonexistent_test_file.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13712)
+  DataPlotter/loadFilePaths  (line 2386)
+  DataPlotter/addFilesDirect  (line 2432)
+  test_gui_harness  (line 816)
+  run  (line 112)
+  runSuite  (line 181)
+  runAllTests  (line 139)
+
+====================================================================
+[2026-03-21 15:23:54]  Import error
+Message: corrupt_test  .xrdmlNo <scan> elements found in "C:\Users\patri\AppData\Local\Temp\gui_test_20260321_152320\corrupt_test.xrdml".  
+Identifier: parser:importXRDML:noScans
+Stack:
+  importXRDML  (line 211)
+  guiImport  (line 13722)
+  DataPlotter/loadFilePaths  (line 2386)
+  DataPlotter/addFilesDirect  (line 2432)
+  test_gui_harness  (line 856)
+  run  (line 112)
+  runSuite  (line 181)
+  runAllTests  (line 139)
+
+====================================================================
+[2026-03-21 15:24:50]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13712)
+  DataPlotter/loadFilePaths  (line 2386)
+  DataPlotter/addFilesDirect  (line 2432)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 181)
+  runAllTests  (line 139)
+
+====================================================================
+[2026-03-21 15:24:57]  Import error
+Message: nonexistent_test_file.xrdml  Invalid argument at position 1. These files do not exist: 'C:\nonexistent_test_file.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13712)
+  DataPlotter/loadFilePaths  (line 2386)
+  DataPlotter/addFilesDirect  (line 2432)
+  test_gui_harness  (line 816)
+  run  (line 112)
+  runSuite  (line 181)
+  runAllTests  (line 139)
+
+====================================================================
+[2026-03-21 15:24:58]  Import error
+Message: corrupt_test  .xrdmlNo <scan> elements found in "C:\Users\patri\AppData\Local\Temp\gui_test_20260321_152426\corrupt_test.xrdml".  
+Identifier: parser:importXRDML:noScans
+Stack:
+  importXRDML  (line 211)
+  guiImport  (line 13722)
+  DataPlotter/loadFilePaths  (line 2386)
+  DataPlotter/addFilesDirect  (line 2432)
+  test_gui_harness  (line 856)
+  run  (line 112)
+  runSuite  (line 181)
+  runAllTests  (line 139)
+
+====================================================================
+[2026-03-21 15:29:33]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13676)
+  DataPlotter/loadFilePaths  (line 2386)
+  DataPlotter/addFilesDirect  (line 2432)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 181)
+  runAllTests  (line 139)
+
+====================================================================
+[2026-03-21 15:29:41]  Import error
+Message: nonexistent_test_file.xrdml  Invalid argument at position 1. These files do not exist: 'C:\nonexistent_test_file.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13676)
+  DataPlotter/loadFilePaths  (line 2386)
+  DataPlotter/addFilesDirect  (line 2432)
+  test_gui_harness  (line 816)
+  run  (line 112)
+  runSuite  (line 181)
+  runAllTests  (line 139)
+
+====================================================================
+[2026-03-21 15:29:41]  Import error
+Message: corrupt_test  .xrdmlNo <scan> elements found in "C:\Users\patri\AppData\Local\Temp\gui_test_20260321_152908\corrupt_test.xrdml".  
+Identifier: parser:importXRDML:noScans
+Stack:
+  importXRDML  (line 211)
+  guiImport  (line 13686)
+  DataPlotter/loadFilePaths  (line 2386)
+  DataPlotter/addFilesDirect  (line 2432)
+  test_gui_harness  (line 856)
+  run  (line 112)
+  runSuite  (line 181)
+  runAllTests  (line 139)
+
+====================================================================
+[2026-03-21 15:55:53]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13740)
+  DataPlotter/loadFilePaths  (line 2386)
+  DataPlotter/addFilesDirect  (line 2432)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 183)
+  runAllTests  (line 141)
+
+====================================================================
+[2026-03-21 15:56:00]  Import error
+Message: nonexistent_test_file.xrdml  Invalid argument at position 1. These files do not exist: 'C:\nonexistent_test_file.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13740)
+  DataPlotter/loadFilePaths  (line 2386)
+  DataPlotter/addFilesDirect  (line 2432)
+  test_gui_harness  (line 816)
+  run  (line 112)
+  runSuite  (line 183)
+  runAllTests  (line 141)
+
+====================================================================
+[2026-03-21 15:56:01]  Import error
+Message: corrupt_test  .xrdmlNo <scan> elements found in "C:\Users\patri\AppData\Local\Temp\gui_test_20260321_155529\corrupt_test.xrdml".  
+Identifier: parser:importXRDML:noScans
+Stack:
+  importXRDML  (line 211)
+  guiImport  (line 13750)
+  DataPlotter/loadFilePaths  (line 2386)
+  DataPlotter/addFilesDirect  (line 2432)
+  test_gui_harness  (line 856)
+  run  (line 112)
+  runSuite  (line 183)
+  runAllTests  (line 141)
+
+====================================================================
+[2026-03-21 16:02:51]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13748)
+  DataPlotter/loadFilePaths  (line 2388)
+  DataPlotter/addFilesDirect  (line 2434)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 183)
+  runAllTests  (line 141)
+
+====================================================================
+[2026-03-21 16:02:58]  Import error
+Message: nonexistent_test_file.xrdml  Invalid argument at position 1. These files do not exist: 'C:\nonexistent_test_file.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13748)
+  DataPlotter/loadFilePaths  (line 2388)
+  DataPlotter/addFilesDirect  (line 2434)
+  test_gui_harness  (line 816)
+  run  (line 112)
+  runSuite  (line 183)
+  runAllTests  (line 141)
+
+====================================================================
+[2026-03-21 16:02:58]  Import error
+Message: corrupt_test  .xrdmlNo <scan> elements found in "C:\Users\patri\AppData\Local\Temp\gui_test_20260321_160226\corrupt_test.xrdml".  
+Identifier: parser:importXRDML:noScans
+Stack:
+  importXRDML  (line 211)
+  guiImport  (line 13758)
+  DataPlotter/loadFilePaths  (line 2388)
+  DataPlotter/addFilesDirect  (line 2434)
+  test_gui_harness  (line 856)
+  run  (line 112)
+  runSuite  (line 183)
+  runAllTests  (line 141)
+
+====================================================================
+[2026-03-21 16:20:36]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 77)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:38]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 104)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:38]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 129)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:39]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 155)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:39]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 192)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:39]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 228)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:39]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 262)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:40]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 295)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:40]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 321)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:40]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 357)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:40]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 400)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:41]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 463)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:41]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13773)
+  DataPlotter/loadFilePaths  (line 2395)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:41]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 514)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:41]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 557)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:41]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 586)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:41]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 621)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:41]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 661)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:41]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 694)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:41]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 741)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:41]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 777)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:42]  Import error
+Message: nonexistent_test_file.xrdml  Invalid argument at position 1. These files do not exist: 'C:\nonexistent_test_file.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13773)
+  DataPlotter/loadFilePaths  (line 2395)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 816)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:42]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 816)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:42]  Import error
+Message: corrupt_test  .xrdmlNo <scan> elements found in "C:\Users\patri\AppData\Local\Temp\gui_test_20260321_162030\corrupt_test.xrdml".  
+Identifier: parser:importXRDML:noScans
+Stack:
+  importXRDML  (line 211)
+  guiImport  (line 13783)
+  DataPlotter/loadFilePaths  (line 2395)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 856)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:42]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 866)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:43]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 889)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:46]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 60)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:46]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 96)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:46]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 121)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:47]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 146)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:47]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 191)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:47]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 229)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:50]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 62)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:50]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 106)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:50]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 129)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:50]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 161)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:50]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 195)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:50]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 239)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:20:50]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 268)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:24]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 77)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:25]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 104)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:26]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 129)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:26]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 155)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:27]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 192)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:27]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 228)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:27]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 262)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:27]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 295)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:28]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 321)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:28]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 357)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:28]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 400)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:28]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 463)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:28]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13773)
+  DataPlotter/loadFilePaths  (line 2395)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:29]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 514)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:29]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 557)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:29]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 586)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:29]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 621)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:29]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 661)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:29]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 694)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:29]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 741)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:29]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 777)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:29]  Import error
+Message: nonexistent_test_file.xrdml  Invalid argument at position 1. These files do not exist: 'C:\nonexistent_test_file.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13773)
+  DataPlotter/loadFilePaths  (line 2395)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 816)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:30]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 816)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:30]  Import error
+Message: corrupt_test  .xrdmlNo <scan> elements found in "C:\Users\patri\AppData\Local\Temp\gui_test_20260321_162116\corrupt_test.xrdml".  
+Identifier: parser:importXRDML:noScans
+Stack:
+  importXRDML  (line 211)
+  guiImport  (line 13783)
+  DataPlotter/loadFilePaths  (line 2395)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 856)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:30]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 866)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:31]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 889)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:34]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 60)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:34]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 96)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:34]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 121)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:35]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 146)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:35]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 191)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:35]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 229)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:38]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 62)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:38]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 106)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:38]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 129)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:38]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 161)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:38]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 195)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:38]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 239)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:21:39]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 268)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:17]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 77)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:19]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 104)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:19]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 129)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:20]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 155)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:20]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 192)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:20]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 228)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:21]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 262)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:21]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 295)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:21]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 321)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:21]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 357)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:21]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 400)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:22]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 463)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:22]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13773)
+  DataPlotter/loadFilePaths  (line 2395)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:22]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 514)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:22]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 557)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:22]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 586)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:22]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 621)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:22]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 661)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:22]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 694)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:22]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 741)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:22]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 777)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:23]  Import error
+Message: nonexistent_test_file.xrdml  Invalid argument at position 1. These files do not exist: 'C:\nonexistent_test_file.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13773)
+  DataPlotter/loadFilePaths  (line 2395)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 816)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:23]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 816)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:23]  Import error
+Message: corrupt_test  .xrdmlNo <scan> elements found in "C:\Users\patri\AppData\Local\Temp\gui_test_20260321_162209\corrupt_test.xrdml".  
+Identifier: parser:importXRDML:noScans
+Stack:
+  importXRDML  (line 211)
+  guiImport  (line 13783)
+  DataPlotter/loadFilePaths  (line 2395)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 856)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:23]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 866)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:24]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 889)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:27]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 60)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:27]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 96)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:28]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 121)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:28]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 146)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:28]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 191)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:28]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 229)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:31]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 62)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:32]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 106)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:32]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 129)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:32]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 161)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:32]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 195)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:32]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 239)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:22:32]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 268)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:02]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 77)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:04]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 104)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:04]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 129)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:05]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 155)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:05]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 192)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:05]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 228)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:05]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 262)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:06]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 295)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:06]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 321)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:06]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 357)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:06]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 400)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:07]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 463)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:07]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13773)
+  DataPlotter/loadFilePaths  (line 2395)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:07]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 514)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:07]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 557)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:07]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 586)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:07]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 621)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:07]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 661)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:07]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 694)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:07]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 741)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:08]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 777)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:08]  Import error
+Message: nonexistent_test_file.xrdml  Invalid argument at position 1. These files do not exist: 'C:\nonexistent_test_file.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13773)
+  DataPlotter/loadFilePaths  (line 2395)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 816)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:08]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 816)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:08]  Import error
+Message: corrupt_test  .xrdmlNo <scan> elements found in "C:\Users\patri\AppData\Local\Temp\gui_test_20260321_162254\corrupt_test.xrdml".  
+Identifier: parser:importXRDML:noScans
+Stack:
+  importXRDML  (line 211)
+  guiImport  (line 13783)
+  DataPlotter/loadFilePaths  (line 2395)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 856)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:08]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 866)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:09]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 889)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:12]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 60)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:12]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 96)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:13]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 121)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:13]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 146)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:13]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 191)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:13]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 229)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:16]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 62)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:16]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 106)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:17]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 129)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:17]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 161)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:17]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 195)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:17]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 239)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:23:17]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 268)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:34]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 77)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:35]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 104)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:36]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 129)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:36]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 155)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:36]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 192)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:36]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 228)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:37]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 262)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:37]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 295)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:37]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 321)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:37]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 357)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:37]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 400)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:37]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 463)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:37]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13773)
+  DataPlotter/loadFilePaths  (line 2395)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:38]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 514)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:38]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 557)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:38]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 586)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:38]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 621)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:38]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 661)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:38]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 694)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:38]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 741)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:38]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 777)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:38]  Import error
+Message: nonexistent_test_file.xrdml  Invalid argument at position 1. These files do not exist: 'C:\nonexistent_test_file.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13773)
+  DataPlotter/loadFilePaths  (line 2395)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 816)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:38]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 816)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:39]  Import error
+Message: corrupt_test  .xrdmlNo <scan> elements found in "C:\Users\patri\AppData\Local\Temp\gui_test_20260321_162427\corrupt_test.xrdml".  
+Identifier: parser:importXRDML:noScans
+Stack:
+  importXRDML  (line 211)
+  guiImport  (line 13783)
+  DataPlotter/loadFilePaths  (line 2395)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 856)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:39]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 866)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:39]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_harness  (line 889)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:42]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 60)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:43]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 96)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:43]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 121)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:43]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 146)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:43]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 191)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:43]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_2d  (line 229)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:46]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 62)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:46]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 106)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:46]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 129)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:46]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 161)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:47]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 195)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:47]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 239)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:24:47]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9035)
+  DataPlotter/onPlot  (line 8930)
+  DataPlotter/loadFilePaths  (line 2427)
+  DataPlotter/addFilesDirect  (line 2441)
+  test_gui_phase4  (line 268)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:22]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 77)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:23]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 104)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:24]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 129)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:24]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 155)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:24]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 192)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:25]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 228)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:25]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 262)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:25]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 295)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:26]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 321)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:26]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 357)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:26]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 400)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:26]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 463)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:26]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13782)
+  DataPlotter/loadFilePaths  (line 2393)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:27]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 514)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:27]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 557)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:27]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 586)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:27]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 621)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:27]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 661)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:27]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 694)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:27]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 741)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:27]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 777)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:27]  Import error
+Message: nonexistent_test_file.xrdml  Invalid argument at position 1. These files do not exist: 'C:\nonexistent_test_file.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13782)
+  DataPlotter/loadFilePaths  (line 2393)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 816)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:27]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 816)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:28]  Import error
+Message: corrupt_test  .xrdmlNo <scan> elements found in "C:\Users\patri\AppData\Local\Temp\gui_test_20260321_163014\corrupt_test.xrdml".  
+Identifier: parser:importXRDML:noScans
+Stack:
+  importXRDML  (line 211)
+  guiImport  (line 13792)
+  DataPlotter/loadFilePaths  (line 2393)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 856)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:28]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 866)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:28]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 889)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:31]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_2d  (line 60)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:32]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_2d  (line 96)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:32]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_2d  (line 121)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:32]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_2d  (line 146)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:32]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_2d  (line 191)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:32]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_2d  (line 229)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:35]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_phase4  (line 62)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:36]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_phase4  (line 106)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:36]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_phase4  (line 129)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:36]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_phase4  (line 161)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:36]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_phase4  (line 195)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:36]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_phase4  (line 239)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:30:36]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_phase4  (line 268)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:36:43]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 77)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:45]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 104)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:46]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 129)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:46]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 155)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:46]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 192)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:46]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 228)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:47]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 262)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:47]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 295)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:47]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 321)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:47]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 357)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:47]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 400)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:48]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 463)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:48]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13782)
+  DataPlotter/loadFilePaths  (line 2393)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 490)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:48]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 514)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:48]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 557)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:49]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 586)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:49]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 621)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:49]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 661)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:49]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 694)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:49]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 741)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:49]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 777)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:49]  Import error
+Message: nonexistent_test_file.xrdml  Invalid argument at position 1. These files do not exist: 'C:\nonexistent_test_file.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13782)
+  DataPlotter/loadFilePaths  (line 2393)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 816)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:49]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 816)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:50]  Import error
+Message: corrupt_test  .xrdmlNo <scan> elements found in "C:\Users\patri\AppData\Local\Temp\gui_test_20260321_163635\corrupt_test.xrdml".  
+Identifier: parser:importXRDML:noScans
+Stack:
+  importXRDML  (line 211)
+  guiImport  (line 13792)
+  DataPlotter/loadFilePaths  (line 2393)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 856)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:50]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 866)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:36:50]  Plot error
+Message: Unrecognized function or variable 'waterfallOn'.
+Identifier: MATLAB:UndefinedFunction
+Stack:
+  DataPlotter/drawToAxes  (line 9033)
+  DataPlotter/onPlot  (line 8928)
+  DataPlotter/loadFilePaths  (line 2425)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 889)
+  run  (line 112)
+
+====================================================================
+[2026-03-21 16:37:59]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13782)
+  DataPlotter/loadFilePaths  (line 2393)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:38:06]  Import error
+Message: nonexistent_test_file.xrdml  Invalid argument at position 1. These files do not exist: 'C:\nonexistent_test_file.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13782)
+  DataPlotter/loadFilePaths  (line 2393)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 816)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 16:38:06]  Import error
+Message: corrupt_test  .xrdmlNo <scan> elements found in "C:\Users\patri\AppData\Local\Temp\gui_test_20260321_163734\corrupt_test.xrdml".  
+Identifier: parser:importXRDML:noScans
+Stack:
+  importXRDML  (line 211)
+  guiImport  (line 13792)
+  DataPlotter/loadFilePaths  (line 2393)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 856)
+  run  (line 112)
+  runSuite  (line 184)
+  runAllTests  (line 142)
+
+====================================================================
+[2026-03-21 20:52:32]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13839)
+  DataPlotter/loadFilePaths  (line 2393)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 185)
+  runAllTests  (line 143)
+
+====================================================================
+[2026-03-21 20:52:41]  Import error
+Message: nonexistent_test_file.xrdml  Invalid argument at position 1. These files do not exist: 'C:\nonexistent_test_file.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13839)
+  DataPlotter/loadFilePaths  (line 2393)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 816)
+  run  (line 112)
+  runSuite  (line 185)
+  runAllTests  (line 143)
+
+====================================================================
+[2026-03-21 20:52:42]  Import error
+Message: corrupt_test  .xrdmlNo <scan> elements found in "C:\Users\patri\AppData\Local\Temp\gui_test_20260321_205157\corrupt_test.xrdml".  
+Identifier: parser:importXRDML:noScans
+Stack:
+  importXRDML  (line 211)
+  guiImport  (line 13849)
+  DataPlotter/loadFilePaths  (line 2393)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 856)
+  run  (line 112)
+  runSuite  (line 185)
+  runAllTests  (line 143)
+
+====================================================================
+[2026-03-21 20:58:19]  Import error
+Message: does_not_exist_sample.xrdml  Invalid argument at position 1. These files do not exist: 'C:\does_not_exist_sample.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13844)
+  DataPlotter/loadFilePaths  (line 2393)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 490)
+  run  (line 112)
+  runSuite  (line 185)
+  runAllTests  (line 143)
+
+====================================================================
+[2026-03-21 20:58:30]  Import error
+Message: nonexistent_test_file.xrdml  Invalid argument at position 1. These files do not exist: 'C:\nonexistent_test_file.xrdml'.
+Identifier: MATLAB:validators:mustBeFile
+Stack:
+  resolveParser  (line 39)
+  guiImport  (line 13844)
+  DataPlotter/loadFilePaths  (line 2393)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 816)
+  run  (line 112)
+  runSuite  (line 185)
+  runAllTests  (line 143)
+
+====================================================================
+[2026-03-21 20:58:31]  Import error
+Message: corrupt_test  .xrdmlNo <scan> elements found in "C:\Users\patri\AppData\Local\Temp\gui_test_20260321_205741\corrupt_test.xrdml".  
+Identifier: parser:importXRDML:noScans
+Stack:
+  importXRDML  (line 211)
+  guiImport  (line 13854)
+  DataPlotter/loadFilePaths  (line 2393)
+  DataPlotter/addFilesDirect  (line 2439)
+  test_gui_harness  (line 856)
+  run  (line 112)
+  runSuite  (line 185)
+  runAllTests  (line 143)

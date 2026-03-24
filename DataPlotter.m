@@ -4107,7 +4107,8 @@ function varargout = DataPlotter()
             manualSeeds  = ds.peaks(isManual);
         else
             manualSeeds  = struct('center',{},'fwhm',{},'height',{},'area',{}, ...
-                                  'xRange',{},'status',{});
+                                  'xRange',{},'status',{},'bg',{},'model',{},'eta',{}, ...
+                                  'prominence',{},'localSNR',{});
         end
 
         % ── SNIP-based peak detection ───────────────────────────────────
@@ -4151,15 +4152,17 @@ function varargout = DataPlotter()
                 [lH, mi] = max(yWin);  lX = xWin(mi);  lW = halfWin * 0.5;
             end
 
-            newPk.center = lX;
-            newPk.fwhm   = lW;
-            newPk.height = lH;
-            newPk.area   = NaN;
-            newPk.xRange = [];
-            newPk.status = 'manual';
-            newPk.bg     = NaN;
-            newPk.model  = '';
-            newPk.eta    = NaN;
+            newPk.center     = lX;
+            newPk.fwhm       = lW;
+            newPk.height     = lH;
+            newPk.area       = NaN;
+            newPk.xRange     = [];
+            newPk.status     = 'manual';
+            newPk.bg         = NaN;
+            newPk.model      = '';
+            newPk.eta        = NaN;
+            newPk.prominence = NaN;
+            newPk.localSNR   = NaN;
             merged(end+1) = newPk;  %#ok<AGROW>
         end
 
@@ -4264,15 +4267,17 @@ function varargout = DataPlotter()
             pkH = yClick;
         end
 
-        newPk.center = pkX;
-        newPk.fwhm   = NaN;
-        newPk.height = pkH;
-        newPk.area   = NaN;
-        newPk.xRange = [];
-        newPk.status = 'manual';
-        newPk.bg     = NaN;
-        newPk.model  = '';
-        newPk.eta    = NaN;
+        newPk.center     = pkX;
+        newPk.fwhm       = NaN;
+        newPk.height     = pkH;
+        newPk.area       = NaN;
+        newPk.xRange     = [];
+        newPk.status     = 'manual';
+        newPk.bg         = NaN;
+        newPk.model      = '';
+        newPk.eta        = NaN;
+        newPk.prominence = NaN;
+        newPk.localSNR   = NaN;
         ds.peaks(end+1) = newPk;
         appData.datasets{appData.activeIdx} = ds;
 
@@ -4759,7 +4764,7 @@ function varargout = DataPlotter()
                 if ~strcmp(sel, 'Clear'), return; end
             end
         end
-        ds.peaks = struct('center',{},'fwhm',{},'height',{},'area',{},'xRange',{},'status',{},'bg',{},'model',{},'eta',{});
+        ds.peaks = struct('center',{},'fwhm',{},'height',{},'area',{},'xRange',{},'status',{},'bg',{},'model',{},'eta',{},'prominence',{},'localSNR',{});
         appData.datasets{appData.activeIdx} = ds;
         appData.selectedPeakIdx = 0;
         refreshPeakTable();
@@ -12678,12 +12683,12 @@ function varargout = DataPlotter()
         % Position near the Advanced button
         figPos = fig.Position;
         advMenuFig = uifigure('Name', 'Advanced Tools', ...
-            'Position', [figPos(1) + figPos(3) - 210, figPos(2) + figPos(4) - 430, 200, 340], ...
+            'Position', [figPos(1) + figPos(3) - 210, figPos(2) + figPos(4) - 460, 200, 400], ...
             'Resize', 'off', ...
             'CloseRequestFcn', @(~,~) closeAdvMenu());
 
-        advMenuGL = uigridlayout(advMenuFig, [21 1], ...
-            'RowHeight', {18, 26, 26, 26, 26, 6, 18, 26, 26, 6, 18, 26, 26, 26, 6, 18, 26, 6, 18, 26, 26}, ...
+        advMenuGL = uigridlayout(advMenuFig, [24 1], ...
+            'RowHeight', {18, 26, 26, 26, 26, 6, 18, 26, 6, 18, 26, 26, 6, 18, 26, 26, 26, 6, 18, 26, 6, 18, 26, 26}, ...
             'ColumnWidth', {'1x'}, ...
             'Padding', [8 6 8 6], 'RowSpacing', 2);
 
@@ -12722,38 +12727,53 @@ function varargout = DataPlotter()
 
         % Separator (row 6)
 
+        % Section: Peak Analysis
+        lblPeak = uilabel(advMenuGL, 'Text', 'PEAK ANALYSIS', 'FontSize', 9, 'FontWeight', 'bold', ...
+            'FontColor', [0.5 0.5 0.5]);
+        lblPeak.Layout.Row = 7;
+
+        btnAdvPeak = uibutton(advMenuGL, 'Text', 'Advanced Peak Analysis...', ...
+            'ButtonPushedFcn', @(~,~) advMenuAction(@onOpenAdvancedPeakAnalysis), ...
+            'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
+            'HorizontalAlignment', 'left', ...
+            'Tooltip', ['Robust peak detection with adaptive noise, prominence ' ...
+                        'filtering, simultaneous multi-peak + polynomial background fitting']);
+        btnAdvPeak.Layout.Row = 8;
+
+        % Separator (row 9)
+
         % Section: Correction
         lbl2 = uilabel(advMenuGL, 'Text', 'CORRECTION', 'FontSize', 9, 'FontWeight', 'bold', ...
             'FontColor', [0.5 0.5 0.5]);
-        lbl2.Layout.Row = 7;
+        lbl2.Layout.Row = 10;
 
         btn4 = uibutton(advMenuGL, 'Text', [char(8596) ' Resample...'], ...
             'ButtonPushedFcn', @(~,~) advMenuAction(@onResampleDataset), ...
             'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
             'HorizontalAlignment', 'left', ...
             'Tooltip', 'Resample data to a uniform x-grid');
-        btn4.Layout.Row = 8;
+        btn4.Layout.Row = 11;
 
         btn5 = uibutton(advMenuGL, 'Text', 'Column Calculator...', ...
             'ButtonPushedFcn', @(~,~) advMenuAction(@onColumnCalculator), ...
             'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
             'HorizontalAlignment', 'left', ...
             'Tooltip', 'Create new columns from expressions');
-        btn5.Layout.Row = 9;
+        btn5.Layout.Row = 12;
 
-        % Separator (row 10)
+        % Separator (row 13)
 
         % Section: Thickness / Reflectivity
         lblThick = uilabel(advMenuGL, 'Text', 'THICKNESS / REFLECTIVITY', ...
             'FontSize', 9, 'FontWeight', 'bold', 'FontColor', [0.5 0.5 0.5]);
-        lblThick.Layout.Row = 11;
+        lblThick.Layout.Row = 14;
 
         btnAdvFFTThick = uibutton(advMenuGL, 'Text', 'FFT Thickness...', ...
             'ButtonPushedFcn', @(~,~) advMenuAction(@onFFTThickness), ...
             'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
             'HorizontalAlignment', 'left', ...
             'Tooltip', 'Compute film thickness from Laue / Kiessig fringe periodicity via FFT');
-        btnAdvFFTThick.Layout.Row = 12;
+        btnAdvFFTThick.Layout.Row = 15;
 
         btnAdvReflFFT = uibutton(advMenuGL, 'Text', 'Reflectivity FFT...', ...
             'ButtonPushedFcn', @(~,~) advMenuAction(@onReflectivityFFT), ...
@@ -12761,7 +12781,7 @@ function varargout = DataPlotter()
             'HorizontalAlignment', 'left', ...
             'Tooltip', ['Compute SLD profile from Kiessig fringes via FFT (Q-space). ' ...
                         'Also estimates thickness from fringe spacing.']);
-        btnAdvReflFFT.Layout.Row = 13;
+        btnAdvReflFFT.Layout.Row = 16;
 
         btnAdvFringe = uibutton(advMenuGL, 'Text', ['Fringe ' char(916) 't (2-click)...'], ...
             'ButtonPushedFcn', @(~,~) advMenuAction(@onArmFringeThickness), ...
@@ -12769,42 +12789,42 @@ function varargout = DataPlotter()
             'HorizontalAlignment', 'left', ...
             'Tooltip', ['Pick two fringe peaks to estimate thickness via t = 2' char(960) ...
                         '/' char(916) 'Q.  Draggable markers for refinement.']);
-        btnAdvFringe.Layout.Row = 14;
+        btnAdvFringe.Layout.Row = 17;
 
-        % Separator (row 15)
+        % Separator (row 18)
 
         % Section: Visualization
         lbl3 = uilabel(advMenuGL, 'Text', 'VISUALIZATION', 'FontSize', 9, 'FontWeight', 'bold', ...
             'FontColor', [0.5 0.5 0.5]);
-        lbl3.Layout.Row = 16;
+        lbl3.Layout.Row = 19;
 
         btn6 = uibutton(advMenuGL, 'Text', 'Inset Plot...', ...
             'ButtonPushedFcn', @(~,~) advMenuAction(@onCreateInset), ...
             'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
             'HorizontalAlignment', 'left', ...
             'Tooltip', 'Create an inset zoom of a selected region');
-        btn6.Layout.Row = 17;
+        btn6.Layout.Row = 20;
 
-        % Separator (row 18)
+        % Separator (row 21)
 
         % Section: Data
         lbl4 = uilabel(advMenuGL, 'Text', 'DATA', 'FontSize', 9, 'FontWeight', 'bold', ...
             'FontColor', [0.5 0.5 0.5]);
-        lbl4.Layout.Row = 19;
+        lbl4.Layout.Row = 22;
 
         btn7 = uibutton(advMenuGL, 'Text', [char(9998) ' Graph Digitizer...'], ...
             'ButtonPushedFcn', @(~,~) advMenuAction(@onOpenDigitizer), ...
             'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
             'HorizontalAlignment', 'left', ...
             'Tooltip', 'Extract data points from a graph image (screenshot/PDF figure)');
-        btn7.Layout.Row = 20;
+        btn7.Layout.Row = 23;
 
         btnAdvReflFit = uibutton(advMenuGL, 'Text', 'Reflectivity Fitting...', ...
             'ButtonPushedFcn', @(~,~) advMenuAction(@onOpenReflFitDialog), ...
             'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
             'HorizontalAlignment', 'left', ...
             'Tooltip', 'Fit specular reflectivity R(Q) via Parratt recursion with layer stack editor');
-        btnAdvReflFit.Layout.Row = 21;
+        btnAdvReflFit.Layout.Row = 24;
 
         function advMenuAction(callbackFcn)
         %ADVMENUACTION  Close the popup then execute the callback.
@@ -12817,6 +12837,48 @@ function varargout = DataPlotter()
                 delete(advMenuFig);
             end
             advMenuFig = [];
+        end
+    end
+
+    % ── Advanced Peak Analysis (extracted dialog) ────────────────────────
+
+    function onOpenAdvancedPeakAnalysis(~, ~)
+    %ONOPENADVANCEDPEAKANALYSIS  Launch the advanced peak analysis dialog.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig, 'Load a dataset first.', 'Peak Analysis');
+            return;
+        end
+        dataplotter.peakAnalysis(appData.datasets, appData.activeIdx, ax, ...
+            'StatusFcn', @setStatus, ...
+            'PeakUpdateCallback', @peakAnalysisApply, ...
+            'ButtonColors', struct('primary', BTN_PRIMARY, 'tool', BTN_TOOL, 'fg', BTN_FG));
+
+        function peakAnalysisApply(peaksResult, bgEst)
+        %PEAKANALYSISAPPLY  Receive peaks from advanced analysis dialog.
+            ds = appData.datasets{appData.activeIdx};
+
+            % Ensure output peaks have all required fields
+            requiredFields = {'center','fwhm','height','area','xRange','status','bg','model','eta'};
+            for fi = 1:numel(requiredFields)
+                fn = requiredFields{fi};
+                if ~isfield(peaksResult, fn)
+                    for pi = 1:numel(peaksResult)
+                        peaksResult(pi).(fn) = NaN;
+                    end
+                end
+            end
+
+            ds.peaks = peaksResult;
+            if ~isempty(bgEst)
+                d = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
+                xv = double(d.time);
+                valid = ~isnan(xv);
+                ds.snipBackground = struct('x', xv(valid), 'bg', bgEst(1:sum(valid)));
+            end
+            appData.datasets{appData.activeIdx} = ds;
+            refreshPeakTable();
+            onPlot([], []);
+            showPeakWindow();
         end
     end
 

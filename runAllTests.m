@@ -98,6 +98,7 @@ SUITES = {
     T('calc','test_calc_vacuum'),          'vacuum', 'Vacuum module: MFP, sputter yield, pump-down'
     T('calc','test_calc_electrochemistry'),'electrochemistry', 'Electrochemistry: Nernst, BV, Tafel'
     % ── Fitting tests ────────────────────────────────────────────────────
+    T('fitting','test_peak_detection'),   'fitting', 'Robust peak detection, background estimation, prominence'
     T('fitting','test_curve_fitting'),    'fitting', 'Curve fitting engine, models, autoGuess, parseEquation'
     T('fitting','test_templates_fft'),   'fitting', 'Publication templates and FFT filtering'
     T('fitting','test_resample_stats'),  'fitting', 'Resampling, descriptive stats, t-test, linear regression'
