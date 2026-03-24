@@ -2107,13 +2107,14 @@ function varargout = emViewerGUI()
     % ════════════════════════════════════════════════════════════════════
     function onOpenFiles(~, ~)
         filterSpec = { ...
-            '*.tif;*.tiff;*.jpg;*.jpeg;*.png;*.bmp;*.raw;*.dm3;*.dm4;*.bcf;*.ser;*.mrc;*.mrcs', 'All Supported Images'; ...
+            '*.tif;*.tiff;*.jpg;*.jpeg;*.png;*.bmp;*.raw;*.dm3;*.dm4;*.bcf;*.ser;*.mrc;*.mrcs;*.spm;*.000;*.001;*.002;*.003', 'All Supported Images'; ...
             '*.tif;*.tiff',                   'TIFF Files (*.tif, *.tiff)'; ...
             '*.jpg;*.jpeg;*.png;*.bmp',       'Common Images (*.jpg, *.png, *.bmp)'; ...
             '*.dm3;*.dm4',                    'Gatan Files (*.dm3, *.dm4)'; ...
             '*.bcf',                          'Bruker EDS Files (*.bcf)'; ...
             '*.ser',                          'FEI SER Files (*.ser)'; ...
             '*.mrc;*.mrcs',                   'MRC Files (*.mrc, *.mrcs)'; ...
+            '*.spm;*.000;*.001;*.002;*.003',  'AFM Files (*.spm, *.000)'; ...
             '*.raw',                          'RAW Binary Files (*.raw)'; ...
             '*.*',                            'All Files (*.*)'};
 
@@ -2934,6 +2935,12 @@ function varargout = emViewerGUI()
                         addToRecentFiles(fp);
                         loadedAny = true;
 
+                    case {'.spm', '.000', '.001', '.002', '.003'}
+                        data = parser.importAFM(fp);
+                        appendImage(data);
+                        addToRecentFiles(fp);
+                        loadedAny = true;
+
                     case '.raw'
                         % RAW files need dimensions from user
                         data = promptAndLoadRaw(fp);
@@ -2969,7 +2976,7 @@ function varargout = emViewerGUI()
 
                     otherwise
                         uialert(fig, ...
-                            sprintf('Unsupported file format: "%s"\n\nSupported: .tif, .tiff, .jpg, .png, .bcf, .raw, .dm3, .dm4, .ser, .mrc', ext), ...
+                            sprintf('Unsupported file format: "%s"\n\nSupported: .tif, .tiff, .jpg, .png, .bcf, .raw, .dm3, .dm4, .ser, .mrc, .spm, .000', ext), ...
                             'Unsupported Format', 'Icon', 'warning');
                 end
             catch ME
@@ -3131,6 +3138,10 @@ function varargout = emViewerGUI()
                             loadedAny = true;
                         case {'.mrc', '.mrcs'}
                             data = parser.importMRC(fp);
+                            appendImage(data);
+                            loadedAny = true;
+                        case {'.spm', '.000', '.001', '.002', '.003'}
+                            data = parser.importAFM(fp);
                             appendImage(data);
                             loadedAny = true;
                         case '.raw'
