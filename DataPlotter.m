@@ -12206,21 +12206,11 @@ function varargout = DataPlotter()
             btnDataCursor.BackgroundColor = BTN_TOOL;
             fig.WindowButtonDownFcn = @onAxesButtonDown;
             % Remove cursor graphics
-            if isprop(appData, 'cursorMarker') && isvalid(appData.cursorMarker)
-                delete(appData.cursorMarker);
-            end
-            if isprop(appData, 'cursorLabel') && isvalid(appData.cursorLabel)
-                delete(appData.cursorLabel);
-            end
-            if isprop(appData, 'cursorMarker2') && isvalid(appData.cursorMarker2)
-                delete(appData.cursorMarker2);
-            end
-            if isprop(appData, 'cursorDeltaLabel') && isvalid(appData.cursorDeltaLabel)
-                delete(appData.cursorDeltaLabel);
-            end
-            if isprop(appData, 'cursorLine') && isvalid(appData.cursorLine)
-                delete(appData.cursorLine);
-            end
+            if isgraphics(appData.cursorMarker), delete(appData.cursorMarker); end
+            if isgraphics(appData.cursorLabel), delete(appData.cursorLabel); end
+            if isgraphics(appData.cursorMarker2), delete(appData.cursorMarker2); end
+            if isgraphics(appData.cursorDeltaLabel), delete(appData.cursorDeltaLabel); end
+            if isgraphics(appData.cursorLine), delete(appData.cursorLine); end
             appData.cursorClickCount = 0;
             setStatus('Cursor off.');
         else
@@ -12273,23 +12263,12 @@ function varargout = DataPlotter()
         appData.cursorClickCount = appData.cursorClickCount + 1;
 
         if appData.cursorClickCount == 1
-            % First click: show point
-            if isprop(appData, 'cursorMarker') && isvalid(appData.cursorMarker)
-                delete(appData.cursorMarker);
-            end
-            if isprop(appData, 'cursorLabel') && isvalid(appData.cursorLabel)
-                delete(appData.cursorLabel);
-            end
-            % Clean up any previous second-click graphics
-            if isprop(appData, 'cursorMarker2') && isvalid(appData.cursorMarker2)
-                delete(appData.cursorMarker2);
-            end
-            if isprop(appData, 'cursorDeltaLabel') && isvalid(appData.cursorDeltaLabel)
-                delete(appData.cursorDeltaLabel);
-            end
-            if isprop(appData, 'cursorLine') && isvalid(appData.cursorLine)
-                delete(appData.cursorLine);
-            end
+            % First click: show point — clean up previous graphics
+            if isgraphics(appData.cursorMarker), delete(appData.cursorMarker); end
+            if isgraphics(appData.cursorLabel), delete(appData.cursorLabel); end
+            if isgraphics(appData.cursorMarker2), delete(appData.cursorMarker2); end
+            if isgraphics(appData.cursorDeltaLabel), delete(appData.cursorDeltaLabel); end
+            if isgraphics(appData.cursorLine), delete(appData.cursorLine); end
 
             hold(ax, 'on');
             appData.cursorMarker = plot(ax, xSnap, ySnap, 'ro', ...
@@ -12305,6 +12284,10 @@ function varargout = DataPlotter()
 
         elseif appData.cursorClickCount == 2
             % Second click: show delta
+            if isempty(appData.cursorPt1)
+                appData.cursorClickCount = 1;
+                return;
+            end
             hold(ax, 'on');
             appData.cursorMarker2 = plot(ax, xSnap, ySnap, 'bs', ...
                 'MarkerSize', 10, 'LineWidth', 2, 'HandleVisibility', 'off');
