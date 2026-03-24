@@ -3579,15 +3579,11 @@ function varargout = DataPlotter()
                 appData.peakMode = 'reflectometry';
                 configurePeakWindowForMode('reflectometry');
                 analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 210, 0};
-                % Hide BG file rows; show asymmetry rows
+                % Hide BG file rows; asymmetry is now in Advanced Analysis popup
                 corrGL.RowHeight{CROW.BGFILE}  = 0;
                 corrGL.RowHeight{CROW.BGSUBTR} = 0;
-                corrGL.RowHeight{CROW.ASYM1}   = 22;
-                corrGL.RowHeight{CROW.ASYM2}   = 22;
-                lblAsymmetry.Enable        = 'on';
-                cbCalculateAsymmetry.Enable = 'on';
-                lblAsymFormula.Enable      = 'on';
-                ddAsymFormula.Enable       = 'on';
+                corrGL.RowHeight{CROW.ASYM1}   = 0;
+                corrGL.RowHeight{CROW.ASYM2}   = 0;
                 % Hide magnetometry section (not applicable to neutron)
                 showMagSection(false);
 
@@ -8994,6 +8990,45 @@ function varargout = DataPlotter()
         drawToAxes(ax);
     end
 
+    function onAdvAsymmetry(~, ~)
+    %ONADVASYMMETRY  Toggle spin asymmetry from the Advanced Analysis popup.
+    %   Presents a dialog to configure asymmetry formula before toggling.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig, 'Load a neutron dataset first.', 'Spin Asymmetry');
+            return;
+        end
+        ds = appData.datasets{appData.activeIdx};
+        if ~isfield(ds, 'parserName') || ~isNeutronParser(ds.parserName)
+            uialert(fig, 'Active dataset is not neutron data. Load NCNR .refl/.datA files.', 'Spin Asymmetry');
+            return;
+        end
+        if cbCalculateAsymmetry.Value
+            % Currently on — offer to turn off
+            choice = uiconfirm(fig, 'Spin asymmetry is currently ON. Turn off?', ...
+                'Spin Asymmetry', 'Options', {'Turn Off', 'Cancel'}, ...
+                'DefaultOption', 1, 'CancelOption', 2);
+            if strcmp(choice, 'Turn Off')
+                cbCalculateAsymmetry.Value = false;
+                onAsymmetryToggle([], []);
+            end
+        else
+            % Currently off — let user pick formula then enable
+            choice = uiconfirm(fig, 'Calculate spin asymmetry?', ...
+                'Spin Asymmetry', ...
+                'Options', {'Linear: (R++ - R--) / (R++ + R--)', 'Log: log(R++ / R--)', 'Cancel'}, ...
+                'DefaultOption', 1, 'CancelOption', 3);
+            if strcmp(choice, 'Cancel'), return; end
+            if contains(choice, 'Log')
+                ddAsymFormula.Value = ddAsymFormula.Items{2};
+            else
+                ddAsymFormula.Value = ddAsymFormula.Items{1};
+            end
+            cbCalculateAsymmetry.Value = true;
+            onAsymmetryToggle([], []);
+        end
+        recordAction(sprintf('%% Spin asymmetry: %s', mat2str(cbCalculateAsymmetry.Value)));
+    end
+
     function onAsymmetryToggle(~,~)
     %ONASYMMETRYTOGGLE  Handle spin asymmetry checkbox state changes.
     %   When asymmetry is enabled:
@@ -13191,14 +13226,14 @@ function varargout = DataPlotter()
         % Position near the Advanced button
         figPos = fig.Position;
         advMenuFig = uifigure('Name', 'Advanced Tools', ...
-            'Position', [figPos(1) + figPos(3) - 350, figPos(2) + figPos(4) - 560, 340, 500], ...
+            'Position', [figPos(1) + figPos(3) - 350, figPos(2) + figPos(4) - 580, 340, 520], ...
             'Resize', 'off', ...
             'CloseRequestFcn', @(~,~) closeAdvMenu(), ...
             'KeyPressFcn', @(~,evt) onAdvMenuKey(evt));
 
-        % 25 rows x 2 cols: 7 headers, 6 separators, 12 button rows
-        advMenuGL = uigridlayout(advMenuFig, [25 2], ...
-            'RowHeight', {16, 26,26,26,  5,  16, 26,26,26,  5,  16, 26,  5,  16, 26,  5,  16, 26,  5,  16, 26,26,  5,  16, 26}, ...
+        % 26 rows x 2 cols: 7 headers, 6 separators, 13 button rows
+        advMenuGL = uigridlayout(advMenuFig, [26 2], ...
+            'RowHeight', {16, 26,26,26,  5,  16, 26,26,26,  5,  16, 26,  5,  16, 26,  5,  16, 26,  5,  16, 26,26,26,  5,  16, 26}, ...
             'ColumnWidth', {'1x', '1x'}, ...
             'Padding', [8 6 8 6], 'RowSpacing', 2, 'ColumnSpacing', 4);
 
@@ -13264,30 +13299,32 @@ function varargout = DataPlotter()
         advBtn(advMenuGL, 18, 2, 'Column Calculator...', @onColumnCalculator, ...
             'Create new columns from expressions');
 
-        % ── Section: THICKNESS / REFLECTIVITY ────────────────────────
+        % ── Section: NEUTRON / REFLECTOMETRY ─────────────────────────
         % Separator row 19
-        hdr6 = uilabel(advMenuGL, 'Text', 'THICKNESS / REFLECTIVITY', 'FontSize', 9, 'FontWeight', 'bold', 'FontColor', HDR_FC);
+        hdr6 = uilabel(advMenuGL, 'Text', 'NEUTRON / REFLECTOMETRY', 'FontSize', 9, 'FontWeight', 'bold', 'FontColor', HDR_FC);
         hdr6.Layout.Row = 20; hdr6.Layout.Column = [1 2];
 
-        advBtn(advMenuGL, 21, 1, 'FFT Thickness...', @onFFTThickness, ...
+        advBtn(advMenuGL, 21, 1, 'Spin Asymmetry...', @onAdvAsymmetry, ...
+            ['Toggle spin asymmetry calculation (R++ ' char(8722) ' R--) / (R++ + R--) for polarized neutron data']);
+        advBtn(advMenuGL, 21, 2, 'Reflectivity Fitting...', @onOpenReflFitDialog, ...
+            'Fit specular reflectivity R(Q) via Parratt recursion with layer stack editor');
+        advBtn(advMenuGL, 22, 1, 'FFT Thickness...', @onFFTThickness, ...
             'Compute film thickness from Laue / Kiessig fringe periodicity via FFT');
-        advBtn(advMenuGL, 21, 2, 'Reflectivity FFT...', @onReflectivityFFT, ...
+        advBtn(advMenuGL, 22, 2, 'Reflectivity FFT...', @onReflectivityFFT, ...
             ['Compute SLD profile from Kiessig fringes via FFT (Q-space). ' ...
              'Also estimates thickness from fringe spacing.']);
-        advBtn(advMenuGL, 22, 1, ['Fringe ' char(916) 't (2-click)...'], @onArmFringeThickness, ...
+        advBtn(advMenuGL, 23, 1, ['Fringe ' char(916) 't (2-click)...'], @onArmFringeThickness, ...
             ['Pick two fringe peaks to estimate thickness via t = 2' char(960) ...
              '/' char(916) 'Q.  Draggable markers for refinement.']);
-        advBtn(advMenuGL, 22, 2, 'Reflectivity Fitting...', @onOpenReflFitDialog, ...
-            'Fit specular reflectivity R(Q) via Parratt recursion with layer stack editor');
 
         % ── Section: VISUALIZATION & DATA ────────────────────────────
-        % Separator row 23
+        % Separator row 24
         hdr7 = uilabel(advMenuGL, 'Text', 'VISUALIZATION & DATA', 'FontSize', 9, 'FontWeight', 'bold', 'FontColor', HDR_FC);
-        hdr7.Layout.Row = 24; hdr7.Layout.Column = [1 2];
+        hdr7.Layout.Row = 25; hdr7.Layout.Column = [1 2];
 
-        advBtn(advMenuGL, 25, 1, 'Inset Plot...', @onCreateInset, ...
+        advBtn(advMenuGL, 26, 1, 'Inset Plot...', @onCreateInset, ...
             'Create an inset zoom of a selected region');
-        advBtn(advMenuGL, 25, 2, [char(9998) ' Graph Digitizer...'], @onOpenDigitizer, ...
+        advBtn(advMenuGL, 26, 2, [char(9998) ' Graph Digitizer...'], @onOpenDigitizer, ...
             'Extract data points from a graph image (screenshot/PDF figure)');
 
         function advBtn(gl, row, col, txt, cb, tip)
