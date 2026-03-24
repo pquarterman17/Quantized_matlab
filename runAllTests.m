@@ -78,6 +78,7 @@ SUITES = {
     T('gui','test_gui_harness'),            'gui',    'GUI API: load, correct, peaks, session'
     T('gui','test_gui_2d'),                 'gui',    'GUI API: 2D map load, plot types, cuts'
     T('gui','test_gui_phase4'),             'gui',    'GUI API: Q-space, colormap, mixed datasets'
+    T('gui','test_gui_buttons'),            'gui',    'GUI buttons: dataset mgmt, plot controls, corrections, toolbar, macros'
     T('gui','test_contour_features'),       'contour','Contour/heatmap: gridding, plot styles, edge cases, export'
     T('gui','test_materials_calc_gui'),     'calcgui','Materials calculator GUI API'
     % ── Imaging tests ─────────────────────────────────────────────────

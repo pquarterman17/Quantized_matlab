@@ -13162,7 +13162,7 @@ function varargout = DataPlotter()
         groupName = ddGroup.Value;
         if strcmp(groupName, 'All Datasets')
             % Show all datasets
-            refreshDatasetList();
+            rebuildDatasetList(true);
             return;
         end
         if ~appData.datasetGroups.isKey(groupName)
@@ -13179,7 +13179,7 @@ function varargout = DataPlotter()
             setStatus(sprintf('Group "%s" is empty', groupName));
             return;
         end
-        refreshDatasetList();
+        rebuildDatasetList(true);
         setStatus(sprintf('Showing group: %s (%d datasets)', groupName, numel(indices)));
     end
 
@@ -13220,7 +13220,7 @@ function varargout = DataPlotter()
             appData.datasetGroups.remove(groupName);
             ddGroup.Items = [{'All Datasets'}, appData.datasetGroups.keys()];
             ddGroup.Value = 'All Datasets';
-            refreshDatasetList();
+            rebuildDatasetList(true);
             setStatus(sprintf('Group "%s" deleted (empty)', groupName));
         else
             appData.datasetGroups(groupName) = existing;
