@@ -10763,10 +10763,10 @@ function varargout = DataPlotter()
         % -- Panel resize border detection: update cursor and store hover direction --
         dir = detectResizeBorder();
         appData.panelResizeDir = dir;
-        if     strcmp(dir, 'h_row12'), fig.Pointer = 'top';
-        elseif strcmp(dir, 'v_col12')
-                                                                   fig.Pointer = 'left';
-        else,                                                      fig.Pointer = 'arrow';
+        if     any(strcmp(dir, {'h_row12', 'h_axdata'})), fig.Pointer = 'top';
+        elseif any(strcmp(dir, {'v_col12', 'v_col23', 'v_content12', 'v_content23'}))
+                                                          fig.Pointer = 'left';
+        else,                                             fig.Pointer = 'arrow';
         end
 
         % -- x,y readout in top-right of axes --
@@ -11449,23 +11449,27 @@ function varargout = DataPlotter()
     function dir = detectResizeBorder()
     %DETECTRESIZEBORDER  Check whether fig.CurrentPoint is within SNAP_PX of a
     %  resizable panel border.  Returns:
-    %    'h_row12' — horizontal border between content row (1) and analysis row (2)
-    %    'v_col12' — vertical border between corrections col (1) and axis-limits col (2)
-    %    ''        — not near any known border
+    %    'h_row12'      — horizontal border between content row (1) and analysis row (2)
+    %    'h_axdata'     — horizontal border between axLimPanel and dataTablePanel
+    %    'v_col12'      — vertical border between corrections col (1) and axes col (2)
+    %    'v_col23'      — vertical border between axes col (2) and save/export col (3)
+    %    'v_content12'  — vertical border between file list and controls (top row)
+    %    'v_content23'  — vertical border between controls and preview (top row)
+    %    ''             — not near any known border
         SNAP_PX = 5;
         dir = '';
         try
             mp   = fig.CurrentPoint;                        % [x y] from figure bottom-left
             aPos = getpixelposition(analysisPanel, true);   % [l b w h] relative to figure
 
-            % h_row12: top edge of the analysis panel
+            % h_row12: top edge of the analysis panel (border between rows 1 & 2)
             borderY = aPos(2) + aPos(4);
             if abs(mp(2) - borderY) <= SNAP_PX && ...
                mp(1) >= aPos(1) && mp(1) <= aPos(1) + aPos(3)
                 dir = 'h_row12'; return;
             end
 
-            % Vertical borders — only test inside the analysis panel's y-band
+            % Borders inside the analysis panel's y-band
             if mp(2) >= aPos(2) && mp(2) <= aPos(2) + aPos(4)
 
                 % v_col12: right edge of corrections panel
@@ -11475,6 +11479,37 @@ function varargout = DataPlotter()
                     dir = 'v_col12'; return;
                 end
 
+                % v_col23: right edge of axLimPanel / dataTablePanel (col 2 → col 3)
+                alPos   = getpixelposition(axLimPanel, true);
+                borderX2 = alPos(1) + alPos(3);
+                if abs(mp(1) - borderX2) <= SNAP_PX
+                    dir = 'v_col23'; return;
+                end
+
+                % h_axdata: bottom edge of axLimPanel (border between axes and data table)
+                borderY2 = alPos(2);
+                if abs(mp(2) - borderY2) <= SNAP_PX && ...
+                   mp(1) >= alPos(1) && mp(1) <= alPos(1) + alPos(3)
+                    dir = 'h_axdata'; return;
+                end
+            end
+
+            % Borders inside the content row (top half of figure)
+            flPos = getpixelposition(fileListPanel, true);
+            cpPos = getpixelposition(ctrlPanel, true);
+            if mp(2) >= flPos(2) && mp(2) <= flPos(2) + flPos(4)
+
+                % v_content12: right edge of file list panel
+                borderX3 = flPos(1) + flPos(3);
+                if abs(mp(1) - borderX3) <= SNAP_PX
+                    dir = 'v_content12'; return;
+                end
+
+                % v_content23: right edge of controls panel
+                borderX4 = cpPos(1) + cpPos(3);
+                if abs(mp(1) - borderX4) <= SNAP_PX
+                    dir = 'v_content23'; return;
+                end
             end
         catch
             % getpixelposition may throw on some MATLAB versions — silently skip
@@ -11485,23 +11520,60 @@ function varargout = DataPlotter()
     %STARTPANELRESIZE  Arm motion/up handlers to begin dragging the detected border.
         mp = fig.CurrentPoint;
         appData.panelResizeStart = mp;
-        if strcmp(appData.panelResizeDir, 'h_row12')
-            % Snapshot the current analysis panel height (px)
-            try
-                aPos = getpixelposition(analysisPanel, true);
-                appData.panelResizeOrig = aPos(4);
-            catch
-                rh = rootGL.RowHeight;
-                appData.panelResizeOrig = guiTernary(isnumeric(rh{2}), rh{2}, 300);
-            end
-        elseif strcmp(appData.panelResizeDir, 'v_col12')
-            % Snapshot the current corrections panel width (px)
-            try
-                cPos = getpixelposition(corrPanel, true);
-                appData.panelResizeOrig = cPos(3);
-            catch
-                appData.panelResizeOrig = appData.corrPanelWidth;
-            end
+        switch appData.panelResizeDir
+            case 'h_row12'
+                % Snapshot the current analysis panel height (px)
+                try
+                    aPos = getpixelposition(analysisPanel, true);
+                    appData.panelResizeOrig = aPos(4);
+                catch
+                    rh = rootGL.RowHeight;
+                    appData.panelResizeOrig = guiTernary(isnumeric(rh{2}), rh{2}, 300);
+                end
+            case 'v_col12'
+                % Snapshot the current corrections panel width (px)
+                try
+                    cPos = getpixelposition(corrPanel, true);
+                    appData.panelResizeOrig = cPos(3);
+                catch
+                    appData.panelResizeOrig = appData.corrPanelWidth;
+                end
+            case 'h_axdata'
+                % Snapshot the axLimPanel row height (row 1 of analysisGL)
+                rh = analysisGL.RowHeight;
+                try
+                    alPos = getpixelposition(axLimPanel, true);
+                    appData.panelResizeOrig = alPos(4);
+                catch
+                    appData.panelResizeOrig = guiTernary(isnumeric(rh{1}), rh{1}, 110);
+                end
+            case 'v_col23'
+                % Snapshot the save/export panel width (col 3 of analysisGL)
+                try
+                    sPos = getpixelposition(savePanel, true);
+                    appData.panelResizeOrig = sPos(3);
+                catch
+                    cw = analysisGL.ColumnWidth;
+                    appData.panelResizeOrig = guiTernary(isnumeric(cw{3}), cw{3}, 210);
+                end
+            case 'v_content12'
+                % Snapshot the file list panel width (col 1 of contentGL)
+                try
+                    flPos = getpixelposition(fileListPanel, true);
+                    appData.panelResizeOrig = flPos(3);
+                catch
+                    cw = contentGL.ColumnWidth;
+                    appData.panelResizeOrig = guiTernary(isnumeric(cw{1}), cw{1}, 180);
+                end
+            case 'v_content23'
+                % Snapshot the controls panel width (col 2 of contentGL)
+                try
+                    cpPos = getpixelposition(ctrlPanel, true);
+                    appData.panelResizeOrig = cpPos(3);
+                catch
+                    cw = contentGL.ColumnWidth;
+                    appData.panelResizeOrig = guiTernary(isnumeric(cw{2}), cw{2}, 190);
+                end
         end
         fig.WindowButtonMotionFcn = @onPanelResizeMove;
         fig.WindowButtonUpFcn     = @onPanelResizeUp;
@@ -11512,27 +11584,59 @@ function varargout = DataPlotter()
         if isempty(appData.panelResizeStart), return; end
         mp = fig.CurrentPoint;
 
-        if strcmp(appData.panelResizeDir, 'h_row12')
-            % Mouse moves up (mp(2) increases) → analysis panel gets taller
-            delta_y = mp(2) - appData.panelResizeStart(2);
-            figH    = fig.Position(4);
-            % Available px after padding + RowSpacing gaps + status bar
-            %   rootGL: Padding [6 6 6 6] → 12 px;  2 RowSpacing gaps of 4 → 8 px;
-            %   status bar 16 px
-            availH  = figH - 12 - 8 - 16;
-            newH    = round(appData.panelResizeOrig + delta_y);
-            newH    = max(appData.MIN_ANALYSIS_H, min(newH, availH - appData.MIN_PREVIEW_H));
-            rootGL.RowHeight = {'1x', newH, 16};
+        switch appData.panelResizeDir
+            case 'h_row12'
+                % Mouse moves up → analysis panel gets taller
+                delta_y = mp(2) - appData.panelResizeStart(2);
+                figH    = fig.Position(4);
+                availH  = figH - 12 - 8 - 16;
+                newH    = round(appData.panelResizeOrig + delta_y);
+                newH    = max(appData.MIN_ANALYSIS_H, min(newH, availH - appData.MIN_PREVIEW_H));
+                rootGL.RowHeight = {'1x', newH, 16};
 
-        elseif strcmp(appData.panelResizeDir, 'v_col12')
-            % Mouse moves right → corrections panel gets wider
-            delta_x = mp(1) - appData.panelResizeStart(1);
-            newW    = round(appData.panelResizeOrig + delta_x);
-            newW    = max(appData.MIN_CORR_W, min(newW, 600));
-            appData.corrPanelWidth = newW;
-            cw    = analysisGL.ColumnWidth;
-            cw{1} = newW;
-            analysisGL.ColumnWidth = cw;
+            case 'v_col12'
+                % Mouse moves right → corrections panel gets wider
+                delta_x = mp(1) - appData.panelResizeStart(1);
+                newW    = round(appData.panelResizeOrig + delta_x);
+                newW    = max(appData.MIN_CORR_W, min(newW, 600));
+                appData.corrPanelWidth = newW;
+                cw    = analysisGL.ColumnWidth;
+                cw{1} = newW;
+                analysisGL.ColumnWidth = cw;
+
+            case 'h_axdata'
+                % Mouse moves up → axLimPanel (row 1) gets taller, dataTable shrinks
+                delta_y = mp(2) - appData.panelResizeStart(2);
+                newH    = round(appData.panelResizeOrig + delta_y);
+                newH    = max(60, min(newH, 400));  % min 60px for axes, max 400px
+                analysisGL.RowHeight = {newH, '1x'};
+
+            case 'v_col23'
+                % Mouse moves right → save panel (col 3) gets narrower
+                delta_x = mp(1) - appData.panelResizeStart(1);
+                newW    = round(appData.panelResizeOrig - delta_x);
+                newW    = max(140, min(newW, 400));  % min 140px, max 400px
+                cw    = analysisGL.ColumnWidth;
+                cw{3} = newW;
+                analysisGL.ColumnWidth = cw;
+
+            case 'v_content12'
+                % Mouse moves right → file list gets wider
+                delta_x = mp(1) - appData.panelResizeStart(1);
+                newW    = round(appData.panelResizeOrig + delta_x);
+                newW    = max(120, min(newW, 350));  % min 120px, max 350px
+                cw    = contentGL.ColumnWidth;
+                cw{1} = newW;
+                contentGL.ColumnWidth = cw;
+
+            case 'v_content23'
+                % Mouse moves right → controls panel gets wider
+                delta_x = mp(1) - appData.panelResizeStart(1);
+                newW    = round(appData.panelResizeOrig + delta_x);
+                newW    = max(140, min(newW, 350));  % min 140px, max 350px
+                cw    = contentGL.ColumnWidth;
+                cw{2} = newW;
+                contentGL.ColumnWidth = cw;
         end
     end
 
