@@ -155,6 +155,9 @@ classdef AppState < handle
         % ── Macro recording ────────────────────────────────────────
         macroLog                  = []
         macroRecording  logical = false
+
+        % ── Dataset groups ────────────────────────────────────────
+        datasetGroups             = []   % containers.Map (initialized in DataPlotter)
     end
 
     methods

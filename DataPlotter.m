@@ -327,9 +327,9 @@ function varargout = DataPlotter()
     fileListPanel = uipanel(contentGL, 'BorderType', 'none', 'Scrollable', 'on');
     fileListPanel.Layout.Row = 1; fileListPanel.Layout.Column = 1;
 
-    % Stacked vertically: Add | Remove | Filter | Merge | Up/Down | Animate/Shortcuts | Settings | Listbox
-    tbGL = uigridlayout(fileListPanel,[8 2], ...
-        'RowHeight',    {22,22,22,22,22,22,22,'1x'}, ...
+    % Stacked vertically: Add | Batch | Remove | Filter | Merge | Up/Down | Groups | Animate/Shortcuts | Settings | Listbox
+    tbGL = uigridlayout(fileListPanel,[10 2], ...
+        'RowHeight',    {22,22,22,22,22,22,22,22,22,'1x'}, ...
         'ColumnWidth',  {'1x','1x'}, ...
         'Padding',      [0 0 0 0], ...
         'RowSpacing',   2, ...
@@ -342,49 +342,92 @@ function varargout = DataPlotter()
         'Tooltip','Browse for one or more data files — each is added as a new dataset');
     btnBrowse.Layout.Row = 1; btnBrowse.Layout.Column = [1 2];
 
+    % Row 2: Batch Import | Batch XRD Convert
+    btnBatchImport = uibutton(tbGL,'Text','Batch Import...', ...
+        'ButtonPushedFcn',@onBatchImportDir, ...
+        'BackgroundColor',BTN_PRIMARY, ...
+        'FontColor',BTN_FG, ...
+        'Tooltip','Import all supported files from a directory (recursive)');
+    btnBatchImport.Layout.Row = 2; btnBatchImport.Layout.Column = 1;
+
+    btnBatchConvertXRD2 = uibutton(tbGL,'Text','Batch XRD...', ...
+        'ButtonPushedFcn',@onBatchConvertXRD, ...
+        'BackgroundColor',BTN_PRIMARY, ...
+        'FontColor',BTN_FG, ...
+        'Tooltip','Batch convert XRD files between formats');
+    btnBatchConvertXRD2.Layout.Row = 2; btnBatchConvertXRD2.Layout.Column = 2;
+
     btnRemoveDS = uibutton(tbGL,'Text','Remove Selected', ...
         'ButtonPushedFcn',@onRemoveDataset, ...
         'BackgroundColor',BTN_DANGER, ...
         'FontColor',BTN_FG, ...
         'Tooltip','Remove the highlighted dataset from the list (also: right-click or press Delete)');
-    btnRemoveDS.Layout.Row = 2; btnRemoveDS.Layout.Column = [1 2];
+    btnRemoveDS.Layout.Row = 3; btnRemoveDS.Layout.Column = [1 2];
 
     efDatasetSearch = uieditfield(tbGL,'text','Value','', ...
         'Placeholder','Filter datasets...', ...
         'Tooltip','Filter the dataset list by name (case-insensitive substring match)', ...
         'ValueChangedFcn',@onSearchChanged);
-    efDatasetSearch.Layout.Row = 3; efDatasetSearch.Layout.Column = [1 2];
+    efDatasetSearch.Layout.Row = 4; efDatasetSearch.Layout.Column = [1 2];
 
     btnMerge = uibutton(tbGL,'Text','Merge Selected', ...
         'ButtonPushedFcn',@onMergeDatasets, ...
         'BackgroundColor',BTN_ACCENT, ...
         'FontColor',BTN_FG, ...
         'Tooltip','Concatenate 2+ selected datasets into a new merged dataset (sorted by X)');
-    btnMerge.Layout.Row = 4; btnMerge.Layout.Column = 1;
+    btnMerge.Layout.Row = 5; btnMerge.Layout.Column = 1;
 
     btnDatasetMath = uibutton(tbGL,'Text','Dataset Math...', ...
         'ButtonPushedFcn',@onDatasetMath, ...
         'BackgroundColor',BTN_ACCENT, ...
         'FontColor',BTN_FG, ...
         'Tooltip','Create derived datasets via expressions: D1/D2, log10(D1), diff(D1), D1-D2, D1*D2');
-    btnDatasetMath.Layout.Row = 4; btnDatasetMath.Layout.Column = 2;
+    btnDatasetMath.Layout.Row = 5; btnDatasetMath.Layout.Column = 2;
 
     btnMoveUp = uibutton(tbGL,'Text',[char(9650) ' Up'], ...
         'ButtonPushedFcn',@onMoveDatasetUp, ...
         'Tooltip','Move the active dataset up in the list (Ctrl+Up)');
-    btnMoveUp.Layout.Row = 5; btnMoveUp.Layout.Column = 1;
+    btnMoveUp.Layout.Row = 6; btnMoveUp.Layout.Column = 1;
 
     btnMoveDown = uibutton(tbGL,'Text',[char(9660) ' Down'], ...
         'ButtonPushedFcn',@onMoveDatasetDown, ...
         'Tooltip','Move the active dataset down in the list (Ctrl+Down)');
-    btnMoveDown.Layout.Row = 5; btnMoveDown.Layout.Column = 2;
+    btnMoveDown.Layout.Row = 6; btnMoveDown.Layout.Column = 2;
+
+    % Row 7: Dataset Groups — dropdown + add/remove
+    grpGL = uigridlayout(tbGL,[1 3], ...
+        'Padding',[0 0 0 0],'ColumnSpacing',2, ...
+        'ColumnWidth',{'1x',36,20});
+    grpGL.Layout.Row = 7; grpGL.Layout.Column = [1 2];
+
+    ddGroup = uidropdown(grpGL, ...
+        'Items',{'All Datasets'}, ...
+        'Value','All Datasets', ...
+        'Editable','on', ...
+        'FontSize',10, ...
+        'Tooltip',['Filter by group. Type a new name and press Enter to create. ' ...
+                   'Select a group to filter the list.'], ...
+        'ValueChangedFcn',@onGroupChanged);
+    ddGroup.Layout.Column = 1;
+
+    btnAddToGroup = uibutton(grpGL,'Text','+Grp', ...
+        'ButtonPushedFcn',@onAddToGroup, ...
+        'FontSize',9, ...
+        'Tooltip','Add selected dataset(s) to the current group');
+    btnAddToGroup.Layout.Column = 2;
+
+    btnRemoveFromGroup = uibutton(grpGL,'Text',char(10005), ...
+        'ButtonPushedFcn',@onRemoveFromGroup, ...
+        'FontSize',9, ...
+        'Tooltip','Remove selected dataset(s) from the current group');
+    btnRemoveFromGroup.Layout.Column = 3;
 
     btnAnimate = uibutton(tbGL,'Text',[char(9654) ' Animate'], ...
         'ButtonPushedFcn',@onToggleAnimation, ...
         'BackgroundColor',[0.50 0.35 0.15], ...
         'FontColor',[1 1 1], ...
         'Tooltip','Cycle through datasets as animation frames (2 fps). Click again to stop.');
-    btnAnimate.Layout.Row = 6; btnAnimate.Layout.Column = 1;
+    btnAnimate.Layout.Row = 8; btnAnimate.Layout.Column = 1;
 
     btnShortcuts = uibutton(tbGL,'Text','?  Shortcuts', ...
         'ButtonPushedFcn',@onShowShortcuts, ...
@@ -392,7 +435,7 @@ function varargout = DataPlotter()
         'FontColor',[0.75 0.75 0.75], ...
         'FontSize',10, ...
         'Tooltip','Show keyboard shortcuts');
-    btnShortcuts.Layout.Row = 6; btnShortcuts.Layout.Column = 2;
+    btnShortcuts.Layout.Row = 8; btnShortcuts.Layout.Column = 2;
 
     btnSettings = uibutton(tbGL,'Text',[char(9881) '  Settings...'], ...
         'ButtonPushedFcn',@(~,~) onOpenSettings(), ...
@@ -400,7 +443,7 @@ function varargout = DataPlotter()
         'FontColor',[0.85 0.85 0.85], ...
         'FontSize',10, ...
         'Tooltip','Theme, plot style, and other global preferences');
-    btnSettings.Layout.Row = 7; btnSettings.Layout.Column = [1 2];
+    btnSettings.Layout.Row = 9; btnSettings.Layout.Column = [1 2];
 
     lbDatasets = uilistbox(tbGL, ...
         'Items',     {'(no files loaded — click  Add File(s)...  to begin)'}, ...
@@ -408,7 +451,7 @@ function varargout = DataPlotter()
         'Multiselect','on', ...
         'ValueChangedFcn',@onSelectDataset, ...
         'Tooltip','Loaded datasets — click to make active; Ctrl+click to select multiple; right-click to remove');
-    lbDatasets.Layout.Row = 8; lbDatasets.Layout.Column = [1 2];
+    lbDatasets.Layout.Row = 10; lbDatasets.Layout.Column = [1 2];
 
     % Context menu for dataset list (right-click) — #12 expanded
     % uicontextmenu on uifigure components requires R2023b+; guard for older versions.
@@ -563,13 +606,25 @@ function varargout = DataPlotter()
     'Tooltip','Force a full redraw of the current plot');
     btnPlot.Layout.Column = 2;
 
-    % Row 10: Annotation mode toggle
-    cbAnnotationMode = uicheckbox(ctrlGL, ...
-        'Text',    'Annotation Mode', ...
+    % Row 8: Annotation mode + Plot Options button
+    annotPlotGL = uigridlayout(ctrlGL,[1 2], ...
+        'Padding',[0 0 0 0],'ColumnSpacing',3, ...
+        'ColumnWidth',{'1x','1x'});
+    annotPlotGL.Layout.Row = 8;
+
+    cbAnnotationMode = uicheckbox(annotPlotGL, ...
+        'Text',    'Annotate', ...
         'Value',   false, ...
         'Tooltip', 'Click on the plot to add text annotations. Right-click to delete.', ...
         'ValueChangedFcn', @onAnnotationModeChanged);
-    cbAnnotationMode.Layout.Row = 8;
+    cbAnnotationMode.Layout.Column = 1;
+
+    btnPlotOptions = uibutton(annotPlotGL,'Text',['Plot ' char(9662)], ...
+        'ButtonPushedFcn',@onShowPlotOptionsMenu, ...
+        'BackgroundColor',[0.22 0.35 0.55],'FontColor',[1 1 1], ...
+        'FontSize',10, ...
+        'Tooltip','Plot types, visualization options, and unit conversion');
+    btnPlotOptions.Layout.Column = 2;
 
     % ── Right: preview axes ───────────────────────────────────────────────
     axPanel = uipanel(contentGL,'Title','Preview','FontSize',11);
@@ -1703,33 +1758,33 @@ function varargout = DataPlotter()
         'Padding', [0 0 0 0], 'RowSpacing', 2, 'ColumnSpacing', 3);
     saveToolsGL.Layout.Row = 8;
 
-    % Row 1: Batch XRD + Layout
-    btnBatchConvertXRD = uibutton(saveToolsGL,'Text','Batch XRD', ...
-        'ButtonPushedFcn', @onBatchConvertXRD, ...
-        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
-        'Tooltip', 'Batch XRD converter');
-    btnBatchConvertXRD.Layout.Row = 1; btnBatchConvertXRD.Layout.Column = 1;
-
+    % Row 1: Layout + Cursor
     btnLayoutSettings = uibutton(saveToolsGL,'Text','Layout...', ...
         'ButtonPushedFcn', @onOpenLayoutSettings, ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Tooltip', 'Layout settings');
-    btnLayoutSettings.Layout.Row = 1; btnLayoutSettings.Layout.Column = 2;
+    btnLayoutSettings.Layout.Row = 1; btnLayoutSettings.Layout.Column = 1;
 
-    % Row 2: Cursor + Figures
     btnDataCursor = uibutton(saveToolsGL,'Text','Cursor', ...
         'ButtonPushedFcn', @onToggleDataCursor, ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Tooltip', 'Toggle interactive data cursor — click to read (x,y), click again for delta');
-    btnDataCursor.Layout.Row = 2; btnDataCursor.Layout.Column = 1;
+    btnDataCursor.Layout.Row = 1; btnDataCursor.Layout.Column = 2;
 
+    % Row 2: Figures + Templates
     btnAdvFigure = uibutton(saveToolsGL,'Text','Figures...', ...
         'ButtonPushedFcn', @onAdvancedFigureBuilder, ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Tooltip', 'Advanced Figure Builder');
-    btnAdvFigure.Layout.Row = 2; btnAdvFigure.Layout.Column = 2;
+    btnAdvFigure.Layout.Row = 2; btnAdvFigure.Layout.Column = 1;
 
-    % Row 3: Overlay + Templates
+    btnTemplates = uibutton(saveToolsGL,'Text','Templates...', ...
+        'ButtonPushedFcn', @onPlotTemplates, ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Save/load plot formatting presets (axis limits, corrections, labels)');
+    btnTemplates.Layout.Row = 2; btnTemplates.Layout.Column = 2;
+
+    % Row 3: Overlay + Batch Figs
     cbOverlayMode = uicheckbox(saveToolsGL, ...
         'Text', 'Overlay', ...
         'Value', false, ...
@@ -1737,30 +1792,27 @@ function varargout = DataPlotter()
         'ValueChangedFcn', @onOverlayModeChanged);
     cbOverlayMode.Layout.Row = 3; cbOverlayMode.Layout.Column = 1;
 
-    btnTemplates = uibutton(saveToolsGL,'Text','Templates...', ...
-        'ButtonPushedFcn', @onPlotTemplates, ...
-        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
-        'Tooltip', 'Save/load plot formatting presets (axis limits, corrections, labels)');
-    btnTemplates.Layout.Row = 3; btnTemplates.Layout.Column = 2;
-
-    % Row 4: Batch Fig Export
     btnBatchFigExport = uibutton(saveToolsGL,'Text','Batch Figs...', ...
         'ButtonPushedFcn', @onBatchFigureExport, ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Tooltip', 'Export all datasets as individual figures with consistent formatting');
-    btnBatchFigExport.Layout.Row = 4; btnBatchFigExport.Layout.Column = 1;
+    btnBatchFigExport.Layout.Row = 3; btnBatchFigExport.Layout.Column = 2;
 
-    uilabel(saveToolsGL,'Text','');  % spacer
-    saveToolsGL.Children(end).Layout.Row = 4;
-    saveToolsGL.Children(end).Layout.Column = 2;
-
-    % Row 5: Advanced menu button (full width, prominent)
+    % Row 4: Advanced Analysis (full width)
     btnAdvanced = uibutton(saveToolsGL,'Text',[char(9881) ' Advanced Analysis ' char(9662)], ...
         'ButtonPushedFcn', @onShowAdvancedMenu, ...
         'BackgroundColor', [0.22 0.44 0.22], 'FontColor', [1 1 1], ...
         'FontWeight', 'bold', ...
         'Tooltip', 'Advanced analysis & correction tools (integrate, math, resample, inset, ...)');
-    btnAdvanced.Layout.Row = 5; btnAdvanced.Layout.Column = [1 2];
+    btnAdvanced.Layout.Row = 4; btnAdvanced.Layout.Column = [1 2];
+
+    % Row 5: Plot Options (full width)
+    btnPlotOpt2 = uibutton(saveToolsGL,'Text',['Plot Options ' char(9662)], ...
+        'ButtonPushedFcn', @onShowPlotOptionsMenu, ...
+        'BackgroundColor', [0.22 0.35 0.55], 'FontColor', [1 1 1], ...
+        'FontWeight', 'bold', ...
+        'Tooltip', 'Plot types, visualization options, and unit conversion');
+    btnPlotOpt2.Layout.Row = 5; btnPlotOpt2.Layout.Column = [1 2];
 
     % ── Peak Analysis window (separate uifigure) ──────────────────────────
     % The peak table + controls live in their own window, opened on demand.
@@ -9114,6 +9166,7 @@ function varargout = DataPlotter()
                 yyaxis(targetAx,'left');
             end
             lsPrimary    = guiLineSpec(appData.style);
+            lsRight      = guiLineSpec_right(appData.style);
             lsRaw        = guiLineSpec_raw(appData.style);
             anyRawShown  = false;
 
@@ -9529,7 +9582,7 @@ function varargout = DataPlotter()
                         if isfield(ds,'legendNameR') && ~isempty(ds.legendNameR)
                             dispName2 = ds.legendNameR;
                         end
-                        plot(targetAx, xVecPrimary(good2), yY2(good2), lsPrimary{:}, ...
+                        plot(targetAx, xVecPrimary(good2), yY2(good2), lsRight{:}, ...
                             'Color',       baseColor2, ...
                             'HitTest',     'off', ...
                             'DisplayName', dispName2);
@@ -11911,6 +11964,7 @@ function varargout = DataPlotter()
         rebuildDatasetList(true);
         updateControlsForActiveDataset();
         onPlot([],[]);
+        recordAction(sprintf('%% Resample: %d pts [%.4g, %.4g]', newN, newXMin, newXMax));
     end
 
     function onColumnCalculator(~,~)
@@ -11960,6 +12014,7 @@ function varargout = DataPlotter()
             updateControlsForActiveDataset();
             onPlot([],[]);
             setStatus(sprintf('Added column "%s".', colName));
+            recordAction(sprintf('%% Column calculator: %s = %s', colName, expr));
         catch ME
             uialert(fig, sprintf('Expression error:\n%s', ME.message), 'Column Calculator Error');
         end
@@ -12664,172 +12719,482 @@ function varargout = DataPlotter()
         end
     end
 
+    % ── Plot Options Popup Menu ──────────────────────────────────────────
+
+    plotOptFig = [];  % persistent handle to the plot options popup
+
+    function onShowPlotOptionsMenu(~, ~)
+    %ONSHOWPLOTOPTIONSMENU  Show a popup menu of plot types and visualization tools.
+
+        % Bring to front if already open
+        if ~isempty(plotOptFig) && isvalid(plotOptFig)
+            figure(plotOptFig);
+            return;
+        end
+
+        BTN_BG = [0.15 0.15 0.15];
+        BTN_FC = [0.9 0.9 0.9];
+        HDR_FC = [0.5 0.5 0.5];
+
+        figPos = fig.Position;
+        plotOptFig = uifigure('Name', 'Plot Options', ...
+            'Position', [figPos(1) + 200, figPos(2) + figPos(4) - 300, 220, 260], ...
+            'Resize', 'off', ...
+            'CloseRequestFcn', @(~,~) closePlotOptMenu(), ...
+            'KeyPressFcn', @(~,evt) onPlotOptKey(evt));
+
+        poGL = uigridlayout(plotOptFig, [10 1], ...
+            'RowHeight', {16, 26, 26, 26, 5, 16, 26, 26, 5, 26}, ...
+            'ColumnWidth', {'1x'}, ...
+            'Padding', [8 6 8 6], 'RowSpacing', 2);
+
+        % Section: PLOT TYPES
+        uilabel(poGL, 'Text', 'PLOT TYPES', 'FontSize', 9, ...
+            'FontWeight', 'bold', 'FontColor', HDR_FC).Layout.Row = 1;
+
+        poBtn(poGL, 2, 'Compose Figure...', @onComposeFigure, ...
+            'Multi-panel composite figure with subplot labels and annotations');
+        poBtn(poGL, 3, '3D Surface / Mesh...', @on3DSurface, ...
+            'Surface, mesh, or contour plot from gridded 2D data (e.g. area detector XRDML)');
+        poBtn(poGL, 4, 'Polar Plot...', @onPolarPlot, ...
+            'Polar plot for phi scans, pole figures, and angular measurements');
+
+        % Separator row 5
+
+        % Section: CONVERT
+        uilabel(poGL, 'Text', 'CONVERT', 'FontSize', 9, ...
+            'FontWeight', 'bold', 'FontColor', HDR_FC).Layout.Row = 6;
+
+        poBtn(poGL, 7, ['Convert Units (' char(8596) ')...'], @onConvertUnits, ...
+            ['Convert axis units: Oe' char(8596) 'T, emu' char(8596) ...
+             'A' char(183) 'm' char(178) ', K' char(8596) char(176) 'C, etc.']);
+        poBtn(poGL, 8, 'XRD CSV Export...', @onWriteXRDcsv, ...
+            'Export XRD data as CSV with metadata header (standard or Origin ASCII format)');
+
+        % Separator row 9
+
+        % Close
+        uibutton(poGL, 'Text', 'Close', ...
+            'ButtonPushedFcn', @(~,~) closePlotOptMenu(), ...
+            'BackgroundColor', [0.25 0.25 0.25], 'FontColor', [0.7 0.7 0.7]).Layout.Row = 10;
+
+        function poBtn(gl, row, txt, cb, tip)
+            b = uibutton(gl, 'Text', txt, ...
+                'ButtonPushedFcn', @(~,~) plotOptAction(cb), ...
+                'BackgroundColor', BTN_BG, 'FontColor', BTN_FC, ...
+                'HorizontalAlignment', 'left', ...
+                'Tooltip', tip);
+            b.Layout.Row = row;
+        end
+
+        function plotOptAction(callbackFcn)
+            closePlotOptMenu();
+            callbackFcn([], []);
+        end
+
+        function onPlotOptKey(evt)
+            if strcmp(evt.Key, 'escape'), closePlotOptMenu(); end
+        end
+
+        function closePlotOptMenu()
+            if ~isempty(plotOptFig) && isvalid(plotOptFig)
+                delete(plotOptFig);
+            end
+            plotOptFig = [];
+        end
+    end
+
+    % ── Plot Options callbacks ────────────────────────────────────────────
+
+    function onComposeFigure(~, ~)
+    %ONCOMPOSEFIGURE  Create a multi-panel composite figure.
+        if isempty(appData.datasets)
+            uialert(fig, 'Load at least one dataset.', 'Compose Figure');
+            return;
+        end
+        % Build sources from loaded datasets
+        sources = cell(1, numel(appData.datasets));
+        for si = 1:numel(appData.datasets)
+            sources{si} = appData.datasets{si}.data;
+        end
+        try
+            plotting.composeFigure(sources);
+            setStatus(sprintf('Composite figure: %d panels', numel(sources)));
+        catch ME
+            uialert(fig, sprintf('Compose Figure failed:\n%s', ME.message), 'Error');
+        end
+        recordAction('%% Composite figure created');
+    end
+
+    function on3DSurface(~, ~)
+    %ON3DSURFACE  Create a 3D surface/mesh plot from gridded data.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig, 'Load a dataset first.', '3D Surface');
+            return;
+        end
+        ds = appData.datasets{appData.activeIdx};
+        % Check for 2D map data
+        if isfield(ds.data.metadata, 'parserSpecific') && ...
+                isfield(ds.data.metadata.parserSpecific, 'is2D') && ...
+                ds.data.metadata.parserSpecific.is2D
+            try
+                plotting.surface3D(ds.data);
+                setStatus('3D surface plot created');
+            catch ME
+                uialert(fig, sprintf('3D Surface failed:\n%s', ME.message), 'Error');
+            end
+        else
+            uialert(fig, ['Active dataset does not contain 2D gridded data. ' ...
+                'Load a 2D XRDML map or area-detector scan.'], '3D Surface');
+        end
+        recordAction('%% 3D surface plot');
+    end
+
+    function onPolarPlot(~, ~)
+    %ONPOLARPLOT  Create a polar plot from the active dataset.
+        [xV, yV, ~] = getActiveXY();
+        if isempty(yV), return; end
+        try
+            plotting.polarPlot(xV, yV);
+            setStatus('Polar plot created');
+        catch ME
+            uialert(fig, sprintf('Polar Plot failed:\n%s', ME.message), 'Error');
+        end
+        recordAction('%% Polar plot');
+    end
+
+    function onConvertUnits(~, ~)
+    %ONCONVERTUNITS  Convert axis units for the active dataset.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig, 'Load a dataset first.', 'Convert Units');
+            return;
+        end
+        answer = inputdlg({ ...
+            'From unit (e.g. Oe, T, emu, K):', ...
+            'To unit (e.g. T, Oe, A*m2, C):'}, ...
+            'Convert Units', [1 40; 1 40], {'Oe', 'T'});
+        if isempty(answer), return; end
+        fromUnit = strtrim(answer{1});
+        toUnit   = strtrim(answer{2});
+        ds = appData.datasets{appData.activeIdx};
+        d = ds.data;
+        % Convert all matching columns
+        converted = false;
+        for ci = 1:numel(d.units)
+            if strcmpi(d.units{ci}, fromUnit)
+                try
+                    [d.values(:, ci), newUnit] = utilities.convertUnits( ...
+                        d.values(:, ci), fromUnit, toUnit);
+                    d.units{ci} = newUnit;
+                    converted = true;
+                catch ME
+                    uialert(fig, sprintf('Conversion failed for %s:\n%s', ...
+                        d.labels{ci}, ME.message), 'Error');
+                    return;
+                end
+            end
+        end
+        % Also convert time/x if its unit matches
+        if isfield(d.metadata, 'xUnit') && strcmpi(d.metadata.xUnit, fromUnit)
+            try
+                [d.time, newUnit] = utilities.convertUnits(d.time, fromUnit, toUnit);
+                d.metadata.xUnit = newUnit;
+                converted = true;
+            catch
+            end
+        end
+        if converted
+            ds.data = d;
+            ds.corrData = [];  % reset corrections since base data changed
+            appData.datasets{appData.activeIdx} = ds;
+            onPlot([], []);
+            setStatus(sprintf('Converted %s to %s', fromUnit, toUnit));
+        else
+            uialert(fig, sprintf('No columns with unit "%s" found.', fromUnit), 'Convert Units');
+        end
+        recordAction(sprintf('%% Convert units: %s -> %s', fromUnit, toUnit));
+    end
+
+    function onWriteXRDcsv(~, ~)
+    %ONWRITEXRDCSV  Export XRD data as CSV with metadata header.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig, 'Load a dataset first.', 'XRD CSV Export');
+            return;
+        end
+        ds = appData.datasets{appData.activeIdx};
+        [fn, fp] = uiputfile({'*.csv', 'CSV File (*.csv)'}, ...
+            'Export XRD CSV', [ds.name '.csv']);
+        if isequal(fn, 0), return; end
+        outPath = fullfile(fp, fn);
+        try
+            utilities.writeXRDcsv(ds.data, outPath);
+            setStatus(sprintf('XRD CSV exported: %s', fn));
+        catch ME
+            uialert(fig, sprintf('Export failed:\n%s', ME.message), 'Error');
+        end
+        recordAction(sprintf('%% XRD CSV export: %s', fn));
+    end
+
+    % ── Batch Import callback ─────────────────────────────────────────────
+
+    function onBatchImportDir(~, ~)
+    %ONBATCHIMPORTDIR  Import all supported files from a directory.
+        dirPath = uigetdir(pwd, 'Select directory to import');
+        if isequal(dirPath, 0), return; end
+        answer = uiconfirm(fig, 'Scan subdirectories recursively?', ...
+            'Batch Import', 'Options', {'Yes', 'No', 'Cancel'}, ...
+            'DefaultOption', 1, 'CancelOption', 3);
+        if strcmp(answer, 'Cancel'), return; end
+        recursive = strcmp(answer, 'Yes');
+        setStatus('Batch importing...');
+        drawnow;
+        try
+            results = scripts.batchImport(dirPath, 'Recursive', recursive);
+            if isempty(results)
+                uialert(fig, 'No supported files found in the selected directory.', 'Batch Import');
+                setStatus('Batch import: no files found');
+                return;
+            end
+            % Add each result as a dataset via standard buildDs path
+            nAdded = 0;
+            for bi = 1:numel(results)
+                if isempty(results(bi).data), continue; end
+                try
+                    fp_i = results(bi).filepath;
+                    ds_i = buildDs(fp_i, results(bi).data, 'importAuto');
+                    appData.datasets{end+1} = ds_i;
+                    nAdded = nAdded + 1;
+                catch
+                    % Skip files that fail to build dataset struct
+                end
+            end
+            if nAdded > 0
+                rebuildDatasetList(false);
+                appData.activeIdx = numel(appData.datasets);
+                onSelectDataset([], []);
+            end
+            setStatus(sprintf('Batch import: %d files loaded from %s', nAdded, dirPath));
+        catch ME
+            uialert(fig, sprintf('Batch import failed:\n%s', ME.message), 'Error');
+            setStatus('Batch import failed');
+        end
+        recordAction(sprintf("%% Batch import: '%s' (recursive=%d)", dirPath, recursive));
+    end
+
+    % ── Dataset Groups callbacks ──────────────────────────────────────────
+
+    appData.datasetGroups = containers.Map('KeyType', 'char', 'ValueType', 'any');
+
+    function onGroupChanged(~, ~)
+    %ONGROUPCHANGED  Filter dataset list by group or create a new group.
+        groupName = ddGroup.Value;
+        if strcmp(groupName, 'All Datasets')
+            % Show all datasets
+            refreshDatasetList();
+            return;
+        end
+        if ~appData.datasetGroups.isKey(groupName)
+            % New group — create it empty
+            appData.datasetGroups(groupName) = [];
+            ddGroup.Items = [{'All Datasets'}, appData.datasetGroups.keys()];
+            ddGroup.Value = groupName;
+            setStatus(sprintf('Group "%s" created — select datasets and click +Grp to add', groupName));
+            return;
+        end
+        % Filter listbox to show only datasets in this group
+        indices = appData.datasetGroups(groupName);
+        if isempty(indices)
+            setStatus(sprintf('Group "%s" is empty', groupName));
+            return;
+        end
+        refreshDatasetList();
+        setStatus(sprintf('Showing group: %s (%d datasets)', groupName, numel(indices)));
+    end
+
+    function onAddToGroup(~, ~)
+    %ONADDTOGROUP  Add selected datasets to the current group.
+        groupName = ddGroup.Value;
+        if strcmp(groupName, 'All Datasets')
+            uialert(fig, 'Select or create a group first (type a name in the dropdown).', 'Add to Group');
+            return;
+        end
+        sel = lbDatasets.Value;
+        if iscell(sel), sel = [sel{:}]; end
+        sel = sel(sel > 0);
+        if isempty(sel)
+            uialert(fig, 'Select datasets in the list first.', 'Add to Group');
+            return;
+        end
+        if ~appData.datasetGroups.isKey(groupName)
+            appData.datasetGroups(groupName) = [];
+        end
+        existing = appData.datasetGroups(groupName);
+        appData.datasetGroups(groupName) = unique([existing, sel]);
+        ddGroup.Items = [{'All Datasets'}, appData.datasetGroups.keys()];
+        setStatus(sprintf('Added %d dataset(s) to group "%s"', numel(sel), groupName));
+    end
+
+    function onRemoveFromGroup(~, ~)
+    %ONREMOVEFROMGROUP  Remove selected datasets from the current group.
+        groupName = ddGroup.Value;
+        if strcmp(groupName, 'All Datasets'), return; end
+        if ~appData.datasetGroups.isKey(groupName), return; end
+        sel = lbDatasets.Value;
+        if iscell(sel), sel = [sel{:}]; end
+        sel = sel(sel > 0);
+        existing = appData.datasetGroups(groupName);
+        existing = setdiff(existing, sel);
+        if isempty(existing)
+            appData.datasetGroups.remove(groupName);
+            ddGroup.Items = [{'All Datasets'}, appData.datasetGroups.keys()];
+            ddGroup.Value = 'All Datasets';
+            refreshDatasetList();
+            setStatus(sprintf('Group "%s" deleted (empty)', groupName));
+        else
+            appData.datasetGroups(groupName) = existing;
+            setStatus(sprintf('Removed %d dataset(s) from group "%s"', numel(sel), groupName));
+        end
+    end
+
     % ── Advanced Analysis & Correction Menu ─────────────────────────────
 
     advMenuFig = [];  % persistent handle to the popup menu figure
 
     function onShowAdvancedMenu(~, ~)
     %ONSHOWADVANCEDMENU  Show a popup menu of advanced analysis tools.
-    %   Opens a small floating figure with a list of actions. Clicking an
+    %   Opens a 2-column floating figure with sectioned actions. Clicking an
     %   action closes the popup and launches the corresponding dialog.
 
-        % Close existing popup if open
+        % Bring to front if already open (prevents "lost window" problem)
         if ~isempty(advMenuFig) && isvalid(advMenuFig)
-            delete(advMenuFig);
-            advMenuFig = [];
-            return;  % toggle off
+            figure(advMenuFig);
+            return;
         end
+
+        BTN_BG = [0.15 0.15 0.15];
+        BTN_FC = [0.9 0.9 0.9];
+        HDR_FC = [0.5 0.5 0.5];
 
         % Position near the Advanced button
         figPos = fig.Position;
         advMenuFig = uifigure('Name', 'Advanced Tools', ...
-            'Position', [figPos(1) + figPos(3) - 210, figPos(2) + figPos(4) - 460, 200, 400], ...
+            'Position', [figPos(1) + figPos(3) - 350, figPos(2) + figPos(4) - 560, 340, 500], ...
             'Resize', 'off', ...
-            'CloseRequestFcn', @(~,~) closeAdvMenu());
+            'CloseRequestFcn', @(~,~) closeAdvMenu(), ...
+            'KeyPressFcn', @(~,evt) onAdvMenuKey(evt));
 
-        advMenuGL = uigridlayout(advMenuFig, [24 1], ...
-            'RowHeight', {18, 26, 26, 26, 26, 6, 18, 26, 6, 18, 26, 26, 6, 18, 26, 26, 26, 6, 18, 26, 6, 18, 26, 26}, ...
-            'ColumnWidth', {'1x'}, ...
-            'Padding', [8 6 8 6], 'RowSpacing', 2);
+        % 25 rows x 2 cols: 7 headers, 6 separators, 12 button rows
+        advMenuGL = uigridlayout(advMenuFig, [25 2], ...
+            'RowHeight', {16, 26,26,26,  5,  16, 26,26,26,  5,  16, 26,  5,  16, 26,  5,  16, 26,  5,  16, 26,26,  5,  16, 26}, ...
+            'ColumnWidth', {'1x', '1x'}, ...
+            'Padding', [8 6 8 6], 'RowSpacing', 2, 'ColumnSpacing', 4);
 
-        % Section: Analysis
-        lbl1 = uilabel(advMenuGL, 'Text', 'ANALYSIS', 'FontSize', 9, 'FontWeight', 'bold', ...
-            'FontColor', [0.5 0.5 0.5]);
-        lbl1.Layout.Row = 1;
+        % ── Section: ANALYSIS ────────────────────────────────────────
+        hdr = uilabel(advMenuGL, 'Text', 'ANALYSIS', 'FontSize', 9, 'FontWeight', 'bold', 'FontColor', HDR_FC);
+        hdr.Layout.Row = 1; hdr.Layout.Column = [1 2];
 
-        btn1 = uibutton(advMenuGL, 'Text', [char(8747) ' Integrate (bounded)...'], ...
-            'ButtonPushedFcn', @(~,~) advMenuAction(@onOpenIntegrationDialog), ...
-            'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
-            'HorizontalAlignment', 'left', ...
-            'Tooltip', 'Compute definite integral between two x-range edge points');
-        btn1.Layout.Row = 2;
+        advBtn(advMenuGL, 2, 1, [char(8747) ' Integrate...'], @onOpenIntegrationDialog, ...
+            'Compute definite integral between two x-range edge points');
+        advBtn(advMenuGL, 2, 2, [char(8776) ' Curve Fit...'], @onOpenCurveFitDialog, ...
+            'Fit data to built-in models (exponential, power law, polynomial, Gaussian, ...)');
+        advBtn(advMenuGL, 3, 1, [char(916) ' Dataset Math...'], @onDatasetAlgebra, ...
+            'Combine datasets: A+B, A-B, A/B, A*B, asymmetry');
+        advBtn(advMenuGL, 3, 2, [char(8635) ' Hysteresis...'], @onOpenHysteresisDialog, ...
+            'Analyze M(H) loops: Hc, Mr, Ms, squareness, SFD, background subtraction');
+        advBtn(advMenuGL, 4, 1, 'ROI Analysis...', @onROIAnalysis, ...
+            'Select a region of interest and compute statistics within it');
+        advBtn(advMenuGL, 4, 2, 'Confidence Band...', @onConfidenceBand, ...
+            ['Mean' char(177) 'std or median' char(177) 'IQR shaded bands from repeat measurements']);
 
-        btn2 = uibutton(advMenuGL, 'Text', [char(916) ' Dataset Math...'], ...
-            'ButtonPushedFcn', @(~,~) advMenuAction(@onDatasetAlgebra), ...
-            'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
-            'HorizontalAlignment', 'left', ...
-            'Tooltip', 'Combine datasets: A+B, A-B, A/B, A*B, asymmetry');
-        btn2.Layout.Row = 3;
+        % ── Section: STATISTICS & FITTING ────────────────────────────
+        % Separator row 5
+        hdr2 = uilabel(advMenuGL, 'Text', 'STATISTICS & FITTING', 'FontSize', 9, 'FontWeight', 'bold', 'FontColor', HDR_FC);
+        hdr2.Layout.Row = 6; hdr2.Layout.Column = [1 2];
 
-        btn3 = uibutton(advMenuGL, 'Text', [char(8776) ' Curve Fit...'], ...
-            'ButtonPushedFcn', @(~,~) advMenuAction(@onOpenCurveFitDialog), ...
-            'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
-            'HorizontalAlignment', 'left', ...
-            'Tooltip', 'Fit data to built-in models (exponential, power law, polynomial, Gaussian, ...)');
-        btn3.Layout.Row = 4;
+        advBtn(advMenuGL, 7, 1, 'Descriptive Stats...', @onDescriptiveStats, ...
+            'Mean, median, std, quartiles, skewness, kurtosis for selected channel');
+        advBtn(advMenuGL, 7, 2, 'Linear Regression...', @onLinearRegression, ...
+            'Polynomial regression with confidence bands and p-values');
+        advBtn(advMenuGL, 8, 1, 't-Test...', @onTTest, ...
+            'One-sample, paired, or two-sample t-test');
+        advBtn(advMenuGL, 8, 2, 'Batch Fit...', @onBatchFit, ...
+            'Fit the same model across all loaded datasets and collect trend results');
+        advBtn(advMenuGL, 9, 1, 'Global Fit...', @onGlobalFit, ...
+            'Fit multiple datasets simultaneously with shared parameters');
+        advBtn(advMenuGL, 9, 2, 'Track Peak...', @onTrackPeak, ...
+            'Track peak position/width drift across a dataset series');
 
-        btnHyst = uibutton(advMenuGL, 'Text', [char(8635) ' Hysteresis Analysis...'], ...
-            'ButtonPushedFcn', @(~,~) advMenuAction(@onOpenHysteresisDialog), ...
-            'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
-            'HorizontalAlignment', 'left', ...
-            'Tooltip', 'Analyze M(H) loops: Hc, Mr, Ms, squareness, SFD, background subtraction');
-        btnHyst.Layout.Row = 5;
+        % ── Section: SIGNAL PROCESSING ───────────────────────────────
+        % Separator row 10
+        hdr3 = uilabel(advMenuGL, 'Text', 'SIGNAL PROCESSING', 'FontSize', 9, 'FontWeight', 'bold', 'FontColor', HDR_FC);
+        hdr3.Layout.Row = 11; hdr3.Layout.Column = [1 2];
 
-        % Separator (row 6)
+        advBtn(advMenuGL, 12, 1, 'FFT Filter...', @onFFTFilter, ...
+            'Frequency-domain lowpass / highpass / bandpass / notch filter');
 
-        % Section: Peak Analysis
-        lblPeak = uilabel(advMenuGL, 'Text', 'PEAK ANALYSIS', 'FontSize', 9, 'FontWeight', 'bold', ...
-            'FontColor', [0.5 0.5 0.5]);
-        lblPeak.Layout.Row = 7;
+        % ── Section: PEAK ANALYSIS ───────────────────────────────────
+        % Separator row 13
+        hdr4 = uilabel(advMenuGL, 'Text', 'PEAK ANALYSIS', 'FontSize', 9, 'FontWeight', 'bold', 'FontColor', HDR_FC);
+        hdr4.Layout.Row = 14; hdr4.Layout.Column = [1 2];
 
-        btnAdvPeak = uibutton(advMenuGL, 'Text', 'Advanced Peak Analysis...', ...
-            'ButtonPushedFcn', @(~,~) advMenuAction(@onOpenAdvancedPeakAnalysis), ...
-            'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
-            'HorizontalAlignment', 'left', ...
-            'Tooltip', ['Robust peak detection with adaptive noise, prominence ' ...
-                        'filtering, simultaneous multi-peak + polynomial background fitting']);
-        btnAdvPeak.Layout.Row = 8;
+        advBtn(advMenuGL, 15, 1, 'Advanced Peak Analysis...', @onOpenAdvancedPeakAnalysis, ...
+            ['Robust peak detection with adaptive noise, prominence ' ...
+             'filtering, simultaneous multi-peak + polynomial background fitting']);
 
-        % Separator (row 9)
+        % ── Section: CORRECTION ──────────────────────────────────────
+        % Separator row 16
+        hdr5 = uilabel(advMenuGL, 'Text', 'CORRECTION', 'FontSize', 9, 'FontWeight', 'bold', 'FontColor', HDR_FC);
+        hdr5.Layout.Row = 17; hdr5.Layout.Column = [1 2];
 
-        % Section: Correction
-        lbl2 = uilabel(advMenuGL, 'Text', 'CORRECTION', 'FontSize', 9, 'FontWeight', 'bold', ...
-            'FontColor', [0.5 0.5 0.5]);
-        lbl2.Layout.Row = 10;
+        advBtn(advMenuGL, 18, 1, [char(8596) ' Resample...'], @onResampleDataset, ...
+            'Resample data to a uniform x-grid');
+        advBtn(advMenuGL, 18, 2, 'Column Calculator...', @onColumnCalculator, ...
+            'Create new columns from expressions');
 
-        btn4 = uibutton(advMenuGL, 'Text', [char(8596) ' Resample...'], ...
-            'ButtonPushedFcn', @(~,~) advMenuAction(@onResampleDataset), ...
-            'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
-            'HorizontalAlignment', 'left', ...
-            'Tooltip', 'Resample data to a uniform x-grid');
-        btn4.Layout.Row = 11;
+        % ── Section: THICKNESS / REFLECTIVITY ────────────────────────
+        % Separator row 19
+        hdr6 = uilabel(advMenuGL, 'Text', 'THICKNESS / REFLECTIVITY', 'FontSize', 9, 'FontWeight', 'bold', 'FontColor', HDR_FC);
+        hdr6.Layout.Row = 20; hdr6.Layout.Column = [1 2];
 
-        btn5 = uibutton(advMenuGL, 'Text', 'Column Calculator...', ...
-            'ButtonPushedFcn', @(~,~) advMenuAction(@onColumnCalculator), ...
-            'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
-            'HorizontalAlignment', 'left', ...
-            'Tooltip', 'Create new columns from expressions');
-        btn5.Layout.Row = 12;
+        advBtn(advMenuGL, 21, 1, 'FFT Thickness...', @onFFTThickness, ...
+            'Compute film thickness from Laue / Kiessig fringe periodicity via FFT');
+        advBtn(advMenuGL, 21, 2, 'Reflectivity FFT...', @onReflectivityFFT, ...
+            ['Compute SLD profile from Kiessig fringes via FFT (Q-space). ' ...
+             'Also estimates thickness from fringe spacing.']);
+        advBtn(advMenuGL, 22, 1, ['Fringe ' char(916) 't (2-click)...'], @onArmFringeThickness, ...
+            ['Pick two fringe peaks to estimate thickness via t = 2' char(960) ...
+             '/' char(916) 'Q.  Draggable markers for refinement.']);
+        advBtn(advMenuGL, 22, 2, 'Reflectivity Fitting...', @onOpenReflFitDialog, ...
+            'Fit specular reflectivity R(Q) via Parratt recursion with layer stack editor');
 
-        % Separator (row 13)
+        % ── Section: VISUALIZATION & DATA ────────────────────────────
+        % Separator row 23
+        hdr7 = uilabel(advMenuGL, 'Text', 'VISUALIZATION & DATA', 'FontSize', 9, 'FontWeight', 'bold', 'FontColor', HDR_FC);
+        hdr7.Layout.Row = 24; hdr7.Layout.Column = [1 2];
 
-        % Section: Thickness / Reflectivity
-        lblThick = uilabel(advMenuGL, 'Text', 'THICKNESS / REFLECTIVITY', ...
-            'FontSize', 9, 'FontWeight', 'bold', 'FontColor', [0.5 0.5 0.5]);
-        lblThick.Layout.Row = 14;
+        advBtn(advMenuGL, 25, 1, 'Inset Plot...', @onCreateInset, ...
+            'Create an inset zoom of a selected region');
+        advBtn(advMenuGL, 25, 2, [char(9998) ' Graph Digitizer...'], @onOpenDigitizer, ...
+            'Extract data points from a graph image (screenshot/PDF figure)');
 
-        btnAdvFFTThick = uibutton(advMenuGL, 'Text', 'FFT Thickness...', ...
-            'ButtonPushedFcn', @(~,~) advMenuAction(@onFFTThickness), ...
-            'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
-            'HorizontalAlignment', 'left', ...
-            'Tooltip', 'Compute film thickness from Laue / Kiessig fringe periodicity via FFT');
-        btnAdvFFTThick.Layout.Row = 15;
-
-        btnAdvReflFFT = uibutton(advMenuGL, 'Text', 'Reflectivity FFT...', ...
-            'ButtonPushedFcn', @(~,~) advMenuAction(@onReflectivityFFT), ...
-            'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
-            'HorizontalAlignment', 'left', ...
-            'Tooltip', ['Compute SLD profile from Kiessig fringes via FFT (Q-space). ' ...
-                        'Also estimates thickness from fringe spacing.']);
-        btnAdvReflFFT.Layout.Row = 16;
-
-        btnAdvFringe = uibutton(advMenuGL, 'Text', ['Fringe ' char(916) 't (2-click)...'], ...
-            'ButtonPushedFcn', @(~,~) advMenuAction(@onArmFringeThickness), ...
-            'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
-            'HorizontalAlignment', 'left', ...
-            'Tooltip', ['Pick two fringe peaks to estimate thickness via t = 2' char(960) ...
-                        '/' char(916) 'Q.  Draggable markers for refinement.']);
-        btnAdvFringe.Layout.Row = 17;
-
-        % Separator (row 18)
-
-        % Section: Visualization
-        lbl3 = uilabel(advMenuGL, 'Text', 'VISUALIZATION', 'FontSize', 9, 'FontWeight', 'bold', ...
-            'FontColor', [0.5 0.5 0.5]);
-        lbl3.Layout.Row = 19;
-
-        btn6 = uibutton(advMenuGL, 'Text', 'Inset Plot...', ...
-            'ButtonPushedFcn', @(~,~) advMenuAction(@onCreateInset), ...
-            'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
-            'HorizontalAlignment', 'left', ...
-            'Tooltip', 'Create an inset zoom of a selected region');
-        btn6.Layout.Row = 20;
-
-        % Separator (row 21)
-
-        % Section: Data
-        lbl4 = uilabel(advMenuGL, 'Text', 'DATA', 'FontSize', 9, 'FontWeight', 'bold', ...
-            'FontColor', [0.5 0.5 0.5]);
-        lbl4.Layout.Row = 22;
-
-        btn7 = uibutton(advMenuGL, 'Text', [char(9998) ' Graph Digitizer...'], ...
-            'ButtonPushedFcn', @(~,~) advMenuAction(@onOpenDigitizer), ...
-            'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
-            'HorizontalAlignment', 'left', ...
-            'Tooltip', 'Extract data points from a graph image (screenshot/PDF figure)');
-        btn7.Layout.Row = 23;
-
-        btnAdvReflFit = uibutton(advMenuGL, 'Text', 'Reflectivity Fitting...', ...
-            'ButtonPushedFcn', @(~,~) advMenuAction(@onOpenReflFitDialog), ...
-            'BackgroundColor', [0.15 0.15 0.15], 'FontColor', [0.9 0.9 0.9], ...
-            'HorizontalAlignment', 'left', ...
-            'Tooltip', 'Fit specular reflectivity R(Q) via Parratt recursion with layer stack editor');
-        btnAdvReflFit.Layout.Row = 24;
+        function advBtn(gl, row, col, txt, cb, tip)
+        %ADVBTN  Create a styled button in the advanced menu grid.
+            b = uibutton(gl, 'Text', txt, ...
+                'ButtonPushedFcn', @(~,~) advMenuAction(cb), ...
+                'BackgroundColor', BTN_BG, 'FontColor', BTN_FC, ...
+                'HorizontalAlignment', 'left', ...
+                'Tooltip', tip);
+            b.Layout.Row = row; b.Layout.Column = col;
+        end
 
         function advMenuAction(callbackFcn)
         %ADVMENUACTION  Close the popup then execute the callback.
             closeAdvMenu();
             callbackFcn([], []);
+        end
+
+        function onAdvMenuKey(evt)
+            if strcmp(evt.Key, 'escape'), closeAdvMenu(); end
         end
 
         function closeAdvMenu()
@@ -13128,6 +13493,230 @@ function varargout = DataPlotter()
         dataplotter.hysteresisDialog(appData.datasets, appData.activeIdx, ax, ...
             'StatusFcn', @setStatus, ...
             'ButtonColors', struct('primary', BTN_PRIMARY, 'tool', BTN_TOOL, 'fg', BTN_FG));
+    end
+
+    % ── New analysis callbacks (wiring disconnected +utilities/+fitting functions) ──
+    % NOTE: onDescriptiveStats already exists above (data table stats popup).
+    %       The Advanced Analysis button calls that existing function.
+
+    function onLinearRegression(~, ~)
+    %ONLINEARREGRESSION  Polynomial regression with confidence bands.
+        [xV, yV, yLbl] = getActiveXY();
+        if isempty(yV), return; end
+        % Prompt for polynomial degree
+        answer = inputdlg('Polynomial degree (1 = linear):', 'Regression', 1, {'1'});
+        if isempty(answer), return; end
+        deg = round(str2double(answer{1}));
+        if isnan(deg) || deg < 1 || deg > 10
+            uialert(fig, 'Degree must be 1-10.', 'Regression'); return;
+        end
+        result = utilities.linRegress(xV, yV, 'Degree', deg);
+        % Plot regression line on axes
+        hold(ax, 'on');
+        xFit = linspace(min(xV), max(xV), 500)';
+        yFit = polyval(result.coefficients, xFit);
+        plot(ax, xFit, yFit, 'r-', 'LineWidth', 1.5, ...
+            'DisplayName', sprintf('Poly(%d) R%s=%.4f', deg, char(178), result.R2), ...
+            'Tag', 'GUIFitOverlay');
+        if isfield(result, 'ciUpper') && ~isempty(result.ciUpper)
+            ciUp = polyval(result.ciUpper, xFit);
+            ciLo = polyval(result.ciLower, xFit);
+            fill(ax, [xFit; flipud(xFit)], [ciUp; flipud(ciLo)], ...
+                'r', 'FaceAlpha', 0.15, 'EdgeColor', 'none', ...
+                'HandleVisibility', 'off', 'Tag', 'GUIFitOverlay');
+        end
+        hold(ax, 'off');
+        legend(ax, 'show');
+        msg = sprintf('R%s = %.6f,  p = %.4g', char(178), result.R2, result.pValue);
+        setStatus(sprintf('Regression: degree=%d  %s', deg, msg));
+        uialert(fig, sprintf('Degree %d regression:\n%s\nCoeffs: %s', ...
+            deg, msg, mat2str(result.coefficients, 4)), 'Regression', 'Icon', 'info');
+        recordAction(sprintf('%% Regression: degree=%d R2=%.4f', deg, result.R2));
+    end
+
+    function onTTest(~, ~)
+    %ONTTEST  Perform a t-test on the active channel.
+        [~, yV, yLbl] = getActiveXY();
+        if isempty(yV), return; end
+        % Ask for test type
+        choice = uiconfirm(fig, ...
+            'Select t-test type:', 't-Test', ...
+            'Options', {'One-sample (vs 0)', 'One-sample (vs value)', 'Cancel'}, ...
+            'DefaultOption', 1, 'CancelOption', 3);
+        if strcmp(choice, 'Cancel'), return; end
+        if strcmp(choice, 'One-sample (vs value)')
+            answer = inputdlg('Test value:', 't-Test', 1, {'0'});
+            if isempty(answer), return; end
+            mu0 = str2double(answer{1});
+        else
+            mu0 = 0;
+        end
+        result = utilities.tTest(yV, [], 'TestType', 'one', 'Mu', mu0);
+        msg = sprintf(['t-Test: %s vs %.4g\n' ...
+            't-statistic: %.4f\n' ...
+            'p-value:     %.6g\n' ...
+            'df:          %d\n' ...
+            'CI (95%%):    [%.4g, %.4g]\n' ...
+            'Significant: %s'], ...
+            yLbl, mu0, result.tStat, result.pValue, result.df, ...
+            result.ci(1), result.ci(2), ...
+            mat2str(result.pValue < 0.05));
+        uialert(fig, msg, 't-Test Result', 'Icon', 'info');
+        setStatus(sprintf('t-Test: t=%.3f  p=%.4g', result.tStat, result.pValue));
+        recordAction(sprintf('%% t-Test: %s vs %.4g, p=%.4g', yLbl, mu0, result.pValue));
+    end
+
+    function onConfidenceBand(~, ~)
+    %ONCONFIDENCEBAND  Overlay mean+/-std band from multiple datasets.
+        if numel(appData.datasets) < 2
+            uialert(fig, 'Need at least 2 datasets for confidence bands.', 'Confidence Band');
+            return;
+        end
+        choice = uiconfirm(fig, ...
+            'Band type:', 'Confidence Band', ...
+            'Options', {'Mean +/- Std', 'Median +/- IQR', 'Cancel'}, ...
+            'DefaultOption', 1, 'CancelOption', 3);
+        if strcmp(choice, 'Cancel'), return; end
+        bandType = 'meanstd';
+        if contains(choice, 'Median'), bandType = 'medianiqr'; end
+        result = utilities.confidenceBand(appData.datasets, 'Type', bandType);
+        hold(ax, 'on');
+        fill(ax, [result.x; flipud(result.x)], ...
+            [result.upper; flipud(result.lower)], ...
+            'b', 'FaceAlpha', 0.2, 'EdgeColor', 'none', ...
+            'DisplayName', choice, 'Tag', 'GUIFitOverlay');
+        plot(ax, result.x, result.center, 'b-', 'LineWidth', 1.5, ...
+            'DisplayName', 'Center', 'Tag', 'GUIFitOverlay');
+        hold(ax, 'off');
+        legend(ax, 'show');
+        setStatus(sprintf('Confidence band: %s (%d datasets)', bandType, numel(appData.datasets)));
+        recordAction(sprintf('%% Confidence band: %s', bandType));
+    end
+
+    function onROIAnalysis(~, ~)
+    %ONROIANALYSIS  Open ROI selection and statistics dialog.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig, 'Load a dataset first.', 'ROI Analysis');
+            return;
+        end
+        dataplotter.roiAnalysis(appData.datasets, appData.activeIdx, ax, ...
+            'StatusFcn', @setStatus);
+    end
+
+    function onFFTFilter(~, ~)
+    %ONFFTFILTER  Apply FFT filter to active dataset.
+        [xV, yV, yLbl] = getActiveXY();
+        if isempty(yV), return; end
+        % Prompt for filter type and cutoff
+        answer = inputdlg({ ...
+            'Filter type (lowpass / highpass / bandpass / notch):', ...
+            'Cutoff frequency (Hz, or [low high] for bandpass/notch):'}, ...
+            'FFT Filter', [1 50; 1 50], {'lowpass', '0.1'});
+        if isempty(answer), return; end
+        filterType = strtrim(answer{1});
+        cutoffStr = strtrim(answer{2});
+        % Parse cutoff safely (no eval): supports "0.1" or "0.01 0.5"
+        cutoff = str2double(strsplit(strtrim(cutoffStr)));
+        cutoff = cutoff(~isnan(cutoff));
+        if isempty(cutoff)
+            uialert(fig, 'Invalid cutoff value.', 'FFT Filter'); return;
+        end
+        result = utilities.fftFilter(xV, yV, 'Type', filterType, 'Cutoff', cutoff);
+        % Replace active Y channel with filtered data
+        ds = appData.datasets{appData.activeIdx};
+        ySel = ensureCell(lbY.Value);
+        idx = find(strcmp(ds.data.labels, ySel{1}), 1);
+        if ~isempty(idx)
+            ds.data.values(:, idx) = result.filtered;
+            appData.datasets{appData.activeIdx} = ds;
+            onPlot([], []);
+            setStatus(sprintf('FFT filter: %s (cutoff=%s) applied to %s', filterType, cutoffStr, yLbl));
+        end
+        recordAction(sprintf('%% FFT filter: %s cutoff=%s on %s', filterType, cutoffStr, yLbl));
+    end
+
+    function onBatchFit(~, ~)
+    %ONBATCHFIT  Fit the same model across all loaded datasets.
+        if numel(appData.datasets) < 2
+            uialert(fig, 'Need at least 2 datasets for batch fitting.', 'Batch Fit');
+            return;
+        end
+        % Open the curve fit dialog for the active dataset, then use its
+        % result to batch-fit all datasets.
+        setStatus('Batch Fit: first configure a fit on the active dataset using Curve Fit dialog...');
+        onOpenCurveFitDialog([], []);
+    end
+
+    function onGlobalFit(~, ~)
+    %ONGLOBALFIT  Fit multiple datasets simultaneously with shared parameters.
+        if numel(appData.datasets) < 2
+            uialert(fig, 'Need at least 2 datasets for global fitting.', 'Global Fit');
+            return;
+        end
+        setStatus('Global Fit: first configure a model via Curve Fit, then apply globally...');
+        onOpenCurveFitDialog([], []);
+    end
+
+    function onTrackPeak(~, ~)
+    %ONTRACKPEAK  Track peak position across a dataset series.
+        if numel(appData.datasets) < 2
+            uialert(fig, 'Need at least 2 datasets for peak tracking.', 'Track Peak');
+            return;
+        end
+        answer = inputdlg('Seed peak position (x value):', 'Track Peak', 1, {'0'});
+        if isempty(answer), return; end
+        seedPos = str2double(answer{1});
+        if isnan(seedPos)
+            uialert(fig, 'Invalid position.', 'Track Peak'); return;
+        end
+        try
+            result = fitting.trackPeak(appData.datasets, seedPos);
+            % Plot tracked positions
+            hold(ax, 'on');
+            plot(ax, 1:numel(result.positions), result.positions, 'ro-', ...
+                'LineWidth', 1.5, 'DisplayName', 'Peak Track', ...
+                'Tag', 'GUIFitOverlay');
+            hold(ax, 'off');
+            setStatus(sprintf('Peak tracked across %d datasets: %.4g to %.4g', ...
+                numel(result.positions), result.positions(1), result.positions(end)));
+        catch ME
+            uialert(fig, sprintf('Track Peak failed:\n%s', ME.message), 'Error');
+        end
+        recordAction(sprintf('%% Track peak: seed=%.4g', seedPos));
+    end
+
+    function [xV, yV, yLbl] = getActiveXY()
+    %GETACTIVEXY  Extract x,y vectors and label for the active dataset/channel.
+        xV = []; yV = []; yLbl = '';
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig, 'Load a dataset first.', 'No Data');
+            return;
+        end
+        ds = appData.datasets{appData.activeIdx};
+        d = ds.data;
+        if ~isempty(ds.corrData), d = ds.corrData; end
+        ySel = ensureCell(lbY.Value);
+        if isempty(ySel)
+            uialert(fig, 'Select a Y channel.', 'No Channel');
+            return;
+        end
+        yIdx = find(strcmp(d.labels, ySel{1}), 1);
+        if isempty(yIdx)
+            uialert(fig, 'Channel not found.', 'Error');
+            return;
+        end
+        xV = d.time;
+        yV = d.values(:, yIdx);
+        yLbl = d.labels{yIdx};
+        % Remove NaN/NaT
+        if isdatetime(xV)
+            valid = ~isnat(xV) & ~isnan(yV);
+            xV = datenum(xV(valid)); %#ok<DATEFUN>
+        else
+            valid = ~isnan(xV) & ~isnan(yV);
+            xV = xV(valid);
+        end
+        yV = yV(valid);
     end
 
     function onOpenReflFitDialog(~, ~)
@@ -14024,6 +14613,19 @@ function ls = guiLineSpec_raw(style)
             ls = {'LineStyle','--','Marker','o','MarkerSize',4,'LineWidth',0.75};
         otherwise   % 'Line'
             ls = {'LineStyle','--','LineWidth',0.75};
+    end
+end
+
+
+function ls = guiLineSpec_right(style)
+%GUILINESPEC_RIGHT  Dashed line spec for right-axis (Y2) channels.
+    switch style
+        case 'Scatter'
+            ls = {'LineStyle','none','Marker','s','MarkerSize',5};
+        case 'Line+Pts'
+            ls = {'LineStyle','--','Marker','s','MarkerSize',4};
+        otherwise   % 'Line'
+            ls = {'LineStyle','--'};
     end
 end
 
