@@ -11,6 +11,8 @@
 %     sims_stack_barrier.csv    — 10-element Cu/TaN/Ta/SiCN/Si
 %     sims_evans_w2834.xlsx     — Evans Analytical Group Excel format
 %                                 (8 elements, separator cols, mixed units)
+%     sims_evans_w2834_multisheet.xlsx — Same as above + Summary sheet
+%                                 (tests multi-sheet resolveParser dispatch)
 %     sims_synthetic.xlsx       — 8-element Excel (no separator cols)
 %
 %   Run standalone:  cd tests; run test_sims_parser
@@ -532,6 +534,43 @@ try
     assert(numel(orig{1}) == 6, 'Original A should have 6 points');
     assert(numel(orig{2}) == 11, 'Original B should have 11 points');
     fprintf('     Original depths preserved: A=%d pts, B=%d pts\n', numel(orig{1}), numel(orig{2}));
+
+    nPass = nPass + 1;
+catch ME
+    fprintf('     FAIL: %s\n', ME.message);
+    nFail = nFail + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════
+%  Test 16: Multi-sheet Excel SIMS (resolveParser dispatch)
+% ════════════════════════════════════════════════════════════════════
+fprintf('   Test 16: Multi-sheet Excel SIMS (resolveParser dispatch)\n');
+multiFixture = fullfile(rootDir, '+test_datasets', 'SIMS', 'sims_evans_w2834_multisheet.xlsx');
+try
+    assert(isfile(multiFixture), 'Multi-sheet fixture not found');
+
+    % Verify the file has multiple sheets
+    sheets = sheetnames(multiFixture);
+    assert(numel(sheets) >= 2, ...
+        'Fixture should have >= 2 sheets, got %d', numel(sheets));
+    fprintf('     Sheets: %s\n', strjoin(cellstr(sheets), ', '));
+
+    % resolveParser must still detect it as SIMS
+    result = parser.resolveParser(multiFixture);
+    assert(strcmp(result.name, 'importSIMS'), ...
+        'Multi-sheet Excel SIMS should resolve to importSIMS, got %s', result.name);
+    fprintf('     resolveParser: %s ✔\n', result.name);
+
+    % importSIMS should parse the data sheet correctly
+    d = parser.importSIMS(multiFixture, 'Sheet', sheets{1});
+    assert(numel(d.labels) == 8, ...
+        'Expected 8 elements from data sheet, got %d', numel(d.labels));
+
+    % Element names should be recovered (not unit strings)
+    hasElement = cellfun(@(s) ~startsWith(s, '('), d.labels);
+    assert(all(hasElement), ...
+        'Labels should be element names, not units: %s', strjoin(d.labels, ', '));
+    fprintf('     Labels: %s\n', strjoin(d.labels, ', '));
 
     nPass = nPass + 1;
 catch ME

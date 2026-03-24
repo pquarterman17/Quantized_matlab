@@ -2364,11 +2364,20 @@ function varargout = DataPlotter()
                 else
                     selectedSheets = allSheetNames;
                 end
+                % Determine correct parser for this Excel file (SIMS vs generic)
+                resolveResult = parser.resolveParser(fp);
+                excelParserName = resolveResult.name;
+
                 for si = 1:numel(selectedSheets)
                     shName = selectedSheets{si};
                     try
-                        data       = parser.importExcel(fp, 'Sheet', shName);
-                        parserName = 'importExcel';
+                        if strcmp(excelParserName, 'importSIMS')
+                            data       = parser.importSIMS(fp, 'Sheet', shName);
+                            parserName = 'importSIMS';
+                        else
+                            data       = parser.importExcel(fp, 'Sheet', shName);
+                            parserName = 'importExcel';
+                        end
                         ds = buildDs(fp, data, parserName);
                         ds.displayName = sprintf('%s%s [%s]', fnBase, fExt, shName);
                         appData.datasets{end+1} = ds;
