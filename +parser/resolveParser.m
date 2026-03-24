@@ -197,24 +197,38 @@ function tf = looksLikeSIMSExcel(filepath)
 %     (a) Vendor signature: "Evans Analytical", "EAG", "SIMS" in early rows
 %     (b) Repeated "Depth" + "CONC" column pairs (≥3 pairs) in any row
     tf = false;
+
+    % Try readcell with explicit range first; fall back to full read if
+    % the row-range syntax fails (MATLAB version-dependent).
+    raw = {};
     try
         raw = readcell(filepath, 'Range', '1:15');
     catch
-        return;
+        try
+            rawFull = readcell(filepath);
+            nRows = min(15, size(rawFull, 1));
+            raw = rawFull(1:nRows, :);
+        catch
+            return;
+        end
     end
     if isempty(raw), return; end
 
-    % Flatten all text content from the first 15 rows
-    allText = '';
+    tf = checkSIMSContent(raw);
+end
+
+
+function tf = checkSIMSContent(raw)
+%CHECKSIMSCONTENT  Check cell array rows for SIMS vendor signatures or
+%   repeated Depth/CONC column pairs.
+    tf = false;
     [nR, nC] = size(raw);
+
+    % Flatten all text content
+    allText = '';
     for r = 1:nR
         for c = 1:nC
-            v = raw{r, c};
-            if ischar(v)
-                allText = [allText, ' ', v]; %#ok<AGROW>
-            elseif isstring(v)
-                allText = [allText, ' ', char(v)]; %#ok<AGROW>
-            end
+            allText = [allText, ' ', cellToText(raw{r, c})]; %#ok<AGROW>
         end
     end
     allLower = lower(allText);
@@ -231,12 +245,7 @@ function tf = looksLikeSIMSExcel(filepath)
     for r = 1:nR
         rowText = '';
         for c = 1:nC
-            v = raw{r, c};
-            if ischar(v)
-                rowText = [rowText, ' ', v]; %#ok<AGROW>
-            elseif isstring(v)
-                rowText = [rowText, ' ', char(v)]; %#ok<AGROW>
-            end
+            rowText = [rowText, ' ', cellToText(raw{r, c})]; %#ok<AGROW>
         end
         rowLower = lower(rowText);
         nDepth = numel(regexp(rowLower, '\bdepth\b'));
@@ -245,6 +254,22 @@ function tf = looksLikeSIMSExcel(filepath)
             tf = true;
             return;
         end
+    end
+end
+
+
+function s = cellToText(v)
+%CELLTOTEXT  Convert a readcell value to char for text scanning.
+    if ischar(v)
+        s = v;
+    elseif isstring(v)
+        if ismissing(v)
+            s = '';
+        else
+            s = char(v);
+        end
+    else
+        s = '';
     end
 end
 
