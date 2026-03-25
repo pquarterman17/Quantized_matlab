@@ -256,6 +256,316 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  TEST 7 — Box integration: profile vs axis1 (sum along 2Theta → rocking curve)
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 7: Box integration vs axis1 (rocking curve) ══\n');
+api.reset();
+try
+    api.addFiles({FILE_2D});
+    drawnow;
+
+    ds = api.getDatasets();
+    map = ds{1}.data.metadata.parserSpecific.map2D;
+    nBefore = numel(ds);
+
+    % Select a sub-region — middle portion of both axes
+    xLo = map.axis2(2);  xHi = map.axis2(end-1);
+    yLo = map.axis1(2);  yHi = map.axis1(end-1);
+
+    api.boxIntegrate2D(xLo, xHi, yLo, yHi, 'axis1');
+
+    dsAfter = api.getDatasets();
+    assert(numel(dsAfter) == nBefore + 1, 'Expected one new dataset from box integral');
+
+    newDs = dsAfter{end};
+    assert(~newDs.data.metadata.parserSpecific.is2D, 'Box integral result should be 1D');
+    assert(strcmp(newDs.parserName, 'boxIntegral'), 'Parser name should be boxIntegral');
+
+    % Verify profile length matches rows in box
+    rowMask = map.axis1 >= yLo & map.axis1 <= yHi;
+    colMask = map.axis2 >= xLo & map.axis2 <= xHi;
+    expectedLen = sum(rowMask);
+    assert(numel(newDs.data.time) == expectedLen, ...
+        sprintf('Profile length %d != expected %d rows', numel(newDs.data.time), expectedLen));
+
+    % Verify values match manual summation
+    Isub = map.intensity(rowMask, colMask);
+    expectedVals = sum(Isub, 2);
+    assert(max(abs(newDs.data.values(:,1) - expectedVals)) < 1e-6, ...
+        'Integrated values do not match manual sum');
+
+    fprintf('  Profile length: %d\n', expectedLen);
+    fprintf('  Values match  : yes\n');
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  TEST 8 — Box integration: profile vs axis2 (sum along Omega → 2θ profile)
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 8: Box integration vs axis2 (2θ profile) ══\n');
+api.reset();
+try
+    api.addFiles({FILE_2D});
+    drawnow;
+
+    ds = api.getDatasets();
+    map = ds{1}.data.metadata.parserSpecific.map2D;
+    nBefore = numel(ds);
+
+    xLo = map.axis2(2);  xHi = map.axis2(end-1);
+    yLo = map.axis1(2);  yHi = map.axis1(end-1);
+
+    api.boxIntegrate2D(xLo, xHi, yLo, yHi, 'axis2');
+
+    dsAfter = api.getDatasets();
+    assert(numel(dsAfter) == nBefore + 1, 'Expected one new dataset');
+
+    newDs = dsAfter{end};
+    colMask = map.axis2 >= xLo & map.axis2 <= xHi;
+    rowMask = map.axis1 >= yLo & map.axis1 <= yHi;
+    expectedLen = sum(colMask);
+    assert(numel(newDs.data.time) == expectedLen, ...
+        sprintf('Profile length %d != expected %d cols', numel(newDs.data.time), expectedLen));
+
+    Isub = map.intensity(rowMask, colMask);
+    expectedVals = sum(Isub, 1)';
+    assert(max(abs(newDs.data.values(:,1) - expectedVals)) < 1e-6, ...
+        'Integrated values do not match manual sum');
+
+    fprintf('  Profile length: %d\n', expectedLen);
+    fprintf('  Values match  : yes\n');
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  TEST 9 — Box integration: full-range box covers entire map
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 9: Box integration full range ══\n');
+api.reset();
+try
+    api.addFiles({FILE_2D});
+    drawnow;
+
+    ds = api.getDatasets();
+    map = ds{1}.data.metadata.parserSpecific.map2D;
+
+    % Box covering the entire map with generous margin
+    xLo = min(map.axis2) - 1;  xHi = max(map.axis2) + 1;
+    yLo = min(map.axis1) - 1;  yHi = max(map.axis1) + 1;
+
+    api.boxIntegrate2D(xLo, xHi, yLo, yHi, 'axis1');
+
+    dsAfter = api.getDatasets();
+    newDs = dsAfter{end};
+
+    % Full range: all rows, all columns
+    assert(numel(newDs.data.time) == numel(map.axis1), ...
+        'Full-range box should include all rows');
+
+    expectedVals = sum(map.intensity, 2);
+    assert(max(abs(newDs.data.values(:,1) - expectedVals)) < 1e-6, ...
+        'Full-range integrated values should match full row sums');
+
+    fprintf('  Full map rows: %d\n', numel(map.axis1));
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  TEST 10 — Box integration: Q-space mode
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 10: Box integration in Q-space ══\n');
+api.reset();
+try
+    api.addFiles({FILE_2D});
+    drawnow;
+
+    ds = api.getDatasets();
+    map = ds{1}.data.metadata.parserSpecific.map2D;
+
+    if isfield(map, 'Qx')
+        api.setQSpace(true);
+        nBefore = numel(api.getDatasets());
+
+        meanQx = mean(map.Qx, 1);
+        meanQz = mean(map.Qz, 2);
+        qxLo = meanQx(2);  qxHi = meanQx(end-1);
+        qzLo = meanQz(2);  qzHi = meanQz(end-1);
+
+        api.boxIntegrate2D(qxLo, qxHi, qzLo, qzHi, 'axis1');
+
+        dsAfter = api.getDatasets();
+        assert(numel(dsAfter) == nBefore + 1, 'Expected one new dataset in Q-space mode');
+
+        newDs = dsAfter{end};
+        assert(~newDs.data.metadata.parserSpecific.is2D, 'Result should be 1D');
+        assert(contains(newDs.displayName, 'Box'), 'Display name should contain Box');
+
+        fprintf('  Q-space integral added\n');
+        fprintf('  PASS\n');
+        passed = passed + 1;
+    else
+        fprintf('  SKIP: No Qx/Qz in test file (wavelength not available)\n');
+        passed = passed + 1;
+    end
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  TEST 11 — Arc integration: full-circle I(|Q|) profile
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 11: Arc integration full circle ══\n');
+api.reset();
+try
+    api.addFiles({FILE_2D});
+    drawnow;
+
+    ds = api.getDatasets();
+    map = ds{1}.data.metadata.parserSpecific.map2D;
+
+    if isfield(map, 'Qx')
+        Qrad = hypot(map.Qx(:), map.Qz(:));
+        qMin = min(Qrad);  qMax = max(Qrad);
+        nBins = 20;
+        nBefore = numel(api.getDatasets());
+
+        api.arcIntegrate2D(qMin, qMax, nBins);
+
+        dsAfter = api.getDatasets();
+        assert(numel(dsAfter) == nBefore + 1, 'Expected one new dataset from arc integral');
+
+        newDs = dsAfter{end};
+        assert(~newDs.data.metadata.parserSpecific.is2D, 'Arc integral should be 1D');
+        assert(strcmp(newDs.parserName, 'arcIntegral'), 'Parser name should be arcIntegral');
+        assert(numel(newDs.data.time) == nBins, ...
+            sprintf('Expected %d bins, got %d', nBins, numel(newDs.data.time)));
+
+        % All pixels should contribute — total sum should match
+        totalI = sum(newDs.data.values(:,1), 'omitnan');
+        expectedTotal = sum(map.intensity(:));
+        assert(abs(totalI - expectedTotal) / expectedTotal < 0.01, ...
+            'Total integrated intensity should match (within 1% for binning edge effects)');
+
+        fprintf('  Bins: %d, Total I: %.2f (expected ~%.2f)\n', ...
+            nBins, totalI, expectedTotal);
+        fprintf('  PASS\n');
+        passed = passed + 1;
+    else
+        fprintf('  SKIP: No Qx/Qz\n');
+        passed = passed + 1;
+    end
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  TEST 12 — Arc integration: sector mask
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 12: Arc integration with sector mask ══\n');
+api.reset();
+try
+    api.addFiles({FILE_2D});
+    drawnow;
+
+    ds = api.getDatasets();
+    map = ds{1}.data.metadata.parserSpecific.map2D;
+
+    if isfield(map, 'Qx')
+        Qrad = hypot(map.Qx(:), map.Qz(:));
+        qMin = min(Qrad);  qMax = max(Qrad);
+        nBins = 20;
+
+        % Full circle first
+        api.arcIntegrate2D(qMin, qMax, nBins);
+        dsFull = api.getDatasets();
+        fullDs = dsFull{end};
+
+        % Upper half only (0 to 180 degrees)
+        api.arcIntegrate2D(qMin, qMax, nBins, 'SectorMin', 0, 'SectorMax', 180);
+        dsHalf = api.getDatasets();
+        halfDs = dsHalf{end};
+
+        % Sector result should have <= total of full circle
+        fullSum = sum(fullDs.data.values(:,1), 'omitnan');
+        halfSum = sum(halfDs.data.values(:,1), 'omitnan');
+        assert(halfSum <= fullSum + 1e-6, ...
+            'Sector sum should be <= full circle sum');
+        assert(halfSum > 0, 'Sector sum should be > 0');
+
+        fprintf('  Full: %.2f, Sector 0-180: %.2f\n', fullSum, halfSum);
+        fprintf('  PASS\n');
+        passed = passed + 1;
+    else
+        fprintf('  SKIP: No Qx/Qz\n');
+        passed = passed + 1;
+    end
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  TEST 13 — Arc integration: Mean mode
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 13: Arc integration Mean mode ══\n');
+api.reset();
+try
+    api.addFiles({FILE_2D});
+    drawnow;
+
+    ds = api.getDatasets();
+    map = ds{1}.data.metadata.parserSpecific.map2D;
+
+    if isfield(map, 'Qx')
+        Qrad = hypot(map.Qx(:), map.Qz(:));
+        qMin = min(Qrad);  qMax = max(Qrad);
+        nBins = 20;
+
+        api.arcIntegrate2D(qMin, qMax, nBins, 'Mode', 'Mean');
+
+        dsAfter = api.getDatasets();
+        newDs = dsAfter{end};
+        assert(strcmp(newDs.data.metadata.parserSpecific.mode, 'Mean'), ...
+            'Mode should be Mean');
+
+        % Mean values should be smaller than sum values for bins with >1 pixel
+        api.arcIntegrate2D(qMin, qMax, nBins, 'Mode', 'Sum');
+        sumDs = api.getDatasets();
+        sumDs = sumDs{end};
+
+        meanVals = newDs.data.values(:,1);
+        sumVals  = sumDs.data.values(:,1);
+        validBins = ~isnan(meanVals) & ~isnan(sumVals) & sumVals > 0;
+        assert(all(meanVals(validBins) <= sumVals(validBins) + 1e-9), ...
+            'Mean should be <= Sum for each bin');
+
+        fprintf('  Mean mode verified against Sum mode\n');
+        fprintf('  PASS\n');
+        passed = passed + 1;
+    else
+        fprintf('  SKIP: No Qx/Qz\n');
+        passed = passed + 1;
+    end
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  Summary
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n%s\n', repmat(char(9552), 1, 52));

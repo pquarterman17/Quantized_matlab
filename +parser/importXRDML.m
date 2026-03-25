@@ -178,6 +178,13 @@ function data = importXRDML(filepath, options)
     % Detector
     detectorName = rxAttr(xml, 'detector', 'name');
 
+    % Beam attenuator metadata (from incidentBeamPath)
+    attBlock         = rxBlock(xml, 'beamAttenuator');
+    attFactor        = rxDouble(attBlock, 'factor');
+    attMaterial      = rxText(attBlock, 'material');
+    attActivateLevel = rxDouble(attBlock, 'activateLevel');
+    nScansAttCorrected = 0;  % count of scans where factors ~= 1
+
     % Software
     appSoftware     = rxText(xml, 'applicationSoftware');
     appSoftwareVer  = rxAttr(xml, 'applicationSoftware', 'version');
@@ -311,6 +318,22 @@ function data = importXRDML(filepath, options)
         nPts    = numel(cntVals);
         if nPts < 1; continue; end
 
+        % Apply beam attenuation correction (per-pixel factors from the instrument)
+        % When an attenuator is active, factors > 1 restore true intensity.
+        bafStr = rxText(dpBlock, 'beamAttenuationFactors');
+        if ~isempty(bafStr)
+            bafVals = sscanf(bafStr, '%f')';
+            if numel(bafVals) == nPts
+                if any(abs(bafVals - 1) > 1e-6)
+                    nScansAttCorrected = nScansAttCorrected + 1;
+                end
+                cntVals = cntVals .* bafVals;
+            elseif isscalar(bafVals) && abs(bafVals - 1) > 1e-6
+                nScansAttCorrected = nScansAttCorrected + 1;
+                cntVals = cntVals * bafVals;
+            end
+        end
+
         % ── Collect per-scan data for 2D area-detector classification ──────
         nValid2D = nValid2D + 1;
         if isempty(scanSecName)
@@ -406,6 +429,10 @@ function data = importXRDML(filepath, options)
         if options.Verbose
             fprintf('  [importXRDML] 2D area-detector: %d %s frames x %d detector pixels\n', ...
                 nValid, scanSecName, nPtsPerScan);
+            if nScansAttCorrected > 0
+                fprintf('  [importXRDML] Beam attenuation corrected in %d/%d scans (factor: %.1f, %s)\n', ...
+                    nScansAttCorrected, nValid, attFactor, attMaterial);
+            end
         end
         % 1D fallback: override concatenated vectors with integrated profile
         twoTheta_all = twoThetaVec';
@@ -489,6 +516,10 @@ function data = importXRDML(filepath, options)
     ps.startAngle              = twoTheta_col(1);
     ps.endAngle                = twoTheta_col(end);
     ps.stepSize                = mean(diff(twoTheta_col), 'omitnan');
+    ps.attenuatorFactor        = attFactor;
+    ps.attenuatorMaterial      = attMaterial;
+    ps.attenuatorActivateLevel = attActivateLevel;
+    ps.nScansAttCorrected      = nScansAttCorrected;
 
     % 2D area-detector fields
     ps.is2D = is2D;

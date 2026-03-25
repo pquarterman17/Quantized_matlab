@@ -104,6 +104,8 @@ function varargout = DataPlotter()
 %   api.is2DActive()           — true when active dataset is a 2D area-detector map
 %   api.setMap2DType(typeStr)  — set '2D plot type' and replot ('Heatmap'|'Contour'|...)
 %   api.extractLineCut2D(x,y,isH) — extract 1D slice from 2D map (isH: H-cut vs V-cut)
+%   api.boxIntegrate2D(xLo,xHi,yLo,yHi,profileAxis) — integrate box region of 2D map
+%   api.arcIntegrate2D(qMin,qMax,nBins,...) — arc integrate I(|Q|) from 2D RSM
 %   api.setQSpace(tf)          — enable/disable Q-space axes on 2D map and replot
 %   api.setContourLevels(n)    — set number of contour levels for Contour plot types
 %   api.setColormap(name)      — set active colormap by name and replot
@@ -2108,8 +2110,8 @@ function varargout = DataPlotter()
     map2DPanel.Layout.Row = [1 2]; map2DPanel.Layout.Column = 4;
     map2DPanel.Visible = 'off';   % shown only when a 2D area-detector dataset is active
 
-    map2DGL = uigridlayout(map2DPanel,[11 2], ...
-        'RowHeight',    {20, 20, 20, 20, 20, 20, 20, 22, 18, 18, '1x'}, ...
+    map2DGL = uigridlayout(map2DPanel,[13 2], ...
+        'RowHeight',    {20, 20, 20, 20, 20, 20, 20, 22, 22, 22, 18, 18, '1x'}, ...
         'ColumnWidth',  {85, '1x'}, ...
         'Padding',      [4 4 4 4], ...
         'RowSpacing',   3, ...
@@ -2187,18 +2189,38 @@ function varargout = DataPlotter()
         'Tooltip','Open a polar plot of integrated intensity at a chosen 2θ position');
     btnPoleFigure.Layout.Row = 8; btnPoleFigure.Layout.Column = [1 2];
 
+    btnBoxIntegrate = uibutton(map2DGL,'Text','Box Integrate...', ...
+        'ButtonPushedFcn',@onBoxIntButton, ...
+        'BackgroundColor',[0.20 0.50 0.35], ...
+        'FontColor',[1 1 1], ...
+        'Tooltip',['Draw a box on the 2D map to integrate intensity within a region.' newline ...
+                   'Or use ' guiTernary(ismac, 'Option', 'Alt') '+drag directly on the map.']);
+    btnBoxIntegrate.Layout.Row = 9; btnBoxIntegrate.Layout.Column = [1 2];
+
+    btnArcIntegrate = uibutton(map2DGL,'Text','Arc Integrate...', ...
+        'ButtonPushedFcn',@onArcIntButton, ...
+        'BackgroundColor',[0.40 0.25 0.55], ...
+        'FontColor',[1 1 1], ...
+        'Enable', 'off', ...
+        'Tooltip',['Integrate along arcs of constant |Q| in reciprocal space.' newline ...
+                   'Requires Q-space coordinates (wavelength in file metadata).']);
+    btnArcIntegrate.Layout.Row = 10; btnArcIntegrate.Layout.Column = [1 2];
+
     lblMap2DInfo = uilabel(map2DGL,'Text','', ...
         'FontSize', 9, ...
         'FontColor', [0.4 0.4 0.4], ...
         'HorizontalAlignment', 'center', ...
         'WordWrap', 'on');
-    lblMap2DInfo.Layout.Row = 9; lblMap2DInfo.Layout.Column = [1 2];
+    lblMap2DInfo.Layout.Row = 11; lblMap2DInfo.Layout.Column = [1 2];
 
-    lblMap2DHint = uilabel(map2DGL,'Text','Shift+click: H-cut  |  Ctrl+click: V-cut', ...
+    lblMap2DHint = uilabel(map2DGL,'Text', ...
+        ['Shift+click: H-cut | Ctrl+click: V-cut | ' ...
+         guiTernary(ismac, 'Opt', 'Alt') '+drag: Box integrate'], ...
         'FontSize', 8, ...
         'FontColor', [0.55 0.55 0.55], ...
-        'HorizontalAlignment', 'center');
-    lblMap2DHint.Layout.Row = 10; lblMap2DHint.Layout.Column = [1 2];
+        'HorizontalAlignment', 'center', ...
+        'WordWrap', 'on');
+    lblMap2DHint.Layout.Row = 12; lblMap2DHint.Layout.Column = [1 2];
 
     % ── Drag-and-drop: register every major surface as a drop target (R2023a+) ──
     % In uifigure the CEF renderer consumes drag events at whichever child
@@ -2263,6 +2285,8 @@ function varargout = DataPlotter()
     api.unmaskAll           = @() onUnmaskAll([],[]);
     api.fringeThickness     = @fringeThicknessDirect;
     api.clearFringe         = @clearFringeMarkers;
+    api.boxIntegrate2D      = @boxIntegrate2DDirect;
+    api.arcIntegrate2D      = @arcIntegrate2DDirect;
     api.reset               = @resetGUIDirect;
 
     % ── Testability API (headless test hooks) ──────────────────────────
@@ -2666,6 +2690,41 @@ function varargout = DataPlotter()
         drawnow;
     end
 
+    function boxIntegrate2DDirect(xLo, xHi, yLo, yHi, profileAxis)
+    %BOXINTEGRATE2DDIRECT  Programmatically integrate a rectangular region of a 2D map.
+    %   xLo, xHi — X bounds (axis2 / 2Theta / Qx)
+    %   yLo, yHi — Y bounds (axis1 / Omega / Qz)
+    %   profileAxis — 'axis1' (sum along axis2) or 'axis2' (sum along axis1)
+        extract2DBoxIntegral(xLo, yLo, xHi, yHi, profileAxis);
+        drawnow;
+    end
+
+    function arcIntegrate2DDirect(qMin, qMax, nBins, varargin)
+    %ARCINTEGRATE2DDIRECT  Programmatically perform arc integration on a 2D RSM.
+    %   qMin, qMax  — Q-radius range (Ang^-1)
+    %   nBins       — number of radial bins
+    %   Name-Value:
+    %     SectorMin  — azimuthal start angle in degrees (default 0)
+    %     SectorMax  — azimuthal end angle in degrees (default 360)
+    %     Mode       — 'Sum' (default) or 'Mean'
+        p = inputParser;
+        addRequired(p, 'qMin',  @isnumeric);
+        addRequired(p, 'qMax',  @isnumeric);
+        addRequired(p, 'nBins', @isnumeric);
+        addParameter(p, 'SectorMin', 0,     @isnumeric);
+        addParameter(p, 'SectorMax', 360,   @isnumeric);
+        addParameter(p, 'Mode',      'Sum', @(x) ischar(x)||isstring(x));
+        parse(p, qMin, qMax, nBins, varargin{:});
+        params.qMin = p.Results.qMin;
+        params.qMax = p.Results.qMax;
+        params.nBins = round(p.Results.nBins);
+        params.sectorMin = p.Results.SectorMin;
+        params.sectorMax = p.Results.SectorMax;
+        params.mode = char(p.Results.Mode);
+        extract2DArcIntegral(params);
+        drawnow;
+    end
+
     function setQSpaceDirect(tf)
     %SETQSPACEDIRECT  Enable or disable Q-space axes on the 2D map and replot.
     %   tf: true to enable Q-space (Qx/Qz), false for angular axes.
@@ -2735,6 +2794,9 @@ function varargout = DataPlotter()
         appData.fringeDragIdx     = 0;
         appData.maskStartPt       = [];
         appData.maskRectPatch     = [];
+        appData.boxIntStartPt     = [];
+        appData.boxIntPatch       = [];
+        appData.boxIntMode        = false;
 
         % Reset correction widgets
         efXOffset.Value      = 0;
@@ -3270,6 +3332,13 @@ function varargout = DataPlotter()
         end
         appData.maskRectPatch     = [];
         appData.maskStartPt       = [];
+        % Abort any in-progress box integration selection
+        if ~isempty(appData.boxIntPatch) && isvalid(appData.boxIntPatch)
+            delete(appData.boxIntPatch);
+        end
+        appData.boxIntPatch       = [];
+        appData.boxIntStartPt     = [];
+        appData.boxIntMode        = false;
         btnMaskSelect.Text            = 'Mask Selection';
         btnMaskSelect.BackgroundColor = [0.60 0.15 0.15];
         btnMaskSelect.Enable          = 'on';
@@ -3471,12 +3540,14 @@ function varargout = DataPlotter()
             map = ds.data.metadata.parserSpecific.map2D;
             lblMap2DInfo.Text = sprintf('%d %s positions  \xD7  %d 2\xB0 pixels', ...
                 numel(map.axis1), map.axis1Name, numel(map.axis2));
-            % Enable Q-space toggle only when wavelength was available for conversion
+            % Enable Q-space toggle and arc integration only when wavelength was available
             if isfield(map, 'Qx')
-                cbMap2DQSpace.Enable = 'on';
+                cbMap2DQSpace.Enable  = 'on';
+                btnArcIntegrate.Enable = 'on';
             else
-                cbMap2DQSpace.Enable = 'off';
-                cbMap2DQSpace.Value  = false;
+                cbMap2DQSpace.Enable  = 'off';
+                cbMap2DQSpace.Value   = false;
+                btnArcIntegrate.Enable = 'off';
             end
         else
             ddScaleY.Value = 'Linear';
@@ -4375,7 +4446,7 @@ function varargout = DataPlotter()
         refreshPeakTable();
         onPlot([],[]);
         % Auto-open peak window on first peak
-        if numel(ds.peaks) == 1, showPeakWindow(); end
+        if isscalar(ds.peaks), showPeakWindow(); end
         % Stay in pick mode — user presses button again to stop
     end
 
@@ -7170,7 +7241,6 @@ function varargout = DataPlotter()
                       'BgInterp', ddBGInterp.Value};
         end
         corrData = dataplotter.applyCorrections(d, corrParams, bgArgs{:});
-        derivMode = ddDerivative.Value;
 
         ds.corrData      = corrData;
         ds.xOff          = xOff;
@@ -10544,7 +10614,301 @@ function varargout = DataPlotter()
         newDs.legendName  = cutLabel;
         appData.datasets{end+1} = newDs;
         rebuildDatasetList(numel(appData.datasets));
+        updateControlsForActiveDataset();
         fprintf('[DataPlotter] Line-cut added: %s — %s\n', [fn fext], cutLabel);
+    end
+
+    function extract2DBoxIntegral(bx0, by0, bx1, by1, profileAxis)
+    %EXTRACT2DBOXINTEGRAL  Integrate a rectangular region of a 2D map into a 1D profile.
+    %   bx0, by0, bx1, by1 — box corners in data coordinates (X=axis2, Y=axis1)
+    %   profileAxis (optional) — 'axis1' or 'axis2'; if omitted a dialog is shown.
+        if appData.activeIdx < 1 || isempty(appData.datasets), return; end
+        ds = appData.datasets{appData.activeIdx};
+        if ~is2DDataset(ds), return; end
+
+        map = ds.data.metadata.parserSpecific.map2D;
+        [~, fn, fext] = fileparts(ds.filepath);
+
+        xLo = min(bx0, bx1);  xHi = max(bx0, bx1);
+        yLo = min(by0, by1);  yHi = max(by0, by1);
+
+        useQSpace = cbMap2DQSpace.Value && isfield(map, 'Qx');
+
+        % Find row and column masks within the box
+        if useQSpace
+            meanQz = mean(map.Qz, 2);  % [N×1]
+            meanQx = mean(map.Qx, 1);  % [1×M]
+            rowMask = meanQz >= yLo & meanQz <= yHi;
+            colMask = meanQx >= xLo & meanQx <= xHi;
+        else
+            rowMask = map.axis1 >= yLo & map.axis1 <= yHi;
+            colMask = map.axis2 >= xLo & map.axis2 <= xHi;
+        end
+
+        if ~any(rowMask) || ~any(colMask)
+            uialert(fig, 'No data points fall within the selected box.', 'Empty Selection');
+            return;
+        end
+
+        % Determine axis names for dialog
+        if useQSpace
+            name1 = 'Q_z';
+            name2 = 'Q_x';
+        else
+            name1 = map.axis1Name;
+            name2 = map.axis2Name;
+        end
+
+        % Ask user for integration direction (or use supplied profileAxis)
+        if nargin < 5 || isempty(profileAxis)
+            opt1 = sprintf('Profile vs %s (sum along %s)', name1, name2);
+            opt2 = sprintf('Profile vs %s (sum along %s)', name2, name1);
+            sel = uiconfirm(fig, ...
+                'Choose integration direction:', 'Box Integration', ...
+                'Options', {opt1, opt2, 'Cancel'}, ...
+                'DefaultOption', 1, 'CancelOption', 3);
+            if strcmp(sel, 'Cancel'), return; end
+            if strcmp(sel, opt1)
+                profileAxis = 'axis1';
+            else
+                profileAxis = 'axis2';
+            end
+        end
+
+        Isub = map.intensity(rowMask, colMask);
+
+        if strcmp(profileAxis, 'axis1')
+            % Sum across columns (axis2 direction) → profile vs axis1
+            yVec = sum(Isub, 2);
+            if useQSpace
+                xVec = mean(map.Qz(rowMask, colMask), 2);
+                xColName = 'Q_z (Ang^-1)';
+            else
+                xVec = map.axis1(rowMask);
+                xColName = [map.axis1Name ' (' map.axis1Unit ')'];
+            end
+            dirLabel = name2;
+        else
+            % Sum across rows (axis1 direction) → profile vs axis2
+            yVec = sum(Isub, 1)';
+            if useQSpace
+                xVec = mean(map.Qx(rowMask, colMask), 1)';
+                xColName = 'Q_x (Ang^-1)';
+            else
+                xVec = map.axis2(colMask);
+                xColName = [map.axis2Name ' (' map.axis2Unit ')'];
+            end
+            dirLabel = name1;
+        end
+
+        cutLabel = sprintf('Box %s [%.4g–%.4g]%s[%.4g–%.4g] %s %s', ...
+            char(8747), xLo, xHi, char(215), yLo, yHi, char(8594), ...
+            sprintf('vs %s', strrep(dirLabel, '_', '')));
+
+        meta.source      = ds.filepath;
+        meta.importDate  = datetime('now');
+        meta.parserName  = 'boxIntegral';
+        meta.xColumnName = xColName;
+        meta.xColumnUnit = '';
+        meta.parserSpecific = struct('is2D', false, ...
+            'originFile', ds.filepath, 'cutLabel', cutLabel, ...
+            'boxRegion', [xLo xHi yLo yHi], 'profileAxis', profileAxis);
+        intData = parser.createDataStruct(xVec, yVec, ...
+            'labels',   {['I (' map.intensityUnit ')']}, ...
+            'units',    {map.intensityUnit}, ...
+            'metadata', meta);
+
+        newDs             = buildDs('[boxIntegral]', intData, 'boxIntegral');
+        newDs.displayName = cutLabel;
+        newDs.legendName  = cutLabel;
+        appData.datasets{end+1} = newDs;
+        rebuildDatasetList(numel(appData.datasets));
+        updateControlsForActiveDataset();
+
+        % Reset button appearance
+        btnBoxIntegrate.Text = 'Box Integrate...';
+        btnBoxIntegrate.BackgroundColor = [0.20 0.50 0.35];
+
+        fprintf('[DataPlotter] Box integral added: %s — %s\n', [fn fext], cutLabel);
+    end
+
+    function onArcIntButton(~,~)
+    %ONARCINTBUTTON  Open arc-integration dialog and extract I(|Q|) profile.
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        ds = appData.datasets{appData.activeIdx};
+        if ~is2DDataset(ds), return; end
+        map = ds.data.metadata.parserSpecific.map2D;
+        if ~isfield(map, 'Qx')
+            uialert(fig, 'Arc integration requires Q-space coordinates (wavelength must be in the file metadata).', ...
+                'No Q-space Data');
+            return;
+        end
+
+        % Compute Q-radius range for defaults
+        Qrad = hypot(map.Qx, map.Qz);
+        qMin = min(Qrad(:));  qMax = max(Qrad(:));
+        nDefault = min(100, max(20, round(max(size(map.intensity)) / 2)));
+
+        % Build dialog
+        dlgFig = uifigure('Name', 'Arc Integration', ...
+            'Position', [100 100 320 280], 'Resize', 'off');
+        dlgFig.CloseRequestFcn = @(~,~) delete(dlgFig);
+        scr = get(0, 'ScreenSize');
+        dlgFig.Position(1) = round((scr(3) - dlgFig.Position(3)) / 2);
+        dlgFig.Position(2) = round((scr(4) - dlgFig.Position(4)) / 2);
+        dlgGL = uigridlayout(dlgFig, [7 2], ...
+            'RowHeight',    {22, 22, 22, 22, 22, 22, 30}, ...
+            'ColumnWidth',  {120, '1x'}, ...
+            'Padding', [10 10 10 10], 'RowSpacing', 6);
+
+        uilabel(dlgGL, 'Text', 'Q min:', 'HorizontalAlignment', 'right');
+        efQMin = uieditfield(dlgGL, 'numeric', 'Value', qMin, ...
+            'Limits', [0 Inf], 'ValueDisplayFormat', '%.4f', ...
+            'Tooltip', sprintf('Minimum |Q| (%s^{-1})', char(197)));
+
+        uilabel(dlgGL, 'Text', 'Q max:', 'HorizontalAlignment', 'right');
+        efQMax = uieditfield(dlgGL, 'numeric', 'Value', qMax, ...
+            'Limits', [0 Inf], 'ValueDisplayFormat', '%.4f', ...
+            'Tooltip', sprintf('Maximum |Q| (%s^{-1})', char(197)));
+
+        uilabel(dlgGL, 'Text', 'Num bins:', 'HorizontalAlignment', 'right');
+        efNBins = uieditfield(dlgGL, 'numeric', 'Value', nDefault, ...
+            'Limits', [5 2000], 'Tooltip', 'Number of radial Q bins');
+
+        uilabel(dlgGL, 'Text', 'Sector min (deg):', 'HorizontalAlignment', 'right');
+        efSectorMin = uieditfield(dlgGL, 'numeric', 'Value', 0, ...
+            'Limits', [-180 360], 'Tooltip', 'Azimuthal start angle (0 = +Qx axis, CCW)');
+
+        uilabel(dlgGL, 'Text', 'Sector max (deg):', 'HorizontalAlignment', 'right');
+        efSectorMax = uieditfield(dlgGL, 'numeric', 'Value', 360, ...
+            'Limits', [-180 360], 'Tooltip', 'Azimuthal end angle (360 = full circle)');
+
+        uilabel(dlgGL, 'Text', 'Integration:', 'HorizontalAlignment', 'right');
+        ddMode = uidropdown(dlgGL, 'Items', {'Sum', 'Mean'}, 'Value', 'Sum', ...
+            'Tooltip', 'Sum: total counts per bin. Mean: average per contributing pixel.');
+
+        btnGo = uibutton(dlgGL, 'Text', 'Integrate', ...
+            'BackgroundColor', [0.40 0.25 0.55], 'FontColor', [1 1 1], ...
+            'ButtonPushedFcn', @(~,~) doArcInt());
+        btnGo.Layout.Row = 7; btnGo.Layout.Column = [1 2];
+
+        function doArcInt()
+            params.qMin = efQMin.Value;
+            params.qMax = efQMax.Value;
+            params.nBins = round(efNBins.Value);
+            params.sectorMin = efSectorMin.Value;
+            params.sectorMax = efSectorMax.Value;
+            params.mode = ddMode.Value;
+            delete(dlgFig);
+            extract2DArcIntegral(params);
+        end
+    end
+
+    function extract2DArcIntegral(params)
+    %EXTRACT2DARCINTEGRAL  Integrate a 2D RSM along arcs of constant |Q|.
+    %   params struct fields:
+    %     .qMin, .qMax — Q-radius range (Ang^-1)
+    %     .nBins       — number of radial bins
+    %     .sectorMin, .sectorMax — azimuthal sector in degrees (0 = +Qx, CCW)
+    %     .mode        — 'Sum' or 'Mean'
+        if appData.activeIdx < 1 || isempty(appData.datasets), return; end
+        ds = appData.datasets{appData.activeIdx};
+        if ~is2DDataset(ds), return; end
+        map = ds.data.metadata.parserSpecific.map2D;
+        if ~isfield(map, 'Qx'), return; end
+
+        [~, fn, fext] = fileparts(ds.filepath);
+
+        % Flatten Q-space grids and intensity
+        Qx_v  = map.Qx(:);
+        Qz_v  = map.Qz(:);
+        I_v   = double(map.intensity(:));
+        Qrad  = hypot(Qx_v, Qz_v);
+        phi   = atan2d(Qz_v, Qx_v);  % [-180, 180]
+
+        % Apply azimuthal sector mask
+        sMin = params.sectorMin;
+        sMax = params.sectorMax;
+        fullCircle = (sMin == 0 && sMax == 360) || (sMin == -180 && sMax == 180);
+        if ~fullCircle
+            if sMin < sMax
+                sectorMask = (phi >= sMin) & (phi < sMax);
+            else
+                % Wrapping sector (e.g. 170 → -170)
+                sectorMask = (phi >= sMin) | (phi < sMax);
+            end
+        else
+            sectorMask = true(size(Qrad));
+        end
+
+        % Apply Q-range and sector masks, exclude NaN
+        mask = sectorMask & ~isnan(I_v) & (Qrad >= params.qMin) & (Qrad <= params.qMax);
+        if ~any(mask)
+            uialert(fig, 'No data points fall within the specified Q-range and sector.', ...
+                'Empty Selection');
+            return;
+        end
+
+        Qrad_m = Qrad(mask);
+        I_m    = I_v(mask);
+
+        % Radial binning
+        nBins    = params.nBins;
+        edges    = linspace(params.qMin, params.qMax, nBins + 1);
+        binWidth = edges(2) - edges(1);
+        binCentres = (edges(1:nBins) + edges(2:nBins+1))' / 2;
+
+        binIdx = floor((Qrad_m - params.qMin) / binWidth) + 1;
+        binIdx = max(1, min(binIdx, nBins));
+
+        binSum   = accumarray(binIdx, I_m,   [nBins 1], @sum, 0);
+        binCount = accumarray(binIdx, ones(size(I_m)), [nBins 1], @sum, 0);
+
+        if strcmp(params.mode, 'Mean')
+            yVec = binSum ./ binCount;
+            yVec(binCount == 0) = NaN;
+            modeStr = 'mean';
+        else
+            yVec = binSum;
+            modeStr = 'sum';
+        end
+
+        % Build label
+        if fullCircle
+            sectorStr = '';
+        else
+            sectorStr = sprintf(' sector [%.0f%s%.0f%s]', ...
+                sMin, char(176), sMax, char(176));
+        end
+        cutLabel = sprintf('Arc %s |Q|=[%.4g–%.4g] %s%s%s (%s)', ...
+            char(8747), params.qMin, params.qMax, char(197), ...
+            char(8315), char(185), modeStr);
+        if ~isempty(sectorStr)
+            cutLabel = [cutLabel sectorStr];
+        end
+
+        meta.source      = ds.filepath;
+        meta.importDate  = datetime('now');
+        meta.parserName  = 'arcIntegral';
+        meta.xColumnName = '|Q| (Ang^-1)';
+        meta.xColumnUnit = '';
+        meta.parserSpecific = struct('is2D', false, ...
+            'originFile', ds.filepath, 'cutLabel', cutLabel, ...
+            'qRange', [params.qMin params.qMax], ...
+            'sector', [sMin sMax], 'mode', params.mode);
+        arcData = parser.createDataStruct(binCentres, yVec, ...
+            'labels',   {['I (' map.intensityUnit ')']}, ...
+            'units',    {map.intensityUnit}, ...
+            'metadata', meta);
+
+        newDs             = buildDs('[arcIntegral]', arcData, 'arcIntegral');
+        newDs.displayName = cutLabel;
+        newDs.legendName  = cutLabel;
+        appData.datasets{end+1} = newDs;
+        rebuildDatasetList(numel(appData.datasets));
+        updateControlsForActiveDataset();
+
+        fprintf('[DataPlotter] Arc integral added: %s — %s\n', [fn fext], cutLabel);
     end
 
     function onSmartScale(~,~)
@@ -10950,7 +11314,7 @@ function varargout = DataPlotter()
            y0 < ax.YLim(1) || y0 > ax.YLim(2)
             return;
         end
-        % 2D map line-cut (Shift+click = horizontal row, Ctrl+click = vertical col)
+        % 2D map interactions (line-cut and box integration)
         if ~isempty(appData.datasets) && appData.activeIdx >= 1 && ...
                 is2DDataset(appData.datasets{appData.activeIdx})
             mod = fig.CurrentModifier;
@@ -10959,6 +11323,12 @@ function varargout = DataPlotter()
                 return;
             elseif ismember('control', mod)
                 extract2DLineCut(x0, y0, false);
+                return;
+            elseif ismember('alt', mod) || appData.boxIntMode
+                % Alt+drag or button-activated mode: begin box integration selection
+                appData.boxIntStartPt = [x0, y0];
+                fig.WindowButtonMotionFcn = @onBoxIntMove;
+                fig.WindowButtonUpFcn     = @onBoxIntUp;
                 return;
             end
         end
@@ -11052,6 +11422,70 @@ function varargout = DataPlotter()
         efYMax.Value = sprintf('%.6g', yHi);
         saveAxisLimsToActiveDataset();
         onPlot([],[]);
+    end
+
+    function onBoxIntMove(~,~)
+    %ONBOXINTMOVE  Update the box-integration rubber-band rectangle while dragging.
+        if isempty(appData.boxIntStartPt), return; end
+        cp = ax.CurrentPoint;
+        x1 = cp(1,1);  y1 = cp(1,2);
+        x0 = appData.boxIntStartPt(1);
+        y0 = appData.boxIntStartPt(2);
+        xLo = min(x0,x1);  xHi = max(x0,x1);
+        yLo = min(y0,y1);  yHi = max(y0,y1);
+        if ~isempty(appData.boxIntPatch) && isvalid(appData.boxIntPatch)
+            set(appData.boxIntPatch, ...
+                'XData', [xLo xHi xHi xLo xLo], ...
+                'YData', [yLo yLo yHi yHi yLo]);
+        else
+            hold(ax,'on');
+            appData.boxIntPatch = patch(ax, ...
+                [xLo xHi xHi xLo xLo], [yLo yLo yHi yHi yLo], ...
+                [0.90 0.55 0.20], ...
+                'FaceAlpha',       0.15, ...
+                'EdgeColor',       [0.90 0.55 0.20], ...
+                'LineStyle',       '--', ...
+                'LineWidth',       1.5, ...
+                'Tag',             'GUIBoxIntBox', ...
+                'HandleVisibility','off');
+            hold(ax,'off');
+        end
+    end
+
+    function onBoxIntUp(~,~)
+    %ONBOXINTUP  Finalise box-integration selection and extract integrated profile.
+        fig.WindowButtonMotionFcn = @onMouseHover;
+        fig.WindowButtonUpFcn     = '';
+        if isempty(appData.boxIntStartPt)
+            return;
+        end
+        cp = ax.CurrentPoint;
+        x1 = cp(1,1);  y1 = cp(1,2);
+        x0 = appData.boxIntStartPt(1);
+        y0 = appData.boxIntStartPt(2);
+        % Remove rubber-band rectangle
+        if ~isempty(appData.boxIntPatch) && isvalid(appData.boxIntPatch)
+            delete(appData.boxIntPatch);
+        end
+        appData.boxIntPatch   = [];
+        appData.boxIntStartPt = [];
+        appData.boxIntMode    = false;
+        % Minimum drag threshold (1% of axis span in both directions)
+        xDrag = abs(x1 - x0);  xSpan = diff(ax.XLim);
+        yDrag = abs(y1 - y0);  ySpan = diff(ax.YLim);
+        if xDrag < xSpan * 0.01 || yDrag < ySpan * 0.01
+            return;
+        end
+        extract2DBoxIntegral(x0, y0, x1, y1);
+    end
+
+    function onBoxIntButton(~,~)
+    %ONBOXINTBUTTON  Activate one-shot box-integration drag mode.
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        if ~is2DDataset(appData.datasets{appData.activeIdx}), return; end
+        appData.boxIntMode = true;
+        btnBoxIntegrate.Text = 'Draw box on map...';
+        btnBoxIntegrate.BackgroundColor = [0.80 0.50 0.15];
     end
 
     function onFigSizeChanged(~,~)
@@ -12856,7 +13290,6 @@ function varargout = DataPlotter()
             end
 
             % Build export: header row + units row + data
-            validNames = matlab.lang.makeValidName(colNames);
             [~, ~, ext] = fileparts(outPath);
 
             if strcmpi(ext, '.xlsx')
@@ -13258,13 +13691,19 @@ function varargout = DataPlotter()
         % Position near the Advanced button
         figPos = fig.Position;
         advMenuFig = uifigure('Name', 'Advanced Tools', ...
-            'Position', [figPos(1) + figPos(3) - 350, figPos(2) + figPos(4) - 580, 340, 520], ...
-            'Resize', 'off', ...
+            'Position', [figPos(1) + figPos(3) - 400, figPos(2) + figPos(4) - 700, 380, 640], ...
+            'Resize', 'on', ...
             'CloseRequestFcn', @(~,~) closeAdvMenu(), ...
             'KeyPressFcn', @(~,evt) onAdvMenuKey(evt));
 
+        % Scrollable panel so all content is accessible even at small sizes
+        advScrollPanel = uipanel(advMenuFig, 'BorderType', 'none', 'Scrollable', 'on');
+        advScrollPanel.Position = [0 0 advMenuFig.Position(3) advMenuFig.Position(4)];
+        advMenuFig.SizeChangedFcn = @(~,~) set(advScrollPanel, ...
+            'Position', [0 0 advMenuFig.Position(3) advMenuFig.Position(4)]);
+
         % 26 rows x 2 cols: 7 headers, 6 separators, 13 button rows
-        advMenuGL = uigridlayout(advMenuFig, [26 2], ...
+        advMenuGL = uigridlayout(advScrollPanel, [26 2], ...
             'RowHeight', {16, 26,26,26,  5,  16, 26,26,26,  5,  16, 26,  5,  16, 26,  5,  16, 26,  5,  16, 26,26,26,  5,  16, 26}, ...
             'ColumnWidth', {'1x', '1x'}, ...
             'Padding', [8 6 8 6], 'RowSpacing', 2, 'ColumnSpacing', 4);
@@ -13435,7 +13874,6 @@ function varargout = DataPlotter()
             return;
         end
 
-        ds = appData.datasets{appData.activeIdx};
         plotD = getPlotData(appData.activeIdx);
         if isempty(plotD)
             uialert(fig, 'Apply corrections or plot data first.', 'Integrate');
@@ -13676,7 +14114,7 @@ function varargout = DataPlotter()
 
     function onLinearRegression(~, ~)
     %ONLINEARREGRESSION  Polynomial regression with confidence bands.
-        [xV, yV, yLbl] = getActiveXY();
+        [xV, yV, ~] = getActiveXY();
         if isempty(yV), return; end
         % Prompt for polynomial degree
         answer = inputdlg('Polynomial degree (1 = linear):', 'Regression', 1, {'1'});
@@ -13886,7 +14324,7 @@ function varargout = DataPlotter()
         % Remove NaN/NaT
         if isdatetime(xV)
             valid = ~isnat(xV) & ~isnan(yV);
-            xV = datenum(xV(valid)); %#ok<DATEFUN>
+            xV = datenum(xV(valid)); %#ok<DATNM>
         else
             valid = ~isnan(xV) & ~isnan(yV);
             xV = xV(valid);
@@ -14191,7 +14629,7 @@ function varargout = DataPlotter()
             tpl.xTickFormat = ddXTickFmt.Value;
             tpl.yTickFormat = ddYTickFmt.Value;
 
-            save(fullfile(fpath, fname), '-struct', 'tpl'); %#ok<SAVEVAR>
+            save(fullfile(fpath, fname), '-struct', 'tpl');
             setStatus(sprintf('Template saved: %s', fname));
         end
 
@@ -15126,6 +15564,10 @@ function badge = getParserBadge(parserName)
             badge = '[DAT]';  % Generic data
         case 'lineCut'
             badge = '[CUT]';  % 1D line-cut extracted from a 2D map
+        case 'boxIntegral'
+            badge = '[BOX]';  % Box-integrated profile from a 2D map
+        case 'arcIntegral'
+            badge = '[ARC]';  % Arc-integrated I(|Q|) from a 2D RSM
         otherwise
             badge = '';
     end

@@ -80,6 +80,11 @@ classdef AppState < handle
         maskRectPatch             = []
         maskStartPt     double  = []
 
+        % ── Box integration (2D map) ─────────────────────────────
+        boxIntStartPt   double  = []
+        boxIntPatch               = []
+        boxIntMode      logical = false
+
         % ── Y-translate drag ───────────────────────────────────────
         yTranslateY0    double  = 0
         yTranslateOff0  double  = 0
