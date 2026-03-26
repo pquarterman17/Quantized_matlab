@@ -905,6 +905,63 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  27. refreshState preserves datasets and does not crash
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 27: refreshState preserves datasets ══\n');
+try
+    api.reset();
+    api.addFiles({XRDML_F});
+    drawnow;
+
+    nBefore = numel(api.getDatasets());
+    idxBefore = api.getActiveIdx();
+    assert(nBefore >= 1, 'Should have at least 1 dataset loaded');
+
+    % Call refreshState — should not error
+    api.refreshState();
+    drawnow;
+
+    nAfter = numel(api.getDatasets());
+    idxAfter = api.getActiveIdx();
+    assert(nAfter == nBefore, ...
+        sprintf('Dataset count changed: %d -> %d', nBefore, nAfter));
+    assert(idxAfter == idxBefore, ...
+        sprintf('Active index changed: %d -> %d', idxBefore, idxAfter));
+
+    % Verify the plot still renders (no stale handle errors)
+    d = api.getPlotData(1);
+    assert(~isempty(d.time), 'Plot data should still be accessible after refresh');
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  28. refreshState works with empty state (no crash)
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 28: refreshState on empty state ══\n');
+try
+    api.reset();
+    drawnow;
+    assert(isempty(api.getDatasets()), 'Should start empty');
+
+    % Should not error even with no datasets
+    api.refreshState();
+    drawnow;
+
+    assert(isempty(api.getDatasets()), 'Should still be empty');
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  SUMMARY
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n%s\n', repmat(char(9552), 1, 72));

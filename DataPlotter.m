@@ -762,6 +762,8 @@ function varargout = DataPlotter()
             'MenuSelectedFcn', @(~,~) toggleWfGradient());
         uimenu(cmAxes, 'Text', 'Clear Fit Overlays', ...
             'MenuSelectedFcn', @(~,~) onClearFitOverlays());
+        uimenu(cmAxes, 'Text', 'Refresh State (F5)', 'Separator', 'on', ...
+            'MenuSelectedFcn', @(~,~) refreshState());
 
         ax.ContextMenu = cmAxes;
     catch
@@ -2315,6 +2317,7 @@ function varargout = DataPlotter()
     api.boxIntegrate2D      = @boxIntegrate2DDirect;
     api.setBoxIntSize       = @setBoxIntSizeDirect;
     api.arcIntegrate2D      = @arcIntegrate2DDirect;
+    api.refreshState        = @refreshState;
     api.reset               = @resetGUIDirect;
 
     % ── Testability API (headless test hooks) ──────────────────────────
@@ -2821,6 +2824,48 @@ function varargout = DataPlotter()
         result.thickness_nm = result.thickness_A / 10;
         % Place markers and annotation
         recreateFringeMarkers();
+    end
+
+    function refreshState()
+    %REFRESHSTATE  Flush internal caches and re-sync GUI without losing data.
+    %  Bound to F5 and available in the axes right-click menu.  This is the
+    %  lightweight alternative to `clear all` + `setupToolbox` — it clears
+    %  stale cached state that can cause display glitches while preserving
+    %  all loaded datasets, the figure, and the undo history.
+    %
+    %  What it does:
+    %    1. Invalidate lineCache → forces full line-handle rebuild
+    %    2. Clear persistent caches in parsers and calc modules
+    %    3. Cancel any in-progress interactions (zoom rect, mask, cursor)
+    %    4. Re-sync all widget states from appData
+    %    5. Force a full redraw
+
+        % 1. Invalidate line cache
+        appData.lineCache.valid = false;
+        appData.lineCache.left  = {};
+        appData.lineCache.right = {};
+
+        % 2. Clear persistent caches in parsers and calc modules
+        clear parser.importPPMS;    % clears PPMS_SHORTHAND_MAP
+        clear parser.importQDVSM;   % clears QD_SHORTHAND_MAP
+        clear calc.constants;       % clears cachedC
+        clear calc.elementData;     % clears cachedElements
+        clear calc.unitConvert;     % clears cachedReg, cachedPre
+        clear calc.crystalCache;    % clears cachedDB, cachedMtime
+
+        % 3. Cancel in-progress interactions
+        cancelInteractions();
+
+        % 4. Re-sync widgets from appData
+        if ~isempty(appData.datasets) && appData.activeIdx > 0
+            updateControlsForActiveDataset();
+            rebuildDatasetList(true);
+        end
+
+        % 5. Force full redraw
+        if ~isempty(appData.datasets) && appData.activeIdx > 0
+            drawToAxes(ax);
+        end
     end
 
     function resetGUIDirect()
@@ -11726,10 +11771,14 @@ function varargout = DataPlotter()
     %  Space       — toggle dataset visibility
     %  Ctrl+Up     — move dataset up
     %  Ctrl+Down   — move dataset down
+    %  F5          — refresh state (flush caches, re-sync widgets, redraw)
         hasMod  = ~isempty(e.Modifier);
         hasCtrl = hasMod && any(strcmp(e.Modifier, 'control'));
 
         switch e.Key
+            case 'f5'
+                refreshState();
+                return;
             case 'delete'
                 if ~isempty(lbDatasets.Value) && ~isempty(appData.datasets)
                     onRemoveDataset([], []);

@@ -2089,6 +2089,7 @@ function varargout = emViewerGUI()
         api.getPixels          = @getPixelsAPI;
         api.getImageDimensions = @getImageDimensionsAPI;
 
+        api.refreshState   = @refreshState;
         api.close          = @() close(fig);
         varargout{1}       = api;
     end
@@ -4527,6 +4528,12 @@ function varargout = emViewerGUI()
         % Ctrl+Z  → Undo filters
         if hasCtrl && strcmp(evt.Key, 'z')
             onUndoFilters([], []);
+            return;
+        end
+
+        % F5 → Refresh state
+        if strcmp(evt.Key, 'f5')
+            refreshState();
             return;
         end
 
@@ -11133,7 +11140,32 @@ function varargout = emViewerGUI()
         uimenu(cm, 'Text', 'ROI Statistics', 'MenuSelectedFcn', @(~,~) onArmROIStats([], []));
         uimenu(cm, 'Text', 'Zoom to Fit', 'Separator', 'on', ...
             'MenuSelectedFcn', @(~,~) onResetZoom([], []));
+        uimenu(cm, 'Text', 'Refresh State (F5)', 'Separator', 'on', ...
+            'MenuSelectedFcn', @(~,~) refreshState());
         ax.ContextMenu = cm;
+    end
+
+    function refreshState()
+    %REFRESHSTATE  Flush caches and re-sync display without losing data.
+    %  Bound to F5.  Clears stale display state, persistent caches, and
+    %  forces a full image redraw — without destroying loaded images.
+        % Clear persistent caches in calc modules
+        clear calc.constants;
+        clear calc.elementData;
+        clear calc.unitConvert;
+        clear calc.crystalCache;
+
+        % Cancel any in-progress capture
+        if ~isempty(appData.captureMode)
+            cancelCapture();
+        end
+
+        % Re-display current image
+        if appData.activeIdx > 0 && ~isempty(appData.rawPixels)
+            displayImage();
+        end
+
+        setStatus('State refreshed.');
     end
 
     % ════════════════════════════════════════════════════════════════════
