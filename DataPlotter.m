@@ -105,6 +105,7 @@ function varargout = DataPlotter()
 %   api.setMap2DType(typeStr)  — set '2D plot type' and replot ('Heatmap'|'Contour'|...)
 %   api.extractLineCut2D(x,y,isH) — extract 1D slice from 2D map (isH: H-cut vs V-cut)
 %   api.boxIntegrate2D(xLo,xHi,yLo,yHi,profileAxis) — integrate box region of 2D map
+%   api.setBoxIntSize(w,h)   — set fixed box-integration dimensions ('' to clear)
 %   api.arcIntegrate2D(qMin,qMax,nBins,...) — arc integrate I(|Q|) from 2D RSM
 %   api.setQSpace(tf)          — enable/disable Q-space axes on 2D map and replot
 %   api.setContourLevels(n)    — set number of contour levels for Contour plot types
@@ -811,7 +812,7 @@ function varargout = DataPlotter()
     analysisPanel.Layout.Row = 2; analysisPanel.Layout.Column = 1;
 
     analysisGL = uigridlayout(analysisPanel,[2 4], ...
-        'ColumnWidth', {320, '1x', 210, 0}, ...
+        'ColumnWidth', {320, '1x', 0, 210}, ...
         'RowHeight',   {110, '1x'}, ...
         'Padding',     [4 4 4 4], ...
         'ColumnSpacing', 6, ...
@@ -1634,7 +1635,7 @@ function varargout = DataPlotter()
     % ── Save / Export panel (analysisGL col 3 — vertical, collapsible) ─────
     savePanel = uipanel(analysisGL,'Title','Save / Export','FontSize',10, ...
         'Scrollable','on');
-    savePanel.Layout.Row = [1 2]; savePanel.Layout.Column = 3;
+    savePanel.Layout.Row = [1 2]; savePanel.Layout.Column = 4;
 
     % Vertical stacked layout with collapsible section headers
     % Rows: [hdrData, dataContent, hdrFig, figContent, hdrSession, sessionContent, hdrTools, toolsContent]
@@ -2107,11 +2108,11 @@ function varargout = DataPlotter()
     % ── 2D Map controls (col 3 of analysisGL — visible only for 2D data) ──
     map2DPanel = uipanel(analysisGL,'Title','2D Map View','FontSize',11, ...
         'Scrollable','on');
-    map2DPanel.Layout.Row = [1 2]; map2DPanel.Layout.Column = 4;
+    map2DPanel.Layout.Row = [1 2]; map2DPanel.Layout.Column = 3;
     map2DPanel.Visible = 'off';   % shown only when a 2D area-detector dataset is active
 
-    map2DGL = uigridlayout(map2DPanel,[13 2], ...
-        'RowHeight',    {20, 20, 20, 20, 20, 20, 20, 22, 22, 22, 18, 18, '1x'}, ...
+    map2DGL = uigridlayout(map2DPanel,[16 2], ...
+        'RowHeight',    {20, 20, 20, 20, 20, 20, 20, 22, 22, 16, 20, 20, 22, 22, 18, '1x'}, ...
         'ColumnWidth',  {85, '1x'}, ...
         'Padding',      [4 4 4 4], ...
         'RowSpacing',   3, ...
@@ -2197,6 +2198,32 @@ function varargout = DataPlotter()
                    'Or use ' guiTernary(ismac, 'Option', 'Alt') '+drag directly on the map.']);
     btnBoxIntegrate.Layout.Row = 9; btnBoxIntegrate.Layout.Column = [1 2];
 
+    % Row 10: Box size label
+    lblBoxSize = uilabel(map2DGL,'Text','Box size (fixed):', ...
+        'FontSize', 9, 'FontColor', [0.5 0.5 0.5], ...
+        'HorizontalAlignment', 'left');
+    lblBoxSize.Layout.Row = 10; lblBoxSize.Layout.Column = [1 2];
+
+    % Row 11: Box width
+    lblBoxW = uilabel(map2DGL,'Text','Width:','FontSize',10,'HorizontalAlignment','right');
+    lblBoxW.Layout.Row = 11; lblBoxW.Layout.Column = 1;
+    efBoxIntW = uieditfield(map2DGL,'Value','','Placeholder','free-draw', ...
+        'FontSize',10, ...
+        'Tooltip',['Box width in axis units (X-axis extent).' newline ...
+                   'Leave blank for free-draw mode.'], ...
+        'ValueChangedFcn', @(~,~) updateBoxPreview());
+    efBoxIntW.Layout.Row = 11; efBoxIntW.Layout.Column = 2;
+
+    % Row 12: Box height
+    lblBoxH = uilabel(map2DGL,'Text','Height:','FontSize',10,'HorizontalAlignment','right');
+    lblBoxH.Layout.Row = 12; lblBoxH.Layout.Column = 1;
+    efBoxIntH = uieditfield(map2DGL,'Value','','Placeholder','free-draw', ...
+        'FontSize',10, ...
+        'Tooltip',['Box height in axis units (Y-axis extent).' newline ...
+                   'Leave blank for free-draw mode.'], ...
+        'ValueChangedFcn', @(~,~) updateBoxPreview());
+    efBoxIntH.Layout.Row = 12; efBoxIntH.Layout.Column = 2;
+
     btnArcIntegrate = uibutton(map2DGL,'Text','Arc Integrate...', ...
         'ButtonPushedFcn',@onArcIntButton, ...
         'BackgroundColor',[0.40 0.25 0.55], ...
@@ -2204,14 +2231,14 @@ function varargout = DataPlotter()
         'Enable', 'off', ...
         'Tooltip',['Integrate along arcs of constant |Q| in reciprocal space.' newline ...
                    'Requires Q-space coordinates (wavelength in file metadata).']);
-    btnArcIntegrate.Layout.Row = 10; btnArcIntegrate.Layout.Column = [1 2];
+    btnArcIntegrate.Layout.Row = 13; btnArcIntegrate.Layout.Column = [1 2];
 
     lblMap2DInfo = uilabel(map2DGL,'Text','', ...
         'FontSize', 9, ...
         'FontColor', [0.4 0.4 0.4], ...
         'HorizontalAlignment', 'center', ...
         'WordWrap', 'on');
-    lblMap2DInfo.Layout.Row = 11; lblMap2DInfo.Layout.Column = [1 2];
+    lblMap2DInfo.Layout.Row = 14; lblMap2DInfo.Layout.Column = [1 2];
 
     lblMap2DHint = uilabel(map2DGL,'Text', ...
         ['Shift+click: H-cut | Ctrl+click: V-cut | ' ...
@@ -2220,7 +2247,7 @@ function varargout = DataPlotter()
         'FontColor', [0.55 0.55 0.55], ...
         'HorizontalAlignment', 'center', ...
         'WordWrap', 'on');
-    lblMap2DHint.Layout.Row = 12; lblMap2DHint.Layout.Column = [1 2];
+    lblMap2DHint.Layout.Row = 15; lblMap2DHint.Layout.Column = [1 2];
 
     % ── Drag-and-drop: register every major surface as a drop target (R2023a+) ──
     % In uifigure the CEF renderer consumes drag events at whichever child
@@ -2286,6 +2313,7 @@ function varargout = DataPlotter()
     api.fringeThickness     = @fringeThicknessDirect;
     api.clearFringe         = @clearFringeMarkers;
     api.boxIntegrate2D      = @boxIntegrate2DDirect;
+    api.setBoxIntSize       = @setBoxIntSizeDirect;
     api.arcIntegrate2D      = @arcIntegrate2DDirect;
     api.reset               = @resetGUIDirect;
 
@@ -2699,6 +2727,21 @@ function varargout = DataPlotter()
         drawnow;
     end
 
+    function setBoxIntSizeDirect(w, h)
+    %SETBOXINTSIZEDIRECT  Set the fixed box-integration dimensions.
+    %   w, h — width and height in axis units. Pass '' or 0 to clear.
+        if isempty(w) || (isnumeric(w) && w <= 0)
+            efBoxIntW.Value = '';
+        else
+            efBoxIntW.Value = sprintf('%.6g', w);
+        end
+        if isempty(h) || (isnumeric(h) && h <= 0)
+            efBoxIntH.Value = '';
+        else
+            efBoxIntH.Value = sprintf('%.6g', h);
+        end
+    end
+
     function arcIntegrate2DDirect(qMin, qMax, nBins, varargin)
     %ARCINTEGRATE2DDIRECT  Programmatically perform arc integration on a 2D RSM.
     %   qMin, qMax  — Q-radius range (Ang^-1)
@@ -2797,6 +2840,7 @@ function varargout = DataPlotter()
         appData.boxIntStartPt     = [];
         appData.boxIntPatch       = [];
         appData.boxIntMode        = false;
+        clearBoxPreview();
 
         % Reset correction widgets
         efXOffset.Value      = 0;
@@ -2809,6 +2853,9 @@ function varargout = DataPlotter()
         efXTrimMax.Value     = '';
         ddNormalize.Value    = 'None';
         ddMap2DCmap.Value    = 'parula';
+        cbMap2DQSpace.Value  = false;
+        efBoxIntW.Value      = '';
+        efBoxIntH.Value      = '';
 
         % Reset axis dropdowns and listboxes
         ddX.Items = {'(load file first)'};
@@ -3339,6 +3386,7 @@ function varargout = DataPlotter()
         appData.boxIntPatch       = [];
         appData.boxIntStartPt     = [];
         appData.boxIntMode        = false;
+        clearBoxPreview();
         btnMaskSelect.Text            = 'Mask Selection';
         btnMaskSelect.BackgroundColor = [0.60 0.15 0.15];
         btnMaskSelect.Enable          = 'on';
@@ -3612,7 +3660,7 @@ function varargout = DataPlotter()
                 % Peak window mode — XRD
                 appData.peakMode = 'xrd';
                 configurePeakWindowForMode('xrd');
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 210, 0};
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 210};
                 % Hide asymmetry; respect BG file collapse state
                 corrGL.RowHeight{CROW.BGFILE}  = bgFileH;
                 corrGL.RowHeight{CROW.BGSUBTR} = bgFileH;
@@ -3658,7 +3706,7 @@ function varargout = DataPlotter()
                 btnRemovePeakClick.Visible = 'off';
                 btnPeakWindow.Visible      = 'off';
                 appData.peakMode = 'none';
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 210, 0};
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 210};
                 % Hide asymmetry; respect BG file collapse state; show mag section
                 corrGL.RowHeight{CROW.BGFILE}  = bgFileH;
                 corrGL.RowHeight{CROW.BGSUBTR} = bgFileH;
@@ -3692,7 +3740,7 @@ function varargout = DataPlotter()
                 % Peak window mode — reflectometry
                 appData.peakMode = 'reflectometry';
                 configurePeakWindowForMode('reflectometry');
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 210, 0};
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 210};
                 % Hide BG file rows; asymmetry is now in Advanced Analysis popup
                 corrGL.RowHeight{CROW.BGFILE}  = 0;
                 corrGL.RowHeight{CROW.BGSUBTR} = 0;
@@ -3725,7 +3773,7 @@ function varargout = DataPlotter()
                 btnRemovePeakClick.Visible = 'off';
                 btnPeakWindow.Visible      = 'off';
                 appData.peakMode = 'none';
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 210, 0};
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 210};
                 % Hide asymmetry; respect BG file collapse state
                 corrGL.RowHeight{CROW.BGFILE}  = bgFileH;
                 corrGL.RowHeight{CROW.BGSUBTR} = bgFileH;
@@ -3759,7 +3807,7 @@ function varargout = DataPlotter()
                 btnRemovePeakClick.Visible = 'off';
                 btnPeakWindow.Visible      = 'off';
                 appData.peakMode = 'none';
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 210, 0};
+                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 210};
                 % Hide asymmetry; respect BG file collapse state
                 corrGL.RowHeight{CROW.BGFILE}  = bgFileH;
                 corrGL.RowHeight{CROW.BGSUBTR} = bgFileH;
@@ -3782,7 +3830,7 @@ function varargout = DataPlotter()
                       is2DDataset(appData.datasets{appData.activeIdx});
         if is2D_active
             map2DPanel.Visible = 'on';
-            analysisGL.ColumnWidth = {appData.corrPanelWidth, '1x', 0, '2x'};
+            analysisGL.ColumnWidth = {appData.corrPanelWidth, '1x', '2x', 180};
             % Disable all corrections — not meaningful for raw 2D maps
             for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
                       btnApply, btnReset, btnApplyAll, btnUndo, ...
@@ -10632,6 +10680,10 @@ function varargout = DataPlotter()
         xLo = min(bx0, bx1);  xHi = max(bx0, bx1);
         yLo = min(by0, by1);  yHi = max(by0, by1);
 
+        % Auto-fill the fixed-size input fields with the drawn box dimensions
+        efBoxIntW.Value = sprintf('%.6g', xHi - xLo);
+        efBoxIntH.Value = sprintf('%.6g', yHi - yLo);
+
         useQSpace = cbMap2DQSpace.Value && isfield(map, 'Qx');
 
         % Find row and column masks within the box
@@ -10646,7 +10698,12 @@ function varargout = DataPlotter()
         end
 
         if ~any(rowMask) || ~any(colMask)
-            uialert(fig, 'No data points fall within the selected box.', 'Empty Selection');
+            msg = 'No data points fall within the selected box.';
+            if strcmp(fig.Visible, 'on')
+                uialert(fig, msg, 'Empty Selection');
+            else
+                warning('DataPlotter:emptyBox', '%s', msg);
+            end
             return;
         end
 
@@ -10726,10 +10783,15 @@ function varargout = DataPlotter()
         updateControlsForActiveDataset();
 
         % Reset button appearance
-        btnBoxIntegrate.Text = 'Box Integrate...';
+        % Restore button label — show action hint if dimensions are still set
+        if hasFixedBoxSize()
+            btnBoxIntegrate.Text = [char(9654) ' Integrate Box'];
+        else
+            btnBoxIntegrate.Text = 'Box Integrate...';
+        end
         btnBoxIntegrate.BackgroundColor = [0.20 0.50 0.35];
 
-        fprintf('[DataPlotter] Box integral added: %s — %s\n', [fn fext], cutLabel);
+        setStatus(sprintf('Box integral: %s', cutLabel));
     end
 
     function onArcIntButton(~,~)
@@ -11325,10 +11387,19 @@ function varargout = DataPlotter()
                 extract2DLineCut(x0, y0, false);
                 return;
             elseif ismember('alt', mod) || appData.boxIntMode
-                % Alt+drag or button-activated mode: begin box integration selection
-                appData.boxIntStartPt = [x0, y0];
-                fig.WindowButtonMotionFcn = @onBoxIntMove;
-                fig.WindowButtonUpFcn     = @onBoxIntUp;
+                % Alt+click/drag or button-activated mode: box integration
+                if hasFixedBoxSize()
+                    % Fixed-size mode: single click places centred box
+                    appData.boxIntMode = false;
+                    btnBoxIntegrate.Text = 'Box Integrate...';
+                    btnBoxIntegrate.BackgroundColor = [0.20 0.50 0.35];
+                    executeFixedBoxIntegration(x0, y0);
+                else
+                    % Free-draw mode: drag to define box corners
+                    appData.boxIntStartPt = [x0, y0];
+                    fig.WindowButtonMotionFcn = @onBoxIntMove;
+                    fig.WindowButtonUpFcn     = @onBoxIntUp;
+                end
                 return;
             end
         end
@@ -11441,11 +11512,11 @@ function varargout = DataPlotter()
             hold(ax,'on');
             appData.boxIntPatch = patch(ax, ...
                 [xLo xHi xHi xLo xLo], [yLo yLo yHi yHi yLo], ...
-                [0.90 0.55 0.20], ...
-                'FaceAlpha',       0.15, ...
-                'EdgeColor',       [0.90 0.55 0.20], ...
+                'k', ...
+                'FaceAlpha',       0, ...
+                'EdgeColor',       [0.65 0.20 0.85], ...
                 'LineStyle',       '--', ...
-                'LineWidth',       1.5, ...
+                'LineWidth',       2.5, ...
                 'Tag',             'GUIBoxIntBox', ...
                 'HandleVisibility','off');
             hold(ax,'off');
@@ -11480,12 +11551,101 @@ function varargout = DataPlotter()
     end
 
     function onBoxIntButton(~,~)
-    %ONBOXINTBUTTON  Activate one-shot box-integration drag mode.
+    %ONBOXINTBUTTON  Box-integration trigger.
+    %   Fixed-size mode (W/H filled): integrate the preview box immediately
+    %     at the current axes centre.  Click the map first to reposition.
+    %   Free-draw mode (W/H empty): enter drag mode — draw a box on the map.
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
         if ~is2DDataset(appData.datasets{appData.activeIdx}), return; end
-        appData.boxIntMode = true;
-        btnBoxIntegrate.Text = 'Draw box on map...';
-        btnBoxIntegrate.BackgroundColor = [0.80 0.50 0.15];
+        if hasFixedBoxSize()
+            % Integrate at current axes centre (matches the preview box)
+            cx = mean(ax.XLim);
+            cy = mean(ax.YLim);
+            executeFixedBoxIntegration(cx, cy);
+        else
+            % Free-draw mode: wait for drag on map
+            appData.boxIntMode = true;
+            btnBoxIntegrate.Text = 'Draw box on map...';
+            btnBoxIntegrate.BackgroundColor = [0.80 0.50 0.15];
+        end
+    end
+
+    function [tf, boxW, boxH] = hasFixedBoxSize()
+    %HASFIXEDBOXSIZE  Return true if both Width and Height fields are valid positive numbers.
+        boxW = str2double(efBoxIntW.Value);
+        boxH = str2double(efBoxIntH.Value);
+        tf = ~isnan(boxW) && ~isnan(boxH) && boxW > 0 && boxH > 0;
+    end
+
+    function updateBoxPreview()
+    %UPDATEBOXPREVIEW  Draw or update a dashed preview rectangle on the 2D map
+    %  centred on the current axes view whenever W/H fields change.
+    %  Also updates the button label to reflect the current mode.
+        clearBoxPreview();
+        [ok, boxW, boxH] = hasFixedBoxSize();
+        if ~ok
+            btnBoxIntegrate.Text = 'Box Integrate...';
+            return;
+        end
+        btnBoxIntegrate.Text = [char(9654) ' Integrate Box'];  % ▶
+        % Only draw when a 2D dataset is active
+        if appData.activeIdx < 1 || isempty(appData.datasets), return; end
+        if ~is2DDataset(appData.datasets{appData.activeIdx}), return; end
+        % Centre on the current axes midpoint
+        cx = mean(ax.XLim);
+        cy = mean(ax.YLim);
+        hw = boxW / 2;  hh = boxH / 2;
+        xLo = cx - hw;  xHi = cx + hw;
+        yLo = cy - hh;  yHi = cy + hh;
+        hold(ax, 'on');
+        appData.boxPreviewPatch = patch(ax, ...
+            [xLo xHi xHi xLo xLo], [yLo yLo yHi yHi yLo], ...
+            'k', ...
+            'FaceAlpha',       0, ...
+            'EdgeColor',       [0.65 0.20 0.85], ...
+            'LineStyle',       '--', ...
+            'LineWidth',       2.5, ...
+            'Tag',             'GUIBoxIntPreview', ...
+            'HandleVisibility','off');
+        hold(ax, 'off');
+    end
+
+    function clearBoxPreview()
+    %CLEARBOXPREVIEW  Remove the box-size preview rectangle if present.
+        if ~isempty(appData.boxPreviewPatch) && isvalid(appData.boxPreviewPatch)
+            delete(appData.boxPreviewPatch);
+        end
+        appData.boxPreviewPatch = [];
+    end
+
+    function executeFixedBoxIntegration(cx, cy)
+    %EXECUTEFIXEDBOXINTEGRATION  Place a fixed-size box centred at (cx,cy) and integrate.
+        clearBoxPreview();
+        [~, boxW, boxH] = hasFixedBoxSize();
+        hw = boxW / 2;  hh = boxH / 2;
+        xLo = cx - hw;  xHi = cx + hw;
+        yLo = cy - hh;  yHi = cy + hh;
+
+        % Draw overlay showing the fixed-size box
+        hold(ax, 'on');
+        hBoxOverlay = patch(ax, ...
+            [xLo xHi xHi xLo xLo], [yLo yLo yHi yHi yLo], ...
+            'k', ...
+            'FaceAlpha',       0, ...
+            'EdgeColor',       [0.65 0.20 0.85], ...
+            'LineStyle',       '--', ...
+            'LineWidth',       2.5, ...
+            'Tag',             'GUIBoxIntFixed', ...
+            'HandleVisibility','off');
+        hold(ax, 'off');
+        drawnow;
+
+        extract2DBoxIntegral(xLo, yLo, xHi, yHi);
+
+        % Clean up overlay
+        if ~isempty(hBoxOverlay) && isvalid(hBoxOverlay)
+            delete(hBoxOverlay);
+        end
     end
 
     function onFigSizeChanged(~,~)
@@ -11525,11 +11685,16 @@ function varargout = DataPlotter()
         % (Wide windows keep whatever width the user or prefs last set.)
 
         % ── Adapt analysis columns for narrow windows ──
+        % Col 3 = 2D map panel (visible only for 2D data), col 4 = save/export (always).
+        is2D_now = appData.activeIdx >= 1 && ~isempty(appData.datasets) && ...
+                   is2DDataset(appData.datasets{appData.activeIdx});
+        col3W = guiTernary(is2D_now, '2x', 0);
         defCorrW = LAYOUT_DEFAULTS.corrPanelW;
         if figW < 900
-            analysisGL.ColumnWidth = {min(260, defCorrW), '1x', 0, 0};
+            col4W = guiTernary(is2D_now, 140, 0);
+            analysisGL.ColumnWidth = {min(260, defCorrW), '1x', col3W, col4W};
         elseif figW < 1100
-            analysisGL.ColumnWidth = {min(280, defCorrW), '1x', 180, 0};
+            analysisGL.ColumnWidth = {min(280, defCorrW), '1x', col3W, 180};
         end
 
         fig.SizeChangedFcn = @onFigSizeChanged;
@@ -11997,9 +12162,9 @@ function varargout = DataPlotter()
                     dir = 'v_col12'; return;
                 end
 
-                % v_col23: right edge of axLimPanel / dataTablePanel (col 2 → col 3)
-                alPos   = getpixelposition(axLimPanel, true);
-                borderX2 = alPos(1) + alPos(3);
+                % v_col23: left edge of savePanel (col 4 — always rightmost)
+                spPos    = getpixelposition(savePanel, true);
+                borderX2 = spPos(1);
                 if abs(mp(1) - borderX2) <= SNAP_PX
                     dir = 'v_col23'; return;
                 end
@@ -12066,13 +12231,13 @@ function varargout = DataPlotter()
                     appData.panelResizeOrig = guiTernary(isnumeric(rh{1}), rh{1}, 110);
                 end
             case 'v_col23'
-                % Snapshot the save/export panel width (col 3 of analysisGL)
+                % Snapshot the save/export panel width (col 4 of analysisGL)
                 try
                     sPos = getpixelposition(savePanel, true);
                     appData.panelResizeOrig = sPos(3);
                 catch
                     cw = analysisGL.ColumnWidth;
-                    appData.panelResizeOrig = guiTernary(isnumeric(cw{3}), cw{3}, 210);
+                    appData.panelResizeOrig = guiTernary(isnumeric(cw{4}), cw{4}, 210);
                 end
             case 'v_content12'
                 % Snapshot the file list panel width (col 1 of contentGL)
@@ -12130,12 +12295,12 @@ function varargout = DataPlotter()
                 analysisGL.RowHeight = {newH, '1x'};
 
             case 'v_col23'
-                % Mouse moves right → save panel (col 3) gets narrower
+                % Mouse moves right → save panel (col 4) gets narrower
                 delta_x = mp(1) - appData.panelResizeStart(1);
                 newW    = round(appData.panelResizeOrig - delta_x);
                 newW    = max(140, min(newW, 400));  % min 140px, max 400px
                 cw    = analysisGL.ColumnWidth;
-                cw{3} = newW;
+                cw{4} = newW;
                 analysisGL.ColumnWidth = cw;
 
             case 'v_content12'

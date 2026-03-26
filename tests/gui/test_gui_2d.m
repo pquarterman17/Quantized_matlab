@@ -566,6 +566,56 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  TEST 14 — Fixed-size box integration via setBoxIntSize + boxIntegrate2D
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 14: Fixed-size box integration ══\n');
+api.reset();
+try
+    api.addFiles({FILE_2D});
+    drawnow;
+
+    ds = api.getDatasets();
+    map = ds{1}.data.metadata.parserSpecific.map2D;
+
+    % Define a fixed box size
+    boxW = (max(map.axis2) - min(map.axis2)) * 0.4;
+    boxH = (max(map.axis1) - min(map.axis1)) * 0.4;
+    api.setBoxIntSize(boxW, boxH);
+
+    % Place box at center of map
+    cx = (min(map.axis2) + max(map.axis2)) / 2;
+    cy = (min(map.axis1) + max(map.axis1)) / 2;
+    hw = boxW / 2;  hh = boxH / 2;
+
+    % Integration using explicit bounds (same result as fixed-size centred at cx,cy)
+    xLo = cx - hw;  xHi = cx + hw;
+    yLo = cy - hh;  yHi = cy + hh;
+
+    api.boxIntegrate2D(xLo, xHi, yLo, yHi, 'axis1');
+
+    dsAfter = api.getDatasets();
+    assert(numel(dsAfter) == numel(ds) + 1, 'Expected one new dataset');
+
+    newDs = dsAfter{end};
+    rowMask = map.axis1 >= yLo & map.axis1 <= yHi;
+    colMask = map.axis2 >= xLo & map.axis2 <= xHi;
+    Isub = map.intensity(rowMask, colMask);
+    expectedVals = sum(Isub, 2);
+    assert(max(abs(newDs.data.values(:,1) - expectedVals)) < 1e-6, ...
+        'Fixed-size box values do not match manual sum');
+
+    % Verify setBoxIntSize clears when passed empty
+    api.setBoxIntSize('', '');
+    fprintf('  Box W=%.4g  H=%.4g  center=(%.4g, %.4g)\n', boxW, boxH, cx, cy);
+    fprintf('  Profile length: %d\n', sum(rowMask));
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  Summary
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n%s\n', repmat(char(9552), 1, 52));

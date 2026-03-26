@@ -84,6 +84,7 @@ classdef AppState < handle
         boxIntStartPt   double  = []
         boxIntPatch               = []
         boxIntMode      logical = false
+        boxPreviewPatch           = []
 
         % ── Y-translate drag ───────────────────────────────────────
         yTranslateY0    double  = 0
