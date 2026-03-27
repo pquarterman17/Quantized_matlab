@@ -15,11 +15,17 @@ Previously extracted subsystems in `+dataplotter/`:
 - `roiAnalysis.m`, `multiPanel.m`, `actionLog.m`, `datasetGroups.m`
 - `applyCorrections.m`, `correctionParams.m`, `reflFitting.m`
 
+### Extracted (2026-03-26)
+- `+dataplotter/drawOverlays.m` — peak markers, fit curves, annotations, ref lines (~200 lines from drawToAxes)
+- `+dataplotter/peakTools.m` — analysis dialogs (lattice refinement, phase matching, FFT thickness, reflectivity FFT, Williamson-Hall)
+- `+dataplotter/buildPeakWindow.m` — peak window widget construction
+- `+dataplotter/buildMap2DPanel.m` — 2D map panel widget construction
+- Session save/load dialog wrappers merged into `+dataplotter/sessionManager.m`
+
 ### Remaining candidates (lower priority)
-- Peak detection/fitting subsystem (~2,600 lines) — deep `appData` coupling
-- Session save/load (~500 lines)
-- GUI layout construction (~2,000 lines)
-- `drawToAxes` (~1,175 lines) — hardest to extract due to state coupling
+- Core peak detection/fitting callbacks (~1,000 lines) — deep bidirectional coupling with appData + click handlers
+- Main GUI layout construction (~1,500 lines) — creates ~200 widget handles captured by closure
+- drawToAxes main rendering loop (~900 lines after overlay extraction)
 
 ### emViewerGUI.m (~12k lines)
 Less urgent — well-organized internally with clear section dividers.

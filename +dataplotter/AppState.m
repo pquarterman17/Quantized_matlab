@@ -157,6 +157,7 @@ classdef AppState < handle
 
         % ── Line cache (optimization) ─────────────────────────────
         lineCache                 = []
+        map2DHandle               = []   % cached graphics handle for 2D heatmap
 
         % ── Macro recording ────────────────────────────────────────
         macroLog                  = []

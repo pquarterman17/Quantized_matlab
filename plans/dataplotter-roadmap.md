@@ -41,10 +41,10 @@ export. Toggle record/stop, export as .m script. API: `getMacroLog`,
 - [x] Pre-allocate scan arrays in importXRDML
 - [x] Memory usage display after loading
 
-### Remaining
-- [ ] Lazy Q-space: move Qx/Qz out of parser, compute on demand (~2 hr)
-- [ ] Cache 2D graphics handle for faster replot (~30 min)
-- [ ] Chunked file reading for XRDML > 20 MB (~1 day, highest risk)
-- [ ] Stride-based decimation for very large maps (~1 hr)
-- [ ] "Clear 2D Matrix" button to reclaim memory (~1 hr)
-- [ ] Optional `single` precision for intensity matrices
+### Completed (2026-03-26)
+- [x] Lazy Q-space: wavelength stored at parse, Qx/Qz computed on first 2D activation
+- [x] Cache 2D graphics handle for faster heatmap replot (skip cla on 2D→2D)
+- [x] Chunked file reading: early xml string release + per-block cleanup in importXRDML
+- [x] Stride-based decimation for maps > 2000px per axis
+- [x] "Clear 2D Matrix" button to discard intensity + Qx/Qz and reclaim RAM
+- [x] Optional single precision checkbox for intensity matrices (½ RAM)

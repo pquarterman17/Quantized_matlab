@@ -265,9 +265,9 @@ try
     % Set active to first, apply correction
     api.setActiveIdx(1);
     api.setCorrections(0, 3.0, 0, 0);
-    api.fig.Visible = 'on'; drawnow;   % applyCorrectionsAll requires visible figure
+    showTestFig(api.fig);   % applyCorrectionsAll requires visible figure
     api.applyCorrectionsAll();
-    api.fig.Visible = 'off';
+    hideTestFig(api.fig);
 
     datasets = api.getDatasets();
 
@@ -322,9 +322,9 @@ try
     drawnow;
 
     api.autoPeaks();
-    api.fig.Visible = 'on'; drawnow;   % fitPeaks requires visible figure
+    showTestFig(api.fig);   % fitPeaks requires visible figure
     api.fitPeaks();
-    api.fig.Visible = 'off';
+    hideTestFig(api.fig);
 
     peaks = api.getPeaks();
     assert(~isempty(peaks), 'no peaks after fit');
@@ -701,7 +701,7 @@ try
     fprintf('  Collapsed: advRow=%g, analysisRow1=%g\n', s1.advRowHeight, s1.analysisRow1Height);
 
     % Expand — make fig visible briefly so layout engine processes changes
-    api.fig.Visible = 'on';
+    showTestFig(api.fig);
     drawnow;
     api.toggleAxAppearance();
     drawnow;
@@ -721,14 +721,14 @@ try
         sprintf('Analysis row 1 should return to 110 (got %g)', s3.analysisRow1Height));
     fprintf('  Re-collapsed: advRow=%g, analysisRow1=%g\n', s3.advRowHeight, s3.analysisRow1Height);
 
-    api.fig.Visible = 'off';
+    hideTestFig(api.fig);
     drawnow;
 
     fprintf('  PASS\n');
     passed = passed + 1;
 catch ME
     fprintf('  FAIL: %s\n', ME.message);
-    try; api.fig.Visible = 'off'; catch; end
+    try; hideTestFig(api.fig); catch; end
     failed = failed + 1;
 end
 
@@ -742,7 +742,7 @@ try
     drawnow;
 
     % Peak operations need visible figure for fitting
-    api.fig.Visible = 'on';
+    showTestFig(api.fig);
     drawnow;
 
     api.autoPeaks();
@@ -757,14 +757,14 @@ try
     drawnow;
     fprintf('  showDecomposition() completed without error\n');
 
-    api.fig.Visible = 'off';
+    hideTestFig(api.fig);
     drawnow;
 
     fprintf('  PASS\n');
     passed = passed + 1;
 catch ME
     fprintf('  FAIL: %s\n', ME.message);
-    try; api.fig.Visible = 'off'; catch; end
+    try; hideTestFig(api.fig); catch; end
     failed = failed + 1;
 end
 
@@ -809,7 +809,7 @@ try
     drawnow;
 
     % uialert needs visible figure for error reporting
-    api.fig.Visible = 'on';
+    showTestFig(api.fig);
     drawnow;
 
     % Try loading a non-existent file followed by a valid one
@@ -824,14 +824,14 @@ try
     fprintf('  Datasets after mixed load: %d (expected 1)\n', numel(datasets));
     fprintf('  GUI still valid: yes\n');
 
-    api.fig.Visible = 'off';
+    hideTestFig(api.fig);
     drawnow;
 
     fprintf('  PASS\n');
     passed = passed + 1;
 catch ME
     fprintf('  FAIL: %s\n', ME.message);
-    try; api.fig.Visible = 'off'; catch; end
+    try; hideTestFig(api.fig); catch; end
     failed = failed + 1;
 end
 
@@ -850,7 +850,7 @@ try
     fclose(fid);
 
     % uialert needs visible figure for error reporting
-    api.fig.Visible = 'on';
+    showTestFig(api.fig);
     drawnow;
 
     api.addFiles({corruptFile});
@@ -869,14 +869,14 @@ try
     assert(numel(datasets) == 1, 'Should load valid file after corrupt one');
     fprintf('  Valid file loaded after corrupt: yes (%d dataset)\n', numel(datasets));
 
-    api.fig.Visible = 'off';
+    hideTestFig(api.fig);
     drawnow;
 
     fprintf('  PASS\n');
     passed = passed + 1;
 catch ME
     fprintf('  FAIL: %s\n', ME.message);
-    try; api.fig.Visible = 'off'; catch; end
+    try; hideTestFig(api.fig); catch; end
     failed = failed + 1;
 end
 
@@ -982,7 +982,7 @@ function api = launchHeadless()
 %   fresh GUI instance is required to verify that saved state loads
 %   correctly into a clean environment.
     api = DataPlotter();
-    api.fig.Visible = 'off';
+    hideTestFig(api.fig);
     drawnow;
 end
 

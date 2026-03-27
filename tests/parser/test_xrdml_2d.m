@@ -263,8 +263,10 @@ try
     d   = parser.importXRDML(FILE_2D, Intensity='cps');
     map = d.metadata.parserSpecific.map2D;
 
-    % Fields must exist (synthetic file has a wavelength node)
-    assert(isfield(map, 'Qx'),      'map2D.Qx field missing');
+    % Lazy Q-space: wavelength stored at parse, Qx/Qz computed on demand
+    assert(isfield(map, 'wavelength_A'), 'map2D.wavelength_A missing (lazy Q-space)');
+    map = parser.computeQSpace(map);
+    assert(isfield(map, 'Qx'),      'map2D.Qx field missing after computeQSpace');
     assert(isfield(map, 'Qz'),      'map2D.Qz field missing');
     assert(isfield(map, 'QxUnit'),  'map2D.QxUnit field missing');
     assert(isfield(map, 'QzUnit'),  'map2D.QzUnit field missing');

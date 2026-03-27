@@ -66,6 +66,7 @@ fprintf('  2Theta range: %.3f to %.3f deg (%d pixels)\n', ...
     map.axis2(1), map.axis2(end), numel(map.axis2));
 fprintf('  Intensity   : %.1f to %.1f %s\n', ...
     min(map.intensity(:)), max(map.intensity(:)), map.intensityUnit);
+map = parser.computeQSpace(map);  % lazy Q-space: compute on demand
 if isfield(map, 'Qx')
     fprintf('  Qx range    : %.4f to %.4f Ang^-1\n', min(map.Qx(:)), max(map.Qx(:)));
     fprintf('  Qz range    : %.4f to %.4f Ang^-1\n', min(map.Qz(:)), max(map.Qz(:)));

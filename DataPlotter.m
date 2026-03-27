@@ -1863,163 +1863,8 @@ function varargout = DataPlotter()
     btnPlotOpt2.Layout.Row = 4; btnPlotOpt2.Layout.Column = [1 2];
 
     % ── Peak Analysis window (separate uifigure) ──────────────────────────
-    % The peak table + controls live in their own window, opened on demand.
-    peakFig = uifigure('Name', 'Peak Analysis', 'Visible', 'off', ...
-        'Position', [200 150 580 620], ...
-        'CloseRequestFcn', @(~,~) set(peakFig, 'Visible', 'off'));
-
-    peakRootGL = uigridlayout(peakFig, [3 1], ...
-        'RowHeight', {'1x', 340, 24}, ...
-        'Padding', [6 6 6 6], 'RowSpacing', 4);
-
-    peakTable = uitable(peakRootGL, ...
-        'ColumnName',     {'#','Center (°)','d (Å)','Size (nm)','FWHM (°)','Height','Area',char(951),'Status'}, ...
-        'ColumnWidth',    {22, 82, 70, 70, 68, 65, 65, 38, 55}, ...
-        'Data',           {}, ...
-        'RowName',        {}, ...
-        'ColumnEditable', [false false false false false false false false false], ...
-        'CellSelectionCallback', @onPeakTableSelect, ...
-        'Tooltip','Detected peaks — select a row to highlight it on the plot');
-    peakTable.Layout.Row = 1;
-
-    % Peak buttons — 2-column layout: fitting/actions on left, export/settings on right
-    peakBtnGL = uigridlayout(peakRootGL, [10 2], ...
-        'RowHeight',    {24,22,22,22,22,22,0, 18, 0, 96}, ...
-        'ColumnWidth',  {'1x','1x'}, ...
-        'Padding',      [0 0 0 0], ...
-        'RowSpacing',   2, ...
-        'ColumnSpacing', 4);
-    peakBtnGL.Layout.Row = 2;
-
-    % Row 1: Fit model dropdown (spans both columns)
-    ddFitModel = uidropdown(peakBtnGL, ...
-        'Items',   {'Lorentzian', 'Gaussian', 'Pseudo-Voigt', 'Split Pearson VII'}, ...
-        'Value',   'Lorentzian', ...
-        'Tooltip', ['Peak shape model: Lorentzian, Gaussian, Pseudo-Voigt (' char(951) char(183) ...
-                    'L + (1-' char(951) ')' char(183) 'G), or Split Pearson VII (asymmetric)']);
-    ddFitModel.Layout.Row = 1; ddFitModel.Layout.Column = [1 2];
-
-    % Row 2: Fit Peaks | Fit All
-    btnFitPeaks = uibutton(peakBtnGL,'Text','Fit Peaks', ...
-        'ButtonPushedFcn',@onFitPeaks, ...
-        'BackgroundColor',BTN_ACCENT,'FontColor',BTN_FG, ...
-        'Tooltip','Fit the selected model to each listed peak and extract precise center and FWHM');
-    btnFitPeaks.Layout.Row = 2; btnFitPeaks.Layout.Column = 1;
-
-    btnFitAllPeaks = uibutton(peakBtnGL,'Text','Fit All (global)', ...
-        'ButtonPushedFcn',@onFitAllPeaks, ...
-        'BackgroundColor',BTN_ACCENT,'FontColor',BTN_FG, ...
-        'Tooltip','Fit all peaks simultaneously as a single multi-peak model (requires ≥2 peaks)');
-    btnFitAllPeaks.Layout.Row = 2; btnFitAllPeaks.Layout.Column = 2;
-
-    % Row 3: Clear All | Remove Selected
-    btnClearPeaks = uibutton(peakBtnGL,'Text','Clear All', ...
-        'ButtonPushedFcn',@onClearPeaks, ...
-        'Tooltip','Remove all peaks for the active dataset');
-    btnClearPeaks.Layout.Row = 3; btnClearPeaks.Layout.Column = 1;
-
-    btnRemovePeak = uibutton(peakBtnGL,'Text','Remove Sel.', ...
-        'ButtonPushedFcn',@onRemoveSelectedPeak, ...
-        'Tooltip','Remove the currently highlighted peak from the list');
-    btnRemovePeak.Layout.Row = 3; btnRemovePeak.Layout.Column = 2;
-
-    % Row 4: Export CSV | Export XLSX
-    btnSavePeaks = uibutton(peakBtnGL,'Text','Export CSV', ...
-        'ButtonPushedFcn',@onSavePeakSummary, ...
-        'BackgroundColor',BTN_EXPORT,'FontColor',BTN_FG, ...
-        'Tooltip','Save peak centers and FWHM values to a CSV file');
-    btnSavePeaks.Layout.Row = 4; btnSavePeaks.Layout.Column = 1;
-
-    btnExportPeakXLSX = uibutton(peakBtnGL,'Text','Export XLSX', ...
-        'ButtonPushedFcn',@onExportPeakXLSX, ...
-        'BackgroundColor',BTN_EXPORT,'FontColor',BTN_FG, ...
-        'Tooltip','Export peak data from all datasets to an Excel file (.xlsx)');
-    btnExportPeakXLSX.Layout.Row = 4; btnExportPeakXLSX.Layout.Column = 2;
-
-    % Row 5: Copy Peaks | Fit Color
-    btnCopyPeaksClip = uibutton(peakBtnGL,'Text','Copy Peaks', ...
-        'ButtonPushedFcn', @onCopyPeaksToClipboard, ...
-        'BackgroundColor', BTN_SECONDARY, 'FontColor', BTN_FG, ...
-        'Tooltip', 'Copy peak table as tab-delimited text to clipboard');
-    btnCopyPeaksClip.Layout.Row = 5; btnCopyPeaksClip.Layout.Column = 1;
-
-    btnFitColor = uibutton(peakBtnGL, 'Text', 'Fit color...', ...
-        'Tooltip',           'Pick the color used for fit curve overlays', ...
-        'ButtonPushedFcn',   @onPickFitColor);
-    btnFitColor.Layout.Row = 5; btnFitColor.Layout.Column = 2;
-    btnFitColor.BackgroundColor = appData.fitCurveColor;
-
-    % Row 6: Show fit curves | Reflectivity FFT
-    chkShowFit = uicheckbox(peakBtnGL, ...
-        'Text',              'Show fit curves', ...
-        'Value',             true, ...
-        'Tooltip',           'Overlay fit curves on the plot', ...
-        'ValueChangedFcn',   @onToggleFitCurves);
-    chkShowFit.Layout.Row = 6; chkShowFit.Layout.Column = 1;
-
-    btnReflFFT = uibutton(peakBtnGL, 'Text', 'Refl. FFT', ...
-        'ButtonPushedFcn', @onReflectivityFFT, ...
-        'BackgroundColor', BTN_ACCENT, 'FontColor', BTN_FG, ...
-        'Tooltip', ['Compute film thickness from Kiessig fringes via FFT.' newline ...
-                    'For neutron/XRR data (Q-space). Also works for XRD in 2' char(952) ...
-                    '-space if wavelength is set.']);
-    btnReflFFT.Layout.Row = 6; btnReflFFT.Layout.Column = 2;
-
-    % Row 7: Fringe thickness (2-click) — visible only in reflectometry mode
-    btnFringeThick = uibutton(peakBtnGL, 'Text', ['Fringe ' char(916) 't (2-click)'], ...
-        'ButtonPushedFcn', @onArmFringeThickness, ...
-        'BackgroundColor', BTN_ACCENT, 'FontColor', BTN_FG, ...
-        'FontSize', 9, ...
-        'Tooltip', ['Pick two fringe peaks to estimate film thickness via t = 2' char(960) ...
-                    '/' char(916) 'Q.  Points are draggable for refinement.']);
-    btnFringeThick.Layout.Row = 7; btnFringeThick.Layout.Column = [1 2];
-    btnFringeThick.Visible = 'off';  % shown only for reflectometry data
-
-    % Row 8: "Advanced..." toggle (collapsed by default)
-    PEAK_ADV_ROWS = 9;
-    PEAK_ADV_HEIGHTS = 46;
-    btnMorePeak = uibutton(peakBtnGL, 'Text', [char(9654) ' Advanced...'], ...
-        'FontSize', 9, 'FontColor', [0.55 0.55 0.55], ...
-        'BackgroundColor', peakBtnGL.BackgroundColor, ...
-        'HorizontalAlignment', 'left', ...
-        'ButtonPushedFcn', @(~,~) onToggleAdvancedPeakTools());
-    btnMorePeak.Layout.Row = 8; btnMorePeak.Layout.Column = [1 2];
-
-    % Row 8: Advanced peak tools (collapsed by default) — 2x3 sub-grid
-    peakAdvGL = uigridlayout(peakBtnGL, [2 3], ...
-        'Padding', [0 0 0 0], 'ColumnSpacing', 3, 'RowSpacing', 2, ...
-        'ColumnWidth', {'1x','1x','1x'}, 'RowHeight', {22, 22});
-    peakAdvGL.Layout.Row = 9; peakAdvGL.Layout.Column = [1 2];
-
-    btnWHPlot = uibutton(peakAdvGL, 'Text', 'W-H Plot', ...
-        'ButtonPushedFcn', @onWilliamsonHallPlot, ...
-        'BackgroundColor', BTN_ACCENT, 'FontColor', BTN_FG, ...
-        'Tooltip', ['Williamson-Hall strain analysis: plot ' char(946) char(183) ...
-                    'cos' char(952) ' vs 4' char(183) 'sin' char(952) ...
-                    '.  Needs ' char(8805) '3 fitted peaks.']);
-    btnWHPlot.Layout.Row = 1; btnWHPlot.Layout.Column = 1;
-
-    btnFFTThickness = uibutton(peakAdvGL, 'Text', 'FFT Thick.', ...
-        'ButtonPushedFcn', @onFFTThickness, ...
-        'BackgroundColor', BTN_ACCENT, 'FontColor', BTN_FG, ...
-        'Tooltip', 'Compute film thickness from Laue / Kiessig fringe periodicity via FFT');
-    btnFFTThickness.Layout.Row = 1; btnFFTThickness.Layout.Column = 2;
-
-    btnRefineLattice = uibutton(peakAdvGL, 'Text', 'Lattice...', ...
-        'ButtonPushedFcn', @onRefineLattice, ...
-        'BackgroundColor', BTN_ACCENT, 'FontColor', BTN_FG, ...
-        'Tooltip', 'Refine lattice parameters from fitted peak positions + hkl Miller indices');
-    btnRefineLattice.Layout.Row = 1; btnRefineLattice.Layout.Column = 3;
-
-    btnMatchPhases = uibutton(peakAdvGL, 'Text', 'Match Phases', ...
-        'ButtonPushedFcn', @onMatchPhases, ...
-        'BackgroundColor', [0.20 0.50 0.35], 'FontColor', BTN_FG, ...
-        'Tooltip', ['Match detected peak d-spacings against a built-in database of ~50 phases ' ...
-                    '(metals, oxides, substrates, perovskites). Tolerance slider adjustable.']);
-    btnMatchPhases.Layout.Row = 2; btnMatchPhases.Layout.Column = [1 3];
-
-    % Row 9: Min sep / wavelength / source / K factor / instrument broadening (shared sub-grid)
-    % X-ray source lookup table: {display name, wavelength_A}
+    % Construction delegated to +dataplotter/buildPeakWindow.m.
+    % Callbacks are wired below after the struct is returned.
     XRAY_SOURCES = { ...
         ['Cu K' char(945) '1 (1.5406 ' char(197) ')'],   1.5406; ...
         ['Cu K' char(945) '2 (1.5444 ' char(197) ')'],   1.5444; ...
@@ -2030,226 +1875,110 @@ function varargout = DataPlotter()
         ['Fe K' char(945) '1 (1.9373 ' char(197) ')'],   1.9373; ...
         ['Ag K' char(945) '1 (0.5594 ' char(197) ')'],   0.5594; ...
         'Custom',                                          NaN};
+    peakConsts = struct( ...
+        'BTN_ACCENT',    BTN_ACCENT, ...
+        'BTN_EXPORT',    BTN_EXPORT, ...
+        'BTN_SECONDARY', BTN_SECONDARY, ...
+        'BTN_FG',        BTN_FG, ...
+        'XRAY_SOURCES',  {XRAY_SOURCES});
+    pw = dataplotter.buildPeakWindow(appData, peakConsts);
 
-    minSepGL = uigridlayout(peakBtnGL, [4 4], ...
-        'RowHeight', {22,22,24,20}, 'ColumnWidth', {50, '1x', 50, '1x'}, ...
-        'Padding', [0 0 0 0], 'ColumnSpacing', 3, 'RowSpacing', 2);
-    minSepGL.Layout.Row = 10; minSepGL.Layout.Column = [1 2];
-    % Row 1: Min sep | Wavelength (side by side)
-    lblMinSep = uilabel(minSepGL, 'Text', 'Min sep:', 'FontSize', 9, ...
-        'HorizontalAlignment', 'right', ...
-        'Tooltip', 'Minimum peak separation in degrees');
-    lblMinSep.Layout.Row = 1; lblMinSep.Layout.Column = 1;
-    efMinSep = uispinner(minSepGL, ...
-        'Value', 0, 'Limits', [0 20], 'Step', 0.05, ...
-        'Tooltip', ['Minimum peak separation (°) for auto-detect.  ' ...
-                    '0 = automatic (~1% of x-range).  ' ...
-                    'Decrease to resolve closely-spaced peaks.'], ...
-        'ValueDisplayFormat', '%.2f');
-    efMinSep.Layout.Row = 1; efMinSep.Layout.Column = 2;
-    lblWavelength = uilabel(minSepGL, 'Text', [char(955), ' (', char(197), '):'], 'FontSize', 9, ...
-        'HorizontalAlignment', 'right', ...
-        'Tooltip', 'X-ray wavelength in Ångströms for d-spacing / Scherrer calculations');
-    lblWavelength.Layout.Row = 1; lblWavelength.Layout.Column = 3;
-    efWavelength = uieditfield(minSepGL, 'numeric', ...
-        'Value', 0, 'Limits', [0 Inf], ...
-        'Tooltip', ['Wavelength in Å for d-spacing & Scherrer.  ' ...
-                    'Auto-filled from file metadata when available.  ' ...
-                    'Cu K' char(945) '1 = 1.5406 Å.  0 = not set.'], ...
-        'ValueChangedFcn', @onWavelengthChanged);
-    efWavelength.Layout.Row = 1; efWavelength.Layout.Column = 4;
-    % Row 2: K factor | Inst broadening (side by side)
-    lblKFactor = uilabel(minSepGL, 'Text', 'K:', 'FontSize', 9, ...
-        'HorizontalAlignment', 'right', ...
-        'Tooltip', 'Scherrer shape factor K (0.9 for spherical grains, 1.0 for cubic)');
-    lblKFactor.Layout.Row = 2; lblKFactor.Layout.Column = 1;
-    efKFactor = uieditfield(minSepGL, 'numeric', ...
-        'Value', appData.kFactor, 'Limits', [0.1 2], ...
-        'Tooltip', 'Scherrer shape factor K — 0.9 (spherical) or 1.0 (cubic). Affects Size (nm) column.', ...
-        'ValueChangedFcn', @onKFactorChanged);
-    efKFactor.Layout.Row = 2; efKFactor.Layout.Column = 2;
-    lblInstB = uilabel(minSepGL, 'Text', ['Inst ', char(946), ':'], 'FontSize', 9, ...
-        'HorizontalAlignment', 'right', ...
-        'Tooltip', ['Instrument broadening FWHM in degrees (e.g. LaB6 standard).  ' ...
-                    '0 = no correction.  Subtracted in quadrature: ' ...
-                    char(946), char(8321), char(8325), char(8331), ...
-                    ' = sqrt(', char(946), char(8322), char(8320), char(8322), char(8331), ...
-                    ' - ', char(946), char(8321), char(8326), char(8331), char(8322), ')']);
-    lblInstB.Layout.Row = 2; lblInstB.Layout.Column = 3;
-    efInstBroadening = uieditfield(minSepGL, 'numeric', ...
-        'Value', appData.instBroadening_deg, 'Limits', [0 5], ...
-        'Tooltip', ['Instrument broadening FWHM (°). Enter the FWHM of a standard (e.g. LaB6) peak.  ' ...
-                    '0 = no correction applied.'], ...
-        'ValueChangedFcn', @onInstBroadeningChanged);
-    efInstBroadening.Layout.Row = 2; efInstBroadening.Layout.Column = 4;
-    % Row 3: X-ray source dropdown (spans all 4 columns)
-    ddXraySource = uidropdown(minSepGL, ...
-        'Items',   XRAY_SOURCES(:,1)', ...
-        'Value',   XRAY_SOURCES{1,1}, ...
-        'FontSize', 9, ...
-        'Tooltip', 'Select X-ray source to auto-fill wavelength; pick Custom to type manually', ...
-        'ValueChangedFcn', @onXraySourceChanged);
-    ddXraySource.Layout.Row = 3; ddXraySource.Layout.Column = [1 4];
-    % Row 4-6 are unused spacers (grid has 6 rows but only 3 used now)
-    chkShowBG = uicheckbox(minSepGL, ...
-        'Text',            'Show BG', ...
-        'Value',           true, ...
-        'FontSize',        9, ...
-        'Tooltip',         'Overlay the estimated SNIP background curve on the plot', ...
-        'ValueChangedFcn', @onToggleShowBG);
-    chkShowBG.Layout.Row = 4; chkShowBG.Layout.Column = [1 2];
+    % Destructure peak window handles into the DataPlotter closure
+    peakFig           = pw.peakFig;
+    peakBtnGL         = pw.peakBtnGL;
+    peakTable         = pw.peakTable;
+    ddFitModel        = pw.ddFitModel;
+    btnFitPeaks       = pw.btnFitPeaks;
+    btnFitAllPeaks    = pw.btnFitAllPeaks;
+    btnClearPeaks     = pw.btnClearPeaks;
+    btnRemovePeak     = pw.btnRemovePeak;
+    btnSavePeaks      = pw.btnSavePeaks;
+    btnExportPeakXLSX = pw.btnExportPeakXLSX;
+    btnCopyPeaksClip  = pw.btnCopyPeaksClip;
+    btnFitColor       = pw.btnFitColor;
+    chkShowFit        = pw.chkShowFit;
+    btnReflFFT        = pw.btnReflFFT;
+    btnFringeThick    = pw.btnFringeThick;
+    btnMorePeak       = pw.btnMorePeak;
+    btnWHPlot         = pw.btnWHPlot;
+    btnFFTThickness   = pw.btnFFTThickness;
+    btnRefineLattice  = pw.btnRefineLattice;
+    btnMatchPhases    = pw.btnMatchPhases;
+    efMinSep          = pw.efMinSep;
+    efWavelength      = pw.efWavelength;
+    efKFactor         = pw.efKFactor;
+    efInstBroadening  = pw.efInstBroadening;
+    ddXraySource      = pw.ddXraySource;
+    chkShowBG         = pw.chkShowBG;
 
-    % Row 3 of peakRootGL: help label
-    lblPeakHelp = uilabel(peakRootGL, ...
-        'Text', ['Select model ' char(8594) ' Fit Peaks.  Use Add Peak (main window) to click on the plot.  ' ...
-                 'Close this window to hide; peaks stay on plot.'], ...
-        'FontSize', 9, 'FontColor', [0.55 0.55 0.55], ...
-        'HorizontalAlignment', 'center');
-    lblPeakHelp.Layout.Row = 3;
+    % Constants used by onToggleAdvancedPeakTools
+    PEAK_ADV_ROWS    = 9;
+    PEAK_ADV_HEIGHTS = 46;
+
+    % Wire peak window callbacks (deferred from builder)
+    peakFig.CloseRequestFcn                  = @(~,~) set(peakFig, 'Visible', 'off');
+    peakTable.CellSelectionCallback          = @onPeakTableSelect;
+    btnFitPeaks.ButtonPushedFcn              = @onFitPeaks;
+    btnFitAllPeaks.ButtonPushedFcn           = @onFitAllPeaks;
+    btnClearPeaks.ButtonPushedFcn            = @onClearPeaks;
+    btnRemovePeak.ButtonPushedFcn            = @onRemoveSelectedPeak;
+    btnSavePeaks.ButtonPushedFcn             = @onSavePeakSummary;
+    btnExportPeakXLSX.ButtonPushedFcn        = @onExportPeakXLSX;
+    btnCopyPeaksClip.ButtonPushedFcn         = @onCopyPeaksToClipboard;
+    btnFitColor.ButtonPushedFcn              = @onPickFitColor;
+    chkShowFit.ValueChangedFcn               = @onToggleFitCurves;
+    btnReflFFT.ButtonPushedFcn               = @onReflectivityFFT;
+    btnFringeThick.ButtonPushedFcn           = @onArmFringeThickness;
+    btnMorePeak.ButtonPushedFcn              = @(~,~) onToggleAdvancedPeakTools();
+    btnWHPlot.ButtonPushedFcn                = @onWilliamsonHallPlot;
+    btnFFTThickness.ButtonPushedFcn          = @onFFTThickness;
+    btnRefineLattice.ButtonPushedFcn         = @onRefineLattice;
+    btnMatchPhases.ButtonPushedFcn           = @onMatchPhases;
+    efWavelength.ValueChangedFcn             = @onWavelengthChanged;
+    efKFactor.ValueChangedFcn                = @onKFactorChanged;
+    efInstBroadening.ValueChangedFcn         = @onInstBroadeningChanged;
+    ddXraySource.ValueChangedFcn             = @onXraySourceChanged;
+    chkShowBG.ValueChangedFcn                = @onToggleShowBG;
 
     % ── 2D Map controls (col 3 of analysisGL — visible only for 2D data) ──
-    map2DPanel = uipanel(analysisGL,'Title','2D Map View','FontSize',11, ...
-        'Scrollable','on');
-    map2DPanel.Layout.Row = [1 2]; map2DPanel.Layout.Column = 3;
-    map2DPanel.Visible = 'off';   % shown only when a 2D area-detector dataset is active
+    % Construction delegated to +dataplotter/buildMap2DPanel.m.
+    % Callbacks are wired below after the struct is returned.
+    mw = dataplotter.buildMap2DPanel(analysisGL, ismac);
+    mw.map2DPanel.Layout.Row = [1 2]; mw.map2DPanel.Layout.Column = 3;
 
-    map2DGL = uigridlayout(map2DPanel,[16 2], ...
-        'RowHeight',    {20, 20, 20, 20, 20, 20, 20, 22, 22, 16, 20, 20, 22, 22, 18, '1x'}, ...
-        'ColumnWidth',  {85, '1x'}, ...
-        'Padding',      [4 4 4 4], ...
-        'RowSpacing',   3, ...
-        'ColumnSpacing', 4);
+    % Destructure 2D map handles into the DataPlotter closure
+    map2DPanel      = mw.map2DPanel;
+    ddMap2DType     = mw.ddMap2DType;
+    efMap2DContourN = mw.efMap2DContourN;
+    cbMap2DQSpace   = mw.cbMap2DQSpace;
+    ddMap2DCmap     = mw.ddMap2DCmap;
+    ddMap2DScale    = mw.ddMap2DScale;
+    efMap2DCMin     = mw.efMap2DCMin;
+    efMap2DCMax     = mw.efMap2DCMax;
+    btnPoleFigure   = mw.btnPoleFigure;
+    btnBoxIntegrate = mw.btnBoxIntegrate;
+    efBoxIntW       = mw.efBoxIntW;
+    efBoxIntH       = mw.efBoxIntH;
+    btnArcIntegrate = mw.btnArcIntegrate;
+    lblMap2DInfo    = mw.lblMap2DInfo;
+    cbMap2DSingle   = mw.cbMap2DSingle;
+    btnClear2DMatrix = mw.btnClear2DMatrix;
 
-    lblMap2DType = uilabel(map2DGL,'Text','Plot type:','FontSize',10,'HorizontalAlignment','right');
-    lblMap2DType.Layout.Row = 1; lblMap2DType.Layout.Column = 1;
-    ddMap2DType = uidropdown(map2DGL, ...
-        'Items',           {'Heatmap','Contour','Filled Contour'}, ...
-        'Value',           'Heatmap', ...
-        'Tooltip',         'Rendering style for the 2D intensity map', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    ddMap2DType.Layout.Row = 1; ddMap2DType.Layout.Column = 2;
-
-    lblMap2DLevels = uilabel(map2DGL,'Text','Contour lvls:','FontSize',10,'HorizontalAlignment','right');
-    lblMap2DLevels.Layout.Row = 2; lblMap2DLevels.Layout.Column = 1;
-    efMap2DContourN = uieditfield(map2DGL,'numeric', ...
-        'Value',   20, ...
-        'Limits',  [2 200], ...
-        'Tooltip', 'Number of contour levels (Contour and Filled Contour modes)', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    efMap2DContourN.Layout.Row = 2; efMap2DContourN.Layout.Column = 2;
-
-    cbMap2DQSpace = uicheckbox(map2DGL, ...
-        'Text',    'Q-space (Qx / Qz)', ...
-        'Value',   false, ...
-        'Enable',  'off', ...
-        'Tooltip', ['Show reciprocal-space map in Qx/Qz coordinates.' newline ...
-                    'Enabled when the file contains wavelength metadata.' newline ...
-                    'Shift+click / Ctrl+click line-cuts use Q-space coordinates.']);
-    cbMap2DQSpace.Layout.Row = 3; cbMap2DQSpace.Layout.Column = [1 2];
-
-    lblMap2DCmap = uilabel(map2DGL,'Text','Color scale:','FontSize',10,'HorizontalAlignment','right');
-    lblMap2DCmap.Layout.Row = 4; lblMap2DCmap.Layout.Column = 1;
-    MAP2D_CMAPS = {'parula','viridis','plasma','inferno','hot','jet','turbo','gray','bone','copper'};
-    ddMap2DCmap = uidropdown(map2DGL, ...
-        'Items',           MAP2D_CMAPS, ...
-        'Value',           'parula', ...
-        'Tooltip',         'Colormap for 2D heatmap / contour display', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    ddMap2DCmap.Layout.Row = 4; ddMap2DCmap.Layout.Column = 2;
-
-    % Row 5: Intensity scale (log/linear)
-    lblMap2DScale = uilabel(map2DGL,'Text','Intensity:','FontSize',10,'HorizontalAlignment','right');
-    lblMap2DScale.Layout.Row = 5; lblMap2DScale.Layout.Column = 1;
-    ddMap2DScale = uidropdown(map2DGL, ...
-        'Items',           {'Linear','Log₁₀'}, ...
-        'Value',           'Log₁₀', ...
-        'Tooltip',         'Linear or log₁₀ intensity scaling for the 2D map', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    ddMap2DScale.Layout.Row = 5; ddMap2DScale.Layout.Column = 2;
-
-    % Row 6: Colorbar range min
-    lblMap2DCMin = uilabel(map2DGL,'Text','CBar min:','FontSize',10,'HorizontalAlignment','right');
-    lblMap2DCMin.Layout.Row = 6; lblMap2DCMin.Layout.Column = 1;
-    efMap2DCMin = uieditfield(map2DGL,'Value','','Placeholder','auto', ...
-        'FontSize',10, ...
-        'Tooltip','Minimum colorbar value (blank = auto)', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    efMap2DCMin.Layout.Row = 6; efMap2DCMin.Layout.Column = 2;
-
-    % Row 7: Colorbar range max
-    lblMap2DCMax = uilabel(map2DGL,'Text','CBar max:','FontSize',10,'HorizontalAlignment','right');
-    lblMap2DCMax.Layout.Row = 7; lblMap2DCMax.Layout.Column = 1;
-    efMap2DCMax = uieditfield(map2DGL,'Value','','Placeholder','auto', ...
-        'FontSize',10, ...
-        'Tooltip','Maximum colorbar value (blank = auto)', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    efMap2DCMax.Layout.Row = 7; efMap2DCMax.Layout.Column = 2;
-
-    btnPoleFigure = uibutton(map2DGL,'Text','Pole Figure...', ...
-        'ButtonPushedFcn',@onPoleFigure, ...
-        'BackgroundColor',[0.30 0.45 0.55], ...
-        'FontColor',[1 1 1], ...
-        'Tooltip','Open a polar plot of integrated intensity at a chosen 2θ position');
-    btnPoleFigure.Layout.Row = 8; btnPoleFigure.Layout.Column = [1 2];
-
-    btnBoxIntegrate = uibutton(map2DGL,'Text','Box Integrate...', ...
-        'ButtonPushedFcn',@onBoxIntButton, ...
-        'BackgroundColor',[0.20 0.50 0.35], ...
-        'FontColor',[1 1 1], ...
-        'Tooltip',['Draw a box on the 2D map to integrate intensity within a region.' newline ...
-                   'Or use ' guiTernary(ismac, 'Option', 'Alt') '+drag directly on the map.']);
-    btnBoxIntegrate.Layout.Row = 9; btnBoxIntegrate.Layout.Column = [1 2];
-
-    % Row 10: Box size label
-    lblBoxSize = uilabel(map2DGL,'Text','Box size (fixed):', ...
-        'FontSize', 9, 'FontColor', [0.5 0.5 0.5], ...
-        'HorizontalAlignment', 'left');
-    lblBoxSize.Layout.Row = 10; lblBoxSize.Layout.Column = [1 2];
-
-    % Row 11: Box width
-    lblBoxW = uilabel(map2DGL,'Text','Width:','FontSize',10,'HorizontalAlignment','right');
-    lblBoxW.Layout.Row = 11; lblBoxW.Layout.Column = 1;
-    efBoxIntW = uieditfield(map2DGL,'Value','','Placeholder','free-draw', ...
-        'FontSize',10, ...
-        'Tooltip',['Box width in axis units (X-axis extent).' newline ...
-                   'Leave blank for free-draw mode.'], ...
-        'ValueChangedFcn', @(~,~) updateBoxPreview());
-    efBoxIntW.Layout.Row = 11; efBoxIntW.Layout.Column = 2;
-
-    % Row 12: Box height
-    lblBoxH = uilabel(map2DGL,'Text','Height:','FontSize',10,'HorizontalAlignment','right');
-    lblBoxH.Layout.Row = 12; lblBoxH.Layout.Column = 1;
-    efBoxIntH = uieditfield(map2DGL,'Value','','Placeholder','free-draw', ...
-        'FontSize',10, ...
-        'Tooltip',['Box height in axis units (Y-axis extent).' newline ...
-                   'Leave blank for free-draw mode.'], ...
-        'ValueChangedFcn', @(~,~) updateBoxPreview());
-    efBoxIntH.Layout.Row = 12; efBoxIntH.Layout.Column = 2;
-
-    btnArcIntegrate = uibutton(map2DGL,'Text','Arc Integrate...', ...
-        'ButtonPushedFcn',@onArcIntButton, ...
-        'BackgroundColor',[0.40 0.25 0.55], ...
-        'FontColor',[1 1 1], ...
-        'Enable', 'off', ...
-        'Tooltip',['Integrate along arcs of constant |Q| in reciprocal space.' newline ...
-                   'Requires Q-space coordinates (wavelength in file metadata).']);
-    btnArcIntegrate.Layout.Row = 13; btnArcIntegrate.Layout.Column = [1 2];
-
-    lblMap2DInfo = uilabel(map2DGL,'Text','', ...
-        'FontSize', 9, ...
-        'FontColor', [0.4 0.4 0.4], ...
-        'HorizontalAlignment', 'center', ...
-        'WordWrap', 'on');
-    lblMap2DInfo.Layout.Row = 14; lblMap2DInfo.Layout.Column = [1 2];
-
-    lblMap2DHint = uilabel(map2DGL,'Text', ...
-        ['Shift+click: H-cut | Ctrl+click: V-cut | ' ...
-         guiTernary(ismac, 'Opt', 'Alt') '+drag: Box integrate'], ...
-        'FontSize', 8, ...
-        'FontColor', [0.55 0.55 0.55], ...
-        'HorizontalAlignment', 'center', ...
-        'WordWrap', 'on');
-    lblMap2DHint.Layout.Row = 15; lblMap2DHint.Layout.Column = [1 2];
+    % Wire 2D map callbacks (deferred from builder)
+    ddMap2DType.ValueChangedFcn      = @(~,~) onPlot([],[]);
+    efMap2DContourN.ValueChangedFcn  = @(~,~) onPlot([],[]);
+    cbMap2DQSpace.ValueChangedFcn    = @(~,~) onPlot([],[]);
+    ddMap2DCmap.ValueChangedFcn      = @(~,~) onPlot([],[]);
+    ddMap2DScale.ValueChangedFcn     = @(~,~) onPlot([],[]);
+    efMap2DCMin.ValueChangedFcn      = @(~,~) onPlot([],[]);
+    efMap2DCMax.ValueChangedFcn      = @(~,~) onPlot([],[]);
+    btnPoleFigure.ButtonPushedFcn    = @onPoleFigure;
+    btnBoxIntegrate.ButtonPushedFcn  = @onBoxIntButton;
+    efBoxIntW.ValueChangedFcn        = @(~,~) updateBoxPreview();
+    efBoxIntH.ValueChangedFcn        = @(~,~) updateBoxPreview();
+    btnArcIntegrate.ButtonPushedFcn  = @onArcIntButton;
+    cbMap2DSingle.ValueChangedFcn    = @(~,~) onToggleSinglePrecision();
+    btnClear2DMatrix.ButtonPushedFcn = @(~,~) onClear2DMatrix();
 
     % ── Drag-and-drop: register every major surface as a drop target (R2023a+) ──
     % In uifigure the CEF renderer consumes drag events at whichever child
@@ -2603,14 +2332,8 @@ function varargout = DataPlotter()
         if nargin < 1 || isempty(outPath)
             error('outPath required');
         end
-        guiState = struct( ...
-            'colormap', ddColormap.Value, ...
-            'xCol', ddX.Value, ...
-            'yCol', lbY.Value, ...
-            'y2Col', lbY2.Value, ...
-            'logX', strcmp(ddScaleX.Value, 'Log'), ...
-            'logY', strcmp(ddScaleY.Value, 'Log'), ...
-            'logY2', strcmp(ddScaleY2.Value, 'Log'));
+        widgets  = buildSessionWidgets_();
+        guiState = dataplotter.sessionManager.collectGuiState(widgets);
         dataplotter.sessionManager.save(outPath, appData, guiState);
     end
 
@@ -2619,24 +2342,23 @@ function varargout = DataPlotter()
         if nargin < 1 || isempty(matPath)
             error('matPath required');
         end
-        guiState = dataplotter.sessionManager.load(matPath, appData);
-
-        % Restore GUI widget state
-        try
-            ddColormap.Value = guiState.colormap;
-            ddX.Value = guiState.xCol;
-            lbY.Value = guiState.yCol;
-            lbY2.Value = guiState.y2Col;
-            if guiState.logX, ddScaleX.Value = 'Log'; else, ddScaleX.Value = 'Linear'; end
-            if guiState.logY, ddScaleY.Value = 'Log'; else, ddScaleY.Value = 'Linear'; end
-            if guiState.logY2, ddScaleY2.Value = 'Log'; else, ddScaleY2.Value = 'Linear'; end
-        catch
-        end
+        [datasets, restored] = dataplotter.sessionManager.load(matPath);
 
         cancelInteractions();
+
+        appData.datasets  = datasets;
+        appData.activeIdx = restored.activeIdx;
+        appData.bgFile    = restored.bgFile;
+        appData.bgDataset = restored.bgDataset;
+        appData.style     = restored.style;
+        appData.lastDir   = restored.lastDir;
+
+        widgets = buildSessionWidgets_();
+        dataplotter.sessionManager.applyGuiState(restored.guiState, widgets);
+
         rebuildDatasetList(true);
         if ~isempty(appData.datasets)
-            appData.activeIdx = 1;
+            dataplotter.sessionManager.applyAxisSelections(restored.guiState, widgets);
             updateControlsForActiveDataset();
         end
         onPlot([],[]);
@@ -3629,8 +3351,12 @@ function varargout = DataPlotter()
             end
         elseif is2DDataset(ds)
             ddScaleY.Value = 'Log';  % log intensity is standard for XRD reciprocal-space maps
-            % Update map dimension info label
+            % Lazy Q-space: compute Qx/Qz on first activation if wavelength available
             map = ds.data.metadata.parserSpecific.map2D;
+            map = parser.computeQSpace(map);
+            ds.data.metadata.parserSpecific.map2D = map;
+            appData.datasets{appData.activeIdx} = ds;
+            % Update map dimension info label
             lblMap2DInfo.Text = sprintf('%d %s positions  \xD7  %d 2\xB0 pixels', ...
                 numel(map.axis1), map.axis1Name, numel(map.axis2));
             % Enable Q-space toggle and arc integration only when wavelength was available
@@ -5349,7 +5075,7 @@ function varargout = DataPlotter()
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig, 'Load a file first.', 'No data'); return;
         end
-        ds  = appData.datasets{appData.activeIdx};
+        ds   = appData.datasets{appData.activeIdx};
         wl_A = extractWavelength_A(ds);
         if isnan(wl_A) || wl_A <= 0
             uialert(fig, ['Wavelength is required for lattice refinement.  ' ...
@@ -5362,251 +5088,13 @@ function varargout = DataPlotter()
             uialert(fig, 'Fit peaks first (at least one fitted peak required).', ...
                 'No fitted peaks'); return;
         end
-
-        % ── Collect fitted peaks ────────────────────────────────────────
-        DEG2RAD = pi / 180;
-        fittedIdx = find(strcmp({ds.peaks.status}, 'fitted') | ...
-                         strcmp({ds.peaks.status}, 'fitted(global)'));
-        nPk = numel(fittedIdx);
-        centers  = [ds.peaks(fittedIdx).center];
-        theta    = centers / 2 * DEG2RAD;
-        d_obs    = wl_A ./ (2 * sin(theta));
-
-        % ── Create dialog figure ────────────────────────────────────────
-        dlgFig = uifigure('Name', 'Lattice Parameter Refinement', ...
-            'Position', [200 200 520 480], 'Resize', 'on');
-        dlgGL = uigridlayout(dlgFig, [5 1], ...
-            'RowHeight', {24, '1x', 28, 28, '0.6x'}, ...
-            'Padding', [10 10 10 10], 'RowSpacing', 8);
-
-        % Row 1: Crystal system selector
-        sysGL = uigridlayout(dlgGL, [1 2], 'ColumnWidth', {120, '1x'}, ...
-            'Padding', [0 0 0 0]);
-        sysGL.Layout.Row = 1;
-        uilabel(sysGL, 'Text', 'Crystal system:', 'FontWeight', 'bold');
-        ddSystem = uidropdown(sysGL, ...
-            'Items', {'Cubic', 'Tetragonal', 'Hexagonal', 'Orthorhombic'}, ...
-            'Value', 'Cubic');
-
-        % Row 2: hkl assignment table
-        tblData = cell(nPk, 6);
-        for i = 1:nPk
-            tblData{i,1} = fittedIdx(i);
-            tblData{i,2} = sprintf('%.4f', centers(i));
-            tblData{i,3} = sprintf('%.4f', d_obs(i));
-            tblData{i,4} = 0;   % h
-            tblData{i,5} = 0;   % k
-            tblData{i,6} = 0;   % l
-        end
-        hklTable = uitable(dlgGL, ...
-            'ColumnName', {'Peak#', ['2' char(952) ' (' char(176) ')'], ...
-                           'd (Å)', 'h', 'k', 'l'}, ...
-            'ColumnWidth', {50, 75, 75, 55, 55, 55}, ...
-            'ColumnEditable', [false false false true true true], ...
-            'ColumnFormat', {'numeric','char','char','numeric','numeric','numeric'}, ...
-            'Data', tblData, 'RowName', {});
-        hklTable.Layout.Row = 2;
-
-        % Row 3: Refine button
-        btnRefine = uibutton(dlgGL, 'Text', 'Refine Lattice Parameters', ...
-            'ButtonPushedFcn', @doRefine, ...
-            'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG);
-        btnRefine.Layout.Row = 3;
-
-        % Row 4: Nelson-Riley plot button
-        btnNR = uibutton(dlgGL, 'Text', 'Nelson-Riley Plot (cubic only)', ...
-            'ButtonPushedFcn', @doNelsonRiley, 'Enable', 'off');
-        btnNR.Layout.Row = 4;
-
-        % Row 5: Results text area
-        taResults = uitextarea(dlgGL, 'Value', {'Assign hkl indices and click Refine.'}, ...
-            'Editable', false, 'FontName', 'Consolas');
-        taResults.Layout.Row = 5;
-
-        % ── Stored refinement results (closure variable) ────────────────
-        refinedResult = [];
-
-        function doRefine(~, ~)
-        %DOREFINE  Run least-squares lattice parameter refinement.
-            tData  = hklTable.Data;
-            h_arr  = cell2mat(tData(:,4));
-            k_arr  = cell2mat(tData(:,5));
-            l_arr  = cell2mat(tData(:,6));
-            % Validate: at least one non-zero hkl
-            hklSum = abs(h_arr) + abs(k_arr) + abs(l_arr);
-            valid  = hklSum > 0;
-            if sum(valid) < 1
-                taResults.Value = {'Error: assign non-zero hkl to at least one peak.'};
-                return;
-            end
-            hv = h_arr(valid);  kv = k_arr(valid);  lv = l_arr(valid);
-            dv = d_obs(valid);
-            inv_d2 = (1 ./ dv.^2)';
-
-            sys = ddSystem.Value;
-            lines_out = {};
-            switch sys
-                case 'Cubic'
-                    % a = d * sqrt(h^2 + k^2 + l^2) for each peak
-                    a_each = dv' .* sqrt(hv.^2 + kv.^2 + lv.^2);
-                    a_mean = mean(a_each);
-                    a_std  = std(a_each);
-                    % Least-squares: 1/d^2 = (h^2+k^2+l^2) / a^2
-                    A_mat  = hv.^2 + kv.^2 + lv.^2;
-                    inv_a2 = A_mat \ inv_d2;
-                    a_ls   = 1 / sqrt(inv_a2);
-                    d_calc = a_ls ./ sqrt(hv.^2 + kv.^2 + lv.^2);
-                    resid  = dv' - d_calc;
-                    lines_out = {
-                        sprintf('Crystal system: Cubic')
-                        sprintf('Refined a = %.5f %s', a_ls, char(197))
-                        sprintf('Mean a   = %.5f %s %s %.5f', a_mean, char(197), char(177), a_std)
-                        ''
-                        'Per-peak residuals (d_obs - d_calc):'
-                    };
-                    for ri = 1:numel(dv')
-                        lines_out{end+1} = sprintf('  (%d%d%d)  d=%.4f  calc=%.4f  %s=%.4f', ...
-                            hv(ri), kv(ri), lv(ri), dv(ri), d_calc(ri), char(916), resid(ri)); %#ok<AGROW>
-                    end
-                    refinedResult = struct('system','Cubic','a',a_ls,'residuals',resid, ...
-                        'hkl',[hv kv lv],'d_obs',dv','d_calc',d_calc, ...
-                        'theta_rad',theta(valid)');
-                    btnNR.Enable = 'on';
-
-                case 'Tetragonal'
-                    % 1/d^2 = (h^2+k^2)/a^2 + l^2/c^2
-                    A_mat = [hv.^2+kv.^2, lv.^2];
-                    if size(A_mat,1) < 2
-                        taResults.Value = {'Error: tetragonal needs >= 2 peaks with hkl.'};
-                        return;
-                    end
-                    x = A_mat \ inv_d2;
-                    a_ref = 1/sqrt(x(1));  c_ref = 1/sqrt(x(2));
-                    d_calc = 1 ./ sqrt(A_mat * x);
-                    resid  = dv' - d_calc;
-                    lines_out = {
-                        sprintf('Crystal system: Tetragonal')
-                        sprintf('Refined a = %.5f %s', a_ref, char(197))
-                        sprintf('Refined c = %.5f %s', c_ref, char(197))
-                        sprintf('c/a = %.5f', c_ref/a_ref)
-                        ''
-                        'Per-peak residuals:'
-                    };
-                    for ri = 1:numel(dv')
-                        lines_out{end+1} = sprintf('  (%d%d%d)  d=%.4f  calc=%.4f  %s=%.4f', ...
-                            hv(ri), kv(ri), lv(ri), dv(ri), d_calc(ri), char(916), resid(ri)); %#ok<AGROW>
-                    end
-                    refinedResult = struct('system','Tetragonal','a',a_ref,'c',c_ref, ...
-                        'residuals',resid,'hkl',[hv kv lv],'d_obs',dv','d_calc',d_calc);
-                    btnNR.Enable = 'off';
-
-                case 'Hexagonal'
-                    % 1/d^2 = (4/3)(h^2+hk+k^2)/a^2 + l^2/c^2
-                    A_mat = [(4/3)*(hv.^2 + hv.*kv + kv.^2), lv.^2];
-                    if size(A_mat,1) < 2
-                        taResults.Value = {'Error: hexagonal needs >= 2 peaks with hkl.'};
-                        return;
-                    end
-                    x = A_mat \ inv_d2;
-                    a_ref = 1/sqrt(x(1));  c_ref = 1/sqrt(x(2));
-                    d_calc = 1 ./ sqrt(A_mat * x);
-                    resid  = dv' - d_calc;
-                    lines_out = {
-                        sprintf('Crystal system: Hexagonal')
-                        sprintf('Refined a = %.5f %s', a_ref, char(197))
-                        sprintf('Refined c = %.5f %s', c_ref, char(197))
-                        sprintf('c/a = %.5f', c_ref/a_ref)
-                        ''
-                        'Per-peak residuals:'
-                    };
-                    for ri = 1:numel(dv')
-                        lines_out{end+1} = sprintf('  (%d%d%d)  d=%.4f  calc=%.4f  %s=%.4f', ...
-                            hv(ri), kv(ri), lv(ri), dv(ri), d_calc(ri), char(916), resid(ri)); %#ok<AGROW>
-                    end
-                    refinedResult = struct('system','Hexagonal','a',a_ref,'c',c_ref, ...
-                        'residuals',resid,'hkl',[hv kv lv],'d_obs',dv','d_calc',d_calc);
-                    btnNR.Enable = 'off';
-
-                case 'Orthorhombic'
-                    % 1/d^2 = h^2/a^2 + k^2/b^2 + l^2/c^2
-                    A_mat = [hv.^2, kv.^2, lv.^2];
-                    if size(A_mat,1) < 3
-                        taResults.Value = {'Error: orthorhombic needs >= 3 peaks with hkl.'};
-                        return;
-                    end
-                    x = A_mat \ inv_d2;
-                    a_ref = 1/sqrt(x(1));  b_ref = 1/sqrt(x(2));  c_ref = 1/sqrt(x(3));
-                    d_calc = 1 ./ sqrt(A_mat * x);
-                    resid  = dv' - d_calc;
-                    lines_out = {
-                        sprintf('Crystal system: Orthorhombic')
-                        sprintf('Refined a = %.5f %s', a_ref, char(197))
-                        sprintf('Refined b = %.5f %s', b_ref, char(197))
-                        sprintf('Refined c = %.5f %s', c_ref, char(197))
-                        ''
-                        'Per-peak residuals:'
-                    };
-                    for ri = 1:numel(dv')
-                        lines_out{end+1} = sprintf('  (%d%d%d)  d=%.4f  calc=%.4f  %s=%.4f', ...
-                            hv(ri), kv(ri), lv(ri), dv(ri), d_calc(ri), char(916), resid(ri)); %#ok<AGROW>
-                    end
-                    refinedResult = struct('system','Orthorhombic','a',a_ref,'b',b_ref,'c',c_ref, ...
-                        'residuals',resid,'hkl',[hv kv lv],'d_obs',dv','d_calc',d_calc);
-                    btnNR.Enable = 'off';
-            end
-
-            rms = sqrt(mean(resid.^2));
-            lines_out{end+1} = '';
-            lines_out{end+1} = sprintf('RMS residual = %.6f %s', rms, char(197));
-            taResults.Value = lines_out;
-
-            % Persist to dataset
+        result = dataplotter.peakTools.refineLattice(ds, wl_A, ...
+            ParentFig=fig, StatusFcn=@setStatus, ...
+            ButtonColors=struct('primary', BTN_PRIMARY, 'fg', BTN_FG));
+        if ~isempty(result)
             ds2 = appData.datasets{appData.activeIdx};
-            ds2.latticeParams = refinedResult;
+            ds2.latticeParams = result;
             appData.datasets{appData.activeIdx} = ds2;
-        end
-
-        function doNelsonRiley(~, ~)
-        %DONELSONRILEY  Nelson-Riley extrapolation plot for cubic systems.
-        %   Plots a_individual vs NR(θ) = cos²θ/sinθ + cos²θ/θ; extrapolates to NR=0.
-            if isempty(refinedResult) || ~strcmp(refinedResult.system, 'Cubic')
-                return;
-            end
-            th  = refinedResult.theta_rad;
-            hkl = refinedResult.hkl;
-            dObs = refinedResult.d_obs;
-            % a from each peak
-            a_each = dObs .* sqrt(hkl(:,1).^2 + hkl(:,2).^2 + hkl(:,3).^2);
-            % Nelson-Riley function
-            NR = cos(th).^2 ./ sin(th) + cos(th).^2 ./ th;
-            % Linear extrapolation
-            p = polyfit(NR, a_each, 1);
-            a_extrap = p(2);  % intercept at NR=0
-            NR_fit = linspace(0, max(NR)*1.1, 100);
-            a_fit  = polyval(p, NR_fit);
-
-            nrFig = figure('Name', 'Nelson-Riley Extrapolation', ...
-                'NumberTitle', 'off', 'Position', [300 250 500 380]);
-            nrAx = axes(nrFig);
-            plot(nrAx, NR, a_each, 'ko', 'MarkerSize', 8, 'MarkerFaceColor', [0.2 0.5 0.8]);
-            hold(nrAx, 'on');
-            plot(nrAx, NR_fit, a_fit, 'r-', 'LineWidth', 1.5);
-            plot(nrAx, 0, a_extrap, 'r^', 'MarkerSize', 12, 'MarkerFaceColor', 'r');
-            hold(nrAx, 'off');
-            xlabel(nrAx, ['cos' char(178) char(952) '/sin' char(952) ' + cos' char(178) char(952) '/' char(952)]);
-            ylabel(nrAx, ['a (' char(197) ')']);
-            title(nrAx, sprintf('Nelson-Riley:  a_0 = %.5f %s (extrapolated)', a_extrap, char(197)));
-            grid(nrAx, 'on');
-            box(nrAx, 'on');
-            legend(nrAx, 'Per-peak a', 'Linear fit', ...
-                sprintf('a_0 = %.5f', a_extrap), 'Location', 'best');
-
-            % Add hkl labels
-            for li = 1:numel(NR)
-                text(nrAx, NR(li), a_each(li), ...
-                    sprintf(' (%d%d%d)', hkl(li,1), hkl(li,2), hkl(li,3)), ...
-                    'FontSize', 8);
-            end
         end
     end
 
@@ -5615,128 +5103,20 @@ function varargout = DataPlotter()
     % ════════════════════════════════════════════════════════════════════
 
     function onMatchPhases(~, ~)
-    %ONMATCHPHASES  Match detected peaks against built-in crystallographic database.
-    %   Uses d-spacing comparison with adjustable tolerance.  Overlays
-    %   vertical tick marks for matched reference positions.
+    %ONMATCHPHASES  Thin wrapper — delegates to dataplotter.peakTools.matchPhases.
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig, 'Load a file first.', 'No data'); return;
         end
-        ds  = appData.datasets{appData.activeIdx};
-        pks = ds.peaks;
-        if isempty(pks) || ~isstruct(pks)
-            uialert(fig, 'Detect peaks first (Auto Peak button).', 'No peaks'); return;
-        end
-
+        ds   = appData.datasets{appData.activeIdx};
         wl_A = extractWavelength_A(ds);
         if isnan(wl_A) || wl_A <= 0
             uialert(fig, ['Wavelength is required for phase matching.  ' ...
                           'Enter a value in the ' char(955) ' field or select an X-ray source.'], ...
-                          'Wavelength needed'); return;
+                'Wavelength needed'); return;
         end
-
-        % Collect peak centers (2theta)
-        centers = [pks.center];
-        centers = centers(~isnan(centers));
-        if isempty(centers)
-            uialert(fig, 'No valid peak centers found.', 'No peaks'); return;
-        end
-
         try
-            % Ask for tolerance via a simple dialog
-            answer = inputdlg( ...
-                {['d-spacing tolerance (' char(197) '):'], ...
-                 'Min. match fraction (0-1):'}, ...
-                'Phase Match Settings', [1 40], {'0.03', '0.3'});
-            if isempty(answer), return; end
-            tol      = str2double(answer{1});
-            minFrac  = str2double(answer{2});
-            if isnan(tol) || isnan(minFrac)
-                uialert(fig, 'Invalid numeric input.', 'Error'); return;
-            end
-
-            matches = calc.crystal.matchPhases(centers(:), ...
-                Lambda=wl_A, Tolerance=tol, MinMatchFrac=minFrac);
-
-            if isempty(matches)
-                uialert(fig, ...
-                    sprintf('No phases matched with tolerance %.3f %s and min fraction %.0f%%.', ...
-                            tol, char(197), minFrac*100), ...
-                    'No matches');
-                return;
-            end
-
-            % Build results display
-            nShow = min(numel(matches), 10);
-            lines = cell(nShow, 1);
-            for mi = 1:nShow
-                m = matches(mi);
-                hklStr = strjoin(m.matchedHKL, ', ');
-                lines{mi} = sprintf('%d. %s  [%s]  —  %.0f%%  (%d/%d peaks)  hkl: %s', ...
-                    mi, m.phaseName, m.formula, m.score*100, m.nMatched, m.nObserved, hklStr);
-            end
-
-            % Let user select which phases to overlay
-            [sel, ok] = listdlg('ListString', lines, ...
-                'SelectionMode', 'multiple', ...
-                'ListSize', [550 300], ...
-                'PromptString', 'Select phase(s) to overlay on plot:', ...
-                'Name', 'Phase Match Results');
-            if ~ok || isempty(sel), return; end
-
-            % Remove existing phase tick marks
-            delete(findall(ax, 'Tag', 'GUIPhaseTickMark'));
-            delete(findall(ax, 'Tag', 'GUIPhaseLabel'));
-
-            % Overlay vertical tick marks for selected phases
-            phaseColors = [ ...
-                0.85 0.20 0.20;  % red
-                0.20 0.50 0.80;  % blue
-                0.20 0.70 0.30;  % green
-                0.80 0.50 0.10;  % orange
-                0.60 0.20 0.70;  % purple
-                0.10 0.70 0.70;  % teal
-                0.90 0.40 0.60;  % pink
-                0.50 0.50 0.20;  % olive
-                0.35 0.35 0.80;  % indigo
-                0.80 0.30 0.30]; % dark red
-
-            yLims = ax.YLim;
-            tickBase = yLims(1);
-            tickTop  = tickBase + 0.08 * (yLims(2) - yLims(1));
-            labelY   = tickBase - 0.03 * (yLims(2) - yLims(1));
-
-            hold(ax, 'on');
-            for si = 1:numel(sel)
-                m = matches(sel(si));
-                ci = mod(si-1, size(phaseColors, 1)) + 1;
-                col = phaseColors(ci, :);
-
-                % Draw tick marks at all reference 2theta positions in range
-                refTT = m.allRefTwoTheta;
-                xRange = ax.XLim;
-                inView = refTT(refTT >= xRange(1) & refTT <= xRange(2) & ~isnan(refTT));
-
-                for ti = 1:numel(inView)
-                    line(ax, [inView(ti), inView(ti)], [tickBase, tickTop], ...
-                        'Color', col, 'LineWidth', 1.5, ...
-                        'HandleVisibility', 'off', 'Tag', 'GUIPhaseTickMark');
-                end
-
-                % Phase label at the left edge
-                if ~isempty(inView)
-                    text(ax, xRange(1) + 0.01*(xRange(2)-xRange(1)), ...
-                         labelY - (si-1)*0.035*(yLims(2)-yLims(1)), ...
-                         sprintf('%s', m.phaseName), ...
-                         'Color', col, 'FontSize', 8, 'FontWeight', 'bold', ...
-                         'HandleVisibility', 'off', 'Tag', 'GUIPhaseLabel');
-                end
-            end
-
-            % Status bar update
-            topMatch = matches(sel(1));
-            lblStatus.Text = sprintf('Phase match: %s (%.0f%%) — %d phase(s) overlaid', ...
-                topMatch.phaseName, topMatch.score*100, numel(sel));
-
+            dataplotter.peakTools.matchPhases(ds, wl_A, ...
+                ParentFig=fig, StatusFcn=@setStatus, MainAx=ax);
         catch ME
             logGUIError('Phase Match Error', ME.message, ME);
             uialert(fig, sprintf('Phase matching failed:\n\n%s', ME.message), 'Error');
@@ -5748,234 +5128,26 @@ function varargout = DataPlotter()
     % ════════════════════════════════════════════════════════════════════
 
     function onFFTThickness(~, ~)
-    %ONFFTTHICKNESS  Compute film thickness from fringe periodicity via FFT.
-    %   Converts intensity data to Q-space, applies FFT, and finds dominant
-    %   periodicity corresponding to film thickness.
+    %ONFFTTHICKNESS  Thin wrapper — delegates to dataplotter.peakTools.fftThickness.
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig, 'Load a file first.', 'No data'); return;
         end
-        ds  = appData.datasets{appData.activeIdx};
+        ds   = appData.datasets{appData.activeIdx};
         wl_A = extractWavelength_A(ds);
         if isnan(wl_A) || wl_A <= 0
             uialert(fig, ['Wavelength is required for FFT thickness.  ' ...
                           'Enter a value in the ' char(955) ' field.'], ...
                 'No wavelength'); return;
         end
-
-        % Get current data (corrected if available), exclude masked points
-        d = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
-        dmask = buildDisplayMask(ds);
-        xAll = d.time(dmask);
-        % Use first y-channel (primary intensity)
-        yAll = d.values(dmask,1);
-
-        % Pre-fill range from current axis limits
-        xLo = ax.XLim(1);
-        xHi = ax.XLim(2);
-
-        % ── Create dialog figure ────────────────────────────────────────
-        fftFig = uifigure('Name', 'FFT Film Thickness — Laue Fringes', ...
-            'Position', [250 150 680 580], 'Resize', 'on');
-        fftGL = uigridlayout(fftFig, [4 1], ...
-            'RowHeight', {78, 30, '1x', 72}, ...
-            'Padding', [10 10 10 10], 'RowSpacing', 8);
-
-        % ── Row 1: Parameter controls (titled panel) ───────────────────
-        paramPanel = uipanel(fftGL, 'Title', 'Parameters', 'FontSize', 11);
-        paramPanel.Layout.Row = 1;
-        paramGL = uigridlayout(paramPanel, [2 6], ...
-            'ColumnWidth', {80, '1x', 80, '1x', 80, '1x'}, ...
-            'RowHeight', {24, 24}, ...
-            'Padding', [6 4 6 4], 'ColumnSpacing', 6, 'RowSpacing', 4);
-
-        % Row 1 of params: 2theta range + max thickness
-        lbl1 = uilabel(paramGL, 'Text', ['2' char(952) ' min (' char(176) '):'], ...
-            'FontWeight', 'bold');
-        lbl1.Layout.Row = 1; lbl1.Layout.Column = 1;
-        efFFTMin = uieditfield(paramGL, 'numeric', 'Value', xLo, 'Limits', [-10 180], ...
-            'Tooltip', ['Lower bound of the 2' char(952) ' range for FFT analysis'], ...
-            'ValueChangedFcn', @(~,~) doFFT([],[]));
-        efFFTMin.Layout.Row = 1; efFFTMin.Layout.Column = 2;
-        lbl2 = uilabel(paramGL, 'Text', ['2' char(952) ' max (' char(176) '):'], ...
-            'FontWeight', 'bold');
-        lbl2.Layout.Row = 1; lbl2.Layout.Column = 3;
-        efFFTMax = uieditfield(paramGL, 'numeric', 'Value', xHi, 'Limits', [-10 180], ...
-            'Tooltip', ['Upper bound of the 2' char(952) ' range for FFT analysis'], ...
-            'ValueChangedFcn', @(~,~) doFFT([],[]));
-        efFFTMax.Layout.Row = 1; efFFTMax.Layout.Column = 4;
-        lbl3 = uilabel(paramGL, 'Text', 'Max t (nm):', 'FontWeight', 'bold');
-        lbl3.Layout.Row = 1; lbl3.Layout.Column = 5;
-        efMaxThick = uieditfield(paramGL, 'numeric', 'Value', 200, 'Limits', [1 10000], ...
-            'Tooltip', 'Maximum thickness to display on the x-axis (nm)', ...
-            'ValueChangedFcn', @(~,~) doFFT([],[]));
-        efMaxThick.Layout.Row = 1; efMaxThick.Layout.Column = 6;
-
-        % Row 2 of params: window + compute button
-        lbl4 = uilabel(paramGL, 'Text', 'Window:', 'FontWeight', 'bold');
-        lbl4.Layout.Row = 2; lbl4.Layout.Column = 1;
-        ddWindow = uidropdown(paramGL, ...
-            'Items', {'Hann', 'None', 'Blackman'}, 'Value', 'Hann', ...
-            'Tooltip', ['Windowing function applied before FFT.' newline ...
-                        'Hann reduces spectral leakage (recommended).'], ...
-            'ValueChangedFcn', @(~,~) doFFT([],[]));
-        ddWindow.Layout.Row = 2; ddWindow.Layout.Column = 2;
-        btnCompute = uibutton(paramGL, 'Text', 'Compute FFT', ...
-            'ButtonPushedFcn', @doFFT, ...
-            'BackgroundColor', BTN_ACCENT, 'FontColor', BTN_FG, ...
-            'FontWeight', 'bold');
-        btnCompute.Layout.Row = 2; btnCompute.Layout.Column = [5 6];
-
-        % ── Row 2: Wavelength info label ────────────────────────────────
-        lblWavelength = uilabel(fftGL, 'Text', ...
-            sprintf('%s = %.5f %s', char(955), wl_A, char(197)), ...
-            'FontSize', 11, 'FontColor', [0.4 0.4 0.4]);
-        lblWavelength.Layout.Row = 2;
-
-        % ── Row 3: Axes for FFT plot ────────────────────────────────────
-        fftAxPanel = uipanel(fftGL, 'BorderType', 'none');
-        fftAxPanel.Layout.Row = 3;
-        fftAx = axes(fftAxPanel);
-
-        % ── Row 4: Results panel ────────────────────────────────────────
-        resultPanel = uipanel(fftGL, 'Title', 'Result', ...
-            'FontSize', 11, 'FontWeight', 'bold');
-        resultPanel.Layout.Row = 4;
-        resultGL = uigridlayout(resultPanel, [2 4], ...
-            'ColumnWidth', {90, '1x', 100, '1x'}, ...
-            'RowHeight', {20, 20}, ...
-            'Padding', [8 4 8 4], 'ColumnSpacing', 6, 'RowSpacing', 2);
-        uilabel(resultGL, 'Text', 'Thickness:', 'FontWeight', 'bold', ...
-            'FontSize', 12);
-        lblResThick = uilabel(resultGL, 'Text', '---', 'FontSize', 12);
-        lblResThick.Layout.Row = 1; lblResThick.Layout.Column = 2;
-        uilabel(resultGL, 'Text', 'Uncertainty:', 'FontWeight', 'bold', ...
-            'FontSize', 12);
-        lblResUncert = uilabel(resultGL, 'Text', '---', 'FontSize', 12);
-        lblResUncert.Layout.Row = 1; lblResUncert.Layout.Column = 4;
-        uilabel(resultGL, 'Text', 'Range:', 'FontWeight', 'bold', ...
-            'FontSize', 11, 'FontColor', [0.4 0.4 0.4]);
-        lblResRange = uilabel(resultGL, 'Text', '---', 'FontSize', 11, ...
-            'FontColor', [0.4 0.4 0.4]);
-        lblResRange.Layout.Row = 2; lblResRange.Layout.Column = 2;
-        uilabel(resultGL, 'Text', 'Data points:', 'FontWeight', 'bold', ...
-            'FontSize', 11, 'FontColor', [0.4 0.4 0.4]);
-        lblResNpts = uilabel(resultGL, 'Text', '---', 'FontSize', 11, ...
-            'FontColor', [0.4 0.4 0.4]);
-        lblResNpts.Layout.Row = 2; lblResNpts.Layout.Column = 4;
-
-        function doFFT(~, ~)
-        %DOFFT  Run the FFT computation and plot results.
-            twoThMin = efFFTMin.Value;
-            twoThMax = efFFTMax.Value;
-            if twoThMin >= twoThMax
-                uialert(fftFig, 'Min must be less than Max.', 'Invalid range');
-                return;
-            end
-
-            % Extract data in selected range
-            mask = xAll >= twoThMin & xAll <= twoThMax;
-            if sum(mask) < 10
-                uialert(fftFig, 'Too few data points in selected range (need >= 10).', 'Insufficient data');
-                return;
-            end
-            twoTh_sel = xAll(mask);
-            I_sel     = yAll(mask);
-
-            % Convert 2θ → Q (Å⁻¹)
-            Q = (4 * pi / wl_A) * sin(twoTh_sel / 2 * pi / 180);
-
-            % Interpolate to uniform Q grid
-            nPts     = numel(Q);
-            Q_uniform = linspace(min(Q), max(Q), nPts);
-            I_uniform = interp1(Q, I_sel, Q_uniform, 'pchip');
-
-            % Subtract mean (remove DC)
-            I_uniform = I_uniform - mean(I_uniform);
-
-            % Apply window function
-            N = numel(I_uniform);
-            switch ddWindow.Value
-                case 'Hann'
-                    w = 0.5 * (1 - cos(2*pi*(0:N-1)/(N-1)));
-                case 'Blackman'
-                    w = 0.42 - 0.5*cos(2*pi*(0:N-1)/(N-1)) + 0.08*cos(4*pi*(0:N-1)/(N-1));
-                otherwise
-                    w = ones(1, N);
-            end
-            I_windowed = I_uniform(:)' .* w;
-
-            % FFT with zero-padding for better resolution
-            N_fft = 2^nextpow2(4 * N);
-            F     = abs(fft(I_windowed, N_fft));
-            F     = F(1:N_fft/2);
-
-            % Build thickness axis (Å → nm)
-            dQ           = Q_uniform(2) - Q_uniform(1);
-            thickness_A  = 2*pi*(0:N_fft/2-1) / (N_fft * dQ);
-            thickness_nm = thickness_A / 10;
-
-            % Find dominant peak (skip DC component, bins 1-3)
-            searchMin = 4;
-            maxT_nm   = efMaxThick.Value;
-            searchMax = find(thickness_nm <= maxT_nm, 1, 'last');
-            if isempty(searchMax) || searchMax < searchMin + 1
-                searchMax = numel(F);
-            end
-            [peakVal, peakIdx] = max(F(searchMin:searchMax));
-            peakIdx = peakIdx + searchMin - 1;
-            t_nm    = thickness_nm(peakIdx);
-
-            % Estimate uncertainty from FFT peak width (FWHM of FFT peak)
-            halfMax = peakVal / 2;
-            leftIdx  = find(F(1:peakIdx) < halfMax, 1, 'last');
-            rightIdx = peakIdx + find(F(peakIdx:end) < halfMax, 1, 'first') - 1;
-            if ~isempty(leftIdx) && ~isempty(rightIdx)
-                fwhm_bins = rightIdx - leftIdx;
-                dt_nm = thickness_nm(min(peakIdx + ceil(fwhm_bins/2), numel(thickness_nm))) - ...
-                        thickness_nm(max(peakIdx - ceil(fwhm_bins/2), 1));
-            else
-                dt_nm = NaN;
-            end
-
-            % ── Plot ────────────────────────────────────────────────────
-            cla(fftAx);
-            plot(fftAx, thickness_nm(1:searchMax), F(1:searchMax), '-', ...
-                'Color', [0.2 0.4 0.7], 'LineWidth', 1.2);
-            hold(fftAx, 'on');
-            plot(fftAx, t_nm, peakVal, 'rv', 'MarkerSize', 12, 'MarkerFaceColor', 'r');
-            hold(fftAx, 'off');
-            xlabel(fftAx, 'Film thickness (nm)');
-            ylabel(fftAx, 'FFT magnitude');
-            title(fftAx, 'FFT Magnitude Spectrum');
-            grid(fftAx, 'on');
-            box(fftAx, 'on');
-            xlim(fftAx, [0 maxT_nm]);
-
-            % ── Update results panel ──────────────────────────────────
-            lblResThick.Text = sprintf('%.1f nm', t_nm);
-            if ~isnan(dt_nm)
-                lblResUncert.Text = sprintf('%s %.1f nm (FWHM/2)', char(177), dt_nm/2);
-            else
-                lblResUncert.Text = 'N/A (peak too broad)';
-            end
-            lblResRange.Text = sprintf(['%.2f' char(176) ' – %.2f' char(176) ...
-                ' 2' char(952)], twoThMin, twoThMax);
-            lblResNpts.Text = sprintf('%d', sum(mask));
-
-            % Persist to dataset
+        result = dataplotter.peakTools.fftThickness(ds, wl_A, ...
+            ParentFig=fig, StatusFcn=@setStatus, ...
+            ButtonColors=struct('accent', BTN_ACCENT, 'fg', BTN_FG), ...
+            AxisLimits=ax.XLim);
+        if ~isempty(result)
             ds2 = appData.datasets{appData.activeIdx};
-            fftResult.thickness_nm = t_nm;
-            fftResult.uncertainty_nm = guiTernary(isnan(dt_nm), NaN, dt_nm/2);
-            fftResult.wavelength_A = wl_A;
-            fftResult.twoTheta_range = [twoThMin twoThMax];
-            fftResult.fft_magnitude = F(1:searchMax);
-            fftResult.thickness_axis = thickness_nm(1:searchMax);
-            ds2.filmThickness = fftResult;
+            ds2.filmThickness = result;
             appData.datasets{appData.activeIdx} = ds2;
         end
-
-        % Auto-compute on open
-        doFFT([], []);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -6266,19 +5438,12 @@ function varargout = DataPlotter()
 
     function onReflectivityFFT(~, ~)
     %ONREFLECTIVITYFFT  Compute film thickness from Kiessig fringe periodicity.
-    %   Works in Q-space directly (neutron NR data) or converts from 2θ (XRR).
-    %   Supports multilayer / superlattice structures by detecting multiple
-    %   FFT peaks (harmonics + independent layer thicknesses).
-    %   Preprocessing: log(R), R×Q⁴, log(R×Q⁴), or raw R.
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig, 'Load a file first.', 'No data'); return;
         end
         ds = appData.datasets{appData.activeIdx};
 
-        % Determine if data is already in Q-space (neutron) or 2θ-space (XRR)
         isNeutronDS = isfield(ds, 'parserName') && isNeutronParser(ds.parserName);
-
-        % For XRR (2θ-space), wavelength is required
         wl_A = NaN;
         if ~isNeutronDS
             wl_A = extractWavelength_A(ds);
@@ -6289,536 +5454,13 @@ function varargout = DataPlotter()
             end
         end
 
-        % Get current corrected data, exclude masked points
-        d    = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
-        dmask = buildDisplayMask(ds);
-        xAll = d.time(dmask);       % Q (Å⁻¹) for neutron; 2θ (°) for XRR
-        yAll = d.values(dmask,1);   % R (reflectivity) or counts
-
-        % Pre-fill range from current axis limits
-        xLo = ax.XLim(1);
-        xHi = ax.XLim(2);
-
-        % ── Dialog figure ────────────────────────────────────────────────
-        rfFig = uifigure('Name', 'Reflectivity FFT — Kiessig Thickness', ...
-            'Position', [200 150 780 720], 'Resize', 'on');
-        rfGL = uigridlayout(rfFig, [5 1], ...
-            'RowHeight', {80, 28, '2x', 80, '1x'}, ...
-            'Padding', [10 10 10 10], 'RowSpacing', 6);
-
-        % ── Row 1: Controls ──────────────────────────────────────────────
-        ctrlGL = uigridlayout(rfGL, [3 6], ...
-            'ColumnWidth', {80, '1x', 80, '1x', 90, '1x'}, ...
-            'RowHeight', {24, 24, 24}, ...
-            'Padding', [0 0 0 0], 'ColumnSpacing', 6, 'RowSpacing', 4);
-        ctrlGL.Layout.Row = 1;
-
-        if isNeutronDS
-            xLabel = ['Q min (' char(197) char(8315) char(185) '):'];
-            xMaxLabel = ['Q max (' char(197) char(8315) char(185) '):'];
-        else
-            xLabel = ['2' char(952) ' min (' char(176) '):'];
-            xMaxLabel = ['2' char(952) ' max (' char(176) '):'];
-        end
-        lblRFXMin = uilabel(ctrlGL, 'Text', xLabel, 'FontWeight', 'bold');
-        lblRFXMin.Layout.Row = 1; lblRFXMin.Layout.Column = 1;
-        efRFMin = uieditfield(ctrlGL, 'numeric', 'Value', max(0, xLo), 'Limits', [-10 180]);
-        efRFMin.Layout.Row = 1; efRFMin.Layout.Column = 2;
-        lblRFXMax = uilabel(ctrlGL, 'Text', xMaxLabel, 'FontWeight', 'bold');
-        lblRFXMax.Layout.Row = 1; lblRFXMax.Layout.Column = 3;
-        efRFMax = uieditfield(ctrlGL, 'numeric', 'Value', xHi, 'Limits', [-10 180]);
-        efRFMax.Layout.Row = 1; efRFMax.Layout.Column = 4;
-        lblRFMaxT = uilabel(ctrlGL, 'Text', 'Max t (nm):', 'FontWeight', 'bold');
-        lblRFMaxT.Layout.Row = 1; lblRFMaxT.Layout.Column = 5;
-        efRFMaxThick = uieditfield(ctrlGL, 'numeric', 'Value', 500, 'Limits', [1 100000], ...
-            'Tooltip', 'Maximum thickness to show on x-axis (nm)');
-        efRFMaxThick.Layout.Row = 1; efRFMaxThick.Layout.Column = 6;
-
-        lblRFWin = uilabel(ctrlGL, 'Text', 'Window:', 'FontWeight', 'bold');
-        lblRFWin.Layout.Row = 2; lblRFWin.Layout.Column = 1;
-        ddRFWindow = uidropdown(ctrlGL, ...
-            'Items', {'Hann', 'None', 'Blackman'}, 'Value', 'Hann', ...
-            'Tooltip', 'Windowing function applied before FFT (Hann reduces spectral leakage)');
-        ddRFWindow.Layout.Row = 2; ddRFWindow.Layout.Column = 2;
-        lblRFPrep = uilabel(ctrlGL, 'Text', 'Preprocess:', 'FontWeight', 'bold');
-        lblRFPrep.Layout.Row = 2; lblRFPrep.Layout.Column = 3;
-        ddRFPreprocess = uidropdown(ctrlGL, ...
-            'Items', {'log(R)', ['log(R' char(183) 'Q' char(8308) ')'], ...
-                      'R', ['R' char(183) 'Q' char(8308)]}, ...
-            'Value', 'log(R)', ...
-            'Tooltip', ['Preprocessing applied before FFT:' newline ...
-                        '  log(R) — log-scale; equalises fringe visibility across Q (default)' newline ...
-                        '  log(R' char(183) 'Q' char(8308) ') — Fresnel-corrected log' newline ...
-                        '  R — raw linear reflectivity' newline ...
-                        '  R' char(183) 'Q' char(8308) ' — Fresnel-corrected linear']);
-        ddRFPreprocess.Layout.Row = 2; ddRFPreprocess.Layout.Column = 4;
-        lblRFPeakThr = uilabel(ctrlGL, 'Text', 'Peak thr.:', 'FontWeight', 'bold', ...
-            'Tooltip', ['Minimum peak prominence as a fraction of the strongest peak.' newline ...
-                        'Lower = more peaks detected.  0.05 = 5% of max.']);
-        lblRFPeakThr.Layout.Row = 2; lblRFPeakThr.Layout.Column = 5;
-        efRFPeakThr = uieditfield(ctrlGL, 'numeric', ...
-            'Value', 0.05, 'Limits', [0.001 1], ...
-            'Tooltip', 'Minimum prominence threshold (fraction of max peak). Lower → more peaks.');
-        efRFPeakThr.Layout.Row = 2; efRFPeakThr.Layout.Column = 6;
-
-        % Row 3: wavelength controls (XRR) or compute button (neutron)
-        if ~isNeutronDS
-            row3GL = uigridlayout(ctrlGL, [1 6], ...
-                'ColumnWidth', {55, 80, 55, '1x', 20, 100}, ...
-                'Padding', [0 0 0 0], 'ColumnSpacing', 4, 'RowSpacing', 0);
-            row3GL.Layout.Row = 3; row3GL.Layout.Column = [1 6];
-            uilabel(row3GL, 'Text', [char(955) ' (' char(197) '):'], 'FontSize', 10);
-            efRFWavelength = uieditfield(row3GL, 'numeric', 'Value', wl_A, 'Limits', [0 Inf], ...
-                'Tooltip', 'X-ray wavelength in Å for 2θ → Q conversion');
-            efRFWavelength.Layout.Row = 1; efRFWavelength.Layout.Column = 2;
-            lblRFSrc2 = uilabel(row3GL, 'Text', 'Source:', 'FontSize', 10, ...
-                'HorizontalAlignment', 'right');
-            lblRFSrc2.Layout.Row = 1; lblRFSrc2.Layout.Column = 3;
-            ddRFSource = uidropdown(row3GL, ...
-                'Items', XRAY_SOURCES(:,1)', ...
-                'Value', XRAY_SOURCES{1,1}, 'FontSize', 9, ...
-                'Tooltip', 'Select X-ray source to auto-fill wavelength', ...
-                'ValueChangedFcn', @(s,~) set(efRFWavelength, 'Value', ...
-                    guiTernary(isnan(XRAY_SOURCES{strcmp(XRAY_SOURCES(:,1), s.Value), 2}), ...
-                               efRFWavelength.Value, ...
-                               XRAY_SOURCES{strcmp(XRAY_SOURCES(:,1), s.Value), 2})));
-            ddRFSource.Layout.Row = 1; ddRFSource.Layout.Column = 4;
-            % Sync dropdown to current wavelength
-            rfSrcMatch = find(abs([XRAY_SOURCES{:,2}] - wl_A) < 1e-4, 1);
-            if ~isempty(rfSrcMatch), ddRFSource.Value = XRAY_SOURCES{rfSrcMatch,1}; end
-        else
-            efRFWavelength = [];  % not needed for neutron
-            % Fill row 3 with empty space (auto-layout handles it)
-        end
-
-        % ── Row 2: Compute button ────────────────────────────────────────
-        btnRFCompute = uibutton(rfGL, 'Text', 'Compute FFT', ...
-            'ButtonPushedFcn', @doReflFFT, ...
-            'BackgroundColor', BTN_ACCENT, 'FontColor', BTN_FG);
-        btnRFCompute.Layout.Row = 2;
-
-        % ── Row 3: FFT plot ──────────────────────────────────────────────
-        rfAxPanel = uipanel(rfGL, 'BorderType', 'none');
-        rfAxPanel.Layout.Row = 3;
-        rfAx = axes(rfAxPanel);
-
-        % ── Row 4: Superlattice summary panel ────────────────────────────
-        slPanel = uipanel(rfGL, 'Title', 'Superlattice Analysis', 'FontSize', 11);
-        slPanel.Layout.Row = 4;
-        slGL = uigridlayout(slPanel, [3 2], ...
-            'ColumnWidth', {'1x', '1x'}, ...
-            'RowHeight', {20, 18, 18}, ...
-            'Padding', [6 2 6 2], 'ColumnSpacing', 12, 'RowSpacing', 2);
-        lblSLStatus    = uilabel(slGL, 'Text', 'No superlattice pattern detected', ...
-            'FontWeight', 'bold', 'FontColor', [0.4 0.4 0.4]);
-        lblSLStatus.Layout.Row = 1; lblSLStatus.Layout.Column = [1 2];
-        lblSLBilayer   = uilabel(slGL, 'Text', '', 'FontSize', 10);
-        lblSLBilayer.Layout.Row = 2; lblSLBilayer.Layout.Column = 1;
-        lblSLTotal     = uilabel(slGL, 'Text', '', 'FontSize', 10);
-        lblSLTotal.Layout.Row = 2; lblSLTotal.Layout.Column = 2;
-        lblSLSublayers = uilabel(slGL, 'Text', '', 'FontSize', 10);
-        lblSLSublayers.Layout.Row = 3; lblSLSublayers.Layout.Column = [1 2];
-
-        % ── Row 5: Peak results table ────────────────────────────────────
-        rfTblPanel = uipanel(rfGL, 'Title', 'Detected Thickness Peaks', 'FontSize', 11);
-        rfTblPanel.Layout.Row = 5;
-        rfTblGL = uigridlayout(rfTblPanel, [1 1], 'Padding', [4 4 4 4]);
-        rfPeakTable = uitable(rfTblGL, ...
-            'ColumnName',  {'#', 'Thickness (nm)', 'Amplitude', 'Rel (%)', 'Interpretation'}, ...
-            'ColumnWidth', {30, 110, 80, 60, 120}, ...
-            'Data',        {}, ...
-            'RowName',     {});
-
-        % ── Auto-compute on open ─────────────────────────────────────────
-        doReflFFT([], []);
-
-        function doReflFFT(~, ~)
-        %DOREFLEFFT  FFT with multi-peak detection for multilayer / superlattice.
-            xMin = efRFMin.Value;
-            xMax = efRFMax.Value;
-            if xMin >= xMax
-                rfPeakTable.Data = {};
-                title(rfAx, 'Error: min must be less than max');
-                return;
-            end
-
-            % Select data in range
-            mask = xAll >= xMin & xAll <= xMax;
-            if sum(mask) < 10
-                rfPeakTable.Data = {};
-                title(rfAx, 'Too few points in range (need >= 10)');
-                return;
-            end
-            x_sel = xAll(mask);
-            R_sel = yAll(mask);
-
-            % Convert x to Q (Å⁻¹)
-            if isNeutronDS
-                Q = x_sel;
-            else
-                curWL = efRFWavelength.Value;
-                if isnan(curWL) || curWL <= 0
-                    rfPeakTable.Data = {};
-                    title(rfAx, 'Wavelength required for XRR mode');
-                    return;
-                end
-                Q = (4 * pi / curWL) .* sin(x_sel / 2 * pi / 180);
-            end
-
-            % ── Preprocessing ─────────────────────────────────────────
-            prepMode = ddRFPreprocess.Value;
-            useQ4 = contains(prepMode, 'Q');
-            useLog = startsWith(prepMode, 'log');
-
-            R_proc = R_sel;
-            if useQ4
-                Q_safe = max(Q, 1e-6);
-                R_proc = R_proc .* Q_safe.^4;
-            end
-            if useLog
-                R_proc = log10(max(R_proc, 1e-30));  % floor at 1e-30 to avoid -Inf
-            end
-
-            % ── Interpolate to uniform Q grid ─────────────────────────
-            nPts      = numel(Q);
-            Q_uniform = linspace(min(Q), max(Q), nPts);
-            R_uniform = interp1(Q, R_proc, Q_uniform, 'pchip');
-
-            % Subtract linear trend (remove low-frequency drift / DC)
-            p_trend   = polyfit(Q_uniform(:), R_uniform(:), 1);
-            R_uniform = R_uniform - polyval(p_trend, Q_uniform);
-
-            % ── Apply window function ─────────────────────────────────
-            N = numel(R_uniform);
-            switch ddRFWindow.Value
-                case 'Hann'
-                    w = 0.5 * (1 - cos(2*pi*(0:N-1)/(N-1)));
-                case 'Blackman'
-                    w = 0.42 - 0.5*cos(2*pi*(0:N-1)/(N-1)) + ...
-                        0.08*cos(4*pi*(0:N-1)/(N-1));
-                otherwise
-                    w = ones(1, N);
-            end
-            R_windowed = R_uniform(:)' .* w;
-
-            % ── Zero-padded FFT ───────────────────────────────────────
-            N_fft = 2^nextpow2(4 * N);
-            F     = abs(fft(R_windowed, N_fft));
-            F     = F(1:N_fft/2);
-
-            % Thickness axis: t = 2π / ΔQ  (Å → nm via /10)
-            dQ           = Q_uniform(2) - Q_uniform(1);
-            thickness_A  = 2*pi*(0:N_fft/2-1) / (N_fft * dQ);
-            thickness_nm = thickness_A / 10;
-
-            % ── Restrict search range ─────────────────────────────────
-            searchMin = 4;   % skip DC bins 1–3
-            maxT_nm   = efRFMaxThick.Value;
-            searchMax = find(thickness_nm <= maxT_nm, 1, 'last');
-            if isempty(searchMax) || searchMax < searchMin + 1
-                searchMax = numel(F);
-            end
-            F_search = F(searchMin:searchMax);
-            t_search = thickness_nm(searchMin:searchMax);
-
-            % ── Multi-peak detection (no toolbox needed) ──────────────
-            % Find local maxima: F(i) > F(i-1) AND F(i) > F(i+1)
-            nS      = numel(F_search);
-            isLocalMax = false(1, nS);
-            for ki = 2:nS-1
-                isLocalMax(ki) = F_search(ki) > F_search(ki-1) && ...
-                                 F_search(ki) > F_search(ki+1);
-            end
-            maxIdxRel = find(isLocalMax);
-
-            if isempty(maxIdxRel)
-                % Fallback: just take the global max
-                [~, maxIdxRel] = max(F_search);
-            end
-
-            pkAmps = F_search(maxIdxRel);
-            pkThick = t_search(maxIdxRel);
-            pkAbsIdx = maxIdxRel + searchMin - 1;  % index into full F array
-
-            % Filter by prominence: compute local prominence for each peak
-            % Prominence = peak height minus the higher of the two nearest minima
-            prominences = zeros(size(pkAmps));
-            for pi2 = 1:numel(pkAmps)
-                idx = maxIdxRel(pi2);
-                % Find nearest minimum to the left
-                leftMin = min(F_search(1:idx));
-                % Find nearest minimum to the right
-                rightMin = min(F_search(idx:end));
-                prominences(pi2) = pkAmps(pi2) - max(leftMin, rightMin);
-            end
-
-            % Threshold: keep peaks whose prominence > threshold × max(prominence)
-            promThresh = efRFPeakThr.Value * max(prominences);
-            keep = prominences > promThresh;
-            pkAmps   = pkAmps(keep);
-            pkThick  = pkThick(keep);
-            pkAbsIdx = pkAbsIdx(keep);
-            prominences = prominences(keep);
-
-            % Sort by amplitude (descending)
-            [pkAmps, sortOrd] = sort(pkAmps, 'descend');
-            pkThick     = pkThick(sortOrd);
-            pkAbsIdx    = pkAbsIdx(sortOrd);
-            prominences = prominences(sortOrd); %#ok<NASGU>
-
-            % Cap at 20 peaks
-            maxPeaks = 20;
-            if numel(pkAmps) > maxPeaks
-                pkAmps   = pkAmps(1:maxPeaks);
-                pkThick  = pkThick(1:maxPeaks);
-                pkAbsIdx = pkAbsIdx(1:maxPeaks); %#ok<NASGU>
-            end
-
-            % ── Superlattice detection ────────────────────────────────
-            nPk = numel(pkThick);
-            interpLabels = cell(nPk, 1);
-            for hi = 1:nPk
-                interpLabels{hi} = '';
-            end
-
-            slDetected     = false;
-            slLambda_nm    = NaN;
-            slTotal_nm     = NaN;
-            slNRepeats     = NaN;
-            slSubA_nm      = NaN;
-            slSubB_nm      = NaN;
-            slSuppressedOrders = [];
-
-            if nPk >= 2
-                % Sort peaks by thickness ascending for analysis
-                [tAsc, ~] = sort(pkThick, 'ascend');
-
-                % Try each of the 5 smallest peaks as candidate bilayer period
-                nCandidates = min(5, nPk);
-                bestScore   = 0;
-                bestLambda  = NaN;
-                harmTol     = 0.08;   % 8% ratio tolerance
-
-                for ci = 1:nCandidates
-                    Lambda_cand = tAsc(ci);
-                    score = 0;
-                    for pk = 1:nPk
-                        ratio = pkThick(pk) / Lambda_cand;
-                        nr    = round(ratio);
-                        if nr >= 1 && abs(ratio - nr) / nr < harmTol
-                            score = score + 1;
-                        end
-                    end
-                    if score > bestScore
-                        bestScore  = score;
-                        bestLambda = Lambda_cand;
-                    end
-                end
-
-                if bestScore >= 3
-                    slDetected  = true;
-                    slLambda_nm = bestLambda;
-
-                    % Assign labels: find which peaks are SL harmonics or satellites
-                    % First find highest matched harmonic order
-                    nMax = 1;
-                    for pk = 1:nPk
-                        ratio = pkThick(pk) / slLambda_nm;
-                        nr    = round(ratio);
-                        if nr >= 1 && abs(ratio - nr) / nr < harmTol
-                            if nr > nMax, nMax = nr; end
-                        end
-                    end
-
-                    % Count subsidiary peaks between Λ and 2Λ
-                    % Subsidiary peaks: in range [1.15×Λ, 1.85×Λ], not the 2Λ harmonic
-                    nSub = 0;
-                    for pk = 1:nPk
-                        t = pkThick(pk);
-                        if t > 1.15 * slLambda_nm && t < 1.85 * slLambda_nm
-                            ratio = t / slLambda_nm;
-                            nr    = round(ratio);
-                            if ~(nr == 2 && abs(ratio - 2) / 2 < harmTol)
-                                nSub = nSub + 1;
-                            end
-                        end
-                    end
-
-                    if nSub > 0
-                        slNRepeats = nSub + 2;
-                    else
-                        slNRepeats = nMax;
-                    end
-                    slTotal_nm = slNRepeats * slLambda_nm;
-
-                    % Find suppressed orders (2 through min(6, nMax))
-                    for ord = 2:min(6, max(nMax, 3))
-                        expectedT = ord * slLambda_nm;
-                        found = false;
-                        for pk = 1:nPk
-                            if abs(pkThick(pk) - expectedT) / expectedT < harmTol
-                                found = true;
-                                break;
-                            end
-                        end
-                        if ~found
-                            slSuppressedOrders(end+1) = ord; %#ok<AGROW>
-                        end
-                    end
-
-                    % Sublayer estimation from first missing order
-                    if ~isempty(slSuppressedOrders)
-                        firstMissing = slSuppressedOrders(1);
-                        slSubA_nm    = slLambda_nm / firstMissing;
-                        slSubB_nm    = slLambda_nm - slSubA_nm;
-                    end
-
-                    % Assign interpretation labels
-                    bilayerPeakAssigned = false;
-                    for pk = 1:nPk
-                        t     = pkThick(pk);
-                        ratio = t / slLambda_nm;
-                        nr    = round(ratio);
-                        isSLHarm = (nr >= 1) && (abs(ratio - nr) / nr < harmTol);
-
-                        if isSLHarm && nr == 1 && ~bilayerPeakAssigned
-                            interpLabels{pk}    = ['Bilayer ' char(923)];
-                            bilayerPeakAssigned = true;
-                        elseif isSLHarm && nr >= 2
-                            interpLabels{pk} = sprintf('SL order %d', nr);
-                        elseif t > 1.15 * slLambda_nm && t < 1.85 * slLambda_nm
-                            ratio2 = t / slLambda_nm;
-                            nr2    = round(ratio2);
-                            if ~(nr2 == 2 && abs(ratio2 - 2) / 2 < harmTol)
-                                interpLabels{pk} = 'Satellite';
-                            end
-                        else
-                            interpLabels{pk} = 'Independent';
-                        end
-                    end
-                end
-            end
-
-            % ── Update superlattice summary labels ────────────────────
-            if slDetected
-                lblSLStatus.Text      = sprintf(['Superlattice detected  ' char(8212) ...
-                    '  [A/B]%s%d'], char(215), slNRepeats);
-                lblSLStatus.FontColor = [0.10 0.45 0.10];
-                lblSLBilayer.Text     = sprintf(['Bilayer period ' char(923) ' = %.2f nm'], ...
-                    slLambda_nm);
-                lblSLTotal.Text       = sprintf('Total thickness D = %.1f nm  (%d repeats)', ...
-                    slTotal_nm, slNRepeats);
-                if ~isnan(slSubA_nm)
-                    lblSLSublayers.Text = sprintf( ...
-                        ['Estimated sublayers: d_A ' char(8776) ' %.2f nm,  ' ...
-                         'd_B ' char(8776) ' %.2f nm  ' ...
-                         '(suppressed order %d)'], ...
-                        slSubA_nm, slSubB_nm, slSuppressedOrders(1));
-                else
-                    lblSLSublayers.Text = 'd_A, d_B indeterminate (no suppressed orders)';
-                end
-            else
-                lblSLStatus.Text      = 'No superlattice pattern detected';
-                lblSLStatus.FontColor = [0.4 0.4 0.4];
-                lblSLBilayer.Text     = '';
-                lblSLTotal.Text       = '';
-                lblSLSublayers.Text   = '';
-            end
-
-            % ── Plot FFT spectrum with peak markers ───────────────────
-            cla(rfAx);
-            plot(rfAx, t_search, F_search, '-', ...
-                'Color', [0.20 0.45 0.55], 'LineWidth', 1.2);
-            hold(rfAx, 'on');
-
-            % Colour-code peaks by interpretation
-            %   Bilayer Λ      → blue  [0.12 0.47 0.71]
-            %   SL harmonic    → red   [0.85 0.15 0.15]
-            %   Satellite      → cyan  [0.00 0.68 0.75]
-            %   Independent    → orange [0.90 0.50 0.00]
-            %   Unlabelled     → red (default, pre-superlattice-detection)
-            COL_BILAYER  = [0.12 0.47 0.71];
-            COL_SLHARM   = [0.85 0.15 0.15];
-            COL_SAT      = [0.00 0.68 0.75];
-            COL_INDEP    = [0.90 0.50 0.00];
-            COL_DEFAULT  = [0.85 0.15 0.15];
-
-            peakColors = repmat(COL_DEFAULT, nPk, 1);
-            for ci = 1:nPk
-                lbl = interpLabels{ci};
-                if startsWith(lbl, 'Bilayer')
-                    peakColors(ci,:) = COL_BILAYER;
-                elseif startsWith(lbl, 'SL order')
-                    peakColors(ci,:) = COL_SLHARM;
-                elseif strcmp(lbl, 'Satellite')
-                    peakColors(ci,:) = COL_SAT;
-                elseif strcmp(lbl, 'Independent')
-                    peakColors(ci,:) = COL_INDEP;
-                end
-            end
-
-            for mi = 1:nPk
-                plot(rfAx, pkThick(mi), pkAmps(mi), 'v', ...
-                    'MarkerSize', 10, 'MarkerFaceColor', peakColors(mi,:), ...
-                    'MarkerEdgeColor', peakColors(mi,:));
-                % Label bilayer period with Λ annotation; others with thickness value
-                if startsWith(interpLabels{mi}, 'Bilayer')
-                    lblTxt = sprintf('%s\n%.1f nm', char(923), pkThick(mi));
-                    text(rfAx, pkThick(mi), pkAmps(mi) * 1.06, lblTxt, ...
-                        'HorizontalAlignment', 'center', 'FontSize', 8, ...
-                        'FontWeight', 'bold', 'Color', peakColors(mi,:));
-                else
-                    text(rfAx, pkThick(mi), pkAmps(mi) * 1.06, ...
-                        sprintf('%.1f', pkThick(mi)), ...
-                        'HorizontalAlignment', 'center', 'FontSize', 8, ...
-                        'Color', peakColors(mi,:));
-                end
-            end
-            hold(rfAx, 'off');
-            xlabel(rfAx, 'Film thickness (nm)');
-            ylabel(rfAx, 'FFT magnitude');
-            grid(rfAx, 'on');  box(rfAx, 'on');
-            xlim(rfAx, [0 maxT_nm]);
-            if nPk >= 1
-                title(rfAx, sprintf('%d peaks detected  —  strongest: %.1f nm', nPk, pkThick(1)));
-            else
-                title(rfAx, 'No peaks detected');
-            end
-
-            % ── Fill peak results table ───────────────────────────────
-            relPct = 100 * pkAmps / max(pkAmps);
-            tblData = cell(nPk, 5);
-            for ti = 1:nPk
-                tblData{ti,1} = ti;
-                tblData{ti,2} = round(pkThick(ti), 2);
-                tblData{ti,3} = round(pkAmps(ti), 4);
-                tblData{ti,4} = round(relPct(ti), 1);
-                tblData{ti,5} = interpLabels{ti};
-            end
-            rfPeakTable.Data = tblData;
-
-            % ── Persist all peaks to dataset ──────────────────────────
+        result = dataplotter.peakTools.reflectivityFFT(ds, ...
+            WavelengthA=wl_A, ParentFig=fig, StatusFcn=@setStatus, ...
+            ButtonColors=struct('accent', BTN_ACCENT, 'fg', BTN_FG), ...
+            AxisLimits=ax.XLim, XraySources=XRAY_SOURCES);
+        if ~isempty(result)
             ds2 = appData.datasets{appData.activeIdx};
-            rfResult.thicknesses_nm = pkThick(:);
-            rfResult.amplitudes     = pkAmps(:);
-            rfResult.harmonicLabels = interpLabels;
-            rfResult.Q_range        = [min(Q) max(Q)];
-            rfResult.preprocess     = prepMode;
-            rfResult.fft_magnitude  = F_search(:);
-            rfResult.thickness_axis = t_search(:);
-            rfResult.isNeutron      = isNeutronDS;
-            if ~isNeutronDS && ~isempty(efRFWavelength)
-                rfResult.wavelength_A = efRFWavelength.Value;
-            end
-            % Superlattice analysis results
-            rfResult.superlattice.detected           = slDetected;
-            rfResult.superlattice.bilayerPeriod_nm   = slLambda_nm;
-            rfResult.superlattice.totalThickness_nm  = slTotal_nm;
-            rfResult.superlattice.nRepeats           = slNRepeats;
-            rfResult.superlattice.sublayerA_nm       = slSubA_nm;
-            rfResult.superlattice.sublayerB_nm       = slSubB_nm;
-            rfResult.superlattice.suppressedOrders   = slSuppressedOrders;
-            ds2.kiessigThickness = rfResult;
+            ds2.kiessigThickness = result;
             appData.datasets{appData.activeIdx} = ds2;
         end
     end
@@ -6829,129 +5471,28 @@ function varargout = DataPlotter()
 
     function onWilliamsonHallPlot(~, ~)
     %ONWILLIAMSONHALLPLOT  Williamson-Hall analysis: β·cosθ vs 4·sinθ.
-    %   Linear fit: β·cosθ = Kλ/D + 4ε·sinθ
-    %   intercept → crystallite size D,  slope → microstrain ε.
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig, 'Load a file first.', 'No data'); return;
         end
-        ds  = appData.datasets{appData.activeIdx};
+        ds   = appData.datasets{appData.activeIdx};
         wl_A = extractWavelength_A(ds);
         if isnan(wl_A) || wl_A <= 0
             uialert(fig, ['Wavelength is required for Williamson-Hall analysis.  ' ...
                           'Enter a value in the ' char(955) ' field.'], ...
                 'No wavelength'); return;
         end
-
-        % Collect fitted peaks with valid FWHM
         if isempty(ds.peaks)
             uialert(fig, 'No peaks available.  Find and fit peaks first.', 'No peaks');
             return;
         end
-        DEG2RAD  = pi / 180;
-        K        = appData.kFactor;
-        inst_rad = appData.instBroadening_deg * DEG2RAD;
-
-        validIdx = [];
-        for pki = 1:numel(ds.peaks)
-            pk = ds.peaks(pki);
-            isFitted = strcmp(pk.status,'fitted') || strcmp(pk.status,'fitted(global)');
-            hasFWHM  = ~isnan(pk.fwhm) && pk.fwhm > 0;
-            if isFitted && hasFWHM
-                beta_meas = pk.fwhm * DEG2RAD;
-                beta_sq   = beta_meas^2 - inst_rad^2;
-                if beta_sq > 0
-                    validIdx(end+1) = pki; %#ok<AGROW>
-                end
-            end
+        result = dataplotter.peakTools.williamsonHall(ds, wl_A, ...
+            appData.kFactor, appData.instBroadening_deg, ...
+            ParentFig=fig, StatusFcn=@setStatus);
+        if ~isempty(result)
+            ds2 = appData.datasets{appData.activeIdx};
+            ds2.williamsonHall = result;
+            appData.datasets{appData.activeIdx} = ds2;
         end
-        if numel(validIdx) < 3
-            uialert(fig, ...
-                sprintf('Williamson-Hall needs %s 3 fitted peaks with valid FWHM.\nCurrently have %d.', ...
-                    char(8805), numel(validIdx)), ...
-                'Insufficient peaks');
-            return;
-        end
-
-        % ── Compute W-H data ───────────────────────────────────────────
-        nWH      = numel(validIdx);
-        sinTh    = zeros(nWH, 1);
-        betaCos  = zeros(nWH, 1);
-        peakLabels = cell(nWH, 1);
-        for wi = 1:nWH
-            pk        = ds.peaks(validIdx(wi));
-            theta_rad = (pk.center / 2) * DEG2RAD;
-            beta_meas = pk.fwhm * DEG2RAD;
-            beta_corr = sqrt(beta_meas^2 - inst_rad^2);
-            sinTh(wi)   = sin(theta_rad);
-            betaCos(wi)  = beta_corr * cos(theta_rad);
-            peakLabels{wi} = sprintf('%.2f%s', pk.center, char(176));
-        end
-        xWH = 4 * sinTh;
-        yWH = betaCos;
-
-        % ── Linear fit: yWH = slope·xWH + intercept ───────────────────
-        p  = polyfit(xWH, yWH, 1);
-        slope     = p(1);   % = microstrain ε
-        intercept = p(2);   % = Kλ/D
-
-        if intercept > 0
-            D_nm = (K * wl_A * 0.1) / intercept;   % Å→nm via ×0.1
-        else
-            D_nm = NaN;   % unphysical negative intercept
-        end
-        epsilon = slope;   % microstrain (dimensionless)
-
-        % R²
-        yFit = polyval(p, xWH);
-        SS_res = sum((yWH - yFit).^2);
-        SS_tot = sum((yWH - mean(yWH)).^2);
-        R2 = 1 - SS_res / SS_tot;
-
-        % ── Plot ────────────────────────────────────────────────────────
-        whFig = figure('Name', 'Williamson-Hall Plot', ...
-            'NumberTitle', 'off', 'Position', [300 220 540 400]);
-        whAx = axes(whFig);
-        plot(whAx, xWH, yWH, 'ko', 'MarkerSize', 8, 'MarkerFaceColor', [0.2 0.5 0.8]);
-        hold(whAx, 'on');
-        xFitLine = linspace(0, max(xWH)*1.15, 100);
-        yFitLine = polyval(p, xFitLine);
-        plot(whAx, xFitLine, yFitLine, 'r-', 'LineWidth', 1.5);
-        hold(whAx, 'off');
-
-        xlabel(whAx, ['4' char(183) 'sin(' char(952) ')']);
-        ylabel(whAx, [char(946) char(183) 'cos(' char(952) ')  (rad)']);
-        if ~isnan(D_nm)
-            title(whAx, sprintf('D = %.1f nm,  %s = %.2e,  R%s = %.4f', ...
-                D_nm, char(949), epsilon, char(178), R2));
-        else
-            title(whAx, sprintf('%s = %.2e,  R%s = %.4f  (negative intercept)', ...
-                char(949), epsilon, char(178), R2));
-        end
-        grid(whAx, 'on');
-        box(whAx, 'on');
-        legend(whAx, 'Peak data', sprintf('%s%scos%s = %.2e%s4sin%s + %.4e', ...
-            char(946), char(183), char(952), epsilon, char(183), char(952), intercept), ...
-            'Location', 'best');
-
-        % Add 2θ labels to points
-        for li = 1:nWH
-            text(whAx, xWH(li), yWH(li), ['  ' peakLabels{li}], 'FontSize', 8);
-        end
-
-        % Persist to dataset
-        ds2 = appData.datasets{appData.activeIdx};
-        ds2.williamsonHall = struct( ...
-            'D_nm',      D_nm, ...
-            'epsilon',   epsilon, ...
-            'R2',        R2, ...
-            'slope',     slope, ...
-            'intercept', intercept, ...
-            'xWH',       xWH, ...
-            'yWH',       yWH, ...
-            'K',         K, ...
-            'wavelength_A', wl_A, ...
-            'instBroadening_deg', appData.instBroadening_deg);
-        appData.datasets{appData.activeIdx} = ds2;
     end
 
     function onToggleFitCurves(src, ~)
@@ -9357,6 +7898,18 @@ function varargout = DataPlotter()
                 colors = getColorsFromMap(colormapName, nColors);
             end
 
+            % ── 2D fast-path: skip full cla when cached handle is reusable ──
+            is2D = is2DDataset(activeDs);
+            h2D  = appData.map2DHandle;
+            fast2D = is2D && ~isempty(h2D) && isvalid(h2D) ...
+                     && strcmp(ddMap2DType.Value, 'Heatmap') ...
+                     && numel(targetAx.YAxis) <= 1;
+            if fast2D
+                % Only need to remove non-2D overlays (colorbar etc. stay)
+                draw2DMap(targetAx, activeDs);
+                return;
+            end
+
             % ── Draw ──────────────────────────────────────────────────────
             % Peak markers and zoom rect use HandleVisibility='off' so ax.Children may
             % omit them in some MATLAB releases. findall() bypasses this filter.
@@ -9373,6 +7926,7 @@ function varargout = DataPlotter()
             delete(findall(targetAx, 'Tag', 'GUIPhaseLabel'));
             delete(targetAx.Children);
             cla(targetAx);
+            appData.map2DHandle = [];  % clear stale handle after cla
             % cla() removes plot children but DOES NOT reset XLim/YLim — MATLAB
             % retains the last auto-scaled range even after clearing.  When switching
             % data types (e.g. XRD → magnetometry), the stale XRD YLim [0,50000]
@@ -9395,8 +7949,8 @@ function varargout = DataPlotter()
                 yyaxis(targetAx, 'left');
             end
 
-            % ── 2D area-detector map branch ──────────────────────────────
-            if is2DDataset(activeDs)
+            % ── 2D area-detector map branch (full redraw) ─────────────────
+            if is2D
                 draw2DMap(targetAx, activeDs);
                 return;
             end
@@ -10185,213 +8739,24 @@ function varargout = DataPlotter()
                 yyaxis(targetAx, 'left');
             end
 
-            % ── Peak annotations ──────────────────────────────────────────
+            % ── Peak / annotation / reference-line overlays ────────────────
             % Drawn after axis limits so YLim is finalised.
-            % Render order: (1) Lorentzian fit curves, (2) marker lines + labels,
-            % so markers visually sit on top of the model overlay.
-
-            % Waterfall group of the active dataset (used for peak/bg/annotation offsets)
+            % Extracted to +dataplotter/drawOverlays.m for maintainability.
             if waterfallOn && appData.activeIdx >= 1 && appData.activeIdx <= numel(wfGroupIdx)
                 activeGroupIdx = wfGroupIdx(appData.activeIdx);
             else
                 activeGroupIdx = 1;
             end
-
             if appData.activeIdx >= 1 && ~isempty(appData.datasets)
-                dsPk = appData.datasets{appData.activeIdx};
-                if ~isempty(dsPk.peaks)
-                    hold(targetAx,'on');
-                    yLo   = targetAx.YLim(1);
-                    yHi   = targetAx.YLim(2);
-                    ySpan = yHi - yLo;
-                    fitColor = appData.fitCurveColor;
-                    % In waterfall mode the active dataset is shifted by this amount.
-                    % Log mode uses a multiplier; linear mode uses an additive offset.
-                    if wfLogMode
-                        pkYMult = effectiveSpacing^(activeGroupIdx - 1);
-                        pkYOff  = 0;
-                    else
-                        pkYMult = 1;
-                        pkYOff  = (activeGroupIdx - 1) * effectiveSpacing;
-                    end
-
-                    % ── (1) Lorentzian fit overlays ───────────────────────
-                    if appData.showFitCurves
-                        for pki = 1:numel(dsPk.peaks)
-                            pk       = dsPk.peaks(pki);
-                            hasBg    = isfield(pk,'bg') && ~isempty(pk.bg) && ~isnan(pk.bg);
-                            isFitted = strcmp(pk.status,'fitted') && ~isnan(pk.fwhm) && pk.fwhm > 0;
-                            if ~isFitted || ~hasBg, continue; end
-
-                            % X range for the smooth curve: stored xRange or ±3·FWHM
-                            if ~isempty(pk.xRange) && numel(pk.xRange) == 2
-                                gxLo = pk.xRange(1);  gxHi = pk.xRange(2);
-                            else
-                                gxLo = pk.center - 3*pk.fwhm;
-                                gxHi = pk.center + 3*pk.fwhm;
-                            end
-                            xFitPlot = linspace(gxLo, gxHi, 300);
-                            pkModel = '';
-                            if isfield(pk,'model'), pkModel = pk.model; end
-                            u = (xFitPlot - pk.center) ./ pk.fwhm;
-                            if strcmp(pkModel, 'Gaussian')
-                                yFitPlot = pk.height .* exp(-4.*log(2).*u.^2) + pk.bg;
-                            elseif strcmp(pkModel, 'Pseudo-Voigt')
-                                eta = guiTernary(isfield(pk,'eta') && ~isempty(pk.eta) && ~isnan(pk.eta), pk.eta, 0.5);
-                                L   = 1 ./ (1 + 4.*u.^2);
-                                G   = exp(-4.*log(2).*u.^2);
-                                yFitPlot = pk.height .* (eta.*L + (1-eta).*G) + pk.bg;
-                            elseif strcmp(pkModel, 'Split Pearson VII') && isfield(pk,'fitParams') && numel(pk.fitParams) == 7
-                                yFitPlot = utilities.splitPearsonVII(xFitPlot(:), pk.fitParams)';
-                            else   % Lorentzian (default)
-                                yFitPlot = pk.height ./ (1 + 4.*u.^2) + pk.bg;
-                            end
-                            if wfLogMode
-                                yFitPlot = yFitPlot * pkYMult;
-                            else
-                                yFitPlot = yFitPlot + pkYOff;
-                            end
-
-                            isSel = (pki == appData.selectedPeakIdx);
-                            plot(targetAx, xFitPlot, yFitPlot, '-', ...
-                                'Color',            fitColor, ...
-                                'LineWidth',        guiTernary(isSel, 2.5, 1.5), ...
-                                'HitTest',          'off', ...
-                                'Tag',              'GUIPeakAnnotation', ...
-                                'HandleVisibility', 'off');
-                        end
-                    end
-
-                    % ── (2) Vertical markers, labels and FWHM bars ────────
-                    for pki = 1:numel(dsPk.peaks)
-                        pk        = dsPk.peaks(pki);
-                        isSel     = (pki == appData.selectedPeakIdx);
-                        lineColor = guiTernary(isSel, [1.0 0.50 0.00], [0.55 0.15 0.75]);
-                        lineWidth = guiTernary(isSel, 2.5, 1.5);
-
-                        % Vertical dashed line spanning the full y-axis
-                        plot(targetAx, [pk.center, pk.center], [yLo, yHi], '--', ...
-                            'Color',            lineColor, ...
-                            'LineWidth',        lineWidth, ...
-                            'HitTest',          'off', ...
-                            'Tag',              'GUIPeakAnnotation', ...
-                            'HandleVisibility', 'off');
-
-                        % Peak index + centre label near the bottom (shifted in waterfall)
-                        if wfLogMode && yLo > 0 && yHi > 0
-                            pkLabelY = exp(log(yLo) + (log(yHi)-log(yLo))*0.03) * pkYMult;
-                        else
-                            pkLabelY = yLo + ySpan*0.03 + pkYOff;
-                        end
-                        text(targetAx, pk.center, pkLabelY, ...
-                            sprintf('#%d  %.3f\xb0', pi, pk.center), ...
-                            'FontSize',           7, ...
-                            'HorizontalAlignment','center', ...
-                            'Color',              lineColor, ...
-                            'Tag',                'GUIPeakAnnotation', ...
-                            'HandleVisibility',   'off', ...
-                            'Interpreter',        'none');
-
-                        % FWHM horizontal bar at the true half-maximum height
-                        % For a fitted Lorentzian: half-max is at bg + H/2.
-                        % For un-fitted peaks: fall back to H/2 as an estimate.
-                        if ~isnan(pk.fwhm) && pk.fwhm > 0
-                            hasBg = isfield(pk,'bg') && ~isempty(pk.bg) && ~isnan(pk.bg);
-                            halfHBase = guiTernary(hasBg, pk.bg + pk.height*0.5, pk.height*0.5);
-                            if wfLogMode
-                                halfH = halfHBase * pkYMult;
-                            else
-                                halfH = halfHBase + pkYOff;
-                            end
-                            plot(targetAx, ...
-                                [pk.center - pk.fwhm/2, pk.center + pk.fwhm/2], ...
-                                [halfH, halfH], '-', ...
-                                'Color',            lineColor, ...
-                                'LineWidth',        2.0, ...
-                                'HitTest',          'off', ...
-                                'Tag',              'GUIPeakAnnotation', ...
-                                'HandleVisibility', 'off');
-                        end
-                    end
-                    hold(targetAx,'off');
-                end
-            end
-
-            % ── SNIP background overlay ──────────────────────────────────
-            if appData.showSnipBg && appData.activeIdx >= 1 && ...
-               ~isempty(appData.datasets)
-                dsBg = appData.datasets{appData.activeIdx};
-                if isfield(dsBg, 'snipBackground') && ...
-                   ~isempty(dsBg.snipBackground) && ...
-                   ~isempty(dsBg.snipBackground.x)
-                    if wfLogMode
-                        snipBgY = dsBg.snipBackground.bg * effectiveSpacing^(activeGroupIdx - 1);
-                    else
-                        snipBgY = dsBg.snipBackground.bg + (activeGroupIdx - 1) * effectiveSpacing;
-                    end
-                    hold(targetAx, 'on');
-                    plot(targetAx, dsBg.snipBackground.x, snipBgY, '--', ...
-                        'Color',            [0.2 0.8 0.2], ...
-                        'LineWidth',        1.5, ...
-                        'HitTest',          'off', ...
-                        'Tag',              'GUISNIPBackground', ...
-                        'HandleVisibility', 'off');
-                    hold(targetAx, 'off');
-                end
-            end
-
-            % ── User annotations ──────────────────────────────────────────
-            % Render text labels placed by user in annotation mode.
-            if appData.activeIdx >= 1 && ~isempty(appData.datasets)
-                dsAnn = appData.datasets{appData.activeIdx};
-                if isfield(dsAnn, 'annotations') && ~isempty(dsAnn.annotations)
-                    hold(targetAx, 'on');
-                    % In waterfall mode, offset annotations by dataset
-                    for ai = 1:numel(dsAnn.annotations)
-                        annot = dsAnn.annotations{ai};
-                        if wfLogMode
-                            yPos = annot.y * effectiveSpacing^(activeGroupIdx - 1);
-                        else
-                            yPos = annot.y + (activeGroupIdx - 1) * effectiveSpacing;
-                        end
-
-                        % Render text with light background for visibility
-                        text(targetAx, annot.x, yPos, annot.text, ...
-                            'FontSize',         10, ...
-                            'FontWeight',       'normal', ...
-                            'Color',            [0.2 0.2 0.2], ...
-                            'BackgroundColor',  [1.0 0.95 0.85], ...
-                            'EdgeColor',        [0.7 0.7 0.7], ...
-                            'LineWidth',        0.5, ...
-                            'HitTest',          'off', ...
-                            'Tag',              'GUIUserAnnotation', ...
-                            'HandleVisibility', 'off');
-                    end
-                    hold(targetAx, 'off');
-                end
-            end
-
-            % ── Reference lines (#11) ────────────────────────────────────────
-            if appData.activeIdx >= 1 && ~isempty(appData.datasets)
-                dsRef = appData.datasets{appData.activeIdx};
-                if isfield(dsRef, 'refLines') && ~isempty(dsRef.refLines)
-                    hold(targetAx, 'on');
-                    for ri = 1:numel(dsRef.refLines)
-                        rl = dsRef.refLines{ri};
-                        if strcmp(rl.orientation, 'horizontal')
-                            yline(targetAx, rl.value, rl.style, ...
-                                'Color', rl.color, 'LineWidth', 1.2, ...
-                                'HitTest', 'off', 'HandleVisibility', 'off', ...
-                                'Tag', 'GUIRefLine');
-                        else
-                            xline(targetAx, rl.value, rl.style, ...
-                                'Color', rl.color, 'LineWidth', 1.2, ...
-                                'HitTest', 'off', 'HandleVisibility', 'off', ...
-                                'Tag', 'GUIRefLine');
-                        end
-                    end
-                    hold(targetAx, 'off');
-                end
+                dataplotter.drawOverlays(targetAx, appData.datasets{appData.activeIdx}, ...
+                    'ShowFitCurves',    appData.showFitCurves, ...
+                    'ShowSnipBg',       appData.showSnipBg, ...
+                    'FitCurveColor',    appData.fitCurveColor, ...
+                    'SelectedPeakIdx',  appData.selectedPeakIdx, ...
+                    'WaterfallOn',      waterfallOn, ...
+                    'WfLogMode',        wfLogMode, ...
+                    'EffectiveSpacing', effectiveSpacing, ...
+                    'ActiveGroupIdx',   activeGroupIdx);
             end
 
             % ── Cache line handles for soft-update performance ────────────────
@@ -10473,6 +8838,43 @@ function varargout = DataPlotter()
         end
     end
 
+    function onToggleSinglePrecision()
+    %ONTOGGLESINGLEPREC  Convert 2D intensity matrix between single/double.
+        if appData.activeIdx < 1 || isempty(appData.datasets), return; end
+        ds = appData.datasets{appData.activeIdx};
+        if ~is2DDataset(ds), return; end
+        map = ds.data.metadata.parserSpecific.map2D;
+        if cbMap2DSingle.Value
+            map.intensity = single(map.intensity);
+            if isfield(map, 'Qx'), map.Qx = single(map.Qx); end
+            if isfield(map, 'Qz'), map.Qz = single(map.Qz); end
+        else
+            map.intensity = double(map.intensity);
+            if isfield(map, 'Qx'), map.Qx = double(map.Qx); end
+            if isfield(map, 'Qz'), map.Qz = double(map.Qz); end
+        end
+        ds.data.metadata.parserSpecific.map2D = map;
+        appData.datasets{appData.activeIdx} = ds;
+        setStatus(sprintf('2D matrix now %s (%.1f MB)', ...
+            class(map.intensity), numel(map.intensity) * bytesPerElem(map.intensity) / 1e6));
+    end
+
+    function onClear2DMatrix()
+    %ONCLEAR2DMATRIX  Discard the 2D intensity matrix to reclaim memory.
+        if appData.activeIdx < 1 || isempty(appData.datasets), return; end
+        ds = appData.datasets{appData.activeIdx};
+        if ~is2DDataset(ds), return; end
+        map = ds.data.metadata.parserSpecific.map2D;
+        savedMB = numel(map.intensity) * bytesPerElem(map.intensity) / 1e6;
+        if isfield(map, 'Qx'), savedMB = savedMB + 2 * numel(map.Qx) * bytesPerElem(map.Qx) / 1e6; end
+        map.intensity = [];
+        if isfield(map, 'Qx'), map.Qx = []; map.Qz = []; end
+        ds.data.metadata.parserSpecific.map2D = map;
+        appData.datasets{appData.activeIdx} = ds;
+        appData.map2DHandle = [];
+        setStatus(sprintf('Cleared 2D matrix — freed ~%.1f MB', savedMB));
+    end
+
     function onPoleFigure(~,~)
     %ONPOLEFIGURE  Generate a polar plot of intensity vs scan angle at a chosen 2θ.
     %  For 2D area-detector data: extracts a column (fixed 2θ) and plots
@@ -10523,18 +8925,38 @@ function varargout = DataPlotter()
     %   Uses imagesc (Heatmap) or contour/contourf (Contour / Filled Contour).
     %   ddScaleY is reinterpreted as log-intensity toggle for 2D maps.
     %   Axis limits from ds.axLims are applied when present.
+    %   Large maps are stride-decimated for faster rendering.
         ps  = ds.data.metadata.parserSpecific;
         map = ps.map2D;
-        I   = map.intensity;
+        I   = double(map.intensity);   % ensure double for rendering (supports single storage)
 
         x2 = map.axis2(:)';  % 2Theta [1×M]
         x1 = map.axis1(:);   % Omega / Chi / Phi [N×1]
+
+        % ── Stride-based decimation for very large maps ──
+        % Skip every Nth pixel when the display resolution exceeds the screen.
+        % This avoids rendering millions of pixels that would be subsampled anyway.
+        MAX_DISPLAY_PIX = 2000;  % max pixels per axis before decimation
+        [nRows, nCols] = size(I);
+        strideR = max(1, ceil(nRows / MAX_DISPLAY_PIX));
+        strideC = max(1, ceil(nCols / MAX_DISPLAY_PIX));
+        if strideR > 1 || strideC > 1
+            rIdx = 1:strideR:nRows;
+            cIdx = 1:strideC:nCols;
+            I  = I(rIdx, cIdx);
+            x1 = x1(rIdx);
+            x2 = x2(cIdx);
+        end
 
         % Determine whether to render in Q-space (non-uniform Qx/Qz grid)
         useQSpace = cbMap2DQSpace.Value && isfield(map, 'Qx');
         if useQSpace
             Xmat = map.Qx;   % [N×M]  Qx grid
             Ymat = map.Qz;   % [N×M]  Qz grid
+            if strideR > 1 || strideC > 1
+                Xmat = Xmat(rIdx, cIdx);
+                Ymat = Ymat(rIdx, cIdx);
+            end
             xLbl = 'Q_x (Å^{-1})';
             yLbl = 'Q_z (Å^{-1})';
         else
@@ -10570,23 +8992,38 @@ function varargout = DataPlotter()
         end
 
         nLvl = round(efMap2DContourN.Value);
+        % Try to reuse a cached graphics handle for Heatmap replots (faster)
+        h2D = appData.map2DHandle;
+        canReuse = ~isempty(h2D) && isvalid(h2D) && strcmp(ddMap2DType.Value, 'Heatmap');
         switch ddMap2DType.Value
             case 'Heatmap'
                 if useQSpace
-                    % pcolor requires (N+1)×(M+1) for shading flat, but non-uniform
-                    % grids can be passed directly with shading interp/flat on NxM data
-                    pcolor(targetAx, Xmat, Ymat, I);
-                    shading(targetAx, 'flat');
+                    if canReuse && isa(h2D, 'matlab.graphics.chart.primitive.Surface')
+                        h2D.XData = Xmat;  h2D.YData = Ymat;  h2D.CData = I;
+                    else
+                        pcolor(targetAx, Xmat, Ymat, I);
+                        shading(targetAx, 'flat');
+                        appData.map2DHandle = targetAx.Children(1);
+                    end
                 else
-                    imagesc(targetAx, x2, x1, I);
-                    targetAx.YDir = 'normal';
+                    if canReuse && isa(h2D, 'matlab.graphics.primitive.Image')
+                        h2D.XData = [x2(1) x2(end)];
+                        h2D.YData = [x1(1) x1(end)];
+                        h2D.CData = I;
+                    else
+                        imagesc(targetAx, x2, x1, I);
+                        targetAx.YDir = 'normal';
+                        appData.map2DHandle = targetAx.Children(1);
+                    end
                 end
             case 'Contour'
                 if isempty(Xmat), [Xmat, Ymat] = meshgrid(x2, x1); end
                 contour(targetAx, Xmat, Ymat, I, nLvl);
+                appData.map2DHandle = [];
             otherwise  % 'Filled Contour'
                 if isempty(Xmat), [Xmat, Ymat] = meshgrid(x2, x1); end
                 contourf(targetAx, Xmat, Ymat, I, nLvl);
+                appData.map2DHandle = [];
         end
 
         % Apply colorbar range limits from the editor controls
@@ -11990,9 +10427,22 @@ function varargout = DataPlotter()
 
     % ── Session save / load ───────────────────────────────────────────────
 
+    function w = buildSessionWidgets_()
+    %BUILDSESSIONWIDGETS_  Pack widget handles into the struct expected by
+    %  dataplotter.sessionManager.collectGuiState / applyGuiState.
+        w.ddColormap  = ddColormap;
+        w.ddMap2DCmap = ddMap2DCmap;
+        w.ddX         = ddX;
+        w.lbY         = lbY;
+        w.lbY2        = lbY2;
+        w.ddScaleX    = ddScaleX;
+        w.ddScaleY    = ddScaleY;
+        w.ddBGInterp  = ddBGInterp;
+    end
+
     function onSaveSession(~,~)
-    %ONSAVESESSION  Save all datasets, corrections, peaks, and key UI settings
-    %  to a .mat file so the session can be restored later with onLoadSession.
+    %ONSAVESESSION  Save all datasets and key UI settings to a .mat file.
+    %  Delegates serialisation to dataplotter.sessionManager.save().
         if isempty(appData.datasets)
             uialert(fig,'Nothing to save — load some files first.','No data'); return;
         end
@@ -12007,35 +10457,14 @@ function varargout = DataPlotter()
         if isequal(fname, 0), return; end
         outPath = fullfile(fpath, fname);
 
-        % Collect datasets and current UI settings to persist
-        savedDatasets  = appData.datasets;
-        savedActiveIdx = appData.activeIdx;
-        savedBgFile    = appData.bgFile;
-        savedBgDataset = appData.bgDataset;
-        savedStyle     = appData.style;
-        savedLastDir   = appData.lastDir;
-        savedColormap  = ddColormap.Value;
-        savedMap2DCmap = ddMap2DCmap.Value;
-        savedXSel      = ddX.Value;
-        savedYSel      = ensureCell(lbY.Value);
-        savedY2Sel     = ensureCell(lbY2.Value);
-        savedLogX      = strcmp(ddScaleX.Value, 'Log');
-        savedLogY      = strcmp(ddScaleY.Value, 'Log');
-        savedBGInterp  = ddBGInterp.Value;
+        widgets = buildSessionWidgets_();
+        guiState = dataplotter.sessionManager.collectGuiState(widgets);
 
         setStatus('Saving session...');
         fig.Pointer = 'watch';
         drawnow;
         try
-            save(outPath, 'savedDatasets', 'savedActiveIdx', ...
-                          'savedBgFile', 'savedBgDataset', ...
-                          'savedStyle', 'savedLastDir', ...
-                          'savedColormap', 'savedMap2DCmap', ...
-                          'savedXSel', ...
-                          'savedYSel', 'savedY2Sel', ...
-                          'savedLogX', 'savedLogY', ...
-                          'savedBGInterp', ...
-                          '-v7.3');
+            dataplotter.sessionManager.save(outPath, appData, guiState);
             fig.Pointer = 'arrow';
             setStatus(sprintf('Session saved: %s', fname));
             uialert(fig, sprintf('Session saved:\n%s', outPath), 'Session Saved');
@@ -12049,8 +10478,7 @@ function varargout = DataPlotter()
 
     function onLoadSession(~,~)
     %ONLOADSESSION  Restore a previously saved session from a .mat file.
-    %  Replaces all current datasets with those from the file, then refreshes
-    %  all controls.
+    %  Delegates deserialisation to dataplotter.sessionManager.load().
         startDir = guiTernary(isempty(appData.lastDir), pwd, appData.lastDir);
         [fname, fpath] = uigetfile({'*.mat','MATLAB session (*.mat)'}, ...
             'Load session file...', startDir);
@@ -12062,84 +10490,34 @@ function varargout = DataPlotter()
         drawnow;
 
         try
-            S = load(matPath, '-mat');
+            [datasets, restored] = dataplotter.sessionManager.load(matPath);
         catch ME
             fig.Pointer = 'arrow';
             setStatus('Session load failed.');
             logGUIError('Load Error', ME.message, ME);
-            uialert(fig, sprintf('Could not load file:\n%s', ME.message), 'Load Error');
-            return;
-        end
-
-        % Validate required field
-        if ~isfield(S, 'savedDatasets')
-            fig.Pointer = 'arrow';
-            uialert(fig, 'File does not appear to be a valid session file.', 'Load Error');
+            uialert(fig, sprintf('Could not load session:\n%s', ME.message), 'Load Error');
             return;
         end
 
         cancelInteractions();
 
-        % Restore core data
-        appData.datasets  = S.savedDatasets;
-        appData.activeIdx = guiTernary(isfield(S,'savedActiveIdx') && ...
-            S.savedActiveIdx >= 1 && S.savedActiveIdx <= numel(S.savedDatasets), ...
-            S.savedActiveIdx, 1);
-        appData.bgFile    = guiTernary(isfield(S,'savedBgFile'),    S.savedBgFile,    '');
-        appData.bgDataset = guiTernary(isfield(S,'savedBgDataset'), S.savedBgDataset, []);
-        appData.style     = guiTernary(isfield(S,'savedStyle'),     S.savedStyle,     'Line');
-        appData.lastDir   = guiTernary(isfield(S,'savedLastDir'),   S.savedLastDir,   '');
-
-        % parserVersion compatibility check (#18): warn if session was created before v1.0
-        nLegacy = sum(cellfun(@(ds) ...
-            ~isfield(ds.data.metadata, 'parserVersion'), appData.datasets));
-        if nLegacy > 0
-            warning('DataPlotter:legacySession', ...
-                ['%d dataset(s) in this session were imported before parser versioning was introduced.\n' ...
-                 'Data should load correctly; re-import files to attach version metadata.'], nLegacy);
-        end
-
-        % Backward-compat: ensure all expected fields exist for old sessions (#14)
-        sessionDefaults = struct( ...
-            'snipBackground', struct('x', [], 'bg', []), ...
-            'derivativeMode', 'None', ...
-            'refLines', {{}}, ...
-            'undoStack', {{}}, ...
-            'normMethod', 'None', ...
-            'xTrimMin', NaN, ...
-            'xTrimMax', NaN, ...
-            'legendName', '', ...
-            'legendNameR', '', ...
-            'color', [], ...
-            'colorR', [], ...
-            'annotations', {{}}, ...
-            'visible', true);
-        fnames = fieldnames(sessionDefaults);
-        for di = 1:numel(appData.datasets)
-            for fi = 1:numel(fnames)
-                if ~isfield(appData.datasets{di}, fnames{fi})
-                    appData.datasets{di}.(fnames{fi}) = sessionDefaults.(fnames{fi});
-                end
-            end
-        end
+        % Restore core data into appData
+        appData.datasets  = datasets;
+        appData.activeIdx = restored.activeIdx;
+        appData.bgFile    = restored.bgFile;
+        appData.bgDataset = restored.bgDataset;
+        appData.style     = restored.style;
+        appData.lastDir   = restored.lastDir;
 
         if isempty(appData.datasets)
             rebuildDatasetList(false);
+            fig.Pointer = 'arrow';
             return;
         end
 
-        % Restore UI settings
-        if isfield(S,'savedColormap') && ismember(S.savedColormap, ddColormap.Items)
-            ddColormap.Value = S.savedColormap;
-        end
-        if isfield(S,'savedMap2DCmap') && ismember(S.savedMap2DCmap, ddMap2DCmap.Items)
-            ddMap2DCmap.Value = S.savedMap2DCmap;
-        end
-        if isfield(S,'savedLogX'), if S.savedLogX, ddScaleX.Value = 'Log'; else, ddScaleX.Value = 'Linear'; end, end
-        if isfield(S,'savedLogY'), if S.savedLogY, ddScaleY.Value = 'Log'; else, ddScaleY.Value = 'Linear'; end, end
-        if isfield(S,'savedBGInterp') && ismember(S.savedBGInterp, ddBGInterp.Items)
-            ddBGInterp.Value = S.savedBGInterp;
-        end
+        % Restore dropdown/scale widget values (colormap, scale, BG interp)
+        widgets = buildSessionWidgets_();
+        dataplotter.sessionManager.applyGuiState(restored.guiState, widgets);
 
         % Restore plot style button appearance
         onStylePick(appData.style);
@@ -12156,18 +10534,8 @@ function varargout = DataPlotter()
         rebuildDatasetList(true);
         updateControlsForActiveDataset();
 
-        % Restore axis channel selections (best-effort — may not match new dataset)
-        if isfield(S,'savedXSel') && ismember(S.savedXSel, ddX.Items)
-            ddX.Value = S.savedXSel;
-        end
-        if isfield(S,'savedYSel')
-            validY = S.savedYSel(ismember(S.savedYSel, lbY.Items));
-            if ~isempty(validY), lbY.Value = validY; end
-        end
-        if isfield(S,'savedY2Sel')
-            validY2 = S.savedY2Sel(ismember(S.savedY2Sel, lbY2.Items));
-            if ~isempty(validY2), lbY2.Value = validY2; end
-        end
+        % Restore axis channel selections after listbox items are populated
+        dataplotter.sessionManager.applyAxisSelections(restored.guiState, widgets);
 
         onPlot([],[]);
         fig.Pointer = 'arrow';
@@ -15463,6 +13831,15 @@ end
 
 function v = guiTernary(cond, a, b)
     if cond, v = a; else, v = b; end
+end
+
+function b = bytesPerElem(x)
+%BYTESPERELEM  Return bytes per element for the class of x.
+    if isa(x, 'single'), b = 4;
+    elseif isa(x, 'uint16'), b = 2;
+    elseif isa(x, 'uint8'), b = 1;
+    else, b = 8;  % double, int64, uint64
+    end
 end
 
 

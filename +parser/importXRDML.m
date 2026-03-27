@@ -214,6 +214,7 @@ function data = importXRDML(filepath, options)
     % blocks that can overwhelm MATLAB's regex backtracking engine).
     scanBlocks = extractBlocks(xml, 'scan');
     nScans     = numel(scanBlocks);
+    xml = '';  % Free the full XML string — metadata already extracted, scan data in scanBlocks
     if nScans == 0
         error('parser:importXRDML:noScans', ...
             'No <scan> elements found in "%s".', filepath);
@@ -381,7 +382,9 @@ function data = importXRDML(filepath, options)
 
         twoTheta_all = [twoTheta_all, ttVec];    %#ok<AGROW>
         counts_all   = [counts_all,   cntVals];   %#ok<AGROW>
+        scanBlocks{sortIdx(si)} = '';  % free memory for this block
     end
+    scanBlocks = {};  % free all remaining scan block strings
 
     % ════════════════════════════════════════════════════════════════════════
     %  4b. 2D area-detector detection and matrix assembly
@@ -540,19 +543,14 @@ function data = importXRDML(filepath, options)
         map2D.axis2Unit     = 'deg';
         map2D.intensityUnit = mapIntUnit;
 
-        % ── Reciprocal-space conversion (requires wavelength) ─────────────
+        % ── Reciprocal-space: store wavelength for lazy Qx/Qz computation ──
+        % Qx/Qz grids are computed on demand (in draw2DMap / computeQSpace)
+        % rather than eagerly, saving 2×N×M×8 bytes of RAM at parse time.
         % Standard coplanar geometry:
         %   Qx = (4π/λ) · sin(θ) · sin(ω − θ)
         %   Qz = (4π/λ) · sin(θ) · cos(ω − θ)
-        % where θ = 2θ/2 (half detector angle), ω = motor position.
-        % At the symmetric Bragg condition ω = θ: Qx = 0, Qz = (4π/λ)·sin(θ).
         if ~isnan(wl.kAlpha1) && wl.kAlpha1 > 0
-            lambda = wl.kAlpha1;   % Å
-            [TT_rad, OM_rad] = meshgrid(deg2rad(twoThetaVec), deg2rad(secSorted(:)));
-            theta_rad = TT_rad / 2;
-            k0        = 2 * pi / lambda;
-            map2D.Qx     = 2 * k0 .* sin(theta_rad) .* sin(OM_rad - theta_rad);
-            map2D.Qz     = 2 * k0 .* sin(theta_rad) .* cos(OM_rad - theta_rad);
+            map2D.wavelength_A = wl.kAlpha1;   % Å — triggers lazy Q-space
             map2D.QxUnit = 'Ang^-1';
             map2D.QzUnit = 'Ang^-1';
         end
