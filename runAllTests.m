@@ -68,6 +68,7 @@ SUITES = {
     T('parser','test_csv_mixed_format'),    'parser', 'CSV mixed/awkward format handling'
     T('parser','test_new_features'),        'parser', 'Features 4-16: utilities and parser changes'
     T('parser','test_importAFM'),          'parser', 'AFM / NanoScope .spm parser'
+    T('parser','test_importBCF'),          'em',     'BCF EDS spectrum parser'
     T('parser','test_sims_parser'),         'sims',   'SIMS depth profile parser'
     T('parser','test_xrdml_2d'),            'xrd2d',  '2D XRDML parser (parser + Q-space)'
     T('parser','test_xrdml_2d_edge'),       'xrd2d',  '2D XRDML edge cases (shapes, cuts, session)'

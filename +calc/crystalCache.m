@@ -259,7 +259,7 @@ function entry = normaliseEntry(entry, source)
     defaults.spaceGroup = '';
     defaults.atomSites  = struct('label',{},'symbol',{},'x',{},'y',{},'z',{},'occupancy',{});
     defaults.source     = source;
-    defaults.dateAdded  = datestr(now, 'yyyy-mm-dd HH:MM:SS'); %#ok<TNOW1,DATST>
+    defaults.dateAdded  = char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss'));
 
     for fi = 1:numel(requiredFields)
         f = requiredFields{fi};

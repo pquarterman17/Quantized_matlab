@@ -136,7 +136,7 @@ if options.Colorbar
 end
 
 if ~isempty(options.Clim) && numel(options.Clim) == 2
-    caxis(surfAx, options.Clim); %#ok<CAXIS>
+    clim(surfAx, options.Clim);
 end
 
 view(surfAx, options.ViewAngle);

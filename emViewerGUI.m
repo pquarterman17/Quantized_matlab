@@ -1979,8 +1979,8 @@ function varargout = emViewerGUI()
     %  ROW 3: STATUS BAR
     %  [dimensions] | [bit depth] | [pixel size] | [mouse position]
     % ════════════════════════════════════════════════════════════════════
-    statusGL = uigridlayout(rootGL, [1 4], ...
-        'ColumnWidth', {110, 60, 100, '1x'}, ...
+    statusGL = uigridlayout(rootGL, [1 5], ...
+        'ColumnWidth', {110, 60, 100, '1x', 'fit'}, ...
         'RowHeight',   {'1x'}, ...
         'Padding',     [6 0 6 0], ...
         'ColumnSpacing', 10);
@@ -2002,6 +2002,12 @@ function varargout = emViewerGUI()
     lblStatusMouse = uilabel(statusGL, 'Text', '', ...
         'FontSize', 10, 'FontColor', [0.45 0.45 0.45]);
     lblStatusMouse.Layout.Row = 1; lblStatusMouse.Layout.Column = 4;
+
+    % Discreet loading indicator — appears during file I/O, hidden otherwise
+    lblLoadStatus = uilabel(statusGL, 'Text', '', ...
+        'FontSize', 9, 'FontColor', [0.35 0.65 0.85], ...
+        'HorizontalAlignment', 'right');
+    lblLoadStatus.Layout.Row = 1; lblLoadStatus.Layout.Column = 5;
 
     % Populate recent files dropdown from persisted state
     updateRecentDropdown();
@@ -2148,11 +2154,10 @@ function varargout = emViewerGUI()
         % Build full paths
         fpaths = cellfun(@(f) fullfile(folder, f), files, 'UniformOutput', false);
 
-        fig.Pointer = 'watch';
-        drawnow;
         try
             loadImagesFromPaths(fpaths);
         catch ME
+            hideLoading();
             fprintf(2, '\n[emViewerGUI] Error loading files: %s\n', ME.message);
             for si = 1:numel(ME.stack)
                 fprintf(2, '  at %s (line %d)\n', ME.stack(si).name, ME.stack(si).line);
@@ -2160,7 +2165,6 @@ function varargout = emViewerGUI()
             uialert(fig, sprintf('Error loading files:\n%s', ME.message), ...
                 'Load Error', 'Icon', 'error');
         end
-        fig.Pointer = 'arrow';
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2908,10 +2912,16 @@ function varargout = emViewerGUI()
             fpaths = {fpaths};
         end
 
+        nFiles = numel(fpaths);
+        if nFiles > 0
+            showLoading(sprintf('Loading %d file(s)...', nFiles));
+        end
         loadedAny = false;
 
-        for k = 1:numel(fpaths)
+        for k = 1:nFiles
             fp = fpaths{k};
+            [~, fn, fext] = fileparts(fp);
+            updateLoading(k, nFiles, [fn fext]);
 
             [~, ~, ext] = fileparts(fp);
             ext = lower(ext);
@@ -2958,7 +2968,7 @@ function varargout = emViewerGUI()
                         loadedAny = true;
 
                     case '.dm4'
-                        data = parser.importDM3(fp);
+                        data = parser.importDM4(fp);
                         appendImage(data);
                         addToRecentFiles(fp);
                         loadedAny = true;
@@ -2991,6 +3001,7 @@ function varargout = emViewerGUI()
             end
         end
 
+        hideLoading();
         if loadedAny
             rebuildImageList();
             displayImage();
@@ -3130,7 +3141,7 @@ function varargout = emViewerGUI()
                             appendImage(data);
                             loadedAny = true;
                         case '.dm4'
-                            data = parser.importDM3(fp);
+                            data = parser.importDM4(fp);
                             appendImage(data);
                             loadedAny = true;
                         case '.ser'
@@ -4391,7 +4402,7 @@ function varargout = emViewerGUI()
                     msg = 'ROI Composition: ';
                     for kq = 1:numel(appData.edsElements)
                         roi = appData.edsAtomicPct{kq}(r1:r2, c1:c2);
-                        msg = [msg sprintf('%s=%.1f%% ', appData.edsElements{kq}, nanmean(roi(:)))]; %#ok<AGROW>
+                        msg = [msg sprintf('%s=%.1f%% ', appData.edsElements{kq}, mean(roi(:), 'omitnan'))]; %#ok<AGROW>
                     end
                     setStatus(msg);
             end
@@ -9745,6 +9756,26 @@ function varargout = emViewerGUI()
     % ════════════════════════════════════════════════════════════════════
     function setStatus(msg)
         lblStatusMouse.Text = msg;
+    end
+
+    function showLoading(msg)
+    %SHOWLOADING  Display a discreet loading indicator in the status bar.
+        if nargin < 1, msg = 'Loading...'; end
+        lblLoadStatus.Text = msg;
+        fig.Pointer = 'watch';
+        drawnow;
+    end
+
+    function updateLoading(current, total, fname)
+    %UPDATELOADING  Update loading progress (e.g. "Loading 2/5 file.tif").
+        lblLoadStatus.Text = sprintf('Loading %d/%d  %s', current, total, fname);
+        drawnow;
+    end
+
+    function hideLoading()
+    %HIDELOADING  Clear the loading indicator.
+        lblLoadStatus.Text = '';
+        fig.Pointer = 'arrow';
     end
 
     % ════════════════════════════════════════════════════════════════════

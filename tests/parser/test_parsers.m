@@ -373,7 +373,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 %  9. importMPMS  –  Quantum Design MPMS SQUID magnetometer
 % ════════════════════════════════════════════════════════════════════════
-MPMS_FILE = 'C:\Users\patri\Downloads\mpms_sample.dat';
+MPMS_FILE = fullfile(ROOT, '+test_datasets', 'QuantumDesign', 'MPMS_MvsH_ErBAT.dat');
 fprintf('\n══ TEST 9: parser.importMPMS ══\n');
 if ~isfile(MPMS_FILE)
     fprintf('  SKIP – MPMS_FILE not found. Update file path at top of script.\n');
@@ -413,7 +413,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 %  10. importLakeShore  –  Lake Shore magnetometer CSV/DAT
 % ════════════════════════════════════════════════════════════════════════
-LAKESHORE_FILE = 'C:\Users\patri\Downloads\lakeshore_sample.csv';
+LAKESHORE_FILE = fullfile(ROOT, '+test_datasets', 'LakeShore', 'lakeshore_sample.csv');
 fprintf('\n══ TEST 10: parser.importLakeShore ══\n');
 if ~isfile(LAKESHORE_FILE)
     fprintf('  SKIP – LAKESHORE_FILE not found. Update file path at top of script.\n');

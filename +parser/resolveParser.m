@@ -94,7 +94,7 @@ function result = resolveParser(filepath)
             result.name = 'importDM3';
 
         case '.dm4'
-            result.name = 'importDM3';
+            result.name = 'importDM4';
 
         case '.ser'
             result.name = 'importSER';
