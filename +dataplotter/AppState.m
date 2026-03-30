@@ -182,6 +182,12 @@ classdef AppState < handle
 
         % ── Undo/redo manager ─────────────────────────────────────
         undoMgr                      = []   % dataplotter.UndoManager instance
+
+        % ── Data connectors (live file reload) ────────────────────
+        dataConnectors  cell   = {}    % {1×N} scripts.dataConnector structs, indexed by dataset slot
+
+        % ── Smoothing live preview ─────────────────────────────────
+        smoothPreviewLine            = []   % line handle for dashed smooth overlay; [] when inactive
     end
 
     methods

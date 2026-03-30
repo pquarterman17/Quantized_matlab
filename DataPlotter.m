@@ -697,6 +697,9 @@ function varargout = DataPlotter()
     tbActions(end+1) = struct('id','redo',        'label',[char(8618) ' Redo'], ...
         'tooltip','Redo last undone operation  [Ctrl+Y]', ...
         'callback',@(~,~) onRedo([],[]));
+    tbActions(end+1) = struct('id','watchFile',   'label',[char(9711) ' Watch'], ...
+        'tooltip','Toggle live file watch: auto-reload and replot when the source file changes on disk', ...
+        'callback',@(~,~) onToggleWatchFile());
 
     % Build toolbar for the first time
     buildToolbar(axToolbarGL, appData.toolbarConfig, tbActions, BTN_TOOL);
@@ -845,23 +848,28 @@ function varargout = DataPlotter()
     % ── Corrections sub-panel (analysisGL col 1) ─────────────────────────
     % Corrections panel — 18-row × 4-col grid with collapsible sections:
     %   row  1  : Style dropdown + Live Preview checkbox
-    %   row  2  : [HEADER] "Offsets & Background" (collapsible, default open)
-    %   row  3  : X Offset | BG Slope
-    %   row  4  : Y Offset | BG Intercept
-    %   row  5  : BG Order | BG Interp (merged)
-    %   row  6  : Interactive tools (Fit BG / Est Y  OR  Y Translate / Peak btns)
-    %   row  7  : [HEADER] "Processing" (collapsible, default open)
-    %   row  8  : Smoothing controls
-    %   row  9  : Normalize | Derivative (merged)
-    %   row 10  : Trim X min | max
-    %   row 11  : Estimate Baseline (SNIP)
-    %   row 12  : [HEADER] "BG File Subtraction" (collapsible, default collapsed)
-    %   row 13  : BG File path + Load BG / Use Active
-    %   row 14  : Subtract BG + Clear BG
-    %   row 15  : Spin Asymmetry (neutron only, RowHeight=0 otherwise)
-    %   row 16  : Asymmetry formula (neutron only, RowHeight=0 otherwise)
-    %   row 17  : Apply Corrections | Reset | Show Raw
-    %   row 18  : Apply to All | Undo | Hide Dataset
+    %   row  2  : Advanced Analysis button
+    %   row  3  : [HEADER] "Offsets & Background" (collapsible, default open)
+    %   row  4  : X Offset | BG Slope
+    %   row  5  : Y Offset | BG Intercept
+    %   row  6  : BG Order | BG Interp (merged)
+    %   row  7  : Interactive tools (Fit BG / Est Y  OR  Y Translate / Peak btns)
+    %   row  8  : [HEADER] "Processing" (collapsible, default open)
+    %   row  9  : Smoothing controls (Smooth cb | window | method | Preview cb)
+    %   row 10  : Normalize | Derivative (merged)
+    %   row 11  : Trim X min | max
+    %   row 12  : Baseline method selector + Apply button
+    %   row 13  : Baseline method params (ALS lambda / Rolling Ball radius; hidden otherwise)
+    %   row 14  : (reserved, height=0)
+    %   row 15  : [HEADER] "BG File Subtraction" (collapsible, default collapsed)
+    %   row 16  : BG File path + Load BG / Use Active
+    %   row 17  : Subtract BG + Clear BG
+    %   row 18  : Spin Asymmetry (neutron only, RowHeight=0 otherwise)
+    %   row 19  : Asymmetry formula (neutron only, RowHeight=0 otherwise)
+    %   row 26  : Apply Corrections | Reset | Show Raw
+    %   row 27  : Apply to All | Undo | Hide Dataset
+    %   row 28  : Mask Select | Unmask All
+    %   row 29  : Redo
     corrPanel = uipanel(analysisGL,'Title','Corrections','FontSize',11, ...
         'Scrollable','on');
     corrPanel.Layout.Row = [1 2]; corrPanel.Layout.Column = 1;
@@ -870,14 +878,16 @@ function varargout = DataPlotter()
     CROW = struct( ...
         'STYLE',      1,  'ADVANCED',  2,  'SEC_OFFSETS', 3,  'XOFF',       4,  'YOFF',       5, ...
         'BGORDER',    6,  'TOOLS',     7,  'SEC_PROC',   8,  'SMOOTH',     9, ...
-        'NORM_DERIV',10,  'TRIM',     11,  'BASELINE',  12,  'SEC_BGFILE', 13, ...
-        'BGFILE',    14,  'BGSUBTR',  15,  'ASYM1',     16,  'ASYM2',     17, ...
-        'SEC_MAG',   18,  'MAG_MASS', 19,  'MAG_DIM',   20,  'MAG_THICK', 21, ...
-        'MAG_UNITS', 22,  'MAG_AUTO', 23, ...
-        'APPLY',     24,  'ACTIONS',  25,  'MASK',   26,  'REDO',  27);
+        'NORM_DERIV',10,  'TRIM',     11,  'BASELINE',  12, ...
+        'BASELINE_PARAMS', 13,  'BASELINE_APPLY', 14, ...
+        'SEC_BGFILE', 15, ...
+        'BGFILE',    16,  'BGSUBTR',  17,  'ASYM1',     18,  'ASYM2',     19, ...
+        'SEC_MAG',   20,  'MAG_MASS', 21,  'MAG_DIM',   22,  'MAG_THICK', 23, ...
+        'MAG_UNITS', 24,  'MAG_AUTO', 25, ...
+        'APPLY',     26,  'ACTIONS',  27,  'MASK',   28,  'REDO',  29);
 
-    corrGL = uigridlayout(corrPanel,[27 4], ...
-        'RowHeight',    {24, 24, 20, 22,22,22,22, 20, 22,22,22,22, 20, 0,0, 0,0, ...
+    corrGL = uigridlayout(corrPanel,[29 4], ...
+        'RowHeight',    {24, 24, 20, 22,22,22,22, 20, 22,22,22,22, 0,0, 20, 0,0, 0,0, ...
                          0,0,0,0,0,0, 24,22, 22, 22}, ...
         'ColumnWidth',  {80,'1x',80,'1x'}, ...
         'Padding',      [4 4 4 4], ...
@@ -1082,7 +1092,13 @@ function varargout = DataPlotter()
         'Tooltip', ['Moving: uniform average  |  Gaussian: bell-curve weighted  |  ' ...
                     'Savitzky-Golay: polynomial fit (preserves peak shapes)'], ...
         'ValueChangedFcn', @onSmoothingChanged);
-    ddSmoothMethod.Layout.Row = CROW.SMOOTH; ddSmoothMethod.Layout.Column = [3 4];
+    ddSmoothMethod.Layout.Row = CROW.SMOOTH; ddSmoothMethod.Layout.Column = 3;
+
+    cbSmoothPreview = uicheckbox(corrGL, 'Text', 'Preview', 'Value', false, ...
+        'Tooltip', ['Show a live dashed overlay of smoothed data on the plot without modifying ' ...
+                    'the dataset. Uncheck or click Apply to remove the overlay.'], ...
+        'ValueChangedFcn', @onSmoothPreviewToggled);
+    cbSmoothPreview.Layout.Row = CROW.SMOOTH; cbSmoothPreview.Layout.Column = 4;
 
     % Row 9: Normalize (cols 1-2) | Derivative (cols 3-4) — merged from old rows 13+19
     lblNormalize = uilabel(corrGL,'Text','Norm:','HorizontalAlignment','right');
@@ -1121,14 +1137,52 @@ function varargout = DataPlotter()
         'ValueChangedFcn', @(~,~) markCorrectionsDirty());
     efXTrimMax.Layout.Row = CROW.TRIM; efXTrimMax.Layout.Column = [3 4];
 
-    % Row 11: Baseline estimation button
-    btnEstimateBaseline = uibutton(corrGL,'Text','Estimate Baseline (SNIP)', ...
-        'ButtonPushedFcn', @onEstimateBaseline, ...
-        'Tooltip', 'Estimate and subtract baseline using the SNIP peak-clipping algorithm (ideal for XRD data)', ...
-        'FontSize', 9);
-    btnEstimateBaseline.Layout.Row = CROW.BASELINE; btnEstimateBaseline.Layout.Column = [1 4];
+    % Row 11: Baseline method selector
+    lblBaselineMethod = uilabel(corrGL, 'Text', 'Baseline:', 'HorizontalAlignment', 'right');
+    lblBaselineMethod.Layout.Row = CROW.BASELINE; lblBaselineMethod.Layout.Column = 1;
 
-    % Row 12: Section header — BG File Subtraction (collapsed by default, uibutton)
+    ddBaselineMethod = uidropdown(corrGL, ...
+        'Items',   {'SNIP', 'ALS', 'Rolling Ball', 'Mod. Polynomial'}, ...
+        'Value',   'SNIP', ...
+        'Tooltip', ['SNIP: peak-clipping (best for XRD)  |  ALS: asymmetric least squares ' ...
+                    '(Raman, EELS)  |  Rolling Ball: morphological lower envelope  |  ' ...
+                    'Mod. Polynomial: iterative polynomial fit (fluorescence removal)'], ...
+        'ValueChangedFcn', @onBaselineMethodChanged);
+    ddBaselineMethod.Layout.Row = CROW.BASELINE; ddBaselineMethod.Layout.Column = [2 3];
+
+    btnEstimateBaseline = uibutton(corrGL, 'Text', 'Apply', ...
+        'ButtonPushedFcn', @onEstimateBaseline, ...
+        'Tooltip', 'Estimate and subtract baseline using the selected method', ...
+        'FontSize', 9);
+    btnEstimateBaseline.Layout.Row = CROW.BASELINE; btnEstimateBaseline.Layout.Column = 4;
+
+    % Row 12: Baseline method-specific parameters (ALS lambda / Rolling Ball radius)
+    lblBaselineLambda = uilabel(corrGL, 'Text', [char(955) ' (ALS):'], 'HorizontalAlignment', 'right', ...
+        'Tooltip', 'ALS smoothness penalty (default 1e6 — larger = smoother baseline)');
+    lblBaselineLambda.Layout.Row = CROW.BASELINE_PARAMS; lblBaselineLambda.Layout.Column = 1;
+
+    efBaselineLambda = uieditfield(corrGL, 'numeric', 'Value', 1e6, ...
+        'Limits', [1 Inf], 'LowerLimitInclusive', 'on', ...
+        'Tooltip', 'ALS lambda: smoothness penalty (1e4–1e9 typical; default 1e6)', ...
+        'ValueChangedFcn', @(~,~) []);
+    efBaselineLambda.Layout.Row = CROW.BASELINE_PARAMS; efBaselineLambda.Layout.Column = 2;
+
+    lblBaselineRadius = uilabel(corrGL, 'Text', 'Radius:', 'HorizontalAlignment', 'right', ...
+        'Tooltip', 'Rolling Ball radius in data points (default 100)');
+    lblBaselineRadius.Layout.Row = CROW.BASELINE_PARAMS; lblBaselineRadius.Layout.Column = 3;
+
+    efBaselineRadius = uieditfield(corrGL, 'numeric', 'Value', 100, ...
+        'Limits', [1 Inf], 'LowerLimitInclusive', 'on', ...
+        'RoundFractionalValues', 'on', ...
+        'Tooltip', 'Rolling Ball radius in data points (default 100; larger = smoother)', ...
+        'ValueChangedFcn', @(~,~) []);
+    efBaselineRadius.Layout.Row = CROW.BASELINE_PARAMS; efBaselineRadius.Layout.Column = 4;
+
+    % BASELINE_PARAMS row is hidden by default (RowHeight=0 in corrGL initialiser).
+    % onBaselineMethodChanged sets it to 22 for ALS and Rolling Ball, and back to 0
+    % for SNIP and Mod. Polynomial which need no extra spinners.
+
+    % Row 15: Section header — BG File Subtraction (collapsed by default, uibutton)
     lblSecBGFile = uibutton(corrGL, 'Text', [char(9654) ' BG File Subtraction'], ...
         'FontSize', 9, 'FontWeight', 'bold', 'FontColor', [0.55 0.55 0.55], ...
         'BackgroundColor', corrGL.BackgroundColor, ...
@@ -3515,7 +3569,7 @@ function varargout = DataPlotter()
                 % Re-enable controls for non-neutron case
                 for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
                           btnApply, btnReset, btnApplyAll, btnUndo, ...
-                          cbSmooth, efSmoothWin, ddSmoothMethod, ...
+                          cbSmooth, efSmoothWin, ddSmoothMethod, cbSmoothPreview, ...
                           efXTrimMin, efXTrimMax, ddNormalize}
                     hh{1}.Enable = 'on'; %#ok<FXSET>
                 end
@@ -3553,7 +3607,7 @@ function varargout = DataPlotter()
                 % Re-enable controls for magnetometry data
                 for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
                           btnApply, btnReset, btnApplyAll, btnUndo, ...
-                          cbSmooth, efSmoothWin, ddSmoothMethod, ...
+                          cbSmooth, efSmoothWin, ddSmoothMethod, cbSmoothPreview, ...
                           efXTrimMin, efXTrimMax, ddNormalize}
                     hh{1}.Enable = 'on'; %#ok<FXSET>
                 end
@@ -3604,7 +3658,7 @@ function varargout = DataPlotter()
                           efXTrimMin, efXTrimMax, ddNormalize}
                     hh{1}.Enable = 'on'; %#ok<FXSET>
                 end
-                for hh = {efBGSlope, efBGIntercept, cbSmooth, efSmoothWin, ddSmoothMethod}
+                for hh = {efBGSlope, efBGIntercept, cbSmooth, efSmoothWin, ddSmoothMethod, cbSmoothPreview}
                     hh{1}.Enable = 'off'; %#ok<FXSET>
                 end
                 lblBGSlope.Text = 'BG Slope:';
@@ -3638,7 +3692,7 @@ function varargout = DataPlotter()
                 lblBGSlope.Text       = 'BG Slope:';
                 lblBGInt.Text         = 'BG Intercept:';
                 for hh = {efXOffset, efYOffset, btnApply, btnReset, btnApplyAll, btnUndo, ...
-                          cbSmooth, efSmoothWin, ddSmoothMethod, ...
+                          cbSmooth, efSmoothWin, ddSmoothMethod, cbSmoothPreview, ...
                           efXTrimMin, efXTrimMax, ddNormalize}
                     hh{1}.Enable = 'on'; %#ok<FXSET>
                 end
@@ -3666,7 +3720,7 @@ function varargout = DataPlotter()
                 % Re-enable controls for non-neutron case
                 for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
                           btnApply, btnReset, btnApplyAll, btnUndo, ...
-                          cbSmooth, efSmoothWin, ddSmoothMethod, ...
+                          cbSmooth, efSmoothWin, ddSmoothMethod, cbSmoothPreview, ...
                           efXTrimMin, efXTrimMax, ddNormalize}
                     hh{1}.Enable = 'on'; %#ok<FXSET>
                 end
@@ -3714,7 +3768,7 @@ function varargout = DataPlotter()
             % Disable all corrections — not meaningful for raw 2D maps
             for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
                       btnApply, btnReset, btnApplyAll, btnUndo, ...
-                      cbSmooth, efSmoothWin, ddSmoothMethod, ...
+                      cbSmooth, efSmoothWin, ddSmoothMethod, cbSmoothPreview, ...
                       efXTrimMin, efXTrimMax, ddNormalize}
                 hh{1}.Enable = 'off'; %#ok<FXSET>
             end
@@ -6767,9 +6821,143 @@ function varargout = DataPlotter()
 
     function onSmoothingChanged(~,~)
     %ONSMOOTHINGCHANGED  Re-apply corrections whenever smoothing controls change.
+    %   Also refreshes the smooth preview overlay when it is active.
         if ~isempty(appData.datasets) && appData.activeIdx >= 1
-            onApplyCorrections([],[]);
+            if isvalid(cbSmoothPreview) && cbSmoothPreview.Value
+                updateSmoothPreview();
+            else
+                onApplyCorrections([],[]);
+            end
         end
+    end
+
+    function onSmoothPreviewToggled(~,~)
+    %ONSMOOTHPREVIEWTOGGLED  Show or remove the smoothing live preview overlay.
+    %   When checked: compute smoothed Y on the active dataset and draw a dashed
+    %   line on the axes without modifying any dataset.  When unchecked: delete
+    %   the overlay line.
+        clearSmoothPreview();
+        if cbSmoothPreview.Value
+            updateSmoothPreview();
+        end
+    end
+
+    function updateSmoothPreview()
+    %UPDATESMOOTHPREVIEW  Recompute and redraw the dashed smooth preview line.
+        clearSmoothPreview();
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        if ~cbSmooth.Value, return; end
+
+        ds = appData.datasets{appData.activeIdx};
+        d  = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
+        if isempty(d) || isempty(d.values), return; end
+
+        xVec = double(d.time);
+        yVec = d.values(:, 1);  % preview on first Y column only
+
+        win  = max(1, round(efSmoothWin.Value));
+        % Map GUI dropdown labels to smoothData 'Method' values (lowercase)
+        methMap = containers.Map( ...
+            {'Moving','Gaussian','Savitzky-Golay'}, ...
+            {'moving','gaussian','savitzky-golay'});
+        methKey = ddSmoothMethod.Value;
+        if isKey(methMap, methKey)
+            methVal = methMap(methKey);
+        else
+            methVal = 'moving';
+        end
+        try
+            ySmooth = utilities.smoothData(yVec, 'Method', methVal, 'Window', win);
+        catch
+            return;  % silently skip if smoothData fails (e.g. insufficient data)
+        end
+
+        hold(ax, 'on');
+        appData.smoothPreviewLine = plot(ax, xVec, ySmooth, ...
+            '--', 'Color', [0.2 0.7 1.0], 'LineWidth', 1.5, ...
+            'Tag', 'GUISmoothPreview', 'HandleVisibility', 'off');
+        hold(ax, 'off');
+    end
+
+    function clearSmoothPreview()
+    %CLEARSMOOTHPREVIEW  Delete the smooth preview overlay line if it exists.
+        delete(findall(ax, 'Tag', 'GUISmoothPreview'));
+        appData.smoothPreviewLine = [];
+    end
+
+    function onBaselineMethodChanged(~,~)
+    %ONBASELINEMETHODCHANGED  Show/hide ALS lambda and Rolling Ball radius spinners.
+        meth = ddBaselineMethod.Value;
+        switch meth
+            case 'ALS'
+                corrGL.RowHeight{CROW.BASELINE_PARAMS} = 22;
+                lblBaselineLambda.Visible = 'on';
+                efBaselineLambda.Visible  = 'on';
+                lblBaselineRadius.Visible = 'off';
+                efBaselineRadius.Visible  = 'off';
+            case 'Rolling Ball'
+                corrGL.RowHeight{CROW.BASELINE_PARAMS} = 22;
+                lblBaselineLambda.Visible = 'off';
+                efBaselineLambda.Visible  = 'off';
+                lblBaselineRadius.Visible = 'on';
+                efBaselineRadius.Visible  = 'on';
+            otherwise  % 'SNIP', 'Mod. Polynomial' — no extra params
+                corrGL.RowHeight{CROW.BASELINE_PARAMS} = 0;
+        end
+    end
+
+    function onToggleWatchFile()
+    %ONTOGGLEWATCHFILE  Start or stop live file watching on the active dataset.
+    %   Creates a scripts.dataConnector that polls the source file and calls
+    %   onFileChanged when a modification is detected.  The connector is stored
+    %   in appData.dataConnectors{activeIdx}.  A second toggle stops and clears
+    %   the watcher for that slot.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig, 'Load a file first.', 'Watch File');
+            return;
+        end
+
+        idx = appData.activeIdx;
+        ds  = appData.datasets{idx};
+
+        % Ensure connector cell is large enough
+        while numel(appData.dataConnectors) < idx
+            appData.dataConnectors{end+1} = [];
+        end
+
+        existing = appData.dataConnectors{idx};
+        if ~isempty(existing) && isstruct(existing) && existing.isRunning()
+            % Already watching — stop it
+            existing.stop();
+            appData.dataConnectors{idx} = [];
+            setStatus(sprintf('File watch stopped for: %s', ds.filepath));
+            return;
+        end
+
+        if ~isfile(ds.filepath)
+            uialert(fig, sprintf('Cannot watch: file not found.\n%s', ds.filepath), 'Watch File');
+            return;
+        end
+
+        connector = scripts.dataConnector(ds.filepath, ...
+            Callback=@(newData) onFileChanged(idx, newData));
+        appData.dataConnectors{idx} = connector;
+        setStatus(sprintf('Watching: %s', ds.filepath));
+    end
+
+    function onFileChanged(dsIdx, newData)
+    %ONFILECHANGED  Called by dataConnector when the watched file changes.
+    %   Replaces the dataset's raw data, clears corrData, and replots.
+        if dsIdx < 1 || dsIdx > numel(appData.datasets), return; end
+        ds = appData.datasets{dsIdx};
+        ds.data     = newData;
+        ds.corrData = [];  % stale corrections discarded — user must re-apply
+        appData.datasets{dsIdx} = ds;
+        rebuildDatasetList(false);
+        if appData.activeIdx == dsIdx
+            onPlot([], []);
+        end
+        setStatus(sprintf('Reloaded: %s', ds.filepath));
     end
 
     % ── Annotation tool ───────────────────────────────────────────────────
@@ -8419,6 +8607,8 @@ function varargout = DataPlotter()
             delete(findall(targetAx, 'Tag', 'GUIFringeSpan'));
             delete(findall(targetAx, 'Tag', 'GUIPhaseTickMark'));
             delete(findall(targetAx, 'Tag', 'GUIPhaseLabel'));
+            delete(findall(targetAx, 'Tag', 'GUISmoothPreview'));
+            appData.smoothPreviewLine = [];
             delete(targetAx.Children);
             cla(targetAx);
             appData.map2DHandle = [];  % clear stale handle after cla
@@ -10705,6 +10895,14 @@ function varargout = DataPlotter()
             end
             appData.autoRecalcTimer = [];
         end
+        % Stop all live file-watch connectors
+        for ci = 1:numel(appData.dataConnectors)
+            conn = appData.dataConnectors{ci};
+            if ~isempty(conn) && isstruct(conn) && isfield(conn, 'stop')
+                try; conn.stop(); catch; end
+            end
+        end
+        appData.dataConnectors = {};
         % Close the peak analysis window if it exists
         if isvalid(peakFig), delete(peakFig); end
         delete(fig);
@@ -11812,40 +12010,87 @@ function varargout = DataPlotter()
     end
 
     function onEstimateBaseline(~,~)
-    %ONESTIMATEBASELINE  Estimate and subtract baseline via SNIP algorithm (#5).
-    %  Uses utilities.estimateBackground (peak-clipping) to compute a baseline,
-    %  then subtracts it from all Y channels. The baseline is stored as a new
-    %  dataset for visual comparison. Works best on XRD data with sharp peaks.
+    %ONESTIMATEBASELINE  Estimate and subtract baseline via the selected method.
+    %   Dispatches to SNIP (estimateBackground), ALS, Rolling Ball, or Mod.
+    %   Polynomial based on ddBaselineMethod.  The baseline is subtracted from
+    %   all Y columns and stored as corrected data.  The raw baseline is also
+    %   appended as a new dataset for visual comparison.
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig,'Load a file first.','No data'); return;
         end
         ds = appData.datasets{appData.activeIdx};
-        d = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
+        d  = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
         if isdatetime(d.time)
             uialert(fig,'Baseline estimation requires numeric x-axes.','Error'); return;
         end
-        % Ask for max window parameter
-        answer = inputdlg({'Max window (x-axis units):', 'Smooth passes:'}, ...
-            'SNIP Baseline Estimation', [1 40], {'2.0', '3'});
-        if isempty(answer), return; end
-        maxWin = str2double(answer{1});
-        smoothP = round(str2double(answer{2}));
-        if isnan(maxWin) || isnan(smoothP) || maxWin <= 0
-            uialert(fig,'Invalid parameters.','Error'); return;
-        end
-        xVec = double(d.time);
+
+        meth = ddBaselineMethod.Value;
         bgAll = zeros(size(d.values));
-        for k = 1:size(d.values, 2)
-            bgAll(:, k) = utilities.estimateBackground(xVec, d.values(:, k), ...
-                'MaxWindowDeg', maxWin, 'SmoothPasses', smoothP);
+        statusMsg = '';
+
+        switch meth
+            case 'SNIP'
+                % ── SNIP (peak-clipping) ──────────────────────────────
+                answer = inputdlg({'Max window (x-axis units):', 'Smooth passes:'}, ...
+                    'SNIP Baseline Estimation', [1 40], {'2.0', '3'});
+                if isempty(answer), return; end
+                maxWin  = str2double(answer{1});
+                smoothP = round(str2double(answer{2}));
+                if isnan(maxWin) || isnan(smoothP) || maxWin <= 0
+                    uialert(fig,'Invalid parameters.','Error'); return;
+                end
+                xVec = double(d.time);
+                for k = 1:size(d.values, 2)
+                    bgAll(:, k) = utilities.estimateBackground(xVec, d.values(:, k), ...
+                        'MaxWindowDeg', maxWin, 'SmoothPasses', smoothP);
+                end
+                statusMsg = sprintf('Baseline subtracted (SNIP, window=%.1f).', maxWin);
+
+            case 'ALS'
+                % ── Asymmetric Least Squares ──────────────────────────
+                lambda = efBaselineLambda.Value;
+                for k = 1:size(d.values, 2)
+                    bgAll(:, k) = utilities.baselineALS(d.values(:, k), 'Lambda', lambda);
+                end
+                statusMsg = sprintf('Baseline subtracted (ALS, lambda=%.3g).', lambda);
+
+            case 'Rolling Ball'
+                % ── Rolling Ball ──────────────────────────────────────
+                radius = round(efBaselineRadius.Value);
+                for k = 1:size(d.values, 2)
+                    bgAll(:, k) = utilities.baselineRollingBall(d.values(:, k), 'Radius', radius);
+                end
+                statusMsg = sprintf('Baseline subtracted (Rolling Ball, radius=%d pts).', radius);
+
+            case 'Mod. Polynomial'
+                % ── Modified Polynomial (Lieber & Mahadevan-Jansen) ───
+                answer = inputdlg({'Polynomial order:', 'Max iterations:'}, ...
+                    'Mod. Polynomial Baseline', [1 40], {'5', '100'});
+                if isempty(answer), return; end
+                polyOrd  = round(str2double(answer{1}));
+                maxIter  = round(str2double(answer{2}));
+                if isnan(polyOrd) || isnan(maxIter) || polyOrd < 1
+                    uialert(fig,'Invalid parameters.','Error'); return;
+                end
+                for k = 1:size(d.values, 2)
+                    bgAll(:, k) = utilities.baselineModPoly(d.values(:, k), ...
+                        'Order', polyOrd, 'MaxIter', maxIter);
+                end
+                statusMsg = sprintf('Baseline subtracted (Mod. Poly, order=%d).', polyOrd);
+
+            otherwise
+                uialert(fig, sprintf('Unknown baseline method: %s', meth), 'Error');
+                return;
         end
-        % Subtract baseline and store as corrected data
+
+        % ── Subtract baseline and store as corrected data ─────────────────
         if isempty(ds.corrData)
             ds.corrData = d;
         end
         ds.corrData.values = d.values - bgAll;
         appData.datasets{appData.activeIdx} = ds;
-        % Also add the baseline as a separate dataset for visual comparison
+
+        % ── Add raw baseline as a separate dataset for visual comparison ──
         bgData = d;
         bgData.values = bgAll;
         bgData.labels = cellfun(@(lbl) ['BG: ' lbl], d.labels, 'UniformOutput', false);
@@ -11856,7 +12101,7 @@ function varargout = DataPlotter()
         appData.datasets{end+1} = dsNew;
         rebuildDatasetList(true);
         onPlot([],[]);
-        setStatus(sprintf('Baseline subtracted (SNIP, window=%.1f).', maxWin));
+        setStatus(statusMsg);
     end
 
     function onResampleDataset(~,~)
