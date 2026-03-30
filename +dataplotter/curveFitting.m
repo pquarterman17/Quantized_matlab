@@ -222,8 +222,8 @@ tblCFParams = uitable(cfRootGL, ...
 tblCFParams.Layout.Row = 4;
 
 % ── Row 5: Stats label + action buttons ──────────────────────────────
-cfBottomGL = uigridlayout(cfRootGL, [1 4], ...
-    'ColumnWidth', {'2x', 85, 65, 65}, ...
+cfBottomGL = uigridlayout(cfRootGL, [1 9], ...
+    'ColumnWidth', {'2x', 75, 60, 85, 80, 65, 95, 80, 65}, ...
     'Padding', [0 0 0 0], 'ColumnSpacing', 6);
 cfBottomGL.Layout.Row = 5;
 
@@ -232,15 +232,43 @@ lblCFStats = uilabel(cfBottomGL, 'Text', '', ...
     'Interpreter', 'html');
 lblCFStats.Layout.Column = 1;
 
+% Confidence bands controls
+cbShowBands = uicheckbox(cfBottomGL, 'Text', 'Show Bands', ...
+    'FontSize', 9, ...
+    'Tooltip', 'Overlay confidence and prediction bands on the fit curve', ...
+    'Value', false, ...
+    'ValueChangedFcn', @(~,~) onShowBandsChanged());
+cbShowBands.Layout.Column = 2;
+
+ddCFBandLevel = uidropdown(cfBottomGL, ...
+    'Items', {'90%', '95%', '99%'}, ...
+    'Value', '95%', 'FontSize', 9, ...
+    'Tooltip', 'Confidence level for CI and PI bands', ...
+    'ValueChangedFcn', @(~,~) onShowBandsChanged());
+ddCFBandLevel.Layout.Column = 3;
+
 uibutton(cfBottomGL, 'Text', 'Plot on Main', ...
     'BackgroundColor', BTN_PRIMARY, 'FontColor', [1 1 1], ...
     'FontSize', 9, ...
     'Tooltip', 'Overlay fit curve on the main DataPlotter axes', ...
     'ButtonPushedFcn', @(~,~) onCFPlotOnMain());
+uibutton(cfBottomGL, 'Text', 'Diagnostics', ...
+    'FontSize', 9, ...
+    'Tooltip', 'Open residual diagnostics window (Q-Q, runs, DW, summary)', ...
+    'ButtonPushedFcn', @(~,~) onCFDiagnostics());
 uibutton(cfBottomGL, 'Text', 'Copy', ...
     'FontSize', 9, ...
     'Tooltip', 'Copy fit results to clipboard', ...
     'ButtonPushedFcn', @(~,~) onCFCopyResults());
+uibutton(cfBottomGL, 'Text', 'Compare Models', ...
+    'FontSize', 9, ...
+    'Tooltip', 'Show table comparing up to 5 stored fit results (AIC, BIC, adj-R², F-test)', ...
+    'ButtonPushedFcn', @(~,~) onCompareModels());
+uibutton(cfBottomGL, 'Text', 'Global Fit', ...
+    'BackgroundColor', [0.10 0.35 0.55], 'FontColor', [1 1 1], ...
+    'FontSize', 9, ...
+    'Tooltip', 'Fit the same model to multiple datasets with shared parameter constraints', ...
+    'ButtonPushedFcn', @(~,~) onGlobalFit());
 uibutton(cfBottomGL, 'Text', 'Close', ...
     'FontSize', 9, ...
     'ButtonPushedFcn', @(~,~) delete(cfFig));
@@ -254,7 +282,12 @@ lblCFStats2.Layout.Row = 6;
 % State for fit results
 cfResult = struct('params', [], 'errors', [], 'model', '', ...
     'xFit', [], 'yFit', [], 'R2', NaN, 'RMSE', NaN, ...
-    'chiSqRed', NaN, 'AIC', NaN, 'paramNames', {{}});
+    'chiSqRed', NaN, 'AIC', NaN, 'paramNames', {{}}, 'residuals', [], ...
+    'covar', [], 'nPoints', 0, 'nFree', 0, 'modelFcn', [], ...
+    'bands', []);  % bands struct from fitting.fitBands (empty until computed)
+
+% History for model comparison (stores last 5 fit snapshots)
+cfHistory = {};   % cell array of structs; newest at end
 
 % Initialise parameter table for the default model
 onCFModelChanged();
@@ -506,6 +539,12 @@ onCFModelChanged();
             cfResult.chiSqRed   = res.chiSqRed;
             cfResult.AIC        = res.AIC;
             cfResult.paramNames = pNames;
+            cfResult.residuals  = res.residuals;
+            cfResult.covar      = res.covar;
+            cfResult.nPoints    = res.nPoints;
+            cfResult.nFree      = res.nFree;
+            cfResult.modelFcn   = fcn;
+            cfResult.bands      = [];  % cleared; recomputed by onShowBandsChanged
 
             % Update parameter table with fitted values and errors
             for pi = 1:numel(pNames)
@@ -517,16 +556,11 @@ onCFModelChanged();
                 end
             end
 
-            % Plot fit
-            cla(cfAxFit);
-            plot(cfAxFit, xSeg, ySeg, 'k.', 'MarkerSize', 4);
-            hold(cfAxFit, 'on');
-            plot(cfAxFit, xFit, yFit, 'r-', 'LineWidth', 1.5);
-            hold(cfAxFit, 'off');
-            legend(cfAxFit, {'Data', 'Fit'}, 'Location', 'best');
-            title(cfAxFit, sprintf('%s  (R%s = %.6f)', ...
-                cfResult.model, char(178), res.R2));
-            cfAxFit.Box = 'on'; grid(cfAxFit, 'on');
+            % Plot fit (bands rendered separately via onShowBandsChanged)
+            renderFitAxes(xSeg, ySeg, xFit, yFit, []);
+            if cbShowBands.Value
+                onShowBandsChanged();
+            end
 
             % Plot residuals
             cla(cfAxRes);
@@ -537,14 +571,36 @@ onCFModelChanged();
             title(cfAxRes, sprintf('Residuals (RMSE = %.4g)', res.RMSE));
             cfAxRes.Box = 'on'; grid(cfAxRes, 'on');
 
+            % Durbin-Watson for inline stats
+            dwVal = sum(diff(res.residuals).^2) / max(sum(res.residuals.^2), eps);
+
+            % Extended comparison metrics
+            cmpM = fitting.fitCompare(ySeg, res.residuals, res.nFree);
+
             % Stats labels
             lblCFStats.Text = sprintf( ...
-                'R%s = <b>%.6f</b> &nbsp; RMSE = %.4g &nbsp; N = %d', ...
-                char(178), res.R2, res.RMSE, res.nPoints);
+                'R%s = <b>%.6f</b> &nbsp; adj-R%s = %.6f &nbsp; RMSE = %.4g &nbsp; DW = %.3f &nbsp; N = %d', ...
+                char(178), res.R2, char(178), cmpM.adjR2, res.RMSE, dwVal, res.nPoints);
             lblCFStats2.Text = sprintf( ...
-                '%s%s = %.4g &nbsp; AIC = %.1f &nbsp; Free = %d/%d &nbsp; Exit = %d', ...
-                char(967), char(178), res.chiSqRed, res.AIC, ...
+                '%s%s = %.4g &nbsp; AIC = %.1f &nbsp; AICc = %.1f &nbsp; BIC = %.1f &nbsp; Free = %d/%d &nbsp; Exit = %d', ...
+                char(967), char(178), res.chiSqRed, cmpM.aic, cmpM.aicc, cmpM.bic, ...
                 res.nFree, numel(pNames), res.exitFlag);
+
+            % Push snapshot to history (keep last 5)
+            snap.model    = ddCFModel.Value;
+            snap.R2       = res.R2;
+            snap.adjR2    = cmpM.adjR2;
+            snap.aic      = cmpM.aic;
+            snap.aicc     = cmpM.aicc;
+            snap.bic      = cmpM.bic;
+            snap.rmse     = res.RMSE;
+            snap.nParams  = res.nFree;
+            snap.nPoints  = res.nPoints;
+            snap.residuals = res.residuals;
+            cfHistory{end+1} = snap;
+            if numel(cfHistory) > 5
+                cfHistory = cfHistory(end-4:end);  % keep newest 5
+            end
 
             cfFig.Pointer = 'arrow';
             options.StatusFcn(sprintf('Fit: %s  R%s=%.6f', ...
@@ -555,10 +611,98 @@ onCFModelChanged();
         end
     end
 
+    function renderFitAxes(xSeg, ySeg, xFit, yFit, bands)
+    %RENDERFITAXES  Draw data + fit curve (+ optional bands) on cfAxFit.
+        cla(cfAxFit);
+        hold(cfAxFit, 'on');
+
+        % CI band (darker shade)
+        if ~isempty(bands) && ~all(isnan(bands.ciLo))
+            xPatch = [xFit; flipud(xFit)];
+            yPatch = [bands.ciLo; flipud(bands.ciHi)];
+            fill(cfAxFit, xPatch, yPatch, [0.2 0.5 0.9], ...
+                'FaceAlpha', 0.25, 'EdgeColor', 'none', ...
+                'DisplayName', sprintf('%.0f%% CI', bands.level*100), ...
+                'HandleVisibility', 'on');
+        end
+
+        % PI band (lighter shade)
+        if ~isempty(bands) && ~all(isnan(bands.piLo))
+            xPatch = [xFit; flipud(xFit)];
+            yPatch = [bands.piLo; flipud(bands.piHi)];
+            fill(cfAxFit, xPatch, yPatch, [0.6 0.8 1.0], ...
+                'FaceAlpha', 0.18, 'EdgeColor', 'none', ...
+                'DisplayName', sprintf('%.0f%% PI', bands.level*100), ...
+                'HandleVisibility', 'on');
+        end
+
+        plot(cfAxFit, xSeg, ySeg, 'k.', 'MarkerSize', 4, ...
+            'DisplayName', 'Data', 'HandleVisibility', 'on');
+        plot(cfAxFit, xFit, yFit, 'r-', 'LineWidth', 1.5, ...
+            'DisplayName', 'Fit', 'HandleVisibility', 'on');
+
+        hold(cfAxFit, 'off');
+        legend(cfAxFit, 'Location', 'best');
+        title(cfAxFit, sprintf('%s  (R%s = %.6f)', ...
+            cfResult.model, char(178), cfResult.R2));
+        cfAxFit.Box = 'on'; grid(cfAxFit, 'on');
+    end
+
+    function onShowBandsChanged()
+    %ONSHOWBANDSCHANGED  Recompute and render bands when checkbox or level changes.
+        if isempty(cfResult.xFit), return; end
+
+        [xSeg, ySeg] = getDataSegment();
+        bands = [];
+
+        if cbShowBands.Value && ~isempty(cfResult.covar) && cfResult.nFree > 0
+            levelStr = ddCFBandLevel.Value;
+            switch levelStr
+                case '90%', level = 0.90;
+                case '99%', level = 0.99;
+                otherwise,  level = 0.95;
+            end
+            try
+                bands = fitting.fitBands(cfResult.xFit, cfResult.modelFcn, ...
+                    cfResult.params(:), cfResult.covar, ...
+                    cfResult.nPoints, cfResult.nFree, Level=level);
+                cfResult.bands = bands;
+            catch ME
+                options.StatusFcn(sprintf('Bands failed: %s', ME.message));
+                cfResult.bands = [];
+            end
+        else
+            cfResult.bands = [];
+        end
+
+        renderFitAxes(xSeg, ySeg, cfResult.xFit, cfResult.yFit, cfResult.bands);
+    end
+
     function onCFPlotOnMain()
-    %ONCFPLOTONMAIN  Overlay the fit curve on the main DataPlotter axes.
+    %ONCFPLOTONMAIN  Overlay the fit curve (and optional bands) on the main axes.
         if isempty(cfResult.xFit), return; end
         hold(mainAx, 'on');
+
+        % CI band on main axes
+        if ~isempty(cfResult.bands) && ~all(isnan(cfResult.bands.ciLo))
+            xPatch = [cfResult.xFit; flipud(cfResult.xFit)];
+            fill(mainAx, xPatch, ...
+                [cfResult.bands.ciLo; flipud(cfResult.bands.ciHi)], ...
+                [0.2 0.5 0.9], 'FaceAlpha', 0.22, 'EdgeColor', 'none', ...
+                'DisplayName', sprintf('%.0f%% CI', cfResult.bands.level*100), ...
+                'HandleVisibility', 'on', 'Tag', 'curveFitBandCI');
+        end
+
+        % PI band on main axes
+        if ~isempty(cfResult.bands) && ~all(isnan(cfResult.bands.piLo))
+            xPatch = [cfResult.xFit; flipud(cfResult.xFit)];
+            fill(mainAx, xPatch, ...
+                [cfResult.bands.piLo; flipud(cfResult.bands.piHi)], ...
+                [0.6 0.8 1.0], 'FaceAlpha', 0.15, 'EdgeColor', 'none', ...
+                'DisplayName', sprintf('%.0f%% PI', cfResult.bands.level*100), ...
+                'HandleVisibility', 'on', 'Tag', 'curveFitBandPI');
+        end
+
         plot(mainAx, cfResult.xFit, cfResult.yFit, 'r-', 'LineWidth', 1.5, ...
             'DisplayName', sprintf('%s fit (R%s=%.4f)', ...
                 cfResult.model, char(178), cfResult.R2), ...
@@ -573,6 +717,83 @@ onCFModelChanged();
             'HandleVisibility', 'off', 'Tag', 'curveFitLabel');
         options.StatusFcn(sprintf('Fit overlaid: %s (R%s=%.6f)', ...
             cfResult.model, char(178), cfResult.R2));
+    end
+
+    function onCFDiagnostics()
+    %ONCFDIAGNOSTICS  Open residual diagnostics window for the last fit.
+        if isempty(cfResult.residuals)
+            uialert(cfFig, 'Run a fit first.', 'Diagnostics');
+            return
+        end
+
+        d = fitting.residualDiagnostics(cfResult.residuals);
+
+        diagFig = figure('Name', sprintf('Residual Diagnostics — %s', cfResult.model), ...
+            'NumberTitle', 'off', 'Color', [1 1 1], ...
+            'Position', [250 120 820 600]);
+
+        % ── Subplot 1: Q-Q plot ──────────────────────────────────────
+        ax1 = subplot(2, 2, 1, 'Parent', diagFig);
+        plot(ax1, d.qqX, d.qqY, 'b.', 'MarkerSize', 5);
+        hold(ax1, 'on');
+        qlim = [min(d.qqX) max(d.qqX)];
+        plot(ax1, qlim, qlim, 'r--', 'LineWidth', 1.2);
+        hold(ax1, 'off');
+        xlabel(ax1, 'Theoretical Quantiles');
+        ylabel(ax1, 'Sample Quantiles');
+        title(ax1, 'Normal Q-Q Plot');
+        grid(ax1, 'on'); box(ax1, 'on');
+
+        % ── Subplot 2: Residuals vs X (data-point order) ────────────
+        ax2 = subplot(2, 2, 2, 'Parent', diagFig);
+        [xSeg, ~] = getDataSegment();
+        plot(ax2, xSeg, cfResult.residuals, 'b.', 'MarkerSize', 5);
+        hold(ax2, 'on');
+        yline(ax2, 0, 'r--');
+        hold(ax2, 'off');
+        xlabel(ax2, 'X (data points)');
+        ylabel(ax2, 'Residual');
+        title(ax2, sprintf('Residuals vs X  (RMSE = %.4g)', cfResult.RMSE));
+        grid(ax2, 'on'); box(ax2, 'on');
+
+        % ── Subplot 3: Residuals vs order, runs colour-coded ─────────
+        ax3 = subplot(2, 2, 3, 'Parent', diagFig);
+        r = cfResult.residuals;
+        nR = numel(r);
+        hold(ax3, 'on');
+        % Compute run membership
+        signs = r >= 0;
+        runId = cumsum([true; signs(1:end-1) ~= signs(2:end)]);
+        isOdd = mod(runId, 2) == 1;
+        % Plot positive/negative runs in alternating colours
+        plot(ax3, find(isOdd),  r(isOdd),  'b.', 'MarkerSize', 6);
+        plot(ax3, find(~isOdd), r(~isOdd), 'm.', 'MarkerSize', 6);
+        yline(ax3, 0, 'k--');
+        hold(ax3, 'off');
+        xlabel(ax3, 'Observation Order');
+        ylabel(ax3, 'Residual');
+        if isnan(d.runsTestP)
+            runTitle = sprintf('Residuals vs Order  (nRuns = %d)', d.nRuns);
+        else
+            runTitle = sprintf('Residuals vs Order  (nRuns = %d, p = %.3f)', ...
+                d.nRuns, d.runsTestP);
+        end
+        title(ax3, runTitle);
+        legend(ax3, {'Run (odd)', 'Run (even)'}, 'Location', 'best', 'FontSize', 7);
+        grid(ax3, 'on'); box(ax3, 'on');
+
+        % ── Subplot 4: Text summary ──────────────────────────────────
+        ax4 = subplot(2, 2, 4, 'Parent', diagFig);
+        axis(ax4, 'off');
+        summaryLines = strsplit(d.summary, newline);
+        nLines = numel(summaryLines);
+        yStep  = 0.9 / max(nLines, 1);
+        for li = 1:nLines
+            text(ax4, 0.04, 0.95 - (li-1)*yStep, summaryLines{li}, ...
+                'Units', 'normalized', 'FontSize', 9, ...
+                'VerticalAlignment', 'top', 'Interpreter', 'none');
+        end
+        title(ax4, 'Diagnostic Summary');
     end
 
     function onCFCopyResults()
@@ -621,5 +842,474 @@ onCFModelChanged();
             options.StatusFcn(sprintf('X %s set to %.4g', wh, xClick));
         end
     end
+
+    function onCompareModels()
+    %ONCOMPAREMODELS  Open a figure showing a comparison table of stored fits.
+    %   Highlights the best model (lowest AIC).
+    %   If exactly 2 models are in history, also shows F-test result.
+        if isempty(cfHistory)
+            uialert(cfFig, 'No fit history yet. Run at least one fit first.', ...
+                'Compare Models');
+            return;
+        end
+
+        nH = numel(cfHistory);
+
+        % ── Build table data ──────────────────────────────────────────
+        colNames = {'#', 'Model', 'R²', 'adj-R²', 'AIC', 'AICc', 'BIC', ...
+            'RMSE', 'Params', 'N'};
+        tData = cell(nH, numel(colNames));
+        aicVals = zeros(1, nH);
+        for hi = 1:nH
+            s = cfHistory{hi};
+            aicVals(hi) = s.aic;
+            tData{hi,1}  = hi;
+            tData{hi,2}  = s.model;
+            tData{hi,3}  = sprintf('%.6f', s.R2);
+            tData{hi,4}  = sprintf('%.6f', s.adjR2);
+            tData{hi,5}  = sprintf('%.2f', s.aic);
+            tData{hi,6}  = sprintf('%.2f', s.aicc);
+            tData{hi,7}  = sprintf('%.2f', s.bic);
+            tData{hi,8}  = sprintf('%.4g',  s.rmse);
+            tData{hi,9}  = s.nParams;
+            tData{hi,10} = s.nPoints;
+        end
+
+        % Find best model (lowest AIC, ignoring -Inf from perfect fits)
+        finiteAIC = aicVals;
+        finiteAIC(~isfinite(aicVals)) = Inf;
+        [~, bestIdx] = min(finiteAIC);
+
+        % ── F-test between 2 models (if exactly 2 in history) ─────────
+        fLine = '';
+        if nH == 2
+            s1 = cfHistory{1};
+            s2 = cfHistory{2};
+            % Compare the model with more params against the simpler one
+            if s1.nParams ~= s2.nParams && s1.nPoints == s2.nPoints
+                if s1.nParams > s2.nParams
+                    full = s1; ref = s2;
+                else
+                    full = s2; ref = s1;
+                end
+                try
+                    mF = fitting.fitCompare(zeros(full.nPoints,1), full.residuals, ...
+                        full.nParams, ResidRef=ref.residuals, NParamsRef=ref.nParams);
+                    if ~isnan(mF.fStat)
+                        fLine = sprintf('F(%d,%d) = %.3f   p = %.4f', ...
+                            full.nParams - ref.nParams, ...
+                            full.nPoints - full.nParams, ...
+                            mF.fStat, mF.fPvalue);
+                    end
+                catch
+                    fLine = 'F-test could not be computed';
+                end
+            else
+                fLine = 'F-test requires 2 nested models with the same N';
+            end
+        end
+
+        % ── Figure ────────────────────────────────────────────────────
+        cmpFig = figure('Name', 'Model Comparison', ...
+            'NumberTitle', 'off', 'Color', [1 1 1], ...
+            'Position', [300 200 860 max(160, 80 + nH*22)]);
+
+        % Table
+        ax = axes(cmpFig, 'Visible', 'off', ...
+            'Position', [0 0.2 1 0.75]);
+
+        colWidths = [0.04, 0.20, 0.09, 0.09, 0.08, 0.08, 0.08, 0.08, 0.06, 0.06];
+        xPos = cumsum([0.02, colWidths(1:end-1)]);
+
+        % Header row
+        for ci = 1:numel(colNames)
+            text(ax, xPos(ci), 0.97, colNames{ci}, ...
+                'Units', 'normalized', 'FontSize', 9, 'FontWeight', 'bold', ...
+                'VerticalAlignment', 'top', 'Interpreter', 'none');
+        end
+
+        % Divider line
+        annotation(cmpFig, 'line', [0.02 0.98], [0.92 0.92]);
+
+        % Data rows
+        rowH = 0.85 / max(nH, 1);
+        for hi = 1:nH
+            yRow = 0.90 - (hi-1) * rowH;
+            isBest = (hi == bestIdx);
+            if isBest
+                annotation(cmpFig, 'rectangle', [0.01, yRow-0.01, 0.97, rowH], ...
+                    'FaceColor', [0.85 1.0 0.85], 'EdgeColor', 'none');
+            end
+            for ci = 1:numel(colNames)
+                val = tData{hi, ci};
+                if isnumeric(val)
+                    txt = num2str(val);
+                else
+                    txt = val;
+                end
+                textColor = [0 0 0];
+                if isBest && (ci == 5 || ci == 6 || ci == 7)
+                    textColor = [0 0.5 0];  % green for best AIC/AICc/BIC
+                end
+                text(ax, xPos(ci), yRow, txt, ...
+                    'Units', 'normalized', 'FontSize', 9, ...
+                    'VerticalAlignment', 'top', 'Interpreter', 'none', ...
+                    'Color', textColor);
+            end
+        end
+
+        % Legend
+        annotation(cmpFig, 'rectangle', [0.01, 0.13, 0.15, 0.04], ...
+            'FaceColor', [0.85 1.0 0.85], 'EdgeColor', [0 0.5 0]);
+        annotation(cmpFig, 'textbox', [0.17, 0.12, 0.80, 0.05], ...
+            'String', sprintf('Best model by AIC: #%d (%s)', bestIdx, ...
+                cfHistory{bestIdx}.model), ...
+            'EdgeColor', 'none', 'FontSize', 9, 'FitBoxToText', 'on');
+
+        % F-test line (if available)
+        if ~isempty(fLine)
+            annotation(cmpFig, 'textbox', [0.02, 0.03, 0.96, 0.08], ...
+                'String', ['F-test: ', fLine], ...
+                'EdgeColor', [0.7 0.7 0.7], 'FontSize', 9, ...
+                'FitBoxToText', 'off', 'BackgroundColor', [0.97 0.97 0.97]);
+        end
+
+        options.StatusFcn(sprintf('Model comparison: %d fits — best by AIC: %s', ...
+            nH, cfHistory{bestIdx}.model));
+    end
+
+% ════════════════════════════════════════════════════════════════════════
+
+    function onGlobalFit()
+    %ONGLOBALFIT  Open the Global Fit configuration dialog.
+    %
+    %   Lets the user select multiple loaded datasets, choose a model,
+    %   and mark which parameters should be shared across datasets.
+    %   Calls fitting.globalCurveFit and displays results.
+
+        if numel(datasets) < 2
+            uialert(cfFig, ...
+                sprintf('Global Fit requires at least 2 loaded datasets (have %d).', ...
+                    numel(datasets)), 'Global Fit');
+            return;
+        end
+
+        % ── Resolve current model ──────────────────────────────────────
+        try
+            [gfcn, gParamNames, gP0, gLb, gUb, ~] = resolveModel();
+        catch ME
+            uialert(cfFig, sprintf('Resolve model failed:\n%s', ME.message), ...
+                'Global Fit');
+            return;
+        end
+        nP = numel(gParamNames);
+
+        % ── Build dialog ───────────────────────────────────────────────
+        gfFig = uifigure('Name', 'Global Fit', ...
+            'Position', [220 100 560 480], 'Resize', 'off');
+
+        gfGL = uigridlayout(gfFig, [5 1], ...
+            'RowHeight', {22, '1x', '1x', 28, 22}, ...
+            'Padding', [10 8 10 8], 'RowSpacing', 6);
+
+        % Info label
+        uilabel(gfGL, ...
+            'Text', sprintf('Model: %s  (%d params)', ddCFModel.Value, nP), ...
+            'FontWeight', 'bold');
+
+        % ── Dataset selection ──────────────────────────────────────────
+        dsPanel = uipanel(gfGL, 'Title', 'Select Datasets', ...
+            'FontSize', 10);
+
+        dsGL = uigridlayout(dsPanel, [1 1], 'Padding', [4 4 4 4]);
+        dsNames = cell(1, numel(datasets));
+        for di = 1:numel(datasets)
+            nm = '';
+            if isfield(datasets{di}, 'label') && ~isempty(datasets{di}.label)
+                nm = datasets{di}.label;
+            elseif isfield(datasets{di}, 'filename') && ~isempty(datasets{di}.filename)
+                [~, nm, ext] = fileparts(datasets{di}.filename);
+                nm = [nm ext]; %#ok<AGROW>
+            end
+            if isempty(nm)
+                nm = sprintf('Dataset %d', di);
+            end
+            dsNames{di} = sprintf('[%d] %s', di, nm);
+        end
+
+        lbDS = uilistbox(dsGL, 'Items', dsNames, ...
+            'Multiselect', 'on', ...
+            'Value', dsNames(max(1, activeIdx - 1) : min(end, activeIdx + 1)));
+
+        % ── Shared parameter table ─────────────────────────────────────
+        shPanel = uipanel(gfGL, 'Title', 'Shared Parameters', ...
+            'FontSize', 10);
+
+        shGL = uigridlayout(shPanel, [1 1], 'Padding', [4 4 4 4]);
+        shTbl = uitable(shGL, ...
+            'ColumnName', {'Parameter', 'Shared?', 'Guess', 'Lower', 'Upper'}, ...
+            'ColumnEditable', [false true true true true], ...
+            'ColumnFormat', {'char', 'logical', 'numeric', 'numeric', 'numeric'}, ...
+            'ColumnWidth', {'auto', 60, 65, 65, 65});
+
+        shData = cell(nP, 5);
+        for pi = 1:nP
+            shData{pi, 1} = gParamNames{pi};
+            shData{pi, 2} = false;           % not shared by default
+            shData{pi, 3} = gP0(pi);
+            shData{pi, 4} = gLb(pi);
+            shData{pi, 5} = gUb(pi);
+        end
+        shTbl.Data = shData;
+
+        % ── Action buttons ─────────────────────────────────────────────
+        gfBtnGL = uigridlayout(gfGL, [1 3], ...
+            'ColumnWidth', {'1x', '1x', '1x'}, ...
+            'Padding', [0 0 0 0], 'ColumnSpacing', 8);
+
+        uibutton(gfBtnGL, 'Text', 'Run Global Fit', ...
+            'BackgroundColor', BTN_PRIMARY, 'FontColor', [1 1 1], ...
+            'FontWeight', 'bold', ...
+            'ButtonPushedFcn', @(~,~) doRunGlobalFit());
+
+        uibutton(gfBtnGL, 'Text', 'Share All', ...
+            'Tooltip', 'Mark all parameters as shared', ...
+            'ButtonPushedFcn', @(~,~) setAllShared(true));
+
+        uibutton(gfBtnGL, 'Text', 'Share None', ...
+            'Tooltip', 'Clear all shared flags', ...
+            'ButtonPushedFcn', @(~,~) setAllShared(false));
+
+        % Status label
+        lblGFStatus = uilabel(gfGL, 'Text', 'Select datasets and shared parameters, then click Run.', ...
+            'FontSize', 9, 'FontColor', [0.5 0.5 0.5]);
+
+        % ── Nested helpers ─────────────────────────────────────────────
+        function setAllShared(val)
+            for pi2 = 1:nP
+                shTbl.Data{pi2, 2} = val;
+            end
+        end
+
+        function doRunGlobalFit()
+            % Identify selected dataset indices
+            selItems = lbDS.Value;
+            selIdx = zeros(1, numel(selItems));
+            for si = 1:numel(selItems)
+                selIdx(si) = find(strcmp(dsNames, selItems{si}), 1);
+            end
+
+            if numel(selIdx) < 2
+                uialert(gfFig, 'Select at least 2 datasets.', 'Global Fit');
+                return;
+            end
+
+            % Extract per-dataset data structs
+            selDS = cell(1, numel(selIdx));
+            for si = 1:numel(selIdx)
+                d = datasets{selIdx(si)};
+                if ~isempty(d.corrData) && ~isempty(d.corrData.time)
+                    pd = d.corrData;
+                else
+                    pd = d.data;
+                end
+                ch = min(ddCFCh.Value, size(pd.values, 2));
+                selDS{si} = struct('x', pd.time, 'y', pd.values(:, ch));
+            end
+
+            % Build constraints from shared flags
+            gfConstraints = struct('paramName', {}, 'datasets', {});
+            nC = 0;
+            for pi2 = 1:nP
+                if logical(shTbl.Data{pi2, 2})
+                    nC = nC + 1;
+                    gfConstraints(nC).paramName = shData{pi2, 1};
+                    gfConstraints(nC).datasets  = 1:numel(selIdx);
+                end
+            end
+
+            % Build per-dataset init guesses and bounds from table
+            p0Row = zeros(1, nP);
+            lbRow = zeros(1, nP);
+            ubRow = zeros(1, nP);
+            for pi2 = 1:nP
+                p0Row(pi2) = readNumericCell(shTbl.Data{pi2, 3}, gP0(pi2));
+                lbRow(pi2) = readNumericCell(shTbl.Data{pi2, 4}, gLb(pi2));
+                ubRow(pi2) = readNumericCell(shTbl.Data{pi2, 5}, gUb(pi2));
+            end
+            initG = repmat({p0Row}, 1, numel(selIdx));
+            lbG   = repmat({lbRow}, 1, numel(selIdx));
+            ubG   = repmat({ubRow}, 1, numel(selIdx));
+
+            % Build a model struct (use active model's fcn/paramNames)
+            gModel.name       = ddCFModel.Value;
+            gModel.fcn        = gfcn;
+            gModel.paramNames = gParamNames;
+            gModel.p0         = p0Row;
+            gModel.lb         = lbRow;
+            gModel.ub         = ubRow;
+            gModel.nParams    = nP;
+
+            % Run fit
+            gfFig.Pointer = 'watch'; drawnow;
+            lblGFStatus.Text = 'Fitting...'; drawnow;
+            try
+                gfResult = fitting.globalCurveFit(selDS, gModel, gfConstraints, ...
+                    InitGuess=initG, LowerBound=lbG, UpperBound=ubG);
+                gfFig.Pointer = 'arrow';
+                lblGFStatus.Text = sprintf( ...
+                    'Done. Global chi²_red=%.4g  Exit=%d', ...
+                    gfResult.chiSqRed, gfResult.exitFlag);
+                showGlobalResults(gfResult, selIdx, selItems, gfConstraints);
+            catch ME
+                gfFig.Pointer = 'arrow';
+                lblGFStatus.Text = 'Fit failed.';
+                uialert(gfFig, sprintf('Global fit failed:\n%s', ME.message), 'Error');
+            end
+        end
+
+        function showGlobalResults(gfr, selIdx2, selItems2, gfConst)
+        %SHOWGLOBALRESULTS  Display global fit results in a separate figure.
+            nSel = numel(selIdx2);
+
+            resFig = figure('Name', sprintf('Global Fit Results — %s', ddCFModel.Value), ...
+                'NumberTitle', 'off', 'Color', [1 1 1], ...
+                'Position', [270 80 820 max(500, 180 + nSel * 140)]);
+
+            % ── Shared parameter summary ───────────────────────────────
+            nShared = numel(gfr.shared);
+            yTop = 0.97;
+            axHdr = axes(resFig, 'Visible', 'off', ...
+                'Position', [0 0.88 1 0.10]);
+            text(axHdr, 0.01, 0.9, ...
+                sprintf('Model: %s    Global chi²_red = %.4g    Total N = %d    Free params = %d', ...
+                    ddCFModel.Value, gfr.chiSqRed, gfr.nTotal, gfr.nFree), ...
+                'Units', 'normalized', 'FontSize', 10, 'FontWeight', 'bold', ...
+                'Interpreter', 'none', 'VerticalAlignment', 'top');
+
+            if nShared > 0
+                shLines = cell(1, nShared);
+                for g = 1:nShared
+                    if isfinite(gfr.shared(g).error)
+                        shLines{g} = sprintf('  %s = %.6g  ±  %.3g  (shared across datasets [%s])', ...
+                            gfr.shared(g).name, gfr.shared(g).value, gfr.shared(g).error, ...
+                            num2str(selIdx2(gfr.shared(g).datasets)));
+                    else
+                        shLines{g} = sprintf('  %s = %.6g  (shared)', ...
+                            gfr.shared(g).name, gfr.shared(g).value);
+                    end
+                end
+                text(axHdr, 0.01, 0.55, ['Shared:  ' strjoin(shLines, '   |   ')], ...
+                    'Units', 'normalized', 'FontSize', 9, ...
+                    'Color', [0.1 0.5 0.1], 'Interpreter', 'none', ...
+                    'VerticalAlignment', 'top');
+            end
+
+            % ── Per-dataset fit overlays ───────────────────────────────
+            COLORS = lines(nSel);
+            axOverlay = axes(resFig, 'Position', [0.07 0.46 0.90 0.40]);
+            hold(axOverlay, 'on');
+            box(axOverlay, 'on'); grid(axOverlay, 'on');
+
+            for si = 1:nSel
+                d = datasets{selIdx2(si)};
+                if ~isempty(d.corrData) && ~isempty(d.corrData.time)
+                    pd = d.corrData;
+                else
+                    pd = d.data;
+                end
+                ch = min(ddCFCh.Value, size(pd.values, 2));
+                xd = pd.time;
+                yd = pd.values(:, ch);
+
+                plot(axOverlay, xd, yd, '.', 'Color', COLORS(si,:), ...
+                    'MarkerSize', 3, 'HandleVisibility', 'off');
+
+                xFine = linspace(min(xd), max(xd), 400)';
+                yFine = gfcn(xFine, gfr.params{si});
+                plot(axOverlay, xFine, yFine, '-', 'Color', COLORS(si,:), ...
+                    'LineWidth', 1.5, ...
+                    'DisplayName', sprintf('%s (R²=%.4f)', selItems2{si}, gfr.R2(si)));
+            end
+            legend(axOverlay, 'Location', 'best', 'FontSize', 8);
+            title(axOverlay, 'Data + Global Fit Curves');
+            xlabel(axOverlay, 'X'); ylabel(axOverlay, 'Y');
+            hold(axOverlay, 'off');
+
+            % ── Per-dataset parameter table ────────────────────────────
+            % Shared params are highlighted in green via annotation rectangles
+            axTbl = axes(resFig, 'Visible', 'off', ...
+                'Position', [0.02 0.02 0.96 0.42]);
+
+            colHdr = [{'Dataset'}, gParamNames, {'R²', 'RMSE'}];
+            nCols  = numel(colHdr);
+            colW   = 1 / nCols;
+
+            % Find which param indices are shared (for highlighting)
+            sharedParamIdx = zeros(1, nShared);
+            for g = 1:nShared
+                sharedParamIdx(g) = gfr.shared(g).paramIdx;
+            end
+
+            % Header
+            for ci = 1:nCols
+                text(axTbl, (ci-0.5) * colW, 0.97, colHdr{ci}, ...
+                    'Units', 'normalized', 'FontSize', 8.5, ...
+                    'FontWeight', 'bold', 'HorizontalAlignment', 'center', ...
+                    'Interpreter', 'none', 'VerticalAlignment', 'top');
+            end
+            annotation(resFig, 'line', [0.02 0.98], [0.93*0.42+0.02 0.93*0.42+0.02]);
+
+            rowH = 0.88 / max(nSel, 1);
+            for si = 1:nSel
+                yRow = 0.91 - (si-1) * rowH;
+
+                % Dataset name
+                text(axTbl, 0.5*colW, yRow, selItems2{si}, ...
+                    'Units', 'normalized', 'FontSize', 8, ...
+                    'HorizontalAlignment', 'center', 'Interpreter', 'none', ...
+                    'VerticalAlignment', 'top');
+
+                % Parameters
+                for pi2 = 1:nP
+                    xCell = (pi2 + 0.5) * colW;
+                    pVal  = gfr.params{si}(pi2);
+                    pErr  = gfr.errors{si}(pi2);
+
+                    if isfinite(pErr)
+                        txt = sprintf('%.4g\n±%.2g', pVal, pErr);
+                    else
+                        txt = sprintf('%.4g', pVal);
+                    end
+
+                    isSharedParam = ismember(pi2, sharedParamIdx);
+                    fc = [0 0 0];
+                    if isSharedParam
+                        fc = [0.05 0.45 0.05];  % green text for shared
+                    end
+
+                    text(axTbl, xCell, yRow, txt, ...
+                        'Units', 'normalized', 'FontSize', 8, ...
+                        'HorizontalAlignment', 'center', 'Interpreter', 'none', ...
+                        'VerticalAlignment', 'top', 'Color', fc);
+                end
+
+                % R² and RMSE
+                text(axTbl, (nP + 1 + 0.5) * colW, yRow, ...
+                    sprintf('%.5f', gfr.R2(si)), ...
+                    'Units', 'normalized', 'FontSize', 8, ...
+                    'HorizontalAlignment', 'center', 'VerticalAlignment', 'top');
+                text(axTbl, (nP + 2 + 0.5) * colW, yRow, ...
+                    sprintf('%.4g', gfr.RMSE(si)), ...
+                    'Units', 'normalized', 'FontSize', 8, ...
+                    'HorizontalAlignment', 'center', 'VerticalAlignment', 'top');
+            end
+
+            options.StatusFcn(sprintf( ...
+                'Global fit complete: %d datasets, chi²_red=%.4g, exit=%d', ...
+                nSel, gfr.chiSqRed, gfr.exitFlag));
+        end
+
+    end % onGlobalFit
 
 end

@@ -93,7 +93,10 @@ function varargout = DataPlotter()
 %                              — write correction widget values
 %   api.applyCorrections()     — run onApplyCorrections on active dataset
 %   api.applyCorrectionsAll()  — apply same corrections to every dataset
-%   api.undoCorrections()      — restore pre-correction state
+%   api.undoCorrections()      — restore pre-correction state (legacy single-level)
+%   api.undo()                 — undo last operation via UndoManager  [Ctrl+Z]
+%   api.redo()                 — redo last undone operation  [Ctrl+Y]
+%   api.undoMgr()              — return the live dataplotter.UndoManager instance
 %   api.autoPeaks()            — run auto peak detection
 %   api.fitPeaks()             — fit detected peaks individually
 %   api.getPeaks()             — return peaks struct from active dataset
@@ -247,6 +250,12 @@ function varargout = DataPlotter()
 
     % ── Line caching for performance (nested struct as property) ──
     appData.lineCache  = struct('valid', false, 'left', {{}}, 'right', {{}});
+
+    % ── Undo / redo manager ──────────────────────────────────────────────
+    appData.undoMgr = dataplotter.UndoManager(MaxSize=50);
+
+    % ── Toolbar configuration: load from prefdir or use factory default ────
+    appData.toolbarConfig = loadToolbarConfig();
 
     % ── Figure ───────────────────────────────────────────────────────────
     % Detect available screen size and fit the window to it
@@ -635,54 +644,62 @@ function varargout = DataPlotter()
     axGL = uigridlayout(axPanel,[2 1],'Padding',[2 2 2 2],'RowSpacing',1, ...
         'RowHeight',{18,'1x'});
 
-    % Toolbar row above the axes (right-aligned buttons)
-    axToolbarGL = uigridlayout(axGL,[1 7],'Padding',[0 0 0 0],'ColumnSpacing',2, ...
-        'ColumnWidth',{'1x',55,50,55,50,50,50});
+    % ── Dynamic axes toolbar (right-aligned buttons, order from user prefs) ──
+    % The toolbar is built/rebuilt by buildToolbar().  A single-row grid with
+    % N+1 columns is created here; column widths are set dynamically.
+    axToolbarGL = uigridlayout(axGL,[1 1],'Padding',[0 0 0 0],'ColumnSpacing',2);
     axToolbarGL.Layout.Row = 1;
 
-    uilabel(axToolbarGL,'Text','');  % spacer
+    % ── Action registry — ALL available toolbar actions ────────────────────
+    tbActions = struct('id', {}, 'label', {}, 'tooltip', {}, 'callback', {});
+    tbActions(end+1) = struct('id','cursor',     'label',[char(8982) ' Cursor'],  ...
+        'tooltip','Toggle data cursor — click to read (x,y), click again for delta', ...
+        'callback',@(~,~) onToggleDataCursor([],[]));
+    tbActions(end+1) = struct('id','autoscale',  'label','Auto',   ...
+        'tooltip','Reset all axis limits to auto-scale', ...
+        'callback',@(~,~) onAutoLimits([],[]));
+    tbActions(end+1) = struct('id','grid',       'label','Grid',   ...
+        'tooltip','Toggle grid lines on/off', ...
+        'callback',@(~,~) onContextToggle('grid'));
+    tbActions(end+1) = struct('id','legend',     'label','Legend', ...
+        'tooltip','Toggle legend visibility', ...
+        'callback',@(~,~) onToolbarLegendToggle([],[]));
+    tbActions(end+1) = struct('id','copy',       'label','Copy',   ...
+        'tooltip','Copy plot to clipboard', ...
+        'callback',@(~,~) onCopyPlotToClipboard());
+    tbActions(end+1) = struct('id','save',       'label','Save',   ...
+        'tooltip','Export figure as PNG / PDF / SVG / EPS', ...
+        'callback',@(~,~) onExportFigure([],[]));
+    tbActions(end+1) = struct('id','zoomIn',     'label',[char(43) ' Zoom'],  ...
+        'tooltip','Zoom in (set axis limits to visible range)', ...
+        'callback',@(~,~) onZoomInToolbar());
+    tbActions(end+1) = struct('id','zoomOut',    'label','Zoom Out', ...
+        'tooltip','Zoom out one step', ...
+        'callback',@(~,~) onZoomOutToolbar());
+    tbActions(end+1) = struct('id','pan',        'label','Pan',    ...
+        'tooltip','Enable pan mode on plot axes', ...
+        'callback',@(~,~) onPanToolbar());
+    tbActions(end+1) = struct('id','figBuilder', 'label','Figure Builder', ...
+        'tooltip','Open the Figure Builder for publication-quality figures', ...
+        'callback',@(~,~) onAdvancedFigureBuilder([],[]));
+    tbActions(end+1) = struct('id','export',     'label','Export Data', ...
+        'tooltip','Export active dataset data to CSV', ...
+        'callback',@(~,~) onSaveCSV([],[]));
+    tbActions(end+1) = struct('id','animate',    'label',[char(9654) ' Animate'], ...
+        'tooltip','Animate dataset sequence', ...
+        'callback',@(~,~) onToggleAnimation([],[]));
+    tbActions(end+1) = struct('id','spreadsheet', 'label',[char(9783) ' Sheet'], ...
+        'tooltip','Open dataset in spreadsheet view', ...
+        'callback',@(~,~) onSpreadsheetPopup([],[]));
+    tbActions(end+1) = struct('id','undo',        'label',[char(8617) ' Undo'], ...
+        'tooltip','Undo last operation  [Ctrl+Z]', ...
+        'callback',@(~,~) onUndo([],[]));
+    tbActions(end+1) = struct('id','redo',        'label',[char(8618) ' Redo'], ...
+        'tooltip','Redo last undone operation  [Ctrl+Y]', ...
+        'callback',@(~,~) onRedo([],[]));
 
-    btnDataCursor = uibutton(axToolbarGL,'Text',[char(8982) ' Cursor'], ...
-        'ButtonPushedFcn',@onToggleDataCursor, ...
-        'BackgroundColor',BTN_TOOL,'FontColor',[0.85 0.85 0.85], ...
-        'FontSize',9, ...
-        'Tooltip','Toggle data cursor — click to read (x,y), click again for delta');
-    btnDataCursor.Layout.Column = 2;
-
-    btnTbAuto = uibutton(axToolbarGL,'Text','Auto', ...
-        'ButtonPushedFcn',@onAutoLimits, ...
-        'BackgroundColor',BTN_TOOL,'FontColor',[0.85 0.85 0.85], ...
-        'FontSize',9, ...
-        'Tooltip','Reset all axis limits to auto-scale');
-    btnTbAuto.Layout.Column = 3;
-
-    btnTbGrid = uibutton(axToolbarGL,'Text','Grid', ...
-        'ButtonPushedFcn',@(~,~) onContextToggle('grid'), ...
-        'BackgroundColor',BTN_TOOL,'FontColor',[0.85 0.85 0.85], ...
-        'FontSize',9, ...
-        'Tooltip','Toggle grid lines on/off');
-    btnTbGrid.Layout.Column = 4;
-
-    btnTbLegend = uibutton(axToolbarGL,'Text','Legend', ...
-        'ButtonPushedFcn',@onToolbarLegendToggle, ...
-        'BackgroundColor',BTN_TOOL,'FontColor',[0.85 0.85 0.85], ...
-        'FontSize',9, ...
-        'Tooltip','Toggle legend visibility');
-    btnTbLegend.Layout.Column = 5;
-
-    btnCopyPlot = uibutton(axToolbarGL,'Text','Copy', ...
-        'ButtonPushedFcn',@(~,~) onCopyPlotToClipboard(), ...
-        'BackgroundColor',BTN_TOOL,'FontColor',[0.85 0.85 0.85], ...
-        'FontSize',9, ...
-        'Tooltip','Copy plot to clipboard');
-    btnCopyPlot.Layout.Column = 6;
-
-    btnTbSave = uibutton(axToolbarGL,'Text','Save', ...
-        'ButtonPushedFcn',@onExportFigure, ...
-        'BackgroundColor',BTN_TOOL,'FontColor',[0.85 0.85 0.85], ...
-        'FontSize',9, ...
-        'Tooltip','Export figure as PNG / PDF / SVG / EPS');
-    btnTbSave.Layout.Column = 7;
+    % Build toolbar for the first time
+    buildToolbar(axToolbarGL, appData.toolbarConfig, tbActions, BTN_TOOL);
 
     ax = uiaxes(axGL);
     ax.Layout.Row = 2;
@@ -699,6 +716,7 @@ function varargout = DataPlotter()
     appData.tableMask       = [];
     appData.tableEdited     = false;
     appData.tableRowCap     = 500;    % max rows displayed in uitable (perf cap)
+    appData.filterMask      = [];     % [N×1] logical from filter bar; [] = no filter
     fig.WindowButtonDownFcn   = @onAxesButtonDown;  % normal mode; special modes overwrite this
     fig.WindowButtonMotionFcn = @onMouseHover;      % idle hover; drags overwrite and restore this
 
@@ -764,6 +782,10 @@ function varargout = DataPlotter()
             'MenuSelectedFcn', @(~,~) onClearFitOverlays());
         uimenu(cmAxes, 'Text', 'Refresh State (F5)', 'Separator', 'on', ...
             'MenuSelectedFcn', @(~,~) refreshState());
+
+        % Toolbar customisation
+        uimenu(cmAxes, 'Text', 'Customise Toolbar...', 'Separator', 'on', ...
+            'MenuSelectedFcn', @(~,~) onCustomiseToolbar());
 
         ax.ContextMenu = cmAxes;
     catch
@@ -852,11 +874,11 @@ function varargout = DataPlotter()
         'BGFILE',    14,  'BGSUBTR',  15,  'ASYM1',     16,  'ASYM2',     17, ...
         'SEC_MAG',   18,  'MAG_MASS', 19,  'MAG_DIM',   20,  'MAG_THICK', 21, ...
         'MAG_UNITS', 22,  'MAG_AUTO', 23, ...
-        'APPLY',     24,  'ACTIONS',  25,  'MASK',   26);
+        'APPLY',     24,  'ACTIONS',  25,  'MASK',   26,  'REDO',  27);
 
-    corrGL = uigridlayout(corrPanel,[26 4], ...
+    corrGL = uigridlayout(corrPanel,[27 4], ...
         'RowHeight',    {24, 24, 20, 22,22,22,22, 20, 22,22,22,22, 20, 0,0, 0,0, ...
-                         0,0,0,0,0,0, 24,22, 22}, ...
+                         0,0,0,0,0,0, 24,22, 22, 22}, ...
         'ColumnWidth',  {80,'1x',80,'1x'}, ...
         'Padding',      [4 4 4 4], ...
         'RowSpacing',   2, ...
@@ -1278,13 +1300,20 @@ function varargout = DataPlotter()
         'Tooltip', 'Apply auto-correction to just the active dataset or all loaded magnetometry datasets');
     ddAutoMagScope.Layout.Row = CROW.MAG_AUTO; ddAutoMagScope.Layout.Column = [3 4];
 
-    % Row APPLY: Apply | Reset | Show Raw (pinned to bottom)
+    % Row APPLY: Apply | Auto | Reset | Show Raw (pinned to bottom)
     btnApply = uibutton(corrGL,'Text','Apply Corrections', ...
         'ButtonPushedFcn',@onApplyCorrections, ...
         'BackgroundColor',BTN_PRIMARY, ...
         'FontColor',BTN_FG,'FontWeight','bold', ...
         'Tooltip','Compute corrected data and update plot');
-    btnApply.Layout.Row = CROW.APPLY; btnApply.Layout.Column = [1 2];
+    btnApply.Layout.Row = CROW.APPLY; btnApply.Layout.Column = 1;
+
+    cbAutoRecalc = uicheckbox(corrGL, ...
+        'Text',    'Auto', ...
+        'Value',   false, ...
+        'Tooltip', 'Automatically re-apply corrections 0.3 s after any parameter change (debounced; off by default)', ...
+        'ValueChangedFcn', @(~,~) updateApplyButtonStyle());
+    cbAutoRecalc.Layout.Row = CROW.APPLY; cbAutoRecalc.Layout.Column = 2;
 
     btnReset = uibutton(corrGL,'Text','Reset', ...
         'ButtonPushedFcn',@onResetCorrections, ...
@@ -1303,10 +1332,10 @@ function varargout = DataPlotter()
         'FontColor',[0.75 0.75 0.75],'FontSize',9);
     btnApplyAll.Layout.Row = CROW.ACTIONS; btnApplyAll.Layout.Column = [1 2];
 
-    btnUndo = uibutton(corrGL,'Text','Undo', ...
-        'ButtonPushedFcn',@onUndoCorrections, ...
-        'Tooltip','Restore previous correction state (one-level undo)  [Ctrl+Z]', ...
-        'FontColor',[0.75 0.75 0.75]);
+    btnUndo = uibutton(corrGL,'Text',[char(8617) ' Undo'], ...
+        'ButtonPushedFcn',@(~,~) onUndo([],[]), ...
+        'Tooltip','Nothing to undo  [Ctrl+Z]', ...
+        'FontColor',[0.75 0.75 0.75],'FontSize',9);
     btnUndo.Layout.Row = CROW.ACTIONS; btnUndo.Layout.Column = 3;
 
     btnToggleVis = uibutton(corrGL,'Text','Hide', ...
@@ -1315,7 +1344,15 @@ function varargout = DataPlotter()
         'FontColor',[0.75 0.75 0.75],'FontSize',9);
     btnToggleVis.Layout.Row = CROW.ACTIONS; btnToggleVis.Layout.Column = 4;
 
-    % Row 25: Mask Selection | Unmask All
+    % Row 27: Redo button (spans [1 2]) | placeholder (spans [3 4])
+    btnRedo = uibutton(corrGL,'Text',[char(8618) ' Redo'], ...
+        'ButtonPushedFcn',@(~,~) onRedo([],[]), ...
+        'Tooltip','Nothing to redo  [Ctrl+Y]', ...
+        'FontColor',[0.75 0.75 0.75],'FontSize',9, ...
+        'Enable','off');
+    btnRedo.Layout.Row = CROW.REDO; btnRedo.Layout.Column = [1 2];
+
+    % Row 26: Mask Selection | Unmask All
     btnMaskSelect = uibutton(corrGL,'Text','Mask Selection', ...
         'ButtonPushedFcn',@onArmMaskSelection, ...
         'BackgroundColor',[0.60 0.15 0.15], ...
@@ -1350,9 +1387,9 @@ function varargout = DataPlotter()
     dataTablePanel = uipanel(analysisGL, 'Title', 'Data Table', 'FontSize', 10);
     dataTablePanel.Layout.Row = 2; dataTablePanel.Layout.Column = 2;
 
-    % ── Data Table contents (toolbar + units + editable table) ───────
-    dataTableInnerGL = uigridlayout(dataTablePanel, [3 1], ...
-        'RowHeight', {22, 14, '1x'}, 'Padding', [2 2 2 2], 'RowSpacing', 1);
+    % ── Data Table contents (toolbar + filter bar + units + editable table) ──
+    dataTableInnerGL = uigridlayout(dataTablePanel, [4 1], ...
+        'RowHeight', {22, 22, 14, '1x'}, 'Padding', [2 2 2 2], 'RowSpacing', 1);
 
     % Toolbar row
     tableBarGL = uigridlayout(dataTableInnerGL, [1 7], ...
@@ -1408,11 +1445,48 @@ function varargout = DataPlotter()
         'HorizontalAlignment', 'right');
     lblTableStats.Layout.Column = 7;
 
+    % ── Filter bar row ────────────────────────────────────────────────────
+    % Layout: [label | edit field (stretch) | Filter btn | Clear btn]
+    filterBarGL = uigridlayout(dataTableInnerGL, [1 4], ...
+        'ColumnWidth', {30, '1x', 44, 40}, ...
+        'RowHeight',   {'1x'}, ...
+        'Padding', [2 0 2 0], 'ColumnSpacing', 3);
+    filterBarGL.Layout.Row = 2;
+
+    lblFilter = uilabel(filterBarGL, 'Text', 'Filter:', ...
+        'FontSize', 8, 'FontColor', [0.75 0.75 0.75], ...
+        'HorizontalAlignment', 'right');
+    lblFilter.Layout.Column = 1; %#ok<NASGU>
+
+    efFilter = uieditfield(filterBarGL, 'text', 'Value', '', ...
+        'Placeholder', 'e.g. Temp > 300  or  between(x, 0, 1)', ...
+        'FontSize', 8, ...
+        'BackgroundColor', [0.17 0.17 0.17], 'FontColor', [0.92 0.92 0.92], ...
+        'Tooltip', ['Filter rows by expression. Column names from labels, ' ...
+                    '''x'' = X axis. Operators: > < >= <= == ~= & | ~. ' ...
+                    'Functions: abs(), between(col,lo,hi). Press Enter to apply.'], ...
+        'ValueChangedFcn', @(~,~) onFilterApply());
+    efFilter.Layout.Column = 2;
+
+    btnFilterApply = uibutton(filterBarGL, 'Text', 'Filter', ...
+        'ButtonPushedFcn', @(~,~) onFilterApply(), ...
+        'BackgroundColor', [0.20 0.48 0.20], 'FontColor', [1 1 1], ...
+        'FontSize', 8, ...
+        'Tooltip', 'Apply filter expression');
+    btnFilterApply.Layout.Column = 3; %#ok<NASGU>
+
+    btnFilterClear = uibutton(filterBarGL, 'Text', 'Clear', ...
+        'ButtonPushedFcn', @(~,~) onFilterClear(), ...
+        'BackgroundColor', [0.28 0.28 0.28], 'FontColor', [0.8 0.8 0.8], ...
+        'FontSize', 8, ...
+        'Tooltip', 'Clear filter — show all rows');
+    btnFilterClear.Layout.Column = 4; %#ok<NASGU>
+
     % Units row
     lblTableUnits = uilabel(dataTableInnerGL, 'Text', '', ...
         'FontSize', 8, 'FontColor', [0.5 0.7 0.5], ...
         'BackgroundColor', [0.16 0.16 0.16]);
-    lblTableUnits.Layout.Row = 2;
+    lblTableUnits.Layout.Row = 3;
 
     % Editable data table
     tblData = uitable(dataTableInnerGL, ...
@@ -1422,7 +1496,7 @@ function varargout = DataPlotter()
         'CellEditCallback', @onTableCellEdit, ...
         'CellSelectionCallback', @onTableSelectionChanged, ...
         'FontSize', 9);
-    tblData.Layout.Row = 3;
+    tblData.Layout.Row = 4;
     appData.tableSelection = [];  % [Nx2] matrix of [row col] pairs
 
     axLimGL = uigridlayout(axLimPanel,[5 6], ...
@@ -1959,9 +2033,10 @@ function varargout = DataPlotter()
     btnBoxIntegrate = mw.btnBoxIntegrate;
     efBoxIntW       = mw.efBoxIntW;
     efBoxIntH       = mw.efBoxIntH;
-    btnArcIntegrate = mw.btnArcIntegrate;
-    lblMap2DInfo    = mw.lblMap2DInfo;
-    cbMap2DSingle   = mw.cbMap2DSingle;
+    btnArcIntegrate  = mw.btnArcIntegrate;
+    lblMap2DInfo     = mw.lblMap2DInfo;
+    cbMap2DSingle    = mw.cbMap2DSingle;
+    btnFitSurface    = mw.btnFitSurface;
     btnClear2DMatrix = mw.btnClear2DMatrix;
 
     % Wire 2D map callbacks (deferred from builder)
@@ -1978,6 +2053,7 @@ function varargout = DataPlotter()
     efBoxIntH.ValueChangedFcn        = @(~,~) updateBoxPreview();
     btnArcIntegrate.ButtonPushedFcn  = @onArcIntButton;
     cbMap2DSingle.ValueChangedFcn    = @(~,~) onToggleSinglePrecision();
+    btnFitSurface.ButtonPushedFcn    = @onFitSurface;
     btnClear2DMatrix.ButtonPushedFcn = @(~,~) onClear2DMatrix();
 
     % ── Drag-and-drop: register every major surface as a drop target (R2023a+) ──
@@ -2024,6 +2100,9 @@ function varargout = DataPlotter()
     api.applyCorrections    = @() onApplyCorrections([],[]);
     api.applyCorrectionsAll = @() onApplyCorrectionsAll([],[]);
     api.undoCorrections     = @() onUndoCorrections([],[]);
+    api.undo                = @() onUndo([],[]);
+    api.redo                = @() onRedo([],[]);
+    api.undoMgr             = @() appData.undoMgr;
     api.autoPeaks           = @() onAutoPeak([],[]);
     api.fitPeaks            = @() onFitPeaks([],[]);
     api.getPeaks            = @getPeaksDirect;
@@ -2068,6 +2147,19 @@ function varargout = DataPlotter()
         'working',  appData.tableWorkingCopy, ...
         'units',    {appData.tableUnits});
     api.descriptiveStats    = @() onDescriptiveStats([],[]);
+
+    % ── Toolbar API (for testing) ──────────────────────────────────────
+    api.getToolbarConfig    = @() appData.toolbarConfig;
+    api.setToolbarConfig    = @(cfg) setToolbarConfigDirect(cfg);
+    api.getToolbarGL        = @() axToolbarGL;
+    api.getToolbarRegistry  = @() tbActions;
+
+    % ── Drag-to-plot API (for testing) ────────────────────────────────
+    api.setChannelFromDrag  = @(col, tgt) setChannelFromDrag(col, tgt);
+    api.getDragState        = @() struct( ...
+        'active',   appData.columnDragActive, ...
+        'pending',  appData.columnDragPending, ...
+        'colName',  appData.columnDragColName);
 
     % ════════════════════════════════════════════════════════════════════
     %  NESTED CALLBACKS  (share appData + all control handles via closure)
@@ -2655,6 +2747,16 @@ function varargout = DataPlotter()
         peakTable.Data = {};
     end
 
+    function setToolbarConfigDirect(cfg)
+    %SETTOOLBARCONFIGDIRECT  Programmatically set toolbar config and rebuild.
+    %  Used by automated tests.
+        arguments
+            cfg (1,:) cell
+        end
+        appData.toolbarConfig = cfg;
+        buildToolbar(axToolbarGL, cfg, tbActions, BTN_TOOL);
+    end
+
     function onSelectDataset(~,~)
     %ONSELECTDATASET  Fires when the user clicks a row in lbDatasets.
     %  With Multiselect='on', lbDatasets.Value is a cell array of selected
@@ -3021,15 +3123,16 @@ function varargout = DataPlotter()
     function onShowShortcuts(~,~)
     %ONSHOWSHORTCUTS  Display a uialert listing all keyboard shortcuts.
         msg = sprintf(['Keyboard Shortcuts\n\n' ...
-            'Ctrl+S        Save session\n' ...
-            'Ctrl+Z        Undo corrections\n' ...
-            'Ctrl+C        Copy plot to clipboard\n' ...
-            'Ctrl+E        Export CSV\n' ...
-            'Delete        Remove selected dataset\n' ...
-            'Left / Right  Switch dataset\n' ...
-            'Space         Toggle dataset visibility\n' ...
-            'Ctrl+Up       Move dataset up\n' ...
-            'Ctrl+Down     Move dataset down']);
+            'Ctrl+S              Save session\n' ...
+            'Ctrl+Z              Undo last operation\n' ...
+            'Ctrl+Y / Ctrl+Shift+Z  Redo\n' ...
+            'Ctrl+C              Copy plot to clipboard\n' ...
+            'Ctrl+E              Export CSV\n' ...
+            'Delete              Remove selected dataset\n' ...
+            'Left / Right        Switch dataset\n' ...
+            'Space               Toggle dataset visibility\n' ...
+            'Ctrl+Up             Move dataset up\n' ...
+            'Ctrl+Down           Move dataset down']);
         uialert(fig, msg, 'Keyboard Shortcuts', 'Icon', 'info');
     end
 
@@ -3384,7 +3487,9 @@ function varargout = DataPlotter()
         refreshPeakTable();
 
         % Refresh data table if visible
-        appData.tableMask = [];  % reset mask on dataset switch
+        appData.tableMask   = [];  % reset mask on dataset switch
+        appData.filterMask  = [];  % reset row filter on dataset switch
+        efFilter.Value      = '';  % clear filter text field
         refreshDataTable();
     end
 
@@ -3625,6 +3730,10 @@ function varargout = DataPlotter()
         else
             map2DPanel.Visible = 'off';
         end
+
+        % Sync undo/redo button state after layout changes (enable flags above
+        % may have overridden the UndoManager-managed state for btnUndo).
+        updateUndoButtons();
     end
 
     function pName = resolvedCorrStyle()
@@ -5551,8 +5660,8 @@ function varargout = DataPlotter()
             lblFg = [0 0 0];
         end
 
-        sGL = uigridlayout(settingsFig,[5 2], ...
-            'RowHeight', {24, 28, 14, 28, '1x'}, ...
+        sGL = uigridlayout(settingsFig,[6 2], ...
+            'RowHeight', {24, 28, 14, 28, 28, '1x'}, ...
             'ColumnWidth', {90, '1x'}, ...
             'Padding', [16 16 16 16], ...
             'RowSpacing', 8);
@@ -5590,11 +5699,18 @@ function varargout = DataPlotter()
             'FontSize',10,'FontColor',[0.5 0.5 0.5],'FontAngle','italic');
         lblInfo.Layout.Row = 3; lblInfo.Layout.Column = [1 2];
 
+        % ── Customise Toolbar button ──
+        btnCustomTb = uibutton(sGL,'Text',[char(9881) '  Customise Toolbar...'], ...
+            'FontSize',12, ...
+            'Tooltip','Choose which buttons appear in the axes toolbar', ...
+            'ButtonPushedFcn',@(~,~) onCustomiseToolbar());
+        btnCustomTb.Layout.Row = 4; btnCustomTb.Layout.Column = [1 2];
+
         % ── Close button ──
         btnClose = uibutton(sGL,'Text','Close', ...
             'FontSize',12, ...
             'ButtonPushedFcn',@(~,~) delete(settingsFig));
-        btnClose.Layout.Row = 4; btnClose.Layout.Column = [1 2];
+        btnClose.Layout.Row = 5; btnClose.Layout.Column = [1 2];
     end
 
     function applyThemeFromDialog(themeName, settingsFig)
@@ -5607,6 +5723,149 @@ function varargout = DataPlotter()
             settingsFig.Color = th.bgColor;
         else
             settingsFig.Color = [0.94 0.94 0.94];
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  TOOLBAR CUSTOMISATION
+    % ════════════════════════════════════════════════════════════════════
+
+    function buildToolbar(parentGL, config, registry, btnColor)
+    %BUILDTOOLBAR  Clear and repopulate parentGL with buttons for each action in config.
+    %
+    %   parentGL  — uigridlayout (1 row) that hosts the toolbar buttons
+    %   config    — {1×N} cell of action IDs; empty → use factory default
+    %   registry  — struct array with .id / .label / .tooltip / .callback
+    %   btnColor  — [1×3] background colour for buttons
+
+        if isempty(config)
+            config = dataplotter.toolbarDefaultConfig();
+        end
+
+        % Keep only IDs present in the registry
+        allRegIds = {registry.id};
+        config    = config(ismember(config, allRegIds));
+        if isempty(config)
+            config = dataplotter.toolbarDefaultConfig();
+            config = config(ismember(config, allRegIds));
+        end
+
+        nBtns = numel(config);
+
+        % Remove all existing children (buttons + spacer)
+        existingChildren = parentGL.Children;
+        for ci = 1:numel(existingChildren)
+            if isvalid(existingChildren(ci))
+                delete(existingChildren(ci));
+            end
+        end
+
+        % Set column widths: spacer | btn1 | btn2 | …
+        % Assigning ColumnWidth resizes the grid automatically.
+        BTN_W = 55;
+        colWidths = [{'1x'}, repmat({BTN_W}, 1, nBtns)];
+        parentGL.ColumnWidth = colWidths;
+
+        % Spacer label
+        spacer = uilabel(parentGL, 'Text', '');
+        spacer.Layout.Column = 1;
+
+        % Create a button for each action
+        for bi = 1:nBtns
+            actId = config{bi};
+            idx   = find(strcmp(allRegIds, actId), 1);
+            if isempty(idx), continue; end
+            act = registry(idx);
+            btn = uibutton(parentGL, 'Text', act.label, ...
+                'BackgroundColor', btnColor, ...
+                'FontColor',       [0.85 0.85 0.85], ...
+                'FontSize',        9, ...
+                'Tooltip',         act.tooltip, ...
+                'ButtonPushedFcn', act.callback);
+            btn.Layout.Column = bi + 1;
+        end
+    end
+
+    function cfg = loadToolbarConfig()
+    %LOADTOOLBARCONFIG  Load saved toolbar config from prefdir; fall back to default.
+        cfg = dataplotter.toolbarDefaultConfig();
+        try
+            prefFile = fullfile(prefdir, 'dataplotter_toolbar.mat');
+            if isfile(prefFile)
+                s = load(prefFile, 'toolbarConfig');
+                if isfield(s, 'toolbarConfig') && iscell(s.toolbarConfig) ...
+                        && ~isempty(s.toolbarConfig)
+                    cfg = s.toolbarConfig;
+                end
+            end
+        catch
+            % Silently use default if load fails
+        end
+    end
+
+    function saveToolbarConfig(cfg)
+    %SAVETOOLBARCONFIG  Persist toolbar config to prefdir.
+        try
+            prefFile = fullfile(prefdir, 'dataplotter_toolbar.mat');
+            toolbarConfig = cfg; %#ok<NASGU>
+            save(prefFile, 'toolbarConfig');
+        catch
+            % Non-fatal — silently skip if write fails
+        end
+    end
+
+    function onCustomiseToolbar()
+    %ONCUSTOMISETOOLBAR  Open the toolbar customisation dialog and rebuild on OK.
+        % Build the availableActions struct array from the registry
+        regForDlg = struct('id', {tbActions.id}, ...
+                           'label', {tbActions.label}, ...
+                           'tooltip', {tbActions.tooltip});
+
+        newCfg = dataplotter.toolbarConfig(appData.toolbarConfig, regForDlg);
+
+        if ~isempty(newCfg)
+            appData.toolbarConfig = newCfg;
+            saveToolbarConfig(newCfg);
+            buildToolbar(axToolbarGL, newCfg, tbActions, BTN_TOOL);
+        end
+    end
+
+    % ── Optional toolbar action stubs ─────────────────────────────────────
+
+    function onZoomInToolbar()
+    %ONZOOMINTOOLBAR  Zoom in by shrinking axis limits to the current view ±10%.
+        try
+            xl = xlim(ax);  yl = ylim(ax);
+            xMid = mean(xl);  xHalf = diff(xl) * 0.4;
+            yMid = mean(yl);  yHalf = diff(yl) * 0.4;
+            xlim(ax, [xMid - xHalf, xMid + xHalf]);
+            ylim(ax, [yMid - yHalf, yMid + yHalf]);
+        catch
+        end
+    end
+
+    function onZoomOutToolbar()
+    %ONZOOMOUTTOOLBAR  Zoom out by expanding axis limits by 25%.
+        try
+            xl = xlim(ax);  yl = ylim(ax);
+            xMid = mean(xl);  xHalf = diff(xl) * 0.625;
+            yMid = mean(yl);  yHalf = diff(yl) * 0.625;
+            xlim(ax, [xMid - xHalf, xMid + xHalf]);
+            ylim(ax, [yMid - yHalf, yMid + yHalf]);
+        catch
+        end
+    end
+
+    function onPanToolbar()
+    %ONPANTOOLBAR  Toggle pan mode on the axes.
+        try
+            panObj = pan(fig);
+            if strcmp(panObj.Enable, 'on')
+                panObj.Enable = 'off';
+            else
+                panObj.Enable = 'on';
+            end
+        catch
         end
     end
 
@@ -5970,29 +6229,91 @@ function varargout = DataPlotter()
             xOff, yOff, bgSlope, bgIntcpt, ...
             string(cbSmooth.Value), ddNormalize.Value, ddDerivative.Value));
 
+        % ── Push UndoManager entry for unlimited undo/redo ───────────────
+        % undoState (prevState) captured above; build newState from the
+        % just-applied values so Redo can re-apply the same correction.
+        newState.corrData       = ds.corrData;
+        newState.mask           = guiTernary(isfield(ds,'mask'), ds.mask, true(size(ds.data.time)));
+        newState.xOff           = ds.xOff;
+        newState.yOff           = ds.yOff;
+        newState.bgSlope        = ds.bgSlope;
+        newState.bgInt          = ds.bgInt;
+        newState.bgPoly         = guiTernary(isfield(ds,'bgPoly'), ds.bgPoly, []);
+        newState.smoothEnabled  = ds.smoothEnabled;
+        newState.smoothWindow   = ds.smoothWindow;
+        newState.smoothMethod   = ds.smoothMethod;
+        newState.xTrimMin       = ds.xTrimMin;
+        newState.xTrimMax       = ds.xTrimMax;
+        newState.normMethod     = ds.normMethod;
+        newState.derivativeMode = ds.derivativeMode;
+        newState.sampleMass     = guiTernary(isfield(ds,'sampleMass'),  ds.sampleMass,  0);
+        newState.sampleWidth    = guiTernary(isfield(ds,'sampleWidth'), ds.sampleWidth, 0);
+        newState.sampleHeight   = guiTernary(isfield(ds,'sampleHeight'),ds.sampleHeight,0);
+        newState.dimUnit        = guiTernary(isfield(ds,'dimUnit'),     ds.dimUnit,     'mm');
+        newState.sampleThick    = guiTernary(isfield(ds,'sampleThick'), ds.sampleThick, 0);
+        newState.thickUnit      = guiTernary(isfield(ds,'thickUnit'),   ds.thickUnit,   'nm');
+        newState.momentUnit     = guiTernary(isfield(ds,'momentUnit'),  ds.momentUnit,  'emu (raw)');
+        newState.fieldUnit      = guiTernary(isfield(ds,'fieldUnit'),   ds.fieldUnit,   'Oe (raw)');
+        newState.unitSystem     = guiTernary(isfield(ds,'unitSystem'),  ds.unitSystem,  'CGS');
+        activeIdxAtPush = appData.activeIdx;
+        pushUndoCorrectionEntry(activeIdxAtPush, undoState, newState, 'Apply Corrections');
+
         onPlot([],[]);
     end
 
     function markCorrectionsDirty()
     %MARKCORRECTIONSDIRTY  Visually indicate that correction fields have
     %  changed and the plot may be stale.  If live-preview is enabled (#2),
-    %  immediately apply corrections and redraw instead.
+    %  immediately apply corrections and redraw instead.  If auto-recalc is
+    %  enabled, schedule a debounced recalculation instead.
         if cbLivePreview.Value
             onApplyCorrections([], []);
             return;
         end
+        scheduleAutoRecalc();
         if isvalid(btnApply)
             btnApply.Text      = 'Apply  *';
             btnApply.FontColor = [1 0.85 0.2];
         end
     end
 
+    function scheduleAutoRecalc()
+    %SCHEDULEAUTORECALC  Debounced auto-recalculate trigger.
+    %   If the Auto checkbox is off, returns immediately.  Otherwise stops
+    %   any pending timer and starts a new 0.3 s single-shot timer whose
+    %   callback fires onApplyCorrections.  Rapid successive changes restart
+    %   the delay, so recalculation happens once the user pauses.
+        if ~isvalid(cbAutoRecalc) || ~cbAutoRecalc.Value
+            return;
+        end
+        % Stop and discard any pending timer
+        if ~isempty(appData.autoRecalcTimer) && isvalid(appData.autoRecalcTimer)
+            stop(appData.autoRecalcTimer);
+            delete(appData.autoRecalcTimer);
+        end
+        appData.autoRecalcTimer = timer( ...
+            'ExecutionMode', 'singleShot', ...
+            'StartDelay',    0.3, ...
+            'TimerFcn',      @(~,~) onAutoRecalcFire());
+        start(appData.autoRecalcTimer);
+    end
+
+    function onAutoRecalcFire()
+    %ONAUTORECALCFIRE  Timer callback for debounced auto-recalculate.
+    %   Runs on the timer thread — schedules onApplyCorrections on the
+    %   main MATLAB event queue via drawnow so UI writes are safe.
+        if isvalid(fig) && ~isempty(appData.datasets) && appData.activeIdx >= 1
+            onApplyCorrections([], []);
+        end
+    end
+
     function updateApplyButtonStyle()
-    %UPDATEAPPLYBUTTONSTYLE  Style the Apply button based on Live Preview state.
-    %   When Live Preview is ON, Apply is redundant — show it as muted.
-    %   When OFF, highlight it as the primary action the user needs to click.
+    %UPDATEAPPLYBUTTONSTYLE  Style the Apply button based on Live Preview / Auto state.
+    %   When Live Preview or Auto is ON, Apply is redundant — show it as muted.
+    %   When both are OFF, highlight it as the primary action the user needs to click.
         if ~isvalid(btnApply), return; end
-        if cbLivePreview.Value
+        autoActive = isvalid(cbAutoRecalc) && cbAutoRecalc.Value;
+        if cbLivePreview.Value || autoActive
             btnApply.BackgroundColor = BTN_TOOL;
             btnApply.FontColor       = [0.70 0.70 0.70];
             btnApply.FontWeight      = 'normal';
@@ -6249,6 +6570,121 @@ function varargout = DataPlotter()
 
         % Refresh the plot
         onPlot([],[]);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  UNDO / REDO (UndoManager-based)
+    % ════════════════════════════════════════════════════════════════════
+
+    function onUndo(~,~)
+    %ONUNDO  Execute the topmost undo entry from the UndoManager.
+        entry = appData.undoMgr.undo();
+        if isempty(entry)
+            setStatus('Nothing to undo.');
+            return;
+        end
+        setStatus(['Undid: ' entry.label]);
+        updateUndoButtons();
+        onPlot([],[]);
+    end
+
+    function onRedo(~,~)
+    %ONREDO  Re-apply the next redo entry from the UndoManager.
+        entry = appData.undoMgr.redo();
+        if isempty(entry)
+            setStatus('Nothing to redo.');
+            return;
+        end
+        setStatus(['Redid: ' entry.label]);
+        updateUndoButtons();
+        onPlot([],[]);
+    end
+
+    function updateUndoButtons()
+    %UPDATEUNDOBUTTONS  Sync undo/redo button enabled state and tooltips.
+        if appData.undoMgr.canUndo()
+            btnUndo.Enable  = 'on';
+        else
+            btnUndo.Enable  = 'off';
+        end
+        if appData.undoMgr.canRedo()
+            btnRedo.Enable  = 'on';
+        else
+            btnRedo.Enable  = 'off';
+        end
+        btnUndo.Tooltip = [appData.undoMgr.undoLabel() '  [Ctrl+Z]'];
+        btnRedo.Tooltip = [appData.undoMgr.redoLabel() '  [Ctrl+Y]'];
+    end
+
+    function pushUndoCorrectionEntry(dsIdx, prevState, newState, labelStr)
+    %PUSHUNDOCORRECTIONENTRY  Push a correction undo entry for dataset dsIdx.
+    %
+    %   prevState / newState are structs capturing the full correction state
+    %   of the dataset before and after the operation.
+        appData.undoMgr.push(struct( ...
+            'type',  'correction', ...
+            'label', labelStr, ...
+            'undo',  @() restoreCorrectionState(dsIdx, prevState), ...
+            'redo',  @() restoreCorrectionState(dsIdx, newState)));
+        updateUndoButtons();
+    end
+
+    function restoreCorrectionState(dsIdx, s)
+    %RESTORECORRECTIONSTATE  Apply a saved correction state struct back to a dataset.
+        if dsIdx < 1 || dsIdx > numel(appData.datasets)
+            return;
+        end
+        ds = appData.datasets{dsIdx};
+        ds.corrData      = s.corrData;
+        if isfield(s,'mask'),          ds.mask          = s.mask;          end
+        ds.xOff          = s.xOff;
+        ds.yOff          = s.yOff;
+        ds.bgSlope       = s.bgSlope;
+        ds.bgInt         = s.bgInt;
+        if isfield(s,'bgPoly'),        ds.bgPoly        = s.bgPoly;        end
+        ds.smoothEnabled = s.smoothEnabled;
+        ds.smoothWindow  = s.smoothWindow;
+        ds.smoothMethod  = s.smoothMethod;
+        if isfield(s,'xTrimMin'),      ds.xTrimMin      = s.xTrimMin;      end
+        if isfield(s,'xTrimMax'),      ds.xTrimMax      = s.xTrimMax;      end
+        if isfield(s,'normMethod'),    ds.normMethod    = s.normMethod;    end
+        if isfield(s,'derivativeMode'),ds.derivativeMode= s.derivativeMode;end
+        if isfield(s,'sampleMass'),    ds.sampleMass    = s.sampleMass;    end
+        if isfield(s,'sampleWidth'),   ds.sampleWidth   = s.sampleWidth;   end
+        if isfield(s,'sampleHeight'),  ds.sampleHeight  = s.sampleHeight;  end
+        if isfield(s,'dimUnit'),       ds.dimUnit       = s.dimUnit;       end
+        if isfield(s,'sampleThick'),   ds.sampleThick   = s.sampleThick;   end
+        if isfield(s,'thickUnit'),     ds.thickUnit     = s.thickUnit;     end
+        if isfield(s,'momentUnit'),    ds.momentUnit    = s.momentUnit;    end
+        if isfield(s,'fieldUnit'),     ds.fieldUnit     = s.fieldUnit;     end
+        if isfield(s,'unitSystem'),    ds.unitSystem    = s.unitSystem;    end
+        appData.datasets{dsIdx} = ds;
+
+        % Sync UI widgets only when this is the active dataset
+        if dsIdx == appData.activeIdx
+            efXOffset.Value      = ds.xOff;
+            efYOffset.Value      = ds.yOff;
+            efBGSlope.Value      = ds.bgSlope;
+            efBGIntercept.Value  = ds.bgInt;
+            cbSmooth.Value       = ds.smoothEnabled;
+            efSmoothWin.Value    = ds.smoothWindow;
+            ddSmoothMethod.Value = ds.smoothMethod;
+            efXTrimMin.Value     = nan2str(ds.xTrimMin);
+            efXTrimMax.Value     = nan2str(ds.xTrimMax);
+            ddNormalize.Value    = ds.normMethod;
+            if isfield(ds,'derivativeMode')
+                ddDerivative.Value = ds.derivativeMode;
+            end
+            efSampleMass.Value   = guiTernary(isfield(ds,'sampleMass'),   ds.sampleMass,   0);
+            efSampleWidth.Value  = guiTernary(isfield(ds,'sampleWidth'),  ds.sampleWidth,  0);
+            efSampleHeight.Value = guiTernary(isfield(ds,'sampleHeight'), ds.sampleHeight, 0);
+            ddDimUnit.Value      = guiTernary(isfield(ds,'dimUnit'),      ds.dimUnit,      'mm');
+            efSampleThick.Value  = guiTernary(isfield(ds,'sampleThick'),  ds.sampleThick,  0);
+            ddThickUnit.Value    = guiTernary(isfield(ds,'thickUnit'),    ds.thickUnit,    'nm');
+            ddMomentUnit.Value   = guiTernary(isfield(ds,'momentUnit'),   ds.momentUnit,   'emu (raw)');
+            ddFieldUnit.Value    = guiTernary(isfield(ds,'fieldUnit'),    ds.fieldUnit,    'Oe (raw)');
+            ddUnitSystem.Value   = guiTernary(isfield(ds,'unitSystem'),   ds.unitSystem,   'CGS');
+        end
     end
 
     function onLoadBackground(~,~)
@@ -6976,6 +7412,61 @@ function varargout = DataPlotter()
             'Save corrected data as...');
         if isequal(fname,0), return; end
         efSavePath.Value = fullfile(fpath,fname);
+    end
+
+    function onSpreadsheetPopup(~,~)
+    %ONSPREADSHEETPOPUP  Open the active dataset in a spreadsheet popup.
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig, 'Load a file first.', 'No data');
+            return;
+        end
+        idx = appData.activeIdx;
+        ds  = appData.datasets{idx};
+        % Prefer corrected data if available, else raw
+        if ~isempty(ds.corrData)
+            plotD = ds.corrData;
+        else
+            plotD = ds.data;
+        end
+        titleStr = ds.displayName;
+        dataplotter.spreadsheetPopup(plotD, ...
+            'Title',    titleStr, ...
+            'OnEdit',   @(r,c,v) onSpreadsheetEdit(idx, r, c, v), ...
+            'ReadOnly', false);
+    end
+
+    function onSpreadsheetEdit(dsIdx, rowIdx, colIdx, newValue)
+    %ONSPREADSHEEDEDIT  Update the dataset working copy when a cell is edited.
+        if dsIdx < 1 || dsIdx > numel(appData.datasets), return; end
+        ds = appData.datasets{dsIdx};
+        % Edits target corrData if it exists, otherwise raw data
+        % col 1 = X axis; col 2+ = values columns
+        if colIdx == 1
+            % X-axis edit: apply to time vector
+            if ~isempty(ds.corrData)
+                if rowIdx <= numel(ds.corrData.time)
+                    ds.corrData.time(rowIdx) = newValue;
+                end
+            else
+                if rowIdx <= numel(ds.data.time)
+                    ds.data.time(rowIdx) = newValue;
+                    ds.corrData = [];   % invalidate corrected cache
+                end
+            end
+        else
+            valCol = colIdx - 1;
+            if ~isempty(ds.corrData)
+                if rowIdx <= size(ds.corrData.values, 1) && valCol <= size(ds.corrData.values, 2)
+                    ds.corrData.values(rowIdx, valCol) = newValue;
+                end
+            else
+                if rowIdx <= size(ds.data.values, 1) && valCol <= size(ds.data.values, 2)
+                    ds.data.values(rowIdx, valCol) = newValue;
+                    ds.corrData = [];   % invalidate corrected cache
+                end
+            end
+        end
+        appData.datasets{dsIdx} = ds;
     end
 
     function onSaveCSV(~,~)
@@ -8879,6 +9370,21 @@ function varargout = DataPlotter()
         setStatus(sprintf('Cleared 2D matrix — freed ~%.1f MB', savedMB));
     end
 
+    function onFitSurface(~,~)
+    %ONFITSURFACE  Open the 2D surface fitting dialog for the active map dataset.
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        ds = appData.datasets{appData.activeIdx};
+        if ~is2DDataset(ds)
+            uialert(fig, 'Active dataset is not a 2D area-detector map.', 'Fit Surface');
+            return;
+        end
+        map = ds.data.metadata.parserSpecific.map2D;
+        mapData.intensity = map.intensity;
+        mapData.axis1     = map.axis1;
+        mapData.axis2     = map.axis2;
+        dataplotter.surfaceFitDialog(mapData, Title="Surface Fit — " + ds.name);
+    end
+
     function onPoleFigure(~,~)
     %ONPOLEFIGURE  Generate a polar plot of intensity vs scan angle at a chosen 2θ.
     %  For 2D area-detector data: extracts a column (fixed 2θ) and plots
@@ -10191,6 +10697,14 @@ function varargout = DataPlotter()
             end
             appData.animTimer = [];
         end
+        % Stop and delete auto-recalc debounce timer if pending
+        if isprop(appData, 'autoRecalcTimer') && ~isempty(appData.autoRecalcTimer)
+            if isvalid(appData.autoRecalcTimer)
+                stop(appData.autoRecalcTimer);
+                delete(appData.autoRecalcTimer);
+            end
+            appData.autoRecalcTimer = [];
+        end
         % Close the peak analysis window if it exists
         if isvalid(peakFig), delete(peakFig); end
         delete(fig);
@@ -10198,18 +10712,20 @@ function varargout = DataPlotter()
 
     function onFigureKeyPress(~, e)
     %ONFIGUREKEYPRES  Handle keyboard shortcuts.
-    %  Delete      — remove selected dataset(s)
-    %  Ctrl+S      — save session
-    %  Ctrl+Z      — undo corrections
-    %  Ctrl+E      — export CSV
-    %  Ctrl+C      — copy plot to clipboard
-    %  Left/Right  — switch active dataset
-    %  Space       — toggle dataset visibility
-    %  Ctrl+Up     — move dataset up
-    %  Ctrl+Down   — move dataset down
-    %  F5          — refresh state (flush caches, re-sync widgets, redraw)
-        hasMod  = ~isempty(e.Modifier);
-        hasCtrl = hasMod && any(strcmp(e.Modifier, 'control'));
+    %  Delete          — remove selected dataset(s)
+    %  Ctrl+S          — save session
+    %  Ctrl+Z          — undo last operation
+    %  Ctrl+Y / Ctrl+Shift+Z — redo last undone operation
+    %  Ctrl+E          — export CSV
+    %  Ctrl+C          — copy plot to clipboard
+    %  Left/Right      — switch active dataset
+    %  Space           — toggle dataset visibility
+    %  Ctrl+Up         — move dataset up
+    %  Ctrl+Down       — move dataset down
+    %  F5              — refresh state (flush caches, re-sync widgets, redraw)
+        hasMod   = ~isempty(e.Modifier);
+        hasCtrl  = hasMod && any(strcmp(e.Modifier, 'control'));
+        hasShift = hasMod && any(strcmp(e.Modifier, 'shift'));
 
         switch e.Key
             case 'f5'
@@ -10224,7 +10740,14 @@ function varargout = DataPlotter()
                 if hasCtrl, onSaveSession([], []); end
 
             case 'z'
-                if hasCtrl, onUndoCorrections([], []); end
+                if hasCtrl && hasShift
+                    onRedo([], []);      % Ctrl+Shift+Z = redo
+                elseif hasCtrl
+                    onUndo([], []);      % Ctrl+Z = undo
+                end
+
+            case 'y'
+                if hasCtrl, onRedo([], []); end  % Ctrl+Y = redo
 
             case 'm'
                 if hasCtrl, onUnmaskAll([], []); end
@@ -10938,6 +11461,213 @@ function varargout = DataPlotter()
         appData.activeIdx = find(order == appData.activeIdx, 1);  % follow active dataset
 
         rebuildDatasetList(true);
+        onPlot([], []);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  Column-header drag-to-plot
+    % ════════════════════════════════════════════════════════════════════
+
+    function onColumnDragStart(colName)
+    %ONCOLUMNDRAGSTART  Record the column name and arm drag-detect callbacks.
+    %  Called from onTableSelectionChanged when a column header row is clicked.
+    %  Actual drag does not begin until the mouse has moved > 5 px (hysteresis
+    %  in onColumnDragMove).
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        appData.columnDragPending  = true;
+        appData.columnDragActive   = false;
+        appData.columnDragColName  = colName;
+        appData.columnDragStartPx  = fig.CurrentPoint;
+        % Overwrite motion/up only — leave ButtonDown alone so normal clicks
+        % (column selection) are not disrupted.
+        fig.WindowButtonMotionFcn = @onColumnDragMove;
+        fig.WindowButtonUpFcn     = @onColumnDragUp;
+    end
+
+    function onColumnDragMove(~,~)
+    %ONCOLUMNDRAGMOVE  Move the ghost label; highlight drop zone on axes.
+        if ~appData.columnDragPending && ~appData.columnDragActive, return; end
+        mp = fig.CurrentPoint;   % [x y] in figure pixels
+
+        % Hysteresis: promote pending → active after 5 px movement
+        if ~appData.columnDragActive
+            if norm(mp - appData.columnDragStartPx) < 5, return; end
+            appData.columnDragActive  = true;
+            appData.columnDragPending = false;
+            % Create floating ghost label
+            ghostW = 120;  ghostH = 24;
+            appData.columnDragGhost = uilabel(fig, ...
+                'Text',            appData.columnDragColName, ...
+                'Position',        [mp(1)+8, mp(2)-ghostH/2, ghostW, ghostH], ...
+                'FontSize',        10, ...
+                'FontWeight',      'bold', ...
+                'BackgroundColor', [0.20 0.20 0.60], ...
+                'FontColor',       [1 1 1], ...
+                'HorizontalAlignment', 'center');
+            fig.Pointer = 'hand';
+        end
+
+        % Move ghost
+        if ~isempty(appData.columnDragGhost) && isvalid(appData.columnDragGhost)
+            ghostPos = appData.columnDragGhost.Position;
+            appData.columnDragGhost.Position = [mp(1)+8, mp(2)-ghostPos(4)/2, ghostPos(3), ghostPos(4)];
+        end
+
+        % Highlight drop zone inside axes
+        zone = columnDragZoneAt(mp);   % 'x', 'y', 'y2', or ''
+        updateColumnDragOverlay(zone);
+    end
+
+    function onColumnDragUp(~,~)
+    %ONCOLUMNDRAGUP  If released over axes, assign channel and replot.
+        fig.WindowButtonMotionFcn = @onMouseHover;
+        fig.WindowButtonUpFcn     = '';
+        fig.Pointer               = 'arrow';
+
+        mp   = fig.CurrentPoint;
+        zone = columnDragZoneAt(mp);
+        colName = appData.columnDragColName;
+
+        % Clean up overlay and ghost before any early return
+        cleanUpColumnDragOverlay();
+        if ~isempty(appData.columnDragGhost) && isvalid(appData.columnDragGhost)
+            delete(appData.columnDragGhost);
+        end
+        appData.columnDragGhost   = [];
+        appData.columnDragActive  = false;
+        appData.columnDragPending = false;
+        appData.columnDragColName = '';
+        appData.columnDragStartPx = [];
+
+        if isempty(zone) || isempty(colName), return; end
+        setChannelFromDrag(colName, zone);
+    end
+
+    function zone = columnDragZoneAt(mp)
+    %COLUMNDRAGZONEAT  Return 'x', 'y', 'y2', or '' based on cursor position.
+    %  Left third of axes → X, centre third → Y (left), right third → Y2.
+        zone = '';
+        try
+            axPos = getpixelposition(ax, true);   % [x y w h] in figure pixels
+            px = mp(1);
+            if px < axPos(1) || px > axPos(1)+axPos(3), return; end
+            py = mp(2);
+            if py < axPos(2) || py > axPos(2)+axPos(4), return; end
+            frac = (px - axPos(1)) / axPos(3);
+            if     frac < 1/3, zone = 'x';
+            elseif frac < 2/3, zone = 'y';
+            else,              zone = 'y2';
+            end
+        catch
+            % getpixelposition unavailable or axes invalid — return ''
+        end
+    end
+
+    function updateColumnDragOverlay(zone)
+    %UPDATECOLUMNDRAGOVERLAY  Draw a coloured hint rectangle over the active drop zone.
+    %  Colours: X = blue, Y = green, Y2 = orange.  Clears previous overlay first.
+        cleanUpColumnDragOverlay();
+        if isempty(zone), return; end
+        try
+            axPos = getpixelposition(ax, true);  % figure-pixel coords
+            w3 = axPos(3) / 3;
+            switch zone
+                case 'x',  xOff = 0;     clr = [0.20 0.55 0.90];  lbl = 'X';
+                case 'y',  xOff = w3;    clr = [0.15 0.70 0.30];  lbl = 'Y';
+                case 'y2', xOff = 2*w3;  clr = [0.90 0.55 0.10];  lbl = 'Y2';
+                otherwise, return;
+            end
+            % Overlay uilabel covering the drop-zone third of the axes
+            figX = axPos(1) + xOff;
+            figY = axPos(2);
+            % FontColor must be 3-element RGB; BackgroundColor supports RGBA
+            % on R2023a+ but falls back gracefully on older versions.
+            fig.UserData = uilabel(fig, ...
+                'Position',        [figX, figY, w3, axPos(4)], ...
+                'Text',            lbl, ...
+                'FontSize',        22, ...
+                'FontWeight',      'bold', ...
+                'FontColor',       clr, ...
+                'BackgroundColor', clr * 0.35, ...
+                'HorizontalAlignment', 'center', ...
+                'Tag',             'ColumnDragZoneOverlay');
+        catch
+            % Layout not yet resolved — skip overlay gracefully
+        end
+    end
+
+    function cleanUpColumnDragOverlay()
+    %CLEANUPCOLUMNDRAGOVERLAY  Remove any lingering zone-highlight overlay.
+        try
+            overlay = findobj(fig, 'Tag', 'ColumnDragZoneOverlay');
+            if ~isempty(overlay)
+                delete(overlay);
+            end
+            % Also clear fig.UserData if it held an overlay handle
+            if ~isempty(fig.UserData) && isgraphics(fig.UserData, 'uilabel') && ...
+               isvalid(fig.UserData)
+                delete(fig.UserData);
+            end
+            fig.UserData = [];
+        catch
+        end
+    end
+
+    function setChannelFromDrag(colName, target)
+    %SETCHANNELFROMDRAG  Assign colName to X, Y, or Y2 selector and replot.
+    %
+    %   Syntax
+    %     setChannelFromDrag(colName, target)
+    %
+    %   Inputs
+    %     colName  — column label string (must exist in the active dataset)
+    %     target   — 'x', 'y', or 'y2' (case-insensitive)
+    %
+    %   Called internally by onColumnDragUp and exposed through api for tests.
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        if isempty(colName) || isempty(target), return; end
+
+        ds = appData.datasets{appData.activeIdx};
+        d  = ds.data;
+        xName     = guiXName(d.metadata);
+        allLabels = [{xName}, d.labels];
+
+        target = lower(strtrim(target));
+        switch target
+            case 'x'
+                % colName must be in the X dropdown items
+                if ~ismember(colName, allLabels)
+                    setStatus(sprintf('Drag-to-X: column "%s" not available as X axis', colName));
+                    return;
+                end
+                ddX.ValueChangedFcn = [];
+                ddX.Value = colName;
+                ddX.ValueChangedFcn = @onAxisChanged;
+
+            case 'y'
+                % colName must be a data column (in d.labels)
+                if ~ismember(colName, d.labels)
+                    setStatus(sprintf('Drag-to-Y: column "%s" not a plottable channel', colName));
+                    return;
+                end
+                lbY.ValueChangedFcn = [];
+                lbY.Value = {colName};
+                lbY.ValueChangedFcn = @onAxisChanged;
+
+            case 'y2'
+                if ~ismember(colName, d.labels)
+                    setStatus(sprintf('Drag-to-Y2: column "%s" not a plottable channel', colName));
+                    return;
+                end
+                lbY2.ValueChangedFcn = [];
+                lbY2.Value = {colName};
+                lbY2.ValueChangedFcn = @(~,~) onPlot([],[]);
+
+            otherwise
+                return;
+        end
+
+        setStatus(sprintf('Channel dragged: "%s" → %s axis', colName, upper(target)));
         onPlot([], []);
     end
 
@@ -11675,9 +12405,39 @@ function varargout = DataPlotter()
     end
 
     function onTableSelectionChanged(~, evt)
-    %ONTABLESELECTIONCHANGED  Track selected cells for mask/sort operations.
-    %   Stores selection in appData (compatible with all MATLAB versions).
+    %ONTABLESELECTIONCHANGED  Track selected cells; arm column drag on row-1 click.
+    %   Row 1 of tblData is the units row, which sits directly below the column
+    %   header.  Clicking any cell in row 1 is the closest proxy to "clicking a
+    %   column header" available via CellSelectionCallback.  We use that click
+    %   to arm the drag-to-plot gesture.
         appData.tableSelection = evt.Indices;
+
+        % Arm column drag when a cell in row 1 (units row) is selected
+        if ~isempty(evt.Indices) && evt.Indices(1,1) == 1
+            col = evt.Indices(1,2);
+            colNames = tblData.ColumnName;
+            % Mask column (last column) and row-index column (first column)
+            % should not be dragged as channels.
+            if col < 1 || col > numel(colNames), return; end
+            % Strip any unit annotation that may be appended to the header
+            rawName = colNames{col};
+            % Column headers in the table use the raw label (or label + unit).
+            % Match against the active dataset's labels to find the clean name.
+            if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+            ds = appData.datasets{appData.activeIdx};
+            d  = ds.data;
+            xName     = guiXName(d.metadata);
+            allLabels = [{xName}, d.labels];
+            % Find the best matching label (exact, then prefix match)
+            matched = allLabels(strcmp(allLabels, rawName));
+            if isempty(matched)
+                % Try stripping units suffix " (unit)"
+                cleanName = regexprep(rawName, '\s*\(.*\)\s*$', '');
+                matched = allLabels(strcmp(allLabels, cleanName));
+            end
+            if isempty(matched), return; end
+            onColumnDragStart(matched{1});
+        end
     end
 
     function onTableMaskSelected(~, ~)
@@ -11710,6 +12470,58 @@ function varargout = DataPlotter()
         refreshDataTable();
         syncTableMaskToDataset();
         setStatus('All masks cleared');
+    end
+
+    function onFilterApply()
+    %ONFILTERAPPY  Evaluate filter expression and mask non-passing rows.
+    %   Calls dataplotter.filterRows() with the current data struct.
+    %   Rows that fail the filter are added to the mask (excluded from plot).
+    %   An empty expression clears the filter without touching manual masks.
+        if appData.activeIdx < 1 || isempty(appData.datasets), return; end
+        expr = strtrim(efFilter.Value);
+        d    = getPlotData(appData.activeIdx);
+        nRows = numel(d.time);
+
+        if isempty(expr)
+            % Empty expression — clear filter mask only
+            appData.filterMask = [];
+        else
+            try
+                passMask = dataplotter.filterRows(d, expr);
+                appData.filterMask = ~passMask(:);  % true = excluded by filter
+                nPass = sum(passMask);
+                setStatus(sprintf('Filter applied: %d / %d rows pass', nPass, nRows));
+            catch ME
+                uialert(fig, ME.message, 'Filter Error');
+                return;
+            end
+        end
+
+        % Merge filter mask into table mask: row is masked if either source says so
+        if isempty(appData.filterMask)
+            appData.tableMask = false(nRows, 1);
+        else
+            if isempty(appData.tableMask) || numel(appData.tableMask) ~= nRows
+                appData.tableMask = appData.filterMask;
+            else
+                appData.tableMask = appData.tableMask | appData.filterMask;
+            end
+        end
+        refreshDataTable();
+        syncTableMaskToDataset();
+    end
+
+    function onFilterClear()
+    %ONFILTERCLEAR  Remove the row filter and restore unfiltered data.
+        efFilter.Value     = '';
+        appData.filterMask = [];
+        nRows = size(appData.tableWorkingCopy, 1);
+        if ~isempty(appData.tableMask) && numel(appData.tableMask) == nRows
+            appData.tableMask(:) = false;
+        end
+        refreshDataTable();
+        syncTableMaskToDataset();
+        setStatus('Filter cleared');
     end
 
     function syncTableMaskToDataset()

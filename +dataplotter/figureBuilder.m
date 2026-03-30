@@ -93,8 +93,16 @@ BTN_FG      = options.ButtonColors.fg;
 
         % Row 1: template, error style, line style
         uilabel(gGL,'Text','Template:','HorizontalAlignment','right','FontSize',9);
+        savedTmplNames = plotting.plotTemplate('list');
+        builtinItems   = {'None','APS (Phys Rev)','Nature','ACS','Custom'};
+        if ~isempty(savedTmplNames)
+            userItems = cellfun(@(n) ['User: ' n], savedTmplNames, ...
+                'UniformOutput', false);
+        else
+            userItems = {};
+        end
         ddTemplate = uidropdown(gGL, ...
-            'Items', {'None','APS (Phys Rev)','Nature','ACS','Custom'}, ...
+            'Items', [builtinItems, userItems(:)'], ...
             'Value', 'None', ...
             'ValueChangedFcn', @onTemplateChanged, ...
             'FontSize', 9);
@@ -174,6 +182,19 @@ BTN_FG      = options.ButtonColors.fg;
                     spBFigW.Value = 3.25; spBFigH.Value = 2.5;
                     spFont.Value = 8; ddFontName.Value = 'Helvetica';
                 otherwise
+                    % User-saved template: "User: <name>"
+                    if startsWith(tmpl, 'User: ')
+                        nm = tmpl(7:end);   % strip "User: " prefix
+                        try
+                            ut = plotting.plotTemplate('load', Name=nm);
+                            ap = ut.axesProps;
+                            spBFigW.Value = ut.figureProps.Width  / 96;
+                            spBFigH.Value = ut.figureProps.Height / 96;
+                            spFont.Value  = ap.FontSize;
+                        catch
+                            % template file missing or corrupt — ignore
+                        end
+                    end
                     % None / Custom — leave as-is
             end
         end
@@ -1831,6 +1852,25 @@ BTN_FG      = options.ButtonColors.fg;
                 'ClickedCallback', @(~,~) addPeakLabels(outFig));
             uipushtool(tb, 'Tooltip', 'Add inset zoom', ...
                 'ClickedCallback', @(~,~) addInsetZoom(outFig));
+            % ── Template tools ──
+            uipushtool(tb, 'Tooltip', 'Save as Template', ...
+                'ClickedCallback', @(~,~) onSaveTemplate(outFig));
+            uipushtool(tb, 'Tooltip', 'Apply Template', ...
+                'ClickedCallback', @(~,~) onApplyTemplate(outFig));
+        end
+
+        function onSaveTemplate(outFig)
+        %ONSAVETEMPLATE  Save current figure style as a reusable template.
+            axList = findobj(outFig, 'Type', 'axes');
+            if isempty(axList), return; end
+            plotting.templateDialog(axList(1), 'save');
+        end
+
+        function onApplyTemplate(outFig)
+        %ONAPPLYTEMPLATE  Open Apply Template dialog for the first axes of outFig.
+            axList = findobj(outFig, 'Type', 'axes');
+            if isempty(axList), return; end
+            plotting.templateDialog(axList(1), 'apply');
         end
 
         function addHRefLine(outFig)

@@ -121,6 +121,7 @@ classdef AppState < handle
         tableWorkingCopy double = []
         tableUnits      cell   = {}
         tableMask       logical = logical([])
+        filterMask      logical = logical([])  % [N×1] logical from filter bar; [] = no filter
         tableEdited     logical = false
         tableRowCap     double  = 500
         tableSelection  double  = []   % [Nx2] selected cells from CellSelectionCallback
@@ -149,6 +150,9 @@ classdef AppState < handle
         % ── Animation timer ────────────────────────────────────────
         animTimer                 = []
 
+        % ── Auto-recalculate debounce timer ────────────────────────
+        autoRecalcTimer           = []
+
         % ── Theme ──────────────────────────────────────────────────
         theme            char   = 'dark'
 
@@ -165,6 +169,19 @@ classdef AppState < handle
 
         % ── Dataset groups ────────────────────────────────────────
         datasetGroups             = []   % containers.Map (initialized in DataPlotter)
+
+        % ── Toolbar configuration ─────────────────────────────────
+        toolbarConfig    cell   = {}    % {1×N} ordered action IDs; {} = use default
+
+        % ── Column-to-plot drag state ─────────────────────────────
+        columnDragActive   logical = false  % true while ghost is visible
+        columnDragColName  char    = ''     % name of column being dragged
+        columnDragGhost              = []   % floating uilabel ghost handle
+        columnDragPending  logical = false  % mouse down in table header, not yet moved
+        columnDragStartPx  double  = []     % [x y] fig-pixel coords of button-down
+
+        % ── Undo/redo manager ─────────────────────────────────────
+        undoMgr                      = []   % dataplotter.UndoManager instance
     end
 
     methods

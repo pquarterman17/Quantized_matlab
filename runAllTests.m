@@ -8,7 +8,7 @@ function runAllTests(options)
 %   Name-Value Options:
 %       Group    "all" (default) | "parser" | "batch" | "gui" | "xrd2d" |
 %                "sims" | "em" | "emgui" | "eds" | "eels" | "diffindex" |
-%                "edsquant" | "eels_adv" | "diff_sim" | "fitting"
+%                "edsquant" | "eels_adv" | "diff_sim" | "fitting" | "plotting"
 %                Run only the specified group of test suites.
 %
 %   Groups:
@@ -51,7 +51,7 @@ end
 options.Group = validatestring(options.Group, ...
     ["all", "parser", "batch", "xrd2d", "gui", "calcgui", "sims", "em", "emgui", "eds", ...
      "xrayneutron", "superconductor", "cif", "optics", "vacuum", "electrochemistry", ...
-     "eels", "eels_adv", "diffindex", "diff_sim", "edsquant", "contour", "fitting"]);
+     "eels", "eels_adv", "diffindex", "diff_sim", "edsquant", "contour", "fitting", "plotting"]);
 
 % Build absolute paths to test scripts so `run` works regardless of CWD.
 % Tests are organized into subdirectories: parser/, gui/, imaging/, calc/, batch/
@@ -80,6 +80,11 @@ SUITES = {
     T('gui','test_gui_2d'),                 'gui',    'GUI API: 2D map load, plot types, cuts'
     T('gui','test_gui_phase4'),             'gui',    'GUI API: Q-space, colormap, mixed datasets'
     T('gui','test_gui_buttons'),            'gui',    'GUI buttons: dataset mgmt, plot controls, corrections, toolbar, macros'
+    T('gui','test_toolbarConfig'),          'gui',    'Toolbar customisation: defaults, buildToolbar, save/load, stale IDs'
+    T('gui','test_undoManager'),            'gui',    'UndoManager: push, undo, redo, branch discard, cap, clear, labels'
+    T('gui','test_filterRows'),             'gui',    'filterRows: expression parser, operators, functions, edge cases'
+    T('gui','test_spreadsheetPopup'),       'gui',    'Spreadsheet popup: open, widget, stats, export, ReadOnly, sort, edit'
+    T('gui','test_dragToPlot'),             'gui',    'Drag-column-to-plot: AppState props, setChannelFromDrag API, no-ops'
     T('gui','test_contour_features'),       'contour','Contour/heatmap: gridding, plot styles, edge cases, export'
     T('gui','test_materials_calc_gui'),     'calcgui','Materials calculator GUI API'
     % ── Imaging tests ─────────────────────────────────────────────────
@@ -112,7 +117,14 @@ SUITES = {
     T('fitting','test_reflectivity'),    'fitting', 'Parratt reflectivity, SLD profile, material presets'
     T('fitting','test_hysteresis'),     'fitting', 'Hysteresis loop analysis: Hc, Mr, Ms, SFD, models'
     T('fitting','test_polar'),          'fitting', 'Polar plots for angular-dependent measurements'
-    T('fitting','test_globalfit'),      'fitting', 'Global/shared-parameter fitting'
+    T('fitting','test_globalfit'),       'fitting', 'Global/shared-parameter fitting (sharedMask API)'
+    T('fitting','test_globalCurveFit'), 'fitting', 'Constraint-based global fitting (globalCurveFit)'
+    T('fitting','test_fitBands'),           'fitting', 'Confidence and prediction bands (fitBands)'
+    T('fitting','test_residualDiagnostics'), 'fitting', 'Residual diagnostics: Q-Q, DW, runs test, skewness'
+    T('fitting','test_fitCompare'),          'fitting', 'Model comparison metrics: AIC, BIC, adjR2, F-test'
+    T('fitting','test_surfaceFit'),          'fitting', 'Surface/3D fitting: models, autoGuess, surfaceFit engine'
+    % ── Plotting tests ───────────────────────────────────────────────────
+    T('plotting','test_boxViolinSwarm'),    'plotting', 'Box/violin/swarm plots — objects, KDE, swarm, edge cases'
 };
 
 % Filter by group
