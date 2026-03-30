@@ -18,19 +18,10 @@ arguments
     options.ButtonColors struct = struct('primary', [0.15 0.45 0.75], 'tool', [0.22 0.22 0.28], 'fg', [0.95 0.95 0.95])
 end
 
-BTN_PRIMARY = options.ButtonColors.primary;
-BTN_TOOL    = options.ButtonColors.tool;
-BTN_FG      = options.ButtonColors.fg;
-
-% Local helper: get corrected or raw data for a dataset
-    function d = getPlotData(dsIdx)
-        ds = datasets{dsIdx};
-        if ~isempty(ds.corrData)
-            d = ds.corrData;
-        else
-            d = ds.data;
-        end
-    end
+BTN_PRIMARY  = options.ButtonColors.primary;
+BTN_TOOL     = options.ButtonColors.tool;
+BTN_FG       = options.ButtonColors.fg;
+BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
 
         nDS = numel(datasets);
 
@@ -68,7 +59,7 @@ BTN_FG      = options.ButtonColors.fg;
         uilabel(typeGL,'Text','Figure type:','FontSize',11, ...
             'FontWeight','bold','HorizontalAlignment','right');
         ddFigType = uidropdown(typeGL, ...
-            'Items', {'Multi-Panel','Quick Grid','Waterfall','Overlay + Residual','Normalized Overlay','Before / After','Parameter Evolution','Broken Axis','Confidence Band','Contour / Heatmap'}, ...
+            'Items', {'Multi-Panel','Quick Grid','Waterfall','Overlay + Residual','Normalized Overlay','Before / After','Parameter Evolution','Broken Axis','Confidence Band','Contour / Heatmap','Color Scatter (Z)','Marginal Histogram','Grouped Plot','FFT / Spectral'}, ...
             'Value', 'Multi-Panel', ...
             'ValueChangedFcn', @onTypeChanged);
         uilabel(typeGL,'Text','');  % spacer
@@ -162,6 +153,10 @@ BTN_FG      = options.ButtonColors.fg;
         noWidgets = struct();   % normalized overlay
         peWidgets = struct();   % parameter evolution
         brWidgets = struct();   % broken axis
+        csWidgets = struct();   % color scatter (Z)
+        mhWidgets = struct();   % marginal histogram
+        gpWidgets = struct();   % grouped plot
+        fsWidgets = struct();   % FFT / spectral
 
         % Initial population
         onTypeChanged([], []);
@@ -226,6 +221,14 @@ BTN_FG      = options.ButtonColors.fg;
                     buildConfidenceBandConfig();
                 case 'Contour / Heatmap'
                     buildContourConfig();
+                case 'Color Scatter (Z)'
+                    buildColorScatterZConfig();
+                case 'Marginal Histogram'
+                    buildMarginalHistogramConfig();
+                case 'Grouped Plot'
+                    buildGroupedPlotConfig();
+                case 'FFT / Spectral'
+                    buildFFTSpectralConfig();
             end
         end
 
@@ -325,8 +328,8 @@ BTN_FG      = options.ButtonColors.fg;
         %  CONFIG: Waterfall
         % ────────────────────────────────────────────────────────────────
         function buildWaterfallConfig()
-            gl = uigridlayout(configPanel, [5 4], ...
-                'RowHeight', {22, '1x', 22, 22, 22}, ...
+            gl = uigridlayout(configPanel, [6 4], ...
+                'RowHeight', {22, '1x', 22, 22, 22, 22}, ...
                 'ColumnWidth', {90, '1x', 90, '1x'}, ...
                 'Padding', [8 8 8 8], 'RowSpacing', 4, 'ColumnSpacing', 6);
 
@@ -368,6 +371,24 @@ BTN_FG      = options.ButtonColors.fg;
 
             uilabel(gl,'Text','Title:','HorizontalAlignment','right','FontSize',9);
             wfWidgets.efTitle = uieditfield(gl,'Value','','Placeholder','Figure title','FontSize',9);
+
+            % Row 6: Z-coloring
+            wfZItems = [{'(none)'}, allYLabels];
+            wfWidgets.cbColorZ = uicheckbox(gl,'Text','Color by Z:', ...
+                'Value', false, 'FontSize', 9, ...
+                'Tooltip','Color each trace from a colormap based on a Z channel value');
+            wfWidgets.cbColorZ.Layout.Row = 6; wfWidgets.cbColorZ.Layout.Column = 1;
+
+            wfWidgets.ddColorZChan = uidropdown(gl,'Items', wfZItems, ...
+                'Value', wfZItems{1}, 'FontSize', 9, ...
+                'Tooltip','Channel whose value determines line color');
+            wfWidgets.ddColorZChan.Layout.Row = 6; wfWidgets.ddColorZChan.Layout.Column = 2;
+
+            uilabel(gl,'Text','Colormap:','HorizontalAlignment','right','FontSize',9);
+            wfWidgets.ddColorZCmap = uidropdown(gl, ...
+                'Items', {'parula','viridis','plasma','inferno','hot','jet','turbo','cool','gray'}, ...
+                'Value', 'viridis', 'FontSize', 9);
+            wfWidgets.ddColorZCmap.Layout.Row = 6; wfWidgets.ddColorZCmap.Layout.Column = [3 4];
         end
 
         % ────────────────────────────────────────────────────────────────
@@ -607,6 +628,10 @@ BTN_FG      = options.ButtonColors.fg;
                 case 'Broken Axis',         generateBrokenAxis();
                 case 'Confidence Band',     generateConfidenceBand();
                 case 'Contour / Heatmap',  generateContour();
+                case 'Color Scatter (Z)',   generateColorScatterZ();
+                case 'Marginal Histogram',  generateMarginalHistogram();
+                case 'Grouped Plot',        generateGroupedPlot();
+                case 'FFT / Spectral',      generateFFTSpectral();
             end
         end
 
@@ -737,10 +762,53 @@ BTN_FG      = options.ButtonColors.fg;
             end
 
             nColors = max(numel(dsIdx), 1);
-            if cbGrayscale.Value
-                colors = repmat(linspace(0, 0.7, nColors)', 1, 3);
-            else
-                colors = getColorsFromMap('lines (MATLAB default)', nColors);
+
+            % ── Z-coloring: compute per-trace Z value and map to colormap ──
+            useColorZ = wfWidgets.cbColorZ.Value && ...
+                        ~strcmp(wfWidgets.ddColorZChan.Value, '(none)');
+            if useColorZ
+                zChanName = wfWidgets.ddColorZChan.Value;
+                zVals = NaN(1, numel(dsIdx));
+                for zsi = 1:numel(dsIdx)
+                    zdi = dsIdx(zsi);
+                    if zdi < 1 || zdi > nDS, continue; end
+                    zd = getPlotData(zdi);
+                    zci = find(strcmp(zd.labels, zChanName), 1);
+                    if isempty(zci), continue; end
+                    col_z = zd.values(:, zci);
+                    col_z = col_z(~isnan(col_z));
+                    if ~isempty(col_z)
+                        zVals(zsi) = mean(col_z);
+                    end
+                end
+                zMin = min(zVals(~isnan(zVals)));
+                zMax = max(zVals(~isnan(zVals)));
+                if isempty(zMin) || zMin == zMax
+                    % Fallback: uniform coloring
+                    useColorZ = false;
+                else
+                    cmapFcnWF = str2func(wfWidgets.ddColorZCmap.Value);
+                    cmapRGB   = cmapFcnWF(256);
+                    % Map each zVal to a row in the colormap
+                    zNorm = (zVals - zMin) / (zMax - zMin);
+                    colors = zeros(numel(dsIdx), 3);
+                    for zsi = 1:numel(dsIdx)
+                        if isnan(zNorm(zsi))
+                            colors(zsi, :) = [0.5 0.5 0.5];
+                        else
+                            rowIdx = max(1, round(zNorm(zsi) * 255) + 1);
+                            colors(zsi, :) = cmapRGB(rowIdx, :);
+                        end
+                    end
+                end
+            end
+
+            if ~useColorZ
+                if cbGrayscale.Value
+                    colors = repmat(linspace(0, 0.7, nColors)', 1, 3);
+                else
+                    colors = getColorsFromMap('lines (MATLAB default)', nColors);
+                end
             end
 
             traceOrder = 1:numel(dsIdx);
@@ -813,6 +881,16 @@ BTN_FG      = options.ButtonColors.fg;
             if edgeLabel && xMax > -inf
                 xl = tAx.XLim;
                 tAx.XLim(2) = xl(2) + 0.15 * (xl(2) - xl(1));
+            end
+
+            % Colorbar for Z-coloring
+            if useColorZ
+                cmapFcnWF2 = str2func(wfWidgets.ddColorZCmap.Value);
+                colormap(tAx, cmapFcnWF2(256));
+                cb = colorbar(tAx);
+                cb.Label.String = wfWidgets.ddColorZChan.Value;
+                cb.Label.FontSize = fmtOpts.fontSize;
+                tAx.CLim = [zMin, zMax];
             end
 
             addRefLineTools(outFig);
@@ -2428,6 +2506,471 @@ BTN_FG      = options.ButtonColors.fg;
         end
 
         % ────────────────────────────────────────────────────────────────
+        %  CONFIG: Color Scatter (Z)
+        % ────────────────────────────────────────────────────────────────
+        function buildColorScatterZConfig()
+            gl = uigridlayout(configPanel, [6 4], ...
+                'RowHeight', {22, 22, 22, 22, 22, 22}, ...
+                'ColumnWidth', {90, '1x', 90, '1x'}, ...
+                'Padding', [8 8 8 8], 'RowSpacing', 6, 'ColumnSpacing', 6);
+
+            uilabel(gl,'Text','Dataset:','HorizontalAlignment','right','FontSize',9);
+            csWidgets.ddDS = uidropdown(gl,'Items', dsNames, 'ItemsData', 1:nDS, ...
+                'Value', activeIdx, 'FontSize', 9, ...
+                'ValueChangedFcn', @(~,~) csUpdateChannels());
+            csWidgets.ddDS.Layout.Column = [2 4];
+
+            % Build column list for initial dataset
+            csColItems = [{'X (time/index)'}, allYLabels];
+
+            uilabel(gl,'Text','X Channel:','HorizontalAlignment','right','FontSize',9);
+            csWidgets.ddX = uidropdown(gl,'Items', csColItems, ...
+                'Value', csColItems{1}, 'FontSize', 9);
+            csWidgets.ddX.Layout.Column = [2 4];
+
+            uilabel(gl,'Text','Y Channel:','HorizontalAlignment','right','FontSize',9);
+            csWidgets.ddY = uidropdown(gl,'Items', csColItems, ...
+                'Value', csColItems{min(2, numel(csColItems))}, 'FontSize', 9);
+            csWidgets.ddY.Layout.Column = [2 4];
+
+            uilabel(gl,'Text','Z (color):','HorizontalAlignment','right','FontSize',9);
+            csWidgets.ddZ = uidropdown(gl,'Items', csColItems, ...
+                'Value', csColItems{min(3, numel(csColItems))}, 'FontSize', 9);
+            csWidgets.ddZ.Layout.Column = [2 4];
+
+            uilabel(gl,'Text','Colormap:','HorizontalAlignment','right','FontSize',9);
+            csWidgets.ddCmap = uidropdown(gl, ...
+                'Items', {'viridis','plasma','inferno','parula','hot','jet','turbo','cool','gray'}, ...
+                'Value', 'viridis', 'FontSize', 9);
+
+            uilabel(gl,'Text','Marker size:','HorizontalAlignment','right','FontSize',9);
+            csWidgets.spMkSize = uispinner(gl,'Value',20,'Limits',[1 200],'Step',5,'FontSize',9);
+        end
+
+        function csUpdateChannels()
+            di = csWidgets.ddDS.Value;
+            if di < 1 || di > nDS, return; end
+            d = getPlotData(di);
+            newItems = [{'X (time/index)'}, d.labels];
+            csWidgets.ddX.Items = newItems; csWidgets.ddX.Value = newItems{1};
+            csWidgets.ddY.Items = newItems;
+            csWidgets.ddY.Value = newItems{min(2, numel(newItems))};
+            csWidgets.ddZ.Items = newItems;
+            csWidgets.ddZ.Value = newItems{min(3, numel(newItems))};
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  GENERATE: Color Scatter (Z)
+        % ────────────────────────────────────────────────────────────────
+        function generateColorScatterZ()
+            di   = csWidgets.ddDS.Value;
+            xSel = csWidgets.ddX.Value;
+            ySel = csWidgets.ddY.Value;
+            zSel = csWidgets.ddZ.Value;
+            cmap = csWidgets.ddCmap.Value;
+            mkSz = csWidgets.spMkSize.Value;
+
+            if di < 1 || di > nDS
+                uialert(bFig,'No valid dataset selected.','No data'); return;
+            end
+
+            d = getPlotData(di);
+            fmtOpts = getFormatOpts();
+
+            % Resolve X
+            if strcmp(xSel, 'X (time/index)')
+                xVec = double(d.time(:));
+                xLbl = guiLabel(guiXName(d.metadata), guiXUnit(d.metadata));
+            else
+                xi = find(strcmp(d.labels, xSel), 1);
+                if isempty(xi), uialert(bFig,'X channel not found.','Missing'); return; end
+                xVec = d.values(:, xi);
+                xLbl = guiLabel(xSel, d.units{min(xi, numel(d.units))});
+            end
+
+            % Resolve Y
+            yi = find(strcmp(d.labels, ySel), 1);
+            if isempty(yi), uialert(bFig,'Y channel not found.','Missing'); return; end
+            yVec = d.values(:, yi);
+            yLbl = guiLabel(ySel, d.units{min(yi, numel(d.units))});
+
+            % Resolve Z
+            if strcmp(zSel, 'X (time/index)')
+                zVec = double(d.time(:));
+                zLbl = guiLabel(guiXName(d.metadata), guiXUnit(d.metadata));
+            else
+                zi = find(strcmp(d.labels, zSel), 1);
+                if isempty(zi), uialert(bFig,'Z channel not found.','Missing'); return; end
+                zVec = d.values(:, zi);
+                zLbl = guiLabel(zSel, d.units{min(zi, numel(d.units))});
+            end
+
+            good = ~isnan(xVec) & ~isnan(yVec) & ~isnan(zVec);
+            xVec = xVec(good); yVec = yVec(good); zVec = zVec(good);
+
+            if numel(xVec) < 2
+                uialert(bFig,'Not enough valid data points.','Insufficient data'); return;
+            end
+
+            outFig = figure('Name','Color Scatter (Z)','NumberTitle','off', ...
+                'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
+            oAx = axes(outFig);
+            hold(oAx,'on'); box(oAx,'on'); grid(oAx,'on');
+            oAx.FontSize = fmtOpts.fontSize;
+            oAx.FontName = fmtOpts.fontName;
+            oAx.TickDir  = 'in';
+
+            plotting.colorScatterZ(oAx, xVec, yVec, zVec, ...
+                Colormap=cmap, MarkerSize=mkSz, ...
+                ShowColorbar=true, ColorbarLabel=zLbl);
+
+            xlabel(oAx, xLbl, 'FontSize', fmtOpts.fontSize);
+            ylabel(oAx, yLbl, 'FontSize', fmtOpts.fontSize);
+
+            addRefLineTools(outFig);
+            figure(outFig);
+            delete(bFig);
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  CONFIG: Marginal Histogram
+        % ────────────────────────────────────────────────────────────────
+        function buildMarginalHistogramConfig()
+            gl = uigridlayout(configPanel, [5 4], ...
+                'RowHeight', {22, 22, 22, 22, 22}, ...
+                'ColumnWidth', {90, '1x', 90, '1x'}, ...
+                'Padding', [8 8 8 8], 'RowSpacing', 6, 'ColumnSpacing', 6);
+
+            uilabel(gl,'Text','Dataset:','HorizontalAlignment','right','FontSize',9);
+            mhWidgets.ddDS = uidropdown(gl,'Items', dsNames, 'ItemsData', 1:nDS, ...
+                'Value', activeIdx, 'FontSize', 9, ...
+                'ValueChangedFcn', @(~,~) mhUpdateChannels());
+            mhWidgets.ddDS.Layout.Column = [2 4];
+
+            mhColItems = allYLabels;
+
+            uilabel(gl,'Text','X Channel:','HorizontalAlignment','right','FontSize',9);
+            mhWidgets.ddX = uidropdown(gl,'Items', mhColItems, ...
+                'Value', mhColItems{1}, 'FontSize', 9);
+            mhWidgets.ddX.Layout.Column = [2 4];
+
+            uilabel(gl,'Text','Y Channel:','HorizontalAlignment','right','FontSize',9);
+            mhWidgets.ddY = uidropdown(gl,'Items', mhColItems, ...
+                'Value', mhColItems{min(2, numel(mhColItems))}, 'FontSize', 9);
+            mhWidgets.ddY.Layout.Column = [2 4];
+
+            uilabel(gl,'Text','Bins:','HorizontalAlignment','right','FontSize',9);
+            mhWidgets.spNBins = uispinner(gl,'Value',30,'Limits',[5 200],'Step',5,'FontSize',9);
+
+            mhWidgets.cbKDE = uicheckbox(gl,'Text','Show KDE curve','Value',false,'FontSize',9);
+            mhWidgets.cbKDE.Layout.Row = 5; mhWidgets.cbKDE.Layout.Column = [1 2];
+        end
+
+        function mhUpdateChannels()
+            di = mhWidgets.ddDS.Value;
+            if di < 1 || di > nDS, return; end
+            d = getPlotData(di);
+            newItems = d.labels;
+            if isempty(newItems), return; end
+            mhWidgets.ddX.Items = newItems; mhWidgets.ddX.Value = newItems{1};
+            mhWidgets.ddY.Items = newItems;
+            mhWidgets.ddY.Value = newItems{min(2, numel(newItems))};
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  GENERATE: Marginal Histogram
+        % ────────────────────────────────────────────────────────────────
+        function generateMarginalHistogram()
+            di    = mhWidgets.ddDS.Value;
+            xSel  = mhWidgets.ddX.Value;
+            ySel  = mhWidgets.ddY.Value;
+            nBins = mhWidgets.spNBins.Value;
+            showKDE = mhWidgets.cbKDE.Value;
+
+            if di < 1 || di > nDS
+                uialert(bFig,'No valid dataset selected.','No data'); return;
+            end
+
+            d = getPlotData(di);
+            fmtOpts = getFormatOpts();
+
+            xi = find(strcmp(d.labels, xSel), 1);
+            yi = find(strcmp(d.labels, ySel), 1);
+            if isempty(xi) || isempty(yi)
+                uialert(bFig,'Channel not found in dataset.','Missing channel'); return;
+            end
+
+            xVec = d.values(:, xi);
+            yVec = d.values(:, yi);
+            good = ~isnan(xVec) & ~isnan(yVec);
+            xVec = xVec(good); yVec = yVec(good);
+
+            if numel(xVec) < 2
+                uialert(bFig,'Not enough valid data points.','Insufficient data'); return;
+            end
+
+            outFig = figure('Name','Marginal Histogram','NumberTitle','off', ...
+                'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
+            tmpAx = axes(outFig);
+
+            handles = plotting.marginalHistogram(tmpAx, xVec, yVec, ...
+                NBins=nBins, ShowKDE=showKDE);
+
+            xLbl = guiLabel(xSel, d.units{min(xi, numel(d.units))});
+            yLbl = guiLabel(ySel, d.units{min(yi, numel(d.units))});
+            xlabel(handles.axMain, xLbl, 'FontSize', fmtOpts.fontSize);
+            ylabel(handles.axMain, yLbl, 'FontSize', fmtOpts.fontSize);
+            handles.axMain.FontSize = fmtOpts.fontSize;
+            handles.axMain.FontName = fmtOpts.fontName;
+
+            addRefLineTools(outFig);
+            figure(outFig);
+            delete(bFig);
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  CONFIG: Grouped Plot
+        % ────────────────────────────────────────────────────────────────
+        function buildGroupedPlotConfig()
+            gl = uigridlayout(configPanel, [6 4], ...
+                'RowHeight', {22, 22, 22, 22, 22, 22}, ...
+                'ColumnWidth', {90, '1x', 90, '1x'}, ...
+                'Padding', [8 8 8 8], 'RowSpacing', 6, 'ColumnSpacing', 6);
+
+            uilabel(gl,'Text','Dataset:','HorizontalAlignment','right','FontSize',9);
+            gpWidgets.ddDS = uidropdown(gl,'Items', dsNames, 'ItemsData', 1:nDS, ...
+                'Value', activeIdx, 'FontSize', 9, ...
+                'ValueChangedFcn', @(~,~) gpUpdateChannels());
+            gpWidgets.ddDS.Layout.Column = [2 4];
+
+            gpColItems = allYLabels;
+
+            uilabel(gl,'Text','X Channel:','HorizontalAlignment','right','FontSize',9);
+            gpWidgets.ddX = uidropdown(gl,'Items', gpColItems, ...
+                'Value', gpColItems{1}, 'FontSize', 9);
+            gpWidgets.ddX.Layout.Column = [2 4];
+
+            uilabel(gl,'Text','Y Channel:','HorizontalAlignment','right','FontSize',9);
+            gpWidgets.ddY = uidropdown(gl,'Items', gpColItems, ...
+                'Value', gpColItems{min(2, numel(gpColItems))}, 'FontSize', 9);
+            gpWidgets.ddY.Layout.Column = [2 4];
+
+            uilabel(gl,'Text','Group by:','HorizontalAlignment','right','FontSize',9);
+            gpWidgets.ddGroup = uidropdown(gl,'Items', gpColItems, ...
+                'Value', gpColItems{min(3, numel(gpColItems))}, 'FontSize', 9);
+            gpWidgets.ddGroup.Layout.Column = [2 4];
+
+            uilabel(gl,'Text','Plot type:','HorizontalAlignment','right','FontSize',9);
+            gpWidgets.ddPlotType = uidropdown(gl, ...
+                'Items', {'line','scatter','bar','box'}, ...
+                'Value', 'scatter', 'FontSize', 9);
+
+            gpWidgets.cbLegend = uicheckbox(gl,'Text','Show legend','Value',true,'FontSize',9);
+            gpWidgets.cbLegend.Layout.Row = 6; gpWidgets.cbLegend.Layout.Column = [1 2];
+        end
+
+        function gpUpdateChannels()
+            di = gpWidgets.ddDS.Value;
+            if di < 1 || di > nDS, return; end
+            d = getPlotData(di);
+            newItems = d.labels;
+            if isempty(newItems), return; end
+            gpWidgets.ddX.Items = newItems; gpWidgets.ddX.Value = newItems{1};
+            gpWidgets.ddY.Items = newItems;
+            gpWidgets.ddY.Value = newItems{min(2, numel(newItems))};
+            gpWidgets.ddGroup.Items = newItems;
+            gpWidgets.ddGroup.Value = newItems{min(3, numel(newItems))};
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  GENERATE: Grouped Plot
+        % ────────────────────────────────────────────────────────────────
+        function generateGroupedPlot()
+            di       = gpWidgets.ddDS.Value;
+            xSel     = gpWidgets.ddX.Value;
+            ySel     = gpWidgets.ddY.Value;
+            grpSel   = gpWidgets.ddGroup.Value;
+            plotType = gpWidgets.ddPlotType.Value;
+            showLeg  = gpWidgets.cbLegend.Value;
+
+            if di < 1 || di > nDS
+                uialert(bFig,'No valid dataset selected.','No data'); return;
+            end
+
+            d = getPlotData(di);
+            fmtOpts = getFormatOpts();
+
+            xi   = find(strcmp(d.labels, xSel), 1);
+            yi   = find(strcmp(d.labels, ySel), 1);
+            grpi = find(strcmp(d.labels, grpSel), 1);
+
+            if isempty(xi) || isempty(yi) || isempty(grpi)
+                uialert(bFig,'One or more channels not found.','Missing channel'); return;
+            end
+
+            xVec = d.values(:, xi);
+            yVec = d.values(:, yi);
+            gVec = d.values(:, grpi);
+            good = ~isnan(xVec) & ~isnan(yVec) & ~isnan(gVec);
+            xVec = xVec(good); yVec = yVec(good); gVec = gVec(good);
+
+            if numel(xVec) < 2
+                uialert(bFig,'Not enough valid data points.','Insufficient data'); return;
+            end
+
+            outFig = figure('Name','Grouped Plot','NumberTitle','off', ...
+                'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
+            oAx = axes(outFig);
+            hold(oAx,'on'); box(oAx,'on'); grid(oAx,'on');
+            oAx.FontSize = fmtOpts.fontSize;
+            oAx.FontName = fmtOpts.fontName;
+            oAx.TickDir  = 'in';
+
+            plotting.groupedPlot(oAx, xVec, yVec, gVec, ...
+                PlotType=plotType, Legend=showLeg);
+
+            xLbl = guiLabel(xSel, d.units{min(xi, numel(d.units))});
+            yLbl = guiLabel(ySel, d.units{min(yi, numel(d.units))});
+            xlabel(oAx, xLbl, 'FontSize', fmtOpts.fontSize);
+            ylabel(oAx, yLbl, 'FontSize', fmtOpts.fontSize);
+
+            addRefLineTools(outFig);
+            figure(outFig);
+            delete(bFig);
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  CONFIG: FFT / Spectral
+        % ────────────────────────────────────────────────────────────────
+        function buildFFTSpectralConfig()
+            gl = uigridlayout(configPanel, [7 4], ...
+                'RowHeight', {22, 22, 22, 22, 22, 22, 22}, ...
+                'ColumnWidth', {90, '1x', 90, '1x'}, ...
+                'Padding', [8 8 8 8], 'RowSpacing', 6, 'ColumnSpacing', 6);
+
+            uilabel(gl,'Text','Dataset:','HorizontalAlignment','right','FontSize',9);
+            fsWidgets.ddDS = uidropdown(gl,'Items', dsNames, 'ItemsData', 1:nDS, ...
+                'Value', activeIdx, 'FontSize', 9);
+            fsWidgets.ddDS.Layout.Column = [2 4];
+
+            uilabel(gl,'Text','Channel:','HorizontalAlignment','right','FontSize',9);
+            fsWidgets.ddY = uidropdown(gl,'Items', allYLabels, ...
+                'Value', allYLabels{1}, 'FontSize', 9);
+            fsWidgets.ddY.Layout.Column = [2 4];
+
+            uilabel(gl,'Text','Window:','HorizontalAlignment','right','FontSize',9);
+            fsWidgets.ddWindow = uidropdown(gl, ...
+                'Items', {'hanning','hamming','blackman','flattop','kaiser','none'}, ...
+                'Value', 'hanning', 'FontSize', 9);
+
+            uilabel(gl,'Text','Output:','HorizontalAlignment','right','FontSize',9);
+            fsWidgets.ddOutput = uidropdown(gl, ...
+                'Items', {'psd','magnitude','phase'}, ...
+                'Value', 'psd', 'FontSize', 9);
+
+            uilabel(gl,'Text','Detrend:','HorizontalAlignment','right','FontSize',9);
+            fsWidgets.ddDetrend = uidropdown(gl, ...
+                'Items', {'mean','linear','none'}, ...
+                'Value', 'mean', 'FontSize', 9);
+
+            fsWidgets.cbLogY = uicheckbox(gl,'Text','Log Y axis','Value',true,'FontSize',9);
+            fsWidgets.cbLogY.Layout.Row = 6; fsWidgets.cbLogY.Layout.Column = [1 2];
+
+            fsWidgets.cbLogX = uicheckbox(gl,'Text','Log X (freq) axis','Value',false,'FontSize',9);
+            fsWidgets.cbLogX.Layout.Row = 6; fsWidgets.cbLogX.Layout.Column = [3 4];
+
+            uilabel(gl,'Text','Title:','HorizontalAlignment','right','FontSize',9);
+            fsWidgets.efTitle = uieditfield(gl,'Value','','Placeholder','Figure title','FontSize',9);
+            fsWidgets.efTitle.Layout.Row = 7; fsWidgets.efTitle.Layout.Column = [2 4];
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  GENERATE: FFT / Spectral
+        % ────────────────────────────────────────────────────────────────
+        function generateFFTSpectral()
+            di         = fsWidgets.ddDS.Value;
+            ySel       = fsWidgets.ddY.Value;
+            winType    = fsWidgets.ddWindow.Value;
+            outType    = fsWidgets.ddOutput.Value;
+            detrendMode = fsWidgets.ddDetrend.Value;
+            logY       = fsWidgets.cbLogY.Value;
+            logX       = fsWidgets.cbLogX.Value;
+
+            if di < 1 || di > nDS
+                uialert(bFig,'No valid dataset selected.','No data'); return;
+            end
+
+            d = getPlotData(di);
+            fmtOpts = getFormatOpts();
+
+            ci = find(strcmp(d.labels, ySel), 1);
+            if isempty(ci)
+                uialert(bFig,sprintf('Channel "%s" not found.', ySel),'Missing'); return;
+            end
+
+            xVec = double(d.time(:));
+            yVec = d.values(:, ci);
+            good = ~isnan(xVec) & ~isnan(yVec);
+            xVec = xVec(good); yVec = yVec(good);
+
+            if numel(xVec) < 8
+                uialert(bFig,'Need at least 8 valid data points for FFT.','Insufficient data'); return;
+            end
+
+            % Call fftSpectral
+            result = utilities.fftSpectral(xVec, yVec, ...
+                Window=winType, OutputType=outType, Detrend=detrendMode);
+
+            % Extract output vector
+            switch outType
+                case 'psd',       ySpec = result.psd;
+                case 'magnitude', ySpec = result.magnitude;
+                case 'phase',     ySpec = result.phase;
+                otherwise,        ySpec = result.psd;
+            end
+
+            outFig = figure('Name','FFT / Spectral Analysis','NumberTitle','off', ...
+                'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
+            oAx = axes(outFig);
+            hold(oAx,'on'); box(oAx,'on'); grid(oAx,'on');
+            oAx.FontSize = fmtOpts.fontSize;
+            oAx.FontName = fmtOpts.fontName;
+            oAx.TickDir  = 'in';
+
+            plot(oAx, result.freq, ySpec, '-', ...
+                'Color', [0.12 0.47 0.71], 'LineWidth', fmtOpts.lineWidth);
+
+            if logY, oAx.YScale = 'log'; end
+            if logX, oAx.XScale = 'log'; end
+
+            xUnits = guiXUnit(d.metadata);
+            if isempty(xUnits)
+                freqLbl = 'Frequency';
+            else
+                freqLbl = ['Frequency (1/' xUnits ')'];
+            end
+            xlabel(oAx, freqLbl, 'FontSize', fmtOpts.fontSize);
+
+            switch outType
+                case 'psd',       yLbl = [guiLabel(ySel, d.units{min(ci,numel(d.units))}) '^2 / Hz'];
+                case 'magnitude', yLbl = ['|FFT| of ' ySel];
+                case 'phase',     yLbl = 'Phase (deg)';
+                otherwise,        yLbl = outType;
+            end
+            ylabel(oAx, yLbl, 'FontSize', fmtOpts.fontSize);
+
+            ttl = fsWidgets.efTitle.Value;
+            if isempty(ttl)
+                ttl = ['Spectral Analysis — ' ySel ' (' winType ' window, ' outType ')'];
+            end
+            title(oAx, ttl, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
+
+            addRefLineTools(outFig);
+            figure(outFig);
+            delete(bFig);
+        end
+
+        % ────────────────────────────────────────────────────────────────
         %  Linked Cursor for Multi-Panel / Quick Grid figures
         % ────────────────────────────────────────────────────────────────
         function addLinkedCursor(outFig)
@@ -2492,5 +3035,120 @@ BTN_FG      = options.ButtonColors.fg;
             end
         end
 
+
+        % ════════════════════════════════════════════════════════════════
+        %  Stand-alone helpers (copied from DataPlotter local-function scope)
+        % ════════════════════════════════════════════════════════════════
+
+        function ls = localLineSpec(style)
+        %LOCALLINESPEC  Return line-spec cell for the chosen plot style.
+            switch style
+                case 'Scatter'
+                    ls = {'LineStyle','none','Marker','o','MarkerSize',5};
+                case 'Line+Pts'
+                    ls = {'LineStyle','-','Marker','o','MarkerSize',4};
+                otherwise
+                    ls = {'LineStyle','-'};
+            end
+        end
+
+        function colors = getColorsFromMap(colormapName, nColors)
+        %GETCOLORSFROMMPA  Generate nColors colors from a named colormap.
+            colors = dataplotter.colorMaps(colormapName, nColors);
+        end
+
+        function name = guiXName(meta)
+        %GUIXNAME  Return X-axis column name from metadata.
+            if isfield(meta,'xColumnName') && ~isempty(meta.xColumnName)
+                name = meta.xColumnName;
+            else
+                name = 'X';
+            end
+        end
+
+        function u = guiXUnit(meta)
+        %GUIXUNIT  Return X-axis unit string from metadata.
+            if isfield(meta,'xColumnUnit') && ~isempty(meta.xColumnUnit)
+                u = meta.xColumnUnit;
+            else
+                u = '';
+            end
+        end
+
+        function s = guiLabel(name, unit)
+        %GUILABEL  Format an axis label: "Name (unit)" or just "Name".
+            name = greekify(name);
+            if isempty(unit)
+                s = name;
+            else
+                s = [name, ' (', greekify(unit), ')'];
+            end
+        end
+
+        function s = greekify(s)
+        %GREEKIFY  Replace spelled-out Greek letter names with Unicode characters.
+            pairs = {
+                'degrees', '°';
+                'epsilon', 'ε';
+                'degree',  '°';
+                'lambda',  'λ';
+                'omega',   'ω';
+                'theta',   'θ';
+                'sigma',   'σ';
+                'alpha',   'α';
+                'gamma',   'γ';
+                'delta',   'δ';
+                'kappa',   'κ';
+                'beta',    'β';
+                'zeta',    'ζ';
+                'phi',     'φ';
+                'chi',     'χ';
+                'psi',     'ψ';
+                'tau',     'τ';
+                'rho',     'ρ';
+                'deg',     '°';
+                'eta',     'η';
+                'mu',      'μ';
+                'nu',      'ν';
+                'xi',      'ξ';
+                'pi',      'π';
+            };
+            for k = 1:size(pairs, 1)
+                pat = ['(?i)(?<![a-zA-Z])', pairs{k,1}, '(?![a-zA-Z])'];
+                s   = regexprep(s, pat, pairs{k,2});
+            end
+        end
+
+        function idx = findErrorColumn(labels, yLabel)
+        %FINDERRORCOLUMN  Find a symmetric error column matching yLabel.
+            idx = [];
+            candidates = { ...
+                ['d' yLabel], [yLabel ' err'], [yLabel ' Err'], ...
+                'M. Std. Err.', [yLabel ' std'], [yLabel ' sigma'] };
+            for ci = 1:numel(candidates)
+                ii = find(strcmpi(labels, candidates{ci}), 1);
+                if ~isempty(ii), idx = ii; return; end
+            end
+            for li = 1:numel(labels)
+                lbl = lower(labels{li});
+                if (contains(lbl, 'err') || contains(lbl, 'std')) && ~strcmpi(labels{li}, yLabel)
+                    idx = li; return;
+                end
+            end
+        end
+
+        function [idxLo, idxHi] = findAsymmetricErrorColumns(labels, yLabel)
+        %FINDASYMMETRICERRORCOLUMNS  Find separate lower/upper error columns.
+            idxLo = []; idxHi = [];
+            hiCands = {[yLabel '+'], ['d' yLabel '+'], [yLabel ' err+'], [yLabel '_err_hi'], [yLabel ' hi']};
+            loCands = {[yLabel '-'], ['d' yLabel '-'], [yLabel ' err-'], [yLabel '_err_lo'], [yLabel ' lo']};
+            for ci = 1:numel(hiCands)
+                hi = find(strcmpi(labels, hiCands{ci}), 1);
+                lo = find(strcmpi(labels, loCands{ci}), 1);
+                if ~isempty(hi) && ~isempty(lo)
+                    idxHi = hi; idxLo = lo; return;
+                end
+            end
+        end
 
 end  % figureBuilder
