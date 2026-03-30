@@ -3766,6 +3766,11 @@ function varargout = DataPlotter()
         if is2D_active
             map2DPanel.Visible = 'on';
             analysisGL.ColumnWidth = {appData.corrPanelWidth, '1x', '2x', 180};
+            % Hide the data table — 1D projection rows are not useful in 2D
+            % map mode and the panel wastes space that the axes or map panel
+            % could use.  Let the Axes panel expand to fill both rows.
+            dataTablePanel.Visible   = 'off';
+            axLimPanel.Layout.Row    = [1 2];
             % Disable all corrections — not meaningful for raw 2D maps
             for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
                       btnApply, btnReset, btnApplyAll, btnUndo, ...
@@ -3784,6 +3789,9 @@ function varargout = DataPlotter()
             analysisPanel.Title = 'Analysis  —  XRD 2D Map';
         else
             map2DPanel.Visible = 'off';
+            % Restore the data table and axes panel to normal 1D layout
+            dataTablePanel.Visible   = 'on';
+            axLimPanel.Layout.Row    = 1;
         end
 
         % Sync undo/redo button state after layout changes (enable flags above
@@ -10875,6 +10883,15 @@ function varargout = DataPlotter()
             analysisGL.ColumnWidth = {min(280, defCorrW), '1x', col3W, 180};
         end
 
+        % ── Keep data table hidden in 2D mode during resize ──
+        if is2D_now
+            dataTablePanel.Visible = 'off';
+            axLimPanel.Layout.Row  = [1 2];
+        else
+            dataTablePanel.Visible = 'on';
+            axLimPanel.Layout.Row  = 1;
+        end
+
         fig.SizeChangedFcn = @onFigSizeChanged;
     end
 
@@ -11308,10 +11325,13 @@ function varargout = DataPlotter()
                 end
 
                 % h_axdata: bottom edge of axLimPanel (border between axes and data table)
-                borderY2 = alPos(2);
-                if abs(mp(2) - borderY2) <= SNAP_PX && ...
-                   mp(1) >= alPos(1) && mp(1) <= alPos(1) + alPos(3)
-                    dir = 'h_axdata'; return;
+                % Skip when data table is hidden (2D map mode — axes span both rows).
+                if strcmp(dataTablePanel.Visible, 'on')
+                    borderY2 = alPos(2);
+                    if abs(mp(2) - borderY2) <= SNAP_PX && ...
+                       mp(1) >= alPos(1) && mp(1) <= alPos(1) + alPos(3)
+                        dir = 'h_axdata'; return;
+                    end
                 end
             end
 
@@ -12456,7 +12476,8 @@ function varargout = DataPlotter()
 
     % ── Data Table Functions ─────────────────────────────────────────────
 
-    % (Data table is always visible in the analysis panel — no toggle needed)
+    % (Data table is hidden in 2D map mode — see the is2D_active block in
+    %  updateControlsForActiveDataset.)
 
     function refreshDataTable()
     %REFRESHDATATABLE  Populate the table from the active dataset.
@@ -12465,6 +12486,16 @@ function varargout = DataPlotter()
     %   Depth/Conc columns instead of a single shared X column.
         if appData.activeIdx < 1 || isempty(appData.datasets)
             tblData.ColumnName = {'(no data)'};
+            tblData.Data = {};
+            lblTableUnits.Text = '';
+            lblTableStats.Text = '';
+            return;
+        end
+
+        % Skip table population for 2D datasets — the table is hidden and
+        % the 1D projection data is not meaningful in 2D map mode.
+        if is2DDataset(appData.datasets{appData.activeIdx})
+            tblData.ColumnName = {'(2D map — table hidden)'};
             tblData.Data = {};
             lblTableUnits.Text = '';
             lblTableStats.Text = '';
