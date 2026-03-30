@@ -8,7 +8,8 @@ function runAllTests(options)
 %   Name-Value Options:
 %       Group    "all" (default) | "parser" | "batch" | "gui" | "xrd2d" |
 %                "sims" | "em" | "emgui" | "eds" | "eels" | "diffindex" |
-%                "edsquant" | "eels_adv" | "diff_sim" | "fitting" | "plotting"
+%                "edsquant" | "eels_adv" | "diff_sim" | "fitting" |
+%                "plotting" | "spectral"
 %                Run only the specified group of test suites.
 %
 %   Groups:
@@ -24,9 +25,12 @@ function runAllTests(options)
 %       eels_adv — Advanced EELS: Fourier-log, ELNES, Kramers-Kronig
 %       diffindex — diffraction indexing utilities (calcElectronWavelength,
 %                   findDiffractionSpots, indexDiffraction)
-%       diff_sim — Diffraction simulation, virtual dark-field, ZAF correction
-%       edsquant — EDS quantification (edsKFactorTable, cliffLorimer,
-%                  edsCompositionProfile)
+%       diff_sim  — Diffraction simulation, virtual dark-field, ZAF correction
+%       edsquant  — EDS quantification (edsKFactorTable, cliffLorimer,
+%                   edsCompositionProfile)
+%       interp2d  — 2-D interpolation utilities (interpolate2D, regrid2D)
+%       baseline  — baseline estimation: ALS, rolling ball, modified polynomial
+%       errorprop — error propagation utilities (errorProp and wrappers)
 %       all      — all of the above, in order
 %
 %   Examples:
@@ -51,7 +55,8 @@ end
 options.Group = validatestring(options.Group, ...
     ["all", "parser", "batch", "xrd2d", "gui", "calcgui", "sims", "em", "emgui", "eds", ...
      "xrayneutron", "superconductor", "cif", "optics", "vacuum", "electrochemistry", ...
-     "eels", "eels_adv", "diffindex", "diff_sim", "edsquant", "contour", "fitting", "plotting"]);
+     "eels", "eels_adv", "diffindex", "diff_sim", "edsquant", "contour", "fitting", "plotting", ...
+     "spectral", "interp2d", "baseline", "errorprop"]);
 
 % Build absolute paths to test scripts so `run` works regardless of CWD.
 % Tests are organized into subdirectories: parser/, gui/, imaging/, calc/, batch/
@@ -75,6 +80,9 @@ SUITES = {
     % ── Batch tests ───────────────────────────────────────────────────
     T('batch','test_batch_processing'),     'batch',  'batchImport + batchConvertXRD'
     T('batch','test_batch_xrd_converter'),  'batch',  'XRD converter GUI edge cases'
+    T('batch','test_batchPlot'),            'batch',  'batchPlot: templates, formats, overwrite, prefix/suffix'
+    T('batch','test_generateReport'),       'batch',  'generateReport: HTML/txt output, stats, custom sections'
+    T('batch','test_dataConnector'),        'batch',  'dataConnector: file watcher, callback, stop, AutoStart'
     % ── GUI tests ─────────────────────────────────────────────────────
     T('gui','test_gui_harness'),            'gui',    'GUI API: load, correct, peaks, session'
     T('gui','test_gui_2d'),                 'gui',    'GUI API: 2D map load, plot types, cuts'
@@ -125,6 +133,17 @@ SUITES = {
     T('fitting','test_surfaceFit'),          'fitting', 'Surface/3D fitting: models, autoGuess, surfaceFit engine'
     % ── Plotting tests ───────────────────────────────────────────────────
     T('plotting','test_boxViolinSwarm'),    'plotting', 'Box/violin/swarm plots — objects, KDE, swarm, edge cases'
+    T('plotting','test_colorScatterZ'),     'plotting', 'colorScatterZ — scatter, CData, colormaps, colorbar, edge cases'
+    T('plotting','test_marginalHistogram'), 'plotting', 'marginalHistogram — axes, scatter, histograms, linked limits, KDE'
+    T('plotting','test_groupedPlot'),       'plotting', 'groupedPlot — line/scatter/bar/box, legend, numeric groups, error bars'
+    % ── Spectral tests ───────────────────────────────────────────────────
+    T('calc','test_fftSpectral'),          'spectral','FFT spectral analysis, windows, Welch PSD, cross-correlation'
+    % ── Interpolation 2-D tests ──────────────────────────────────────────
+    T('calc','test_interpolate2D'),        'interp2d','2-D interpolation: linear, natural, TPS, IDW, regrid2D'
+    % ── Baseline tests ───────────────────────────────────────────────────
+    T('calc','test_baselines'),            'baseline','Baseline estimation: ALS, rolling ball, modified polynomial'
+    % ── Error propagation tests ──────────────────────────────────────────
+    T('calc','test_errorProp'),            'errorprop','Error propagation: linear Taylor, Monte Carlo, wrappers'
 };
 
 % Filter by group
