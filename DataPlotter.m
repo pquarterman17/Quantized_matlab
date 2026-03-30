@@ -2804,8 +2804,9 @@ function varargout = DataPlotter()
     function setToolbarConfigDirect(cfg)
     %SETTOOLBARCONFIGDIRECT  Programmatically set toolbar config and rebuild.
     %  Used by automated tests.
-        arguments
-            cfg (1,:) cell
+        if ~iscell(cfg) || ~isvector(cfg)
+            error('DataPlotter:setToolbarConfigDirect:invalidInput', ...
+                'cfg must be a 1×N cell array of action ID strings.');
         end
         appData.toolbarConfig = cfg;
         buildToolbar(axToolbarGL, cfg, tbActions, BTN_TOOL);
