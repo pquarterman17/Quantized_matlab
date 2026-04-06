@@ -19,6 +19,6 @@ Remaining parser work for the `+parser/` package.
 Support new file types as they are added to `+test_datasets/` on a rolling basis. Each new parser must:
 1. Return via `parser.createDataStruct()`
 2. Register in `+parser/resolveParser.m`
-3. Register in `guiImport` section of `DataPlotter.m`
-4. Update `uigetfile` filter list in `DataPlotter.m`
+3. Register in `guiImport` section of `Boson.m`
+4. Update `uigetfile` filter list in `Boson.m`
 5. Include a test in `tests/parser/`

@@ -13,12 +13,12 @@
               ┌────────────┼────────────┐
               │            │            │
     ┌─────────▼──┐  ┌──────▼─────┐  ┌──▼──────────┐
-    │ DataPlotter │  │ emViewerGUI│  │materialsCalc │
+    │ Boson │  │ Fermion│  │materialsCalc │
     │   (main)    │  │  (EM imgs) │  │  GUI (calc)  │
     └──────┬──────┘  └─────┬──────┘  └──────┬──────┘
            │               │               │
     ┌──────▼──────┐  ┌─────▼──────┐  ┌──────▼──────┐
-    │ +dataplotter│  │  +imaging/  │  │   +calc/    │
+    │ +boson│  │  +imaging/  │  │   +calc/    │
     │ (extracted) │  │             │  │             │
     └──────┬──────┘  └─────┬──────┘  └──────┬──────┘
            │               │               │
@@ -42,10 +42,10 @@
      ▼
  data struct (.time, .values, .labels, .units, .metadata)
      │
-     ├──► DataPlotter loads as dataset → appData.datasets{idx}
+     ├──► Boson loads as dataset → appData.datasets{idx}
      │        │
      │        ▼
-     │    dataplotter.applyCorrections(rawData, params)
+     │    boson.applyCorrections(rawData, params)
      │        │  1. Trim/crop
      │        │  2. X offset
      │        │  3. Y background (poly or linear)
@@ -60,13 +60,13 @@
      │        ▼
      │    drawToAxes(ax) ← renders to plot
      │
-     ├──► emViewerGUI loads as image
+     ├──► Fermion loads as image
      │        rawPixels → filteredPixels → displayImg
      │
      └──► scripts.batchImport / scripts.quickPlot
 ```
 
-## DataPlotter State Management
+## Boson State Management
 
 ### appData (main state container)
 
@@ -117,7 +117,7 @@ ds.mask            % logical vector — masked rows excluded from plot
 
 ### Corrections Pipeline
 
-The corrections pipeline is extracted to `+dataplotter/applyCorrections.m`. It takes a raw data struct and a params struct, and returns a corrected data struct. The params struct is built by `+dataplotter/correctionParams.m` from the dataset struct + GUI widget values.
+The corrections pipeline is extracted to `+boson/applyCorrections.m`. It takes a raw data struct and a params struct, and returns a corrected data struct. The params struct is built by `+boson/correctionParams.m` from the dataset struct + GUI widget values.
 
 **Key design decisions:**
 - Pipeline order is fixed: trim → offset → background → units → smooth → normalize → derivative
@@ -132,8 +132,8 @@ The corrections pipeline is extracted to `+dataplotter/applyCorrections.m`. It t
 User clicks "Apply Corrections"
     → onApplyCorrections()
         → reads UI widget values into uiVals struct
-        → dataplotter.correctionParams(ds, uiVals) → params
-        → dataplotter.applyCorrections(data, params) → corrData
+        → boson.correctionParams(ds, uiVals) → params
+        → boson.applyCorrections(data, params) → corrData
         → saves corrData + params back to ds
         → if neutron: propagates to sibling datasets
         → onPlot() → drawToAxes()
@@ -146,9 +146,9 @@ User clicks in plot (peak detection, cursor, mask, etc.)
         → dispatches to mode-specific handler
 ```
 
-## Extracted Subsystems (+dataplotter/)
+## Extracted Subsystems (+boson/)
 
-| Module | Description | Lines saved from DataPlotter |
+| Module | Description | Lines saved from Boson |
 |--------|-------------|-----|
 | `applyCorrections.m` | Core corrections pipeline (pure function) | ~300 |
 | `correctionParams.m` | Build params struct from dataset + UI values | ~60 |
@@ -156,7 +156,7 @@ User clicks in plot (peak detection, cursor, mask, etc.)
 | `graphDigitizer.m` | Graph digitizer dialog (image → data points) | ~340 |
 | `figureBuilder.m` | Advanced Figure Builder (10 figure types) | ~2430 |
 
-## emViewerGUI Image Pipeline
+## Fermion Image Pipeline
 
 ```
 loadImages()
@@ -194,7 +194,7 @@ Tests are organized into subdirectories under `tests/`:
 ```
 tests/
 ├── parser/     — parser smoke tests, edge cases, round-trip, SIMS, 2D XRDML
-├── gui/        — DataPlotter headless API tests, contour, materials calc
+├── gui/        — Boson headless API tests, contour, materials calc
 ├── imaging/    — EM parsers, imaging utils, EM GUI, EDS, EELS, diffraction
 ├── calc/       — calculator module tests (xray, superconductor, CIF, optics, ...)
 └── batch/      — batch import and XRD converter tests
@@ -212,8 +212,8 @@ tests/
 +imaging/ ← standalone
 +calc/ ← standalone
 +scripts/ ← depends on +parser/, +utilities/
-+dataplotter/ ← depends on +parser/, +utilities/
-DataPlotter.m ← depends on all packages
-emViewerGUI.m ← depends on +parser/, +imaging/
++boson/ ← depends on +parser/, +utilities/
+Boson.m ← depends on all packages
+Fermion.m ← depends on +parser/, +imaging/
 materialsCalcGUI.m ← depends on +calc/
 ```

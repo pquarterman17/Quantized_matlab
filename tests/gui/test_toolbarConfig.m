@@ -1,4 +1,4 @@
-%TEST_TOOLBARCONFIG  Headless tests for DataPlotter toolbar customisation.
+%TEST_TOOLBARCONFIG  Headless tests for Boson toolbar customisation.
 %
 %   Tests the toolbar system without any dialog interaction:
 %     A. Default config contains expected button IDs
@@ -28,7 +28,7 @@ mkdir(tmpDir);
 cleanupTmp = onCleanup(@() rmdir(tmpDir, 's'));
 
 % ── Shared headless GUI instance ─────────────────────────────────────────
-api = DataPlotter();
+api = Boson();
 api.fig.Visible = 'off';
 drawnow;
 cleanupApi = onCleanup(@() safeClose(api));
@@ -39,7 +39,7 @@ cleanupApi = onCleanup(@() safeClose(api));
 
 fprintf('\n══ TEST A1: toolbarDefaultConfig returns expected IDs ══\n');
 try
-    defaults = dataplotter.toolbarDefaultConfig();
+    defaults = boson.toolbarDefaultConfig();
     assert(iscell(defaults),         'result must be a cell array');
     assert(~isempty(defaults),       'default config must not be empty');
     assert(ismember('cursor',    defaults), 'missing: cursor');
@@ -114,7 +114,7 @@ try
     cfgToSave = {'legend', 'copy', 'cursor', 'save'};
 
     % Write manually to a temp file (same format as saveToolbarConfig)
-    prefFile = fullfile(tmpDir, 'dataplotter_toolbar.mat');
+    prefFile = fullfile(tmpDir, 'boson_toolbar.mat');
     toolbarConfig = cfgToSave; %#ok<NASGU>
     save(prefFile, 'toolbarConfig');
 
@@ -189,7 +189,7 @@ try
             btnKids = btnKids + 1;
         end
     end
-    defaults = dataplotter.toolbarDefaultConfig();
+    defaults = boson.toolbarDefaultConfig();
     assert(btnKids == numel(defaults), ...
         sprintf('expected %d default buttons, got %d', numel(defaults), btnKids));
     fprintf('PASS\n');

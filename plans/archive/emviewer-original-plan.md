@@ -7,15 +7,15 @@
 
 ## Overview
 
-A new standalone GUI (`emViewerGUI.m`) for viewing and analysing electron microscopy images. Supports TIFF, headerless RAW, and Gatan DM3 formats. Follows the existing toolbox architecture: parsers return the unified data struct, image-specific utilities live in a new `+imaging` package, and the GUI is a monolithic uifigure with nested functions (same pattern as `DataPlotter.m` and `xrdConvertGUI.m`).
+A new standalone GUI (`Fermion.m`) for viewing and analysing electron microscopy images. Supports TIFF, headerless RAW, and Gatan DM3 formats. Follows the existing toolbox architecture: parsers return the unified data struct, image-specific utilities live in a new `+imaging` package, and the GUI is a monolithic uifigure with nested functions (same pattern as `Boson.m` and `xrdConvertGUI.m`).
 
 ---
 
 ## Architecture Decisions
 
-### 1. Separate GUI (not integrated into DataPlotter)
+### 1. Separate GUI (not integrated into Boson)
 
-The interaction model for raster images (pan/zoom/contrast/measurement) is fundamentally different from curve plotting with corrections and peak fitting. Adding it to `DataPlotter.m` (already 11,500+ lines) would push it past 15,000 lines and mix incompatible workflows. A standalone `emViewerGUI.m` follows the established pattern of purpose-specific GUIs.
+The interaction model for raster images (pan/zoom/contrast/measurement) is fundamentally different from curve plotting with corrections and peak fitting. Adding it to `Boson.m` (already 11,500+ lines) would push it past 15,000 lines and mix incompatible workflows. A standalone `Fermion.m` follows the established pattern of purpose-specific GUIs.
 
 ### 2. Image data struct — extend the 2D pattern
 
@@ -103,7 +103,7 @@ Image processing functions that have no meaning for 1D data go in `+imaging/`, n
 
 | File | Description | Estimated size |
 |------|-------------|---------------|
-| `emViewerGUI.m` | Standalone uifigure EM image viewer | ~3,000-4,000 lines |
+| `Fermion.m` | Standalone uifigure EM image viewer | ~3,000-4,000 lines |
 
 ### Tests
 
@@ -119,8 +119,8 @@ Image processing functions that have no meaning for 1D data go in `+imaging/`, n
 |------|--------|
 | `resolveParser.m` | Add `.tif`/`.tiff`/`.dm3` cases; disambiguate `.raw` via magic bytes |
 | `runAllTests.m` | Add `em` and `emgui` test groups |
-| `DataPlotter.m` | Optional "Launch EM Viewer" button (3 lines) |
-| `CLAUDE.md` | Document new parsers, `+imaging` package, `emViewerGUI` |
+| `Boson.m` | Optional "Launch EM Viewer" button (3 lines) |
+| `CLAUDE.md` | Document new parsers, `+imaging` package, `Fermion` |
 
 ---
 
@@ -163,7 +163,7 @@ Image processing functions that have no meaning for 1D data go in `+imaging/`, n
 ### Programmatic API (for testing)
 
 ```matlab
-api = emViewerGUI();
+api = Fermion();
 api.fig                           % figure handle
 api.loadImages(fpaths)            % load cell array of file paths
 api.getImages()                   % return loaded image structs
@@ -259,7 +259,7 @@ api.close()                       % close figure
 | 7a | Batch thumbnail generation | Phase 2h, 1 | code-implementer |
 | 7b | GUI tests (`test_em_gui_harness.m`) | Phase 3-6 | bug-hunter |
 | 7c | `CLAUDE.md` documentation update | All | code-implementer |
-| 7d | "Launch EM Viewer" button in `DataPlotter.m` | Phase 3 | code-implementer |
+| 7d | "Launch EM Viewer" button in `Boson.m` | Phase 3 | code-implementer |
 | 7e | Session save/load | Phase 3-6 | ux-frontend-expert |
 
 ---
@@ -320,7 +320,7 @@ Naive nested-loop on 4096x4096 with 5x5 window = 16M comparisons × 25. Could ta
 
 - **DM3/DM4 parser** — once real test files are available
 - **Multi-channel support** — channel selector, false-color compositing for EDS maps
-- **Line profile → DataPlotter** — export profile as standard struct for correction/peak-fitting
+- **Line profile → Boson** — export profile as standard struct for correction/peak-fitting
 - **Annotation tools** — text labels, arrows, region-of-interest
 - **Image registration** — align stack frames (drift correction)
 - **Session save/load** — persist loaded image list and contrast settings across sessions (Phase 7e, deferred)
@@ -345,12 +345,12 @@ Naive nested-loop on 4096x4096 with 5x5 window = 16M comparisons × 25. Could ta
 | `+imaging/measureDistance.m` | Complete |
 | `+imaging/addScaleBar.m` | Complete |
 | `+imaging/generateThumbnail.m` | Complete |
-| `emViewerGUI.m` | Complete — full uifigure GUI with programmatic API |
+| `Fermion.m` | Complete — full uifigure GUI with programmatic API |
 | `tests/test_em_parsers.m` | Complete — synthetic TIFF + RAW smoke tests |
 | `tests/test_imaging_utils.m` | Complete — unit tests for all +imaging functions |
 | `tests/test_em_gui_harness.m` | Complete — 12 headless API tests |
 | `runAllTests.m` | Updated — `em` and `emgui` groups added |
-| `DataPlotter.m` | Updated — "EM Viewer" button in dataset toolbar |
+| `Boson.m` | Updated — "EM Viewer" button in dataset toolbar |
 | `CLAUDE.md` | Updated — full documentation for EM Viewer |
 
 ### Previously Deferred — Now Complete (2026-03-19)

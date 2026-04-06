@@ -69,7 +69,7 @@ fprintf('\n--- Save / Load ---\n');
 % but redirect output by pointing prefdir mock. We can't mock prefdir in MATLAB
 % without an external toolbox, so instead we call save with the public API
 % and verify the file appeared in prefdir().
-realTmplDir = fullfile(prefdir(), 'dataplotter_templates');
+realTmplDir = fullfile(prefdir(), 'boson_templates');
 testName1   = 'TFT_test_template_001';
 testFile1   = fullfile(realTmplDir, [matlab.lang.makeValidName(testName1) '.mat']);
 

@@ -35,7 +35,7 @@ arguments
     options.Axes  = []
 end
 
-templateDir = fullfile(prefdir(), 'dataplotter_templates');
+templateDir = fullfile(prefdir(), 'boson_templates');
 
 switch action
 

@@ -1,4 +1,4 @@
-%TEST_GUI_BUTTONS  Comprehensive button/control coverage for DataPlotter.
+%TEST_GUI_BUTTONS  Comprehensive button/control coverage for Boson.
 %   54 tests across 10 categories (A–J).
 %   Run via: runAllTests(Group="gui")
 %
@@ -1744,8 +1744,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 
 function api = launchHeadless()
-%LAUNCHHEADLESS  Create a DataPlotter instance with figure hidden.
-    api = DataPlotter();
+%LAUNCHHEADLESS  Create a Boson instance with figure hidden.
+    api = Boson();
     hideTestFig(api.fig);
     drawnow;
 end

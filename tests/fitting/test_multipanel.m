@@ -1,4 +1,4 @@
-%TEST_MULTIPANEL  Tests for multi-panel figure builder (+dataplotter/multiPanel).
+%TEST_MULTIPANEL  Tests for multi-panel figure builder (+boson/multiPanel).
 %
 %   Run:
 %     run tests/fitting/test_multipanel
@@ -34,7 +34,7 @@ d4 = struct('time', x, 'values', x.^2, 'labels', {{'quadratic'}}, ...
 fprintf('\n--- Layout creation ---\n');
 
 % 1x1 layout
-r = dataplotter.multiPanel({d1}, Layout='1x1');
+r = boson.multiPanel({d1}, Layout='1x1');
 if strcmp(r.layout, '1x1') && r.nPanels == 1 && isvalid(r.fig)
     fprintf('  PASS: 1x1 layout created\n'); passed = passed + 1;
 else
@@ -43,7 +43,7 @@ end
 close(r.fig);
 
 % 2x1 layout
-r = dataplotter.multiPanel({d1, d2}, Layout='2x1');
+r = boson.multiPanel({d1, d2}, Layout='2x1');
 if strcmp(r.layout, '2x1') && r.nPanels == 2 && numel(r.axes) == 2
     fprintf('  PASS: 2x1 layout created with 2 panels\n'); passed = passed + 1;
 else
@@ -52,7 +52,7 @@ end
 close(r.fig);
 
 % 1x2 layout
-r = dataplotter.multiPanel({d1, d2}, Layout='1x2');
+r = boson.multiPanel({d1, d2}, Layout='1x2');
 if strcmp(r.layout, '1x2') && r.nPanels == 2
     fprintf('  PASS: 1x2 layout created\n'); passed = passed + 1;
 else
@@ -61,7 +61,7 @@ end
 close(r.fig);
 
 % 2x2 layout
-r = dataplotter.multiPanel({d1, d2, d3, d4}, Layout='2x2');
+r = boson.multiPanel({d1, d2, d3, d4}, Layout='2x2');
 if strcmp(r.layout, '2x2') && r.nPanels == 4 && numel(r.axes) == 4
     fprintf('  PASS: 2x2 layout created with 4 panels\n'); passed = passed + 1;
 else
@@ -70,7 +70,7 @@ end
 close(r.fig);
 
 % 3x1 layout
-r = dataplotter.multiPanel({d1, d2, d3}, Layout='3x1');
+r = boson.multiPanel({d1, d2, d3}, Layout='3x1');
 if strcmp(r.layout, '3x1') && r.nPanels == 3
     fprintf('  PASS: 3x1 layout created\n'); passed = passed + 1;
 else
@@ -79,7 +79,7 @@ end
 close(r.fig);
 
 % Auto-layout selection
-r = dataplotter.multiPanel({d1});
+r = boson.multiPanel({d1});
 if strcmp(r.layout, '1x1')
     fprintf('  PASS: auto-layout selects 1x1 for 1 dataset\n'); passed = passed + 1;
 else
@@ -87,7 +87,7 @@ else
 end
 close(r.fig);
 
-r = dataplotter.multiPanel({d1, d2});
+r = boson.multiPanel({d1, d2});
 if strcmp(r.layout, '2x1')
     fprintf('  PASS: auto-layout selects 2x1 for 2 datasets\n'); passed = passed + 1;
 else
@@ -102,7 +102,7 @@ close(r.fig);
 fprintf('\n--- Features ---\n');
 
 % Panel labels
-r = dataplotter.multiPanel({d1, d2}, Layout='2x1', Labels='abc');
+r = boson.multiPanel({d1, d2}, Layout='2x1', Labels='abc');
 % Check that text objects exist on the axes
 txt1 = findobj(r.axes(1), 'Type', 'Text');
 hasLabel = false;
@@ -119,7 +119,7 @@ end
 close(r.fig);
 
 % No labels
-r = dataplotter.multiPanel({d1, d2}, Layout='2x1', Labels='none');
+r = boson.multiPanel({d1, d2}, Layout='2x1', Labels='none');
 txt1 = findobj(r.axes(1), 'Type', 'Text');
 noLabel = true;
 for ti = 1:numel(txt1)
@@ -135,7 +135,7 @@ end
 close(r.fig);
 
 % Template application
-r = dataplotter.multiPanel({d1}, Layout='1x1', Template='aps');
+r = boson.multiPanel({d1}, Layout='1x1', Template='aps');
 if r.axes(1).FontSize == 9 && strcmp(r.axes(1).FontName, 'Helvetica')
     fprintf('  PASS: APS template applied (9pt Helvetica)\n'); passed = passed + 1;
 else
@@ -145,7 +145,7 @@ end
 close(r.fig);
 
 % {x, y} pair input
-r = dataplotter.multiPanel({{x, sin(x)}}, Layout='1x1');
+r = boson.multiPanel({{x, sin(x)}}, Layout='1x1');
 lines = findobj(r.axes(1), 'Type', 'Line');
 if ~isempty(lines)
     fprintf('  PASS: {x,y} pair input works\n'); passed = passed + 1;
@@ -156,7 +156,7 @@ close(r.fig);
 
 % Plot styles
 for st = ["line", "scatter", "both"]
-    r = dataplotter.multiPanel({d1}, PlotStyle=st);
+    r = boson.multiPanel({d1}, PlotStyle=st);
     lines = findobj(r.axes(1), 'Type', 'Line');
     if ~isempty(lines)
         fprintf('  PASS: PlotStyle="%s" works\n', st); passed = passed + 1;
@@ -167,7 +167,7 @@ for st = ["line", "scatter", "both"]
 end
 
 % Fewer datasets than panels
-r = dataplotter.multiPanel({d1}, Layout='2x2');
+r = boson.multiPanel({d1}, Layout='2x2');
 if r.nPanels == 4 && isvalid(r.fig)
     fprintf('  PASS: 1 dataset in 2x2 layout — extra panels empty\n'); passed = passed + 1;
 else
@@ -177,7 +177,7 @@ close(r.fig);
 
 % Residuals mode (2x1r)
 yFit = sin(x) + 0.1*randn(size(x));
-r = dataplotter.multiPanel({d1}, Layout='2x1r', ...
+r = boson.multiPanel({d1}, Layout='2x1r', ...
     Residuals=struct('yFit', yFit), YLabels={{'sin'}, {'Residual'}});
 if r.nPanels == 2
     % Check bottom panel has data (residuals)
@@ -193,7 +193,7 @@ end
 close(r.fig);
 
 % Custom axis labels
-r = dataplotter.multiPanel({d1, d2}, Layout='2x1', ...
+r = boson.multiPanel({d1, d2}, Layout='2x1', ...
     XLabel='Time (s)', YLabels={{'Signal A'}, {'Signal B'}});
 if strcmp(r.axes(2).XLabel.String, 'Time (s)')
     fprintf('  PASS: custom X label on bottom panel\n'); passed = passed + 1;
@@ -203,7 +203,7 @@ end
 close(r.fig);
 
 % Figure size
-r = dataplotter.multiPanel({d1}, FigureSize=[20 15]);
+r = boson.multiPanel({d1}, FigureSize=[20 15]);
 figPos = r.fig.Position;
 expectedW = 20 * 96/2.54;
 if abs(figPos(3) - expectedW) < 5

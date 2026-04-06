@@ -19,7 +19,7 @@ function runAllTests(options)
 %       gui      — headless GUI API tests (opens/closes figures)
 %       sims     — SIMS depth profile parser tests
 %       em       — EM image parsers: importTIFF, importRawImage (synthetic data)
-%       emgui    — headless emViewerGUI API tests (opens/closes figures, slower)
+%       emgui    — headless Fermion API tests (opens/closes figures, slower)
 %       eds      — EDS multi-channel composite mode tests
 %       eels     — EELS imaging utilities (synthetic data, no files)
 %       eels_adv — Advanced EELS: Fourier-log, ELNES, Kramers-Kronig

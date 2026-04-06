@@ -14,8 +14,8 @@ Prioritized by impact for thin-film / magnetometry / XRD researchers.
 
 **Files modified this session:**
 - `+utilities/smoothData.m` — added `'savitzky-golay'` method with `PolyOrder` param, proper edge handling via asymmetric polynomial fits
-- `DataPlotter.m` — added SG to smoothing dropdown, added "Batch Apply..." button to Templates dialog with `doBatchApplyTemplate()` nested function
-- `+scripts/applyAnalysisTemplate.m` — NEW file, batch-applies saved DataPlotter templates to folders of files (import → correct → export CSV + optional peaks)
+- `Boson.m` — added SG to smoothing dropdown, added "Batch Apply..." button to Templates dialog with `doBatchApplyTemplate()` nested function
+- `+scripts/applyAnalysisTemplate.m` — NEW file, batch-applies saved Boson templates to folders of files (import → correct → export CSV + optional peaks)
 - `CLAUDE.md` — updated smoothData description, added SG examples, added analysis template workflow docs, added applyAnalysisTemplate to scripts listing
 - `planning/origin_feature_gaps.md` — this file
 - `planning/codebase_organization.md` — codebase restructuring TODO
@@ -32,7 +32,7 @@ Prioritized by impact for thin-film / magnetometry / XRD researchers.
 
 ## Priority 1: Savitzky-Golay Filter ✅ IMPLEMENTED
 
-**Status:** Added to `+utilities/smoothData.m` and DataPlotter GUI dropdown.
+**Status:** Added to `+utilities/smoothData.m` and Boson GUI dropdown.
 
 The single most-used smoothing method in experimental science. Polynomial-preserving — keeps peak shapes, heights, and positions intact unlike moving average or Gaussian which always broaden peaks. Critical for XRD and spectroscopy data where peak integrity matters.
 
@@ -44,7 +44,7 @@ The single most-used smoothing method in experimental science. Polynomial-preser
 
 ## Priority 2: Analysis Templates (Reproducible Pipelines) ✅ IMPLEMENTED
 
-**Status:** Added `+scripts/applyAnalysisTemplate.m` and extended DataPlotter template system.
+**Status:** Added `+scripts/applyAnalysisTemplate.m` and extended Boson template system.
 
 **What Origin has:** Save an entire analysis workflow (import → column assignments → baseline → corrections → peak detection → export) as a reusable template. Apply to new files with one click. This is Origin's biggest productivity feature for repetitive measurements.
 
@@ -70,7 +70,7 @@ The single most-used smoothing method in experimental science. Polynomial-preser
 - `+fitting/models.m` — 23 built-in models (decay, growth, peaks, power, sigmoid, magnetic, thermal)
 - `+fitting/autoGuess.m` — heuristic initial parameter estimation from data shape
 - `+fitting/parseEquation.m` — safe RPN-based custom equation parser (no eval)
-- Refactored `+dataplotter/curveFitting.m` dialog: category/model dropdowns, bounds, fixed params, weights, simulate, auto-guess, error display, chi²/AIC stats
+- Refactored `+boson/curveFitting.m` dialog: category/model dropdowns, bounds, fixed params, weights, simulate, auto-guess, error display, chi²/AIC stats
 - Returns: params ± errors, covariance matrix, R², χ²_red, RMSE, AIC
 - 35 unit tests (all passing)
 
@@ -82,7 +82,7 @@ The single most-used smoothing method in experimental science. Polynomial-preser
 
 **What Origin has:** Full frequency-domain filter suite. Essential for removing periodic noise (60 Hz pickup, mechanical vibrations) from transport/magnetometry measurements.
 
-**What we had:** Nothing in frequency domain for 1D data (emViewerGUI has FFT for images).
+**What we had:** Nothing in frequency domain for 1D data (Fermion has FFT for images).
 
 **Implementation:**
 - `+utilities/fftFilter.m` — Butterworth-based frequency-domain filters for 1D data
@@ -91,7 +91,7 @@ The single most-used smoothing method in experimental science. Polynomial-preser
 - Optional detrend (removes/restores linear trend across filtering)
 - Returns: filtered data + power spectrum + transfer function for diagnostics
 - 10 unit tests (all passing)
-- GUI integration: not yet wired into DataPlotter corrections panel
+- GUI integration: not yet wired into Boson corrections panel
 
 ---
 
@@ -123,10 +123,10 @@ The single most-used smoothing method in experimental science. Polynomial-preser
 
 ## Priority 7: Interactive On-Graph Analysis (Origin "Gadgets") ✅ IMPLEMENTED
 
-**Status:** Implemented as `+dataplotter/roiAnalysis.m` (2026-03-21).
+**Status:** Implemented as `+boson/roiAnalysis.m` (2026-03-21).
 
 **Implementation:**
-- `+dataplotter/roiAnalysis.m` — Interactive ROI gadget dialog
+- `+boson/roiAnalysis.m` — Interactive ROI gadget dialog
 - Click two points on the main axes to define region (shaded patch overlay)
 - Live readout: N, integral (trapz), mean, std, min/max with x-positions, median, FWHM
 - Copy stats to clipboard

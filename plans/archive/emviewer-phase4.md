@@ -1,4 +1,4 @@
-# emViewerGUI Feature Plan — Phase 4 (Analysis & Publication)
+# Fermion Feature Plan — Phase 4 (Analysis & Publication)
 
 Gap analysis vs. ImageJ/Fiji, IMOD, SerialEM viewer, Gwyddion, and common
 publication workflows. Focuses on quantitative analysis features and
@@ -52,7 +52,7 @@ those periodicities (Bragg-filtered image).
 lattice measurement; CrysTBox FreqFilt.
 
 **Touches:**
-- `emViewerGUI.m` --- new capture mode `'lattice'` with spot-click
+- `Fermion.m` --- new capture mode `'lattice'` with spot-click
   interaction on the FFT axes; overlay drawing on the real-space axes;
   lattice parameter readout in the measurement table.
 - `+imaging/latticeMeasure.m` (new) --- given two FFT spot positions and
@@ -88,7 +88,7 @@ vector-friendly export ready for journal submission.
 "Layout" mode; manual PowerPoint/Illustrator assembly.
 
 **Touches:**
-- `emViewerGUI.m` --- new menu item "Figure Builder..." opening a dialog.
+- `Fermion.m` --- new menu item "Figure Builder..." opening a dialog.
   The dialog shows a grid selector (rows x cols), drag-and-drop from
   loaded image list, per-panel crop handles, shared scale bar toggle,
   panel letter overlay, border/gap controls.
@@ -131,7 +131,7 @@ phase extraction + numerical gradient, all available via built-ins.
   around Bragg spot, inverse FFT, extract phase via `angle()`, unwrap
   phase (1D unwrap per row then column, or quality-guided), compute strain
   from `gradient()`.
-- `emViewerGUI.m` --- "GPA..." button opening a dialog for spot
+- `Fermion.m` --- "GPA..." button opening a dialog for spot
   selection, mask radius, and strain component display. Reuses FFT display
   and lattice spot selection from Feature 1.
 
@@ -174,7 +174,7 @@ surface analysis; NanoScope Analysis.
 - `+imaging/surfaceRoughness.m` (new) --- accepts 2D matrix + pixel
   calibration, returns struct with Ra, Rq, Rz, Rsk, Rku, bearing ratio
   curve.
-- `emViewerGUI.m` --- "Roughness..." button (Process section), results
+- `Fermion.m` --- "Roughness..." button (Process section), results
   dialog, optional ROI-restricted computation (reuse ROI manager).
 
 **Effort:** ~100 lines (+imaging) + ~80 lines (GUI).
@@ -205,7 +205,7 @@ DM line profile with Gaussian fit; custom scripts.
 **Touches:**
 - `+imaging/fitInterfaceWidth.m` (new) --- fit erf/sigmoid to 1D profile
   data, return width (sigma and 10-90%), center position, R-squared.
-- `emViewerGUI.m` --- "Fit Interface" button in the line profile result
+- `Fermion.m` --- "Fit Interface" button in the line profile result
   panel. Overlays the fit curve on the profile plot. Reports width in
   calibrated units.
 
@@ -237,7 +237,7 @@ in SEM images.
 **Touches:**
 - `+imaging/planeLevel.m` (new) --- fit and subtract polynomial surface
   from 2D image.
-- `emViewerGUI.m` --- "Level..." button in Process section with order
+- `Fermion.m` --- "Level..." button in Process section with order
   dropdown (1st/2nd/3rd). Undo-supported.
 
 **Effort:** ~60 lines (+imaging) + ~40 lines (GUI).
@@ -265,7 +265,7 @@ LaTeX subset).
 text; Gwyddion text overlay.
 
 **Touches:**
-- `emViewerGUI.m` --- enhance existing `'annotation'` capture mode with
+- `Fermion.m` --- enhance existing `'annotation'` capture mode with
   a font-properties mini-panel (size dropdown, bold toggle, background
   color). Store font properties in annotation struct.
 
@@ -295,7 +295,7 @@ data collection and full reconstruction in IMOD.
 Priism.
 
 **Touches:**
-- `emViewerGUI.m` --- extend stack navigator panel with "Tilt Series"
+- `Fermion.m` --- extend stack navigator panel with "Tilt Series"
   mode. Tilt angle input (manual entry or parse from metadata). Sinogram
   display in a side panel. Simple back-projection button.
 - `+imaging/backProject.m` (new) --- filtered back-projection from a
@@ -332,7 +332,7 @@ and data quality.
 **Touches:**
 - `+imaging/estimateCTF.m` (new) --- compute radial power spectrum,
   fit CTF model (voltage, Cs, defocus) to ring positions.
-- `emViewerGUI.m` --- "CTF..." button in Process section, dialog showing
+- `Fermion.m` --- "CTF..." button in Process section, dialog showing
   power spectrum with CTF fit overlay, defocus readout.
 
 **Effort:** ~200 lines (+imaging) + ~100 lines (GUI).
@@ -368,7 +368,7 @@ images without manual clicking.
 "Repeat Last" and module chaining.
 
 **Touches:**
-- `emViewerGUI.m` --- "Record" toggle button in toolbar. When active,
+- `Fermion.m` --- "Record" toggle button in toolbar. When active,
   each measurement callback appends a command struct to a recording list.
   "Stop" saves to `.mat`. "Play" replays on current image or batch over
   all loaded images.
@@ -407,7 +407,7 @@ Ham's intersection method (textbook stereology).
 **Touches:**
 - `+imaging/countDefectLines.m` (new) --- directional convolution +
   intersection counting on binary image.
-- `emViewerGUI.m` --- "Defect Count..." button, ROI selection, direction
+- `Fermion.m` --- "Defect Count..." button, ROI selection, direction
   angle input, results dialog with density estimate.
 
 **Effort:** ~150 lines (+imaging) + ~100 lines (GUI).
@@ -438,7 +438,7 @@ imaging conditions of the same area.
 Displays".
 
 **Touches:**
-- `emViewerGUI.m` --- extend existing compare mode with a "Sync
+- `Fermion.m` --- extend existing compare mode with a "Sync
   Annotations" toggle. Mirror measurement callbacks to both axes.
 
 **Effort:** ~120 lines (GUI only).
@@ -471,7 +471,7 @@ Weka Segmentation (simplified version); Gwyddion "Mark by Threshold".
 **Touches:**
 - `+imaging/multiOtsu.m` (new) --- N-level Otsu threshold via exhaustive
   histogram search.
-- `emViewerGUI.m` --- extend threshold panel with class count spinner
+- `Fermion.m` --- extend threshold panel with class count spinner
   (2-4) and per-class color pickers. Display labeled overlay.
 
 **Effort:** ~80 lines (+imaging) + ~100 lines (GUI).
@@ -501,7 +501,7 @@ which is lost on image export and shows normalized [0,1] values.
 "Data Bar"; ImageJ calibration bar.
 
 **Touches:**
-- `emViewerGUI.m` --- replace colorbar toggle with a configurable
+- `Fermion.m` --- replace colorbar toggle with a configurable
   colorbar overlay. Store intensity-to-unit mapping in appData.
 - `+imaging/addColorbar.m` (new) --- render a colorbar + tick labels
   into a pixel strip that can be composited onto an image.
@@ -532,7 +532,7 @@ Elsevier, APS, IUCr, Wiley.
 Fiji "Bio-Formats Exporter" partially addresses format but not sizing.
 
 **Touches:**
-- `emViewerGUI.m` --- "Journal Export..." menu item with preset dropdown
+- `Fermion.m` --- "Journal Export..." menu item with preset dropdown
   and preview of final pixel dimensions. Reuses existing
   `plotting.saveFigure` and DPI control from Phase 2.
 
@@ -564,7 +564,7 @@ alongside the image. Searchable across all loaded images.
 integration.
 
 **Touches:**
-- `emViewerGUI.m` --- collapsible "Notes" text area below the image list.
+- `Fermion.m` --- collapsible "Notes" text area below the image list.
   Notes stored in `appData.datasets{i}.notes`. Search box filters images
   by note content.
 
@@ -592,7 +592,7 @@ and drawing a new rectangle. This shortcut eliminates redundant clicking.
 DM crop to ROI.
 
 **Touches:**
-- `emViewerGUI.m` --- add "Crop to ROI" button that appears after any
+- `Fermion.m` --- add "Crop to ROI" button that appears after any
   ROI measurement completes. Reads the bounding box of the last ROI
   from `appData`.
 
@@ -620,7 +620,7 @@ in side-by-side layout. Adjustable flicker rate (0.5-5 Hz).
 stack; "Blink Comparator" (astronomy origin, used in EM for dose series).
 
 **Touches:**
-- `emViewerGUI.m` --- "Flicker" toggle in compare mode panel. Uses a
+- `Fermion.m` --- "Flicker" toggle in compare mode panel. Uses a
   MATLAB timer to alternate `CData` on a single axes.
 
 **Effort:** ~60 lines (GUI only).
@@ -651,7 +651,7 @@ declutter the view while retaining data.
 visibility toggle; Gwyddion mask show/hide.
 
 **Touches:**
-- `emViewerGUI.m` --- "Show Measurements" toggle button; per-row
+- `Fermion.m` --- "Show Measurements" toggle button; per-row
   visibility checkbox in measurement table. Store overlay handles in
   the measurement struct.
 
@@ -678,7 +678,7 @@ toolbar for frequent operations.
 options; standard desktop application convention.
 
 **Touches:**
-- `emViewerGUI.m` --- create `uicontextmenu` attached to the image
+- `Fermion.m` --- create `uicontextmenu` attached to the image
   axes. Menu items call existing callbacks.
 
 **Effort:** ~50 lines (GUI only).
@@ -731,10 +731,10 @@ The features have dependencies that suggest this build order:
 | Tier 4 | 5 | 0 | ~290 | ~290 |
 | **Total** | **20** | **~1400** | **~1790** | **~3190** |
 
-Note: `emViewerGUI.m` is currently ~8800 lines. Phase 4 GUI additions
+Note: `Fermion.m` is currently ~8800 lines. Phase 4 GUI additions
 (~1790 lines) would push it to ~10600 lines. Consider extracting
 measurement callbacks or the figure-builder dialog into separate files
-(e.g., `emViewerGUI_figureBuilder.m` as a helper function) if the file
+(e.g., `Fermion_figureBuilder.m` as a helper function) if the file
 becomes unwieldy.
 
 ---

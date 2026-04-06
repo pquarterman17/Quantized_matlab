@@ -1,4 +1,4 @@
-%TEST_SPREADSHEETPOPUP  Headless tests for dataplotter.spreadsheetPopup().
+%TEST_SPREADSHEETPOPUP  Headless tests for boson.spreadsheetPopup().
 %
 %   Run via: runAllTests(Group="gui")
 %   Run standalone: cd tests; run gui/test_spreadsheetPopup
@@ -52,7 +52,7 @@ ds = struct( ...
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 1: Opens without crash ══\n');
 try
-    fig1 = dataplotter.spreadsheetPopup(ds, 'Title', 'Test Popup');
+    fig1 = boson.spreadsheetPopup(ds, 'Title', 'Test Popup');
     hideTestFig(fig1);
     drawnow;
     assert(isvalid(fig1), 'Expected valid uifigure handle');
@@ -68,7 +68,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 2: Contains table/spreadsheet widget ══\n');
 try
-    fig2 = dataplotter.spreadsheetPopup(ds, 'Title', 'Widget Check');
+    fig2 = boson.spreadsheetPopup(ds, 'Title', 'Widget Check');
     hideTestFig(fig2);
     drawnow;
     tbls = findobj(fig2, 'Type', 'uitable');
@@ -121,7 +121,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 5: ReadOnly mode ══\n');
 try
-    fig5 = dataplotter.spreadsheetPopup(ds, 'ReadOnly', true);
+    fig5 = boson.spreadsheetPopup(ds, 'ReadOnly', true);
     hideTestFig(fig5);
     drawnow;
     assert(isvalid(fig5), 'Expected valid figure in ReadOnly mode');
@@ -148,7 +148,7 @@ try
         'labels', {{'A','B'}}, ...
         'units',  {{'',''}}, ...
         'metadata', struct('source', ''));
-    fig6 = dataplotter.spreadsheetPopup(dsEmpty, 'Title', 'Empty');
+    fig6 = boson.spreadsheetPopup(dsEmpty, 'Title', 'Empty');
     hideTestFig(fig6);
     drawnow;
     assert(isvalid(fig6), 'Expected valid figure for empty dataset');
@@ -170,7 +170,7 @@ try
         'labels', {{}}, ...
         'units',  {{}}, ...
         'metadata', struct('source', 'single.dat'));
-    fig7 = dataplotter.spreadsheetPopup(dsSingle, 'Title', 'Single');
+    fig7 = boson.spreadsheetPopup(dsSingle, 'Title', 'Single');
     hideTestFig(fig7);
     drawnow;
     assert(isvalid(fig7), 'Expected valid figure for single-column dataset');
@@ -191,7 +191,7 @@ try
     editLog = containers.Map({'row','col','val','fired'}, {0, 0, NaN, false});
     onEditFn = @(r,c,v) storeEditToMap(editLog, r, c, v);
 
-    fig8 = dataplotter.spreadsheetPopup(ds, ...
+    fig8 = boson.spreadsheetPopup(ds, ...
         'OnEdit', onEditFn, ...
         'ReadOnly', false);
     hideTestFig(fig8);
@@ -223,7 +223,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 9: Table column and row count ══\n');
 try
-    fig9 = dataplotter.spreadsheetPopup(ds, 'Title', 'Table Check');
+    fig9 = boson.spreadsheetPopup(ds, 'Title', 'Table Check');
     hideTestFig(fig9);
     drawnow;
     tbls9 = findobj(fig9, 'Type', 'uitable');
@@ -254,7 +254,7 @@ try
     dsShuffled.time   = flipud(ds.time);
     dsShuffled.values = flipud(ds.values);
 
-    fig10 = dataplotter.spreadsheetPopup(dsShuffled, 'Title', 'Sort Test');
+    fig10 = boson.spreadsheetPopup(dsShuffled, 'Title', 'Sort Test');
     hideTestFig(fig10);
     drawnow;
 
@@ -280,7 +280,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 11: Sort descending via toolbar ══\n');
 try
-    fig11 = dataplotter.spreadsheetPopup(ds, 'Title', 'Sort Desc Test');
+    fig11 = boson.spreadsheetPopup(ds, 'Title', 'Sort Desc Test');
     hideTestFig(fig11);
     drawnow;
 

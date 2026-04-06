@@ -438,8 +438,8 @@ end
 %  Local functions (must appear after all script code)
 % ════════════════════════════════════════════════════════════════════════
 function api = launchHeadless()
-%LAUNCHHEADLESS  Start DataPlotter with the figure hidden.
-    api = DataPlotter();
+%LAUNCHHEADLESS  Start Boson with the figure hidden.
+    api = Boson();
     api.fig.Visible = 'off';
     drawnow;
 end

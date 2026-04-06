@@ -1,7 +1,7 @@
 # Advanced Figure Builder — Plan
 
 **Status:** All Tiers Complete (2026-03-19)
-**Location:** Popup launched from DataPlotter Tools strip → "Figures..."
+**Location:** Popup launched from Boson Tools strip → "Figures..."
 **Architecture:** Standalone `uifigure` dialog that reads `appData.datasets` from the parent GUI and generates publication-ready MATLAB `figure` objects. No changes to the main preview axes.
 
 ---
@@ -207,6 +207,6 @@ The **Figure Type** dropdown swaps the middle config area.
 
 ## Files Modified
 
-- `DataPlotter.m` — "Figures..." button + `onAdvancedFigureBuilder` nested function (~800 lines)
+- `Boson.m` — "Figures..." button + `onAdvancedFigureBuilder` nested function (~800 lines)
 - `+scripts/quickPlot.m` — new file, command-line plotting script (~250 lines)
 - `CLAUDE.md` — documented quickPlot and figure builder

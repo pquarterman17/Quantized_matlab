@@ -5,7 +5,7 @@
 | `default` | Default visual theme (colours, line widths, font sizes) |
 | `dark` | Dark theme variant |
 
-Themes return a struct with fields for colours, line widths, font sizes, and grid settings. Used by `plotting.formatAxes()` and the DataPlotter GUI.
+Themes return a struct with fields for colours, line widths, font sizes, and grid settings. Used by `plotting.formatAxes()` and the Boson GUI.
 
 ```matlab
 th = styles.default();

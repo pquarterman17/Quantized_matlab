@@ -16,7 +16,7 @@ XRD software (HighScore, EVA) but missing here.
 them onto a common x-grid, and creates a new synthetic dataset with the residual. Could
 also support ratio mode (`A / B`) for normalization use cases.
 
-**Touches:** `DataPlotter.m` (new button + callback), dataset struct (synthetic flag).
+**Touches:** `Boson.m` (new button + callback), dataset struct (synthetic flag).
 
 ---
 
@@ -32,7 +32,7 @@ strongest-line d-spacings would save the round-trip to an external database.
 - Vertical tick marks on the plot with mineral/phase labels at matched positions
 - Tolerance slider (default ±0.02 Å)
 
-**Touches:** New `+data/peak_database.mat`, `DataPlotter.m` (peak panel button + overlay logic).
+**Touches:** New `+data/peak_database.mat`, `Boson.m` (peak panel button + overlay logic).
 
 ---
 
@@ -46,7 +46,7 @@ essentially generating calls to the programmatic API already built for the test 
 Each button press appends a line like `api.setCorrection('xOffset', 0.15)` to a script
 buffer. "Stop Recording" writes the buffer to a `.m` file. "Run Macro" executes it.
 
-**Touches:** `DataPlotter.m` (record toggle + script generation), programmatic API
+**Touches:** `Boson.m` (record toggle + script generation), programmatic API
 (ensure all correction/export actions are callable).
 
 ---
@@ -61,7 +61,7 @@ computing absorbance from transmission, or taking d(M)/d(T) from magnetometry sw
 y-values (with `interp1` alignment when x-grids differ), and insert the result as a new
 synthetic dataset.
 
-**Touches:** `DataPlotter.m` (dialog + evaluator), `+utilities/` (safe expression parser).
+**Touches:** `Boson.m` (dialog + evaluator), `+utilities/` (safe expression parser).
 
 ---
 
@@ -75,7 +75,7 @@ that renders the current axes to a high-DPI bitmap eliminates the screenshot wor
 wrapped in a button callback. Add a small button (clipboard icon or "Copy Plot") to the
 controls panel or toolbar.
 
-**Touches:** `DataPlotter.m` (one button + 3-line callback).
+**Touches:** `Boson.m` (one button + 3-line callback).
 
 **Priority:** Trivial to implement, used ~10x/day.
 
@@ -89,7 +89,7 @@ peak's center, d-spacing, and fitted parameters when hovering near a peak marker
 peak in `ds.peaks`. If within a threshold (e.g. 2× FWHM), append peak info to the cursor
 text string: `"2θ = 44.39° | d = 2.039 Å | FWHM = 0.12°"`.
 
-**Touches:** `DataPlotter.m` (`onMouseHover` callback, ~15 lines).
+**Touches:** `Boson.m` (`onMouseHover` callback, ~15 lines).
 
 ---
 
@@ -102,7 +102,7 @@ order and legend sequence.
 in `appData.datasets` and rebuilds the list. Alternatively, support drag-and-drop reorder
 within the listbox (MATLAB R2023a+ `lbDatasets.Sortable`).
 
-**Touches:** `DataPlotter.m` (2 buttons + swap logic in `appData.datasets`).
+**Touches:** `Boson.m` (2 buttons + swap logic in `appData.datasets`).
 
 ---
 
@@ -116,7 +116,7 @@ to auto-set axis labels ("Field (Oe)" vs "Temperature (K)") would remove a manua
 `updateControlsForActiveDataset` can then auto-select the appropriate x-axis column and
 set axis labels without user intervention.
 
-**Touches:** `+parser/importQDVSM.m` (header parsing, ~20 lines), `DataPlotter.m`
+**Touches:** `+parser/importQDVSM.m` (header parsing, ~20 lines), `Boson.m`
 (auto-label logic).
 
 ---
@@ -133,7 +133,7 @@ Lorentzian (size broadening) components.
 by adding `'Pseudo-Voigt'` to `ddFitModel` dropdown items. The fitter needs one extra
 free parameter (η ∈ [0, 1]). Display η in the peak table alongside FWHM.
 
-**Touches:** `DataPlotter.m` (fit engine, peak table column), `+utilities/pseudoVoigt.m`
+**Touches:** `Boson.m` (fit engine, peak table column), `+utilities/pseudoVoigt.m`
 (verify API matches fit engine expectations).
 
 ---
@@ -148,7 +148,7 @@ width parameters handles this without resorting to multiple overlapping symmetri
 parameters per peak. Add `'Split Pearson VII'` to `ddFitModel`. Display asymmetry ratio
 `w_L / w_R` in the peak table.
 
-**Touches:** New `+utilities/splitPearsonVII.m`, `DataPlotter.m` (fit engine, dropdown,
+**Touches:** New `+utilities/splitPearsonVII.m`, `Boson.m` (fit engine, dropdown,
 peak table).
 
 ---
@@ -162,7 +162,7 @@ the missing piece is the angular coordinate transform and a polar heatmap render
 2θ (user picks from a dropdown of detected peaks). Project onto a polar grid using
 `polarplot` or `polaraxes` + `pcolor`. Supports stereographic or equal-area projection.
 
-**Touches:** `DataPlotter.m` (2D panel button + polar rendering), possibly new
+**Touches:** `Boson.m` (2D panel button + polar rendering), possibly new
 `+plotting/poleFigure.m`.
 
 ---
@@ -177,7 +177,7 @@ MATLAB `timer` object calls `drawToAxes` with each dataset sequentially, togglin
 Frame rate control (default 2 fps). "Export GIF" button writes frames to an animated GIF
 via `imwrite(..., 'gif', 'WriteMode', 'append')`.
 
-**Touches:** `DataPlotter.m` (playback UI + timer callbacks), `+plotting/` (optional
+**Touches:** `Boson.m` (playback UI + timer callbacks), `+plotting/` (optional
 GIF export helper).
 
 ---
@@ -192,7 +192,7 @@ Power users want `Ctrl+S` (save session), `Ctrl+Z` (undo), `Delete` (remove data
 and `eventdata.Key`, then calls the matching existing callback. ~30 lines for the
 dispatcher + a help tooltip listing available shortcuts.
 
-**Touches:** `DataPlotter.m` (one new nested function + one `fig.KeyPressFcn` assignment).
+**Touches:** `Boson.m` (one new nested function + one `fig.KeyPressFcn` assignment).
 
 ---
 
@@ -206,7 +206,7 @@ strain during long analysis sessions and make plots pop.
 `BackgroundColor`/`FontColor` on all uigridlayout panels and widgets. MATLAB R2022a+
 supports `uistyle` for listbox styling.
 
-**Touches:** New `+styles/dark.m`, `DataPlotter.m` (theme dropdown + recursive updater).
+**Touches:** New `+styles/dark.m`, `Boson.m` (theme dropdown + recursive updater).
 
 ---
 
@@ -234,13 +234,13 @@ typing them manually.
 hasn't manually set a custom label (check `efCustomXLabel` / `efCustomYLabel` for non-empty
 override).
 
-**Touches:** `DataPlotter.m` (`drawToAxes`, ~10 lines).
+**Touches:** `Boson.m` (`drawToAxes`, ~10 lines).
 
 ---
 
 ## Recently Implemented (2026-03-14)
 
-The following 23 features were implemented in the DataPlotter in a single session:
+The following 23 features were implemented in the Boson in a single session:
 
 | # | Feature | Widget / Function | Location |
 |---|---------|-------------------|----------|

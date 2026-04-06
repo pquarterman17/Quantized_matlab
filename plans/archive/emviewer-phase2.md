@@ -1,4 +1,4 @@
-# emViewerGUI Feature Plan — Phase 2
+# Fermion Feature Plan — Phase 2
 
 ## Tier 1 — High-Value, Moderate Effort
 

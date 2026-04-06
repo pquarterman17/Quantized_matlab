@@ -1,4 +1,4 @@
-%TEST_UNDOMANAGER  Unit tests for dataplotter.UndoManager.
+%TEST_UNDOMANAGER  Unit tests for boson.UndoManager.
 %
 %   Tests the UndoManager class directly — no GUI required.
 %
@@ -31,7 +31,7 @@ failed = 0;
 
 fprintf('\n══ TEST A1: push 3 entries then undo all 3 ══\n');
 try
-    mgr   = dataplotter.UndoManager();
+    mgr   = boson.UndoManager();
     calls = {};
 
     for k = 1:3
@@ -70,7 +70,7 @@ end
 
 fprintf('\n══ TEST B1: undo then redo restores position ══\n');
 try
-    mgr = dataplotter.UndoManager();
+    mgr = boson.UndoManager();
     counter = 0;
 
     mgr.push(struct('type','t','label','Inc', ...
@@ -99,7 +99,7 @@ end
 
 fprintf('\n══ TEST C1: push after undo discards redo entries ══\n');
 try
-    mgr = dataplotter.UndoManager();
+    mgr = boson.UndoManager();
 
     for k = 1:3
         n = k;
@@ -130,7 +130,7 @@ end
 
 fprintf('\n══ TEST D1: push 60 entries with MaxSize=50 — depth capped at 50 ══\n');
 try
-    mgr = dataplotter.UndoManager(MaxSize=50);
+    mgr = boson.UndoManager(MaxSize=50);
 
     for k = 1:60
         n = k;
@@ -156,7 +156,7 @@ end
 
 fprintf('\n══ TEST E1: clear empties undo and redo ══\n');
 try
-    mgr = dataplotter.UndoManager();
+    mgr = boson.UndoManager();
     for k = 1:5
         mgr.push(struct('type','t','label','x','undo',@()[],'redo',@()[]));
     end
@@ -179,7 +179,7 @@ end
 
 fprintf('\n══ TEST F1: undoLabel and redoLabel return correct strings ══\n');
 try
-    mgr = dataplotter.UndoManager();
+    mgr = boson.UndoManager();
 
     % Empty manager
     assert(strcmp(mgr.undoLabel(), 'Nothing to undo'), ...
@@ -220,7 +220,7 @@ end
 
 fprintf('\n══ TEST G1: undo on empty stack returns [] without error ══\n');
 try
-    mgr   = dataplotter.UndoManager();
+    mgr   = boson.UndoManager();
     entry = mgr.undo();
     assert(isempty(entry), 'expected [] from undo on empty stack');
     fprintf('PASS\n'); passed = passed + 1;
@@ -230,7 +230,7 @@ end
 
 fprintf('\n══ TEST G2: redo at head returns [] without error ══\n');
 try
-    mgr = dataplotter.UndoManager();
+    mgr = boson.UndoManager();
     mgr.push(struct('type','t','label','x','undo',@()[],'redo',@()[]));
     entry = mgr.redo();  % already at head
     assert(isempty(entry), 'expected [] from redo at head');
@@ -241,7 +241,7 @@ end
 
 fprintf('\n══ TEST G3: redo after full undo sequence ══\n');
 try
-    mgr = dataplotter.UndoManager();
+    mgr = boson.UndoManager();
     order = {};
     for k = 1:3
         n = k;
@@ -269,7 +269,7 @@ end
 
 fprintf('\n══ TEST H1: custom MaxSize=3 caps at 3 entries ══\n');
 try
-    mgr = dataplotter.UndoManager(MaxSize=3);
+    mgr = boson.UndoManager(MaxSize=3);
     for k = 1:5
         n = k;
         mgr.push(struct('type','t','label',sprintf('E%d',n), ...

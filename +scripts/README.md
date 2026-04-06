@@ -5,7 +5,7 @@
 | Function | Description |
 |----------|-------------|
 | `batchImport` | Walk a directory, call `importAuto` on each supported file |
-| `applyAnalysisTemplate` | Batch-apply a saved DataPlotter template to files |
+| `applyAnalysisTemplate` | Batch-apply a saved Boson template to files |
 | `batchConvertXRD` | Batch-convert XRD files (.xrdml/.raw/.brml) to CSV |
 | `quickPlot` | Auto-detect & plot one or more data files (type-aware defaults) |
 

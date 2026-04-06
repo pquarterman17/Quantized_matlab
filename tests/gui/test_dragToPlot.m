@@ -30,7 +30,7 @@ passed = 0;
 failed = 0;
 
 % ── Launch GUI (headless) ────────────────────────────────────────────────
-api = DataPlotter();
+api = Boson();
 api.fig.Visible = 'off';
 drawnow;
 cleanup = onCleanup(@() api.close());
@@ -40,7 +40,7 @@ cleanup = onCleanup(@() api.close());
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 1: AppState has drag-state properties ══\n');
 try
-    state = dataplotter.AppState();
+    state = boson.AppState();
     assert(isprop(state, 'columnDragActive'),  'missing property: columnDragActive');
     assert(isprop(state, 'columnDragColName'), 'missing property: columnDragColName');
     assert(isprop(state, 'columnDragGhost'),   'missing property: columnDragGhost');

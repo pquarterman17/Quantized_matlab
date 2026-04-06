@@ -46,7 +46,7 @@ quantification, materials property calculator, neutron reflectometry.
 **Effort:** Medium — box plot is straightforward; violin needs kernel density estimation.
 
 ### 4. Auto-Recalculate on Parameter Change
-- [x] Implemented (MATLAB) — "Auto" checkbox + debounced timer in DataPlotter.m
+- [x] Implemented (MATLAB) — "Auto" checkbox + debounced timer in Boson.m
 - [x] Tested (MATLAB) — manual verification (timer-based, hard to automate)
 - [ ] Implemented (Python)
 - [ ] Tested (Python)
@@ -80,7 +80,7 @@ quantification, materials property calculator, neutron reflectometry.
 ## Medium Priority
 
 ### 7. Unlimited Undo
-- [x] Implemented (MATLAB) — `+dataplotter/UndoManager.m` handle class, full wiring in DataPlotter.m with Redo button + Ctrl+Z/Y
+- [x] Implemented (MATLAB) — `+boson/UndoManager.m` handle class, full wiring in Boson.m with Redo button + Ctrl+Z/Y
 - [x] Tested (MATLAB) — `tests/gui/test_undoManager.m` (9 tests)
 - [ ] Implemented (Python)
 - [ ] Tested (Python)
@@ -90,7 +90,7 @@ quantification, materials property calculator, neutron reflectometry.
 **Effort:** Medium — generalize undo stack to all state-mutating operations.
 
 ### 8. Data Filter (Conditional Row Visibility)
-- [x] Implemented (MATLAB) — `+dataplotter/filterRows.m` (recursive descent parser), filter bar in DataPlotter
+- [x] Implemented (MATLAB) — `+boson/filterRows.m` (recursive descent parser), filter bar in Boson
 - [x] Tested (MATLAB) — `tests/gui/test_filterRows.m` (15 tests)
 - [ ] Implemented (Python)
 - [ ] Tested (Python)
@@ -124,11 +124,11 @@ quantification, materials property calculator, neutron reflectometry.
 ## Additional Features Implemented (Beyond Original Gap List)
 
 ### 11. Spreadsheet Popup (Native MATLAB Table)
-- [x] Implemented (MATLAB) — `+dataplotter/spreadsheetPopup.m` with uispreadsheet (R2025a+) / uitable fallback
+- [x] Implemented (MATLAB) — `+boson/spreadsheetPopup.m` with uispreadsheet (R2025a+) / uitable fallback
 - [x] Tested (MATLAB) — `tests/gui/test_spreadsheetPopup.m` (11 tests)
 
 ### 12. Customizable Toolbar
-- [x] Implemented (MATLAB) — `+dataplotter/toolbarConfig.m`, dynamic toolbar builder, persist to prefdir
+- [x] Implemented (MATLAB) — `+boson/toolbarConfig.m`, dynamic toolbar builder, persist to prefdir
 - [x] Tested (MATLAB) — `tests/gui/test_toolbarConfig.m` (7 tests)
 
 ### 13. Drag Columns to Plot
