@@ -7,7 +7,7 @@ Scientific data analysis toolbox for magnetometry and generic lab data. Supports
 ## Repository Structure
 
 ```
-thin_film_toolkit_matlab/
+quantized_matlab/
 ├── setupToolbox.m            # Adds toolbox root to MATLAB path
 ├── Boson.m             # Main GUI: browse, preview, correct, peaks, export
 ├── xrdConvertGUI.m           # Batch XRD file converter GUI

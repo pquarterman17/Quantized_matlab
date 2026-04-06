@@ -7,7 +7,7 @@ from any working directory.
 ## Prerequisites
 
 ```matlab
-cd G:\Onedrive\Coding\git\thin_film_toolkit_matlab
+cd G:\Onedrive\Coding\git\quantized_matlab
 setupToolbox          % add packages to MATLAB path (once per session)
 ```
 

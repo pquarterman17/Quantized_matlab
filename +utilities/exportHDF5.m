@@ -119,7 +119,7 @@ function exportHDF5(data, filepath, options)
     h5create(filepath, '/file_schema_version', [1 1], 'Datatype', 'uint8');
     h5write( filepath, '/file_schema_version', uint8(1));
 
-    h5writeatt(filepath, '/', 'toolboxName',         'thin_film_toolkit_matlab');
+    h5writeatt(filepath, '/', 'toolboxName',         'quantized_matlab');
     h5writeatt(filepath, '/', 'hdf5Schema',           '1.0');
     h5writeatt(filepath, '/', 'createdAt',            datestr(now, 'yyyy-mm-ddTHH:MM:SS')); %#ok<TNOW1,DATST>
     h5writeatt(filepath, '/', 'hasCorrected',         uint8(hasCorrData));

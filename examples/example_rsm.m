@@ -12,7 +12,7 @@
 %   this script runs without instrument access.
 %
 %   Run from the project root:
-%       cd G:\Onedrive\Coding\git\thin_film_toolkit_matlab
+%       cd G:\Onedrive\Coding\git\quantized_matlab
 %       run examples/example_rsm
 %
 %   See also parser.importXRDML, Boson
