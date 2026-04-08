@@ -13028,8 +13028,9 @@ function varargout = Boson()
             'Padding', [8 6 8 6], 'RowSpacing', 2);
 
         % Section: PLOT TYPES
-        uilabel(poGL, 'Text', 'PLOT TYPES', 'FontSize', 9, ...
-            'FontWeight', 'bold', 'FontColor', HDR_FC).Layout.Row = 1;
+        lblPT = uilabel(poGL, 'Text', 'PLOT TYPES', 'FontSize', 9, ...
+            'FontWeight', 'bold', 'FontColor', HDR_FC);
+        lblPT.Layout.Row = 1;
 
         poBtn(poGL, 2, 'Compose Figure...', @onComposeFigure, ...
             'Multi-panel composite figure with subplot labels and annotations');
@@ -13041,8 +13042,9 @@ function varargout = Boson()
         % Separator row 5
 
         % Section: CONVERT
-        uilabel(poGL, 'Text', 'CONVERT', 'FontSize', 9, ...
-            'FontWeight', 'bold', 'FontColor', HDR_FC).Layout.Row = 6;
+        lblCv = uilabel(poGL, 'Text', 'CONVERT', 'FontSize', 9, ...
+            'FontWeight', 'bold', 'FontColor', HDR_FC);
+        lblCv.Layout.Row = 6;
 
         poBtn(poGL, 7, ['Convert Units (' char(8596) ')...'], @onConvertUnits, ...
             ['Convert axis units: Oe' char(8596) 'T, emu' char(8596) ...
@@ -13053,9 +13055,10 @@ function varargout = Boson()
         % Separator row 9
 
         % Close
-        uibutton(poGL, 'Text', 'Close', ...
+        btnCloseP = uibutton(poGL, 'Text', 'Close', ...
             'ButtonPushedFcn', @(~,~) closePlotOptMenu(), ...
-            'BackgroundColor', [0.25 0.25 0.25], 'FontColor', [0.7 0.7 0.7]).Layout.Row = 10;
+            'BackgroundColor', [0.25 0.25 0.25], 'FontColor', [0.7 0.7 0.7]);
+        btnCloseP.Layout.Row = 10;
 
         function poBtn(gl, row, txt, cb, tip)
             b = uibutton(gl, 'Text', txt, ...

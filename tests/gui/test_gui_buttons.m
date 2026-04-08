@@ -36,9 +36,9 @@ passed  = 0;
 failed  = 0;
 skipped = 0;
 
-% Detect headless / batch mode: popup uifigures from callbacks are unreliable
-% when MATLAB is running in -batch mode (no interactive display manager)
-canPopup = usejava('desktop');
+% Popup uifigures work in -batch mode in R2025b+ — gate retained as
+% an escape hatch but defaults to enabled.
+canPopup = true;
 
 % ── Single shared GUI instance ───────────────────────────────────────────
 api = launchHeadless();
@@ -131,27 +131,46 @@ try
     btn = findButtonByText(api.fig, 'Merge Selected');
     assert(~isempty(btn), 'Merge Selected button not found');
 
-    % Select both datasets via the listbox
+    % Select both datasets via the listbox. The correct listbox is the one
+    % with cell ItemsData (numeric indices wrapped in a cell for
+    % Multiselect=on). There are 3 listboxes in the fig; pick by that trait.
     lb = findobj(api.fig, 'Type', 'uilistbox');
     assert(~isempty(lb), 'dataset listbox not found');
-    mainLB = lb(end);
-    if ~isempty(mainLB.ItemsData)
-        mainLB.Value = mainLB.ItemsData;  % select all via numeric ItemsData
-    else
-        mainLB.Value = mainLB.Items;  % select all via string Items
+    mainLB = [];
+    for lbi = 1:numel(lb)
+        if ~isempty(lb(lbi).ItemsData) && iscell(lb(lbi).ItemsData) && ...
+                numel(lb(lbi).Items) == numel(api.getDatasets())
+            mainLB = lb(lbi); break;
+        end
     end
+    if isempty(mainLB)
+        % Fallback: first listbox with matching item count
+        for lbi = 1:numel(lb)
+            if numel(lb(lbi).Items) == numel(api.getDatasets())
+                mainLB = lb(lbi); break;
+            end
+        end
+    end
+    assert(~isempty(mainLB), 'dataset listbox not identified');
+    mainLB.Value = mainLB.ItemsData;  % select all
     drawnow;
 
+    % Merge callback may open a uialert on error — needs visible parent.
+    showTestFig(api.fig);
     btn.ButtonPushedFcn(btn, []);
     drawnow;
+    hideTestFig(api.fig);
 
+    % Merge appends a new dataset; originals are preserved.
     ds = api.getDatasets();
-    assert(numel(ds) == 1, sprintf('expected 1 merged dataset, got %d', numel(ds)));
-    nMerged = numel(ds{1}.data.time);
-    assert(nMerged >= nPts1, sprintf('merged set (%d pts) should be >= first (%d pts)', nMerged, nPts1));
-    fprintf('  Merged %d + %d → %d points\n', nPts1, nPts2, nMerged);
+    assert(numel(ds) == 3, sprintf('expected 3 datasets (2 originals + 1 merged), got %d', numel(ds)));
+    nMerged = numel(ds{3}.data.time);
+    assert(nMerged >= nPts1 + nPts2 - 1, ...
+        sprintf('merged set (%d pts) should be ≈ %d+%d', nMerged, nPts1, nPts2));
+    fprintf('  Merged %d + %d → %d points (appended as dataset #3)\n', nPts1, nPts2, nMerged);
     fprintf('  PASS\n'); passed = passed + 1;
 catch ME
+    hideTestFig(api.fig);
     fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
 end
 end  % canPopup guard for TEST A3
@@ -904,6 +923,8 @@ try
         catch; end
     end
 
+    % "Set active as BG" opens a uiconfirm — needs visible parent figure.
+    showTestFig(api.fig);
     if ~isempty(bgMenu)
         bgMenu.MenuSelectedFcn(bgMenu, []);
         drawnow;
@@ -927,6 +948,7 @@ try
         drawnow;
         fprintf('  Set active as BG via button\n');
     end
+    hideTestFig(api.fig);
 
     % Verify cbSubtractBG is enabled
     cbSub = findCheckboxByText(api.fig, 'Subtract BG');
@@ -935,6 +957,7 @@ try
     fprintf('  cbSubtractBG=true confirmed\n');
     fprintf('  PASS\n'); passed = passed + 1;
 catch ME
+    hideTestFig(api.fig);
     fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
 end
 end
@@ -1197,7 +1220,7 @@ try
     advBtn.ButtonPushedFcn(advBtn, []);
     drawnow; pause(0.2);
 
-    advFig = findobj(groot, 'Type', 'figure', 'Name', 'Advanced Tools');
+    advFig = findall(groot, 'Type', 'figure', 'Name', 'Advanced Tools');
     assert(~isempty(advFig) && isvalid(advFig), 'Advanced Tools popup did not open');
     fprintf('  Advanced Tools popup opened\n');
 
@@ -1224,12 +1247,12 @@ try
     advBtn.ButtonPushedFcn(advBtn, []);
     drawnow; pause(0.2);
 
-    advFig = findobj(groot, 'Type', 'figure', 'Name', 'Advanced Tools');
+    advFig = findall(groot, 'Type', 'figure', 'Name', 'Advanced Tools');
     assert(~isempty(advFig), 'popup did not open');
     delete(advFig);
     drawnow;
 
-    remaining = findobj(groot, 'Type', 'figure', 'Name', 'Advanced Tools');
+    remaining = findall(groot, 'Type', 'figure', 'Name', 'Advanced Tools');
     assert(isempty(remaining), 'Advanced Tools popup should be closed');
 
     hideTestFig(api.fig);
@@ -1255,7 +1278,7 @@ try
     showTestFig(api.fig);
     api.descriptiveStats(); drawnow; pause(0.2);
 
-    statsFig = findobj(groot, 'Type', 'figure', 'Tag', 'dpDescStats');
+    statsFig = findall(groot, 'Type', 'figure', 'Tag', 'dpDescStats');
     assert(~isempty(statsFig) && isvalid(statsFig), 'dpDescStats figure did not open');
     fprintf('  dpDescStats figure opened\n');
 
@@ -1285,7 +1308,7 @@ try
     advBtn.ButtonPushedFcn(advBtn, []);
     drawnow; pause(0.2);
 
-    advFig = findobj(groot, 'Type', 'figure', 'Name', 'Advanced Tools');
+    advFig = findall(groot, 'Type', 'figure', 'Name', 'Advanced Tools');
     assert(~isempty(advFig), 'Advanced Tools popup not open');
 
     allAdvBtns = findobj(advFig, 'Type', 'uibutton');
@@ -1324,7 +1347,7 @@ try
     advBtn.ButtonPushedFcn(advBtn, []);
     drawnow; pause(0.2);
 
-    advFig = findobj(groot, 'Type', 'figure', 'Name', 'Advanced Tools');
+    advFig = findall(groot, 'Type', 'figure', 'Name', 'Advanced Tools');
     assert(~isempty(advFig), 'Advanced Tools popup not open');
 
     allAdvBtns = findobj(advFig, 'Type', 'uibutton');
@@ -1363,7 +1386,7 @@ try
     advBtn.ButtonPushedFcn(advBtn, []);
     drawnow; pause(0.2);
 
-    advFig = findobj(groot, 'Type', 'figure', 'Name', 'Advanced Tools');
+    advFig = findall(groot, 'Type', 'figure', 'Name', 'Advanced Tools');
     assert(~isempty(advFig), 'Advanced Tools popup not open');
 
     allAdvBtns = findobj(advFig, 'Type', 'uibutton');
@@ -1407,7 +1430,7 @@ try
     plotBtn.ButtonPushedFcn(plotBtn, []);
     drawnow; pause(0.2);
 
-    poFig = findobj(groot, 'Type', 'figure', 'Name', 'Plot Options');
+    poFig = findall(groot, 'Type', 'figure', 'Name', 'Plot Options');
     assert(~isempty(poFig) && isvalid(poFig), 'Plot Options popup did not open');
     fprintf('  Plot Options popup opened\n');
 
@@ -1434,7 +1457,7 @@ try
     plotBtn.ButtonPushedFcn(plotBtn, []);
     drawnow; pause(0.2);
 
-    poFig = findobj(groot, 'Type', 'figure', 'Name', 'Plot Options');
+    poFig = findall(groot, 'Type', 'figure', 'Name', 'Plot Options');
     assert(~isempty(poFig), 'Plot Options popup not open');
 
     allPoBtns = findobj(poFig, 'Type', 'uibutton');
@@ -1470,7 +1493,7 @@ try
     plotBtn.ButtonPushedFcn(plotBtn, []);
     drawnow; pause(0.2);
 
-    poFig = findobj(groot, 'Type', 'figure', 'Name', 'Plot Options');
+    poFig = findall(groot, 'Type', 'figure', 'Name', 'Plot Options');
     assert(~isempty(poFig), 'Plot Options popup not open');
 
     allPoBtns = findobj(poFig, 'Type', 'uibutton');
@@ -1508,11 +1531,11 @@ try
     plotBtn.ButtonPushedFcn(plotBtn, []);
     drawnow; pause(0.2);
 
-    poFig = findobj(groot, 'Type', 'figure', 'Name', 'Plot Options');
+    poFig = findall(groot, 'Type', 'figure', 'Name', 'Plot Options');
     assert(~isempty(poFig), 'popup did not open');
 
     delete(poFig); drawnow;
-    remaining = findobj(groot, 'Type', 'figure', 'Name', 'Plot Options');
+    remaining = findall(groot, 'Type', 'figure', 'Name', 'Plot Options');
     assert(isempty(remaining), 'Plot Options popup should be closed after delete');
 
     hideTestFig(api.fig);
@@ -1676,7 +1699,7 @@ try
     settBtn.ButtonPushedFcn(settBtn, []);
     drawnow; pause(0.2);
 
-    settFig = findobj(groot, 'Type', 'figure', 'Name', 'Settings');
+    settFig = findall(groot, 'Type', 'figure', 'Name', 'Settings');
     assert(~isempty(settFig) && isvalid(settFig), 'Settings dialog did not open');
     fprintf('  Settings dialog opened\n');
 
@@ -1768,11 +1791,23 @@ function safeClose(api)
 end
 
 function closePopups(parentFig)
-%CLOSEPOPUPS  Delete all uifigures/figures other than parentFig.
-    allFigs = findobj(groot, 'Type', 'figure');
+%CLOSEPOPUPS  Delete known popup uifigures (leave parentFig and others alone).
+    popupNames = {'Advanced Tools', 'Plot Options', 'Settings', ...
+                  'Convert Units', 'XRD CSV Export', 'Integrate', ...
+                  'Curve Fit', 'Dataset Math', 'Hysteresis', ...
+                  'FFT Filter', 'ROI Analysis', 'dpDescStats'};
+    allFigs = findall(groot, 'Type', 'figure');
     for ii = 1:numel(allFigs)
-        if allFigs(ii) ~= parentFig
-            try; delete(allFigs(ii)); catch; end
+        h = allFigs(ii);
+        if h == parentFig || ~isvalid(h), continue; end
+        try
+            nm = h.Name;
+            tg = h.Tag;
+            if any(strcmp(popupNames, nm)) || any(strcmp(popupNames, tg)) || ...
+                    any(cellfun(@(p) contains(nm, p), popupNames))
+                delete(h);
+            end
+        catch
         end
     end
     drawnow;
