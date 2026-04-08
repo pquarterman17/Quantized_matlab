@@ -98,6 +98,7 @@ SUITES = {
     % ── Imaging tests ─────────────────────────────────────────────────
     T('imaging','test_em_parsers'),         'em',     'EM image parsers: importTIFF + importRawImage'
     T('imaging','test_imaging_utils'),      'em',     'Imaging utilities: contrast, filter, FFT, profile, scale bar, thumbnail'
+    T('imaging','test_imaging_advanced'),   'em',     'Imaging advanced: bin, unsharp, morph, Otsu, Butterworth, plane level, roughness, lattice, radial, azimuthal, interface fit, stitch, defect count'
     T('imaging','test_em_gui_harness'),     'emgui',  'EM Viewer GUI API: load, contrast, filter, FFT, profile, export'
     T('imaging','test_em_gui_phase2'),      'emgui',  'EM Viewer GUI Phase 2: stack nav, session, compare, EDS, EELS, diffraction, annotations'
     T('imaging','test_eds_composite'),      'eds',    'EDS multi-channel composite mode API tests'
