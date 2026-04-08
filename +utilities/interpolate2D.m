@@ -146,8 +146,48 @@ function zqv = interpScattered(xv, yv, zv, xqv, yqv, method, extrapolation)
             siExtrap = 'none';
     end
 
+    % Detect collinear / degenerate input up front. scatteredInterpolant
+    % cannot triangulate collinear points and returns NaN/empty regardless
+    % of extrapolation mode.
+    if isCollinear(xv, yv)
+        if strcmp(siMethod, 'nearest') || strcmp(siExtrap, 'nearest')
+            zqv = nearestFallback(xv, yv, zv, xqv, yqv);
+        else
+            zqv = nan(size(xqv));
+        end
+        return;
+    end
+
     F    = scatteredInterpolant(xv, yv, zv, siMethod, siExtrap);
     zqv  = F(xqv, yqv);
+    if numel(zqv) ~= numel(xqv)
+        if strcmp(siMethod, 'nearest') || strcmp(siExtrap, 'nearest')
+            zqv = nearestFallback(xv, yv, zv, xqv, yqv);
+        else
+            zqv = nan(size(xqv));
+        end
+    end
+end
+
+function tf = isCollinear(xv, yv)
+%ISCOLLINEAR  True if all (xv,yv) points lie on a single line.
+    if numel(xv) < 3
+        tf = true;
+        return;
+    end
+    A = [xv(:) - xv(1), yv(:) - yv(1)];
+    tf = rank(A, max(size(A)) * eps(norm(A,'fro'))) < 2;
+end
+
+function zqv = nearestFallback(xv, yv, zv, xqv, yqv)
+%NEARESTFALLBACK  Brute-force nearest-neighbour lookup (for degenerate inputs).
+    nq = numel(xqv);
+    zqv = nan(nq, 1);
+    for k = 1:nq
+        d2 = (xv - xqv(k)).^2 + (yv - yqv(k)).^2;
+        [~, idx] = min(d2);
+        zqv(k) = zv(idx);
+    end
 end
 
 

@@ -46,13 +46,13 @@ function [baseline, params] = baselineRollingBall(y, options)
     arguments
         y        (:,1) double
         options.Radius (1,1) double {mustBePositive, mustBeInteger} = 100
-        options.Smooth (1,1) double {mustBeNonnegative}            = -1
+        options.Smooth (1,1) double = -1
     end
 
     R = options.Radius;
     N = numel(y);
 
-    % Default smoothing: Radius/10
+    % Default smoothing: Radius/10 (sentinel: negative means "auto")
     if options.Smooth < 0
         smoothHW = max(1, round(R / 10));
     else

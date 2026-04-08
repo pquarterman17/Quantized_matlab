@@ -45,7 +45,7 @@ arguments
     covar    (:,:) double
     nPoints  (1,1) double {mustBePositive}
     nFree    (1,1) double {mustBeNonnegative}
-    options.Level (1,1) double {mustBeInRange(options.Level, 0, 1, 'exclusive', 'exclusive')} = 0.95
+    options.Level (1,1) double {mustBeInRange(options.Level, 0, 1, "exclusive")} = 0.95
 end
 
 M = numel(xGrid);

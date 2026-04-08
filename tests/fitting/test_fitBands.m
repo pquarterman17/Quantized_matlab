@@ -13,8 +13,9 @@ if ~contains(path, rootDir)
 end
 
 fprintf('\n=== test_fitBands ===\n');
-passed = 0;
-failed = 0;
+global TEST_FITBANDS_PASSED TEST_FITBANDS_FAILED
+TEST_FITBANDS_PASSED = 0;
+TEST_FITBANDS_FAILED = 0;
 
 rng(42);
 
@@ -27,13 +28,15 @@ rng(42);
     end
 
     function logPass(msg)
+        global TEST_FITBANDS_PASSED
         fprintf('  PASS: %s\n', msg);
-        passed = passed + 1;
+        TEST_FITBANDS_PASSED = TEST_FITBANDS_PASSED + 1;
     end
 
     function logFail(msg)
+        global TEST_FITBANDS_FAILED
         fprintf('  FAIL: %s\n', msg);
-        failed = failed + 1;
+        TEST_FITBANDS_FAILED = TEST_FITBANDS_FAILED + 1;
     end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -281,7 +284,8 @@ end
 % Summary
 % ════════════════════════════════════════════════════════════════════════
 
-fprintf('\n=== test_fitBands: %d passed, %d failed ===\n\n', passed, failed);
-if failed > 0
-    error('test_fitBands: %d test(s) FAILED', failed);
+fprintf('\n=== test_fitBands: %d passed, %d failed ===\n\n', ...
+    TEST_FITBANDS_PASSED, TEST_FITBANDS_FAILED);
+if TEST_FITBANDS_FAILED > 0
+    error('test_fitBands: %d test(s) FAILED', TEST_FITBANDS_FAILED);
 end

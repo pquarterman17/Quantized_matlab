@@ -42,8 +42,9 @@ try
     fp = fullfile(tmpDir, 'live_data.csv');
     writeCsv(fp, 10);
 
-    callbackCount = 0;
-    callbackData  = [];
+    global TDC_CALLBACK_COUNT TDC_CALLBACK_DATA
+    TDC_CALLBACK_COUNT = 0;
+    TDC_CALLBACK_DATA  = [];
 
     c = scripts.dataConnector(fp, ...
         Interval=0.2, ...
@@ -61,13 +62,13 @@ try
 
     c.stop();
 
-    assert(callbackCount >= 1, ...
-        sprintf('expected at least 1 callback, got %d', callbackCount));
-    assert(~isempty(callbackData), 'callbackData should be populated');
-    assert(isfield(callbackData, 'values'), 'data struct missing .values');
+    assert(TDC_CALLBACK_COUNT >= 1, ...
+        sprintf('expected at least 1 callback, got %d', TDC_CALLBACK_COUNT));
+    assert(~isempty(TDC_CALLBACK_DATA), 'callbackData should be populated');
+    assert(isfield(TDC_CALLBACK_DATA, 'values'), 'data struct missing .values');
 
-    fprintf('  Callback fires: %d time(s)\n', callbackCount);
-    fprintf('  Rows in reloaded data: %d\n', size(callbackData.values,1));
+    fprintf('  Callback fires: %d time(s)\n', TDC_CALLBACK_COUNT);
+    fprintf('  Rows in reloaded data: %d\n', size(TDC_CALLBACK_DATA.values,1));
     fprintf('  PASS\n');
     passed = passed + 1;
 catch ME
@@ -80,8 +81,9 @@ end
 
     % Nested capture function (modifies outer callbackCount / callbackData)
     function captureCallback(d)
-        callbackCount = callbackCount + 1;
-        callbackData  = d;
+        global TDC_CALLBACK_COUNT TDC_CALLBACK_DATA
+        TDC_CALLBACK_COUNT = TDC_CALLBACK_COUNT + 1;
+        TDC_CALLBACK_DATA  = d;
     end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -92,7 +94,8 @@ try
     fp2 = fullfile(tmpDir, 'live_data2.csv');
     writeCsv(fp2, 5);
 
-    count2 = 0;
+    global TDC_COUNT2
+    TDC_COUNT2 = 0;
 
     c2 = scripts.dataConnector(fp2, ...
         Interval=0.2, ...
@@ -104,7 +107,7 @@ try
     % Modify once to trigger a callback (baseline)
     writeCsv(fp2, 10);
     pause(0.5);
-    countAfterFirst = count2;
+    countAfterFirst = TDC_COUNT2;
 
     % Stop the connector
     c2.stop();
@@ -114,9 +117,9 @@ try
     writeCsv(fp2, 15);
     pause(0.5);
 
-    assert(count2 == countAfterFirst, ...
+    assert(TDC_COUNT2 == countAfterFirst, ...
         sprintf('callback fired after stop(): count went from %d to %d', ...
-                countAfterFirst, count2));
+                countAfterFirst, TDC_COUNT2));
 
     fprintf('  stop() works; no callback after stop  ✓\n');
     fprintf('  PASS\n');
@@ -130,7 +133,8 @@ catch ME
 end
 
     function incrementCount()
-        count2 = count2 + 1;
+        global TDC_COUNT2
+        TDC_COUNT2 = TDC_COUNT2 + 1;
     end
 
 % ════════════════════════════════════════════════════════════════════════

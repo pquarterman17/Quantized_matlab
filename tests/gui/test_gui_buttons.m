@@ -828,11 +828,19 @@ try
     api.reset(); drawnow;
     api.addFiles({XRDML}); drawnow;
 
-    btn = findButtonByText(api.fig, 'Estimate Baseline (SNIP)');
-    assert(~isempty(btn), 'Estimate Baseline (SNIP) button not found');
-
-    % SNIP opens a blocking dialog — verify button exists but skip execution in headless
-    fprintf('  Baseline estimation button found (skipped in headless — blocking dialog)\n');
+    % Baseline UI is now a dropdown ("Baseline:" — SNIP/ALS/Rolling Ball/
+    % Mod. Polynomial) with an adjacent "Apply" button. Verify the dropdown
+    % exists and lists SNIP as a valid option.
+    allDd = findobj(api.fig, 'Type', 'uidropdown');
+    foundBaseline = false;
+    for di = 1:numel(allDd)
+        if iscell(allDd(di).Items) && any(strcmp(allDd(di).Items, 'SNIP'))
+            foundBaseline = true;
+            break;
+        end
+    end
+    assert(foundBaseline, 'Baseline method dropdown (with SNIP option) not found');
+    fprintf('  Baseline dropdown found with SNIP option (apply skipped — blocking dialog)\n');
     fprintf('  PASS\n'); passed = passed + 1;
 catch ME
     fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;

@@ -2061,10 +2061,10 @@ function varargout = Fermion()
         % EDS composite mode
         api.enterEDS        = @() onEnterEDS([], []);
         api.exitEDS         = @() onExitEDS();
-        api.isEDSMode       = @() appData.edsMode;
-        api.getEDSChannels  = @() appData.edsChannels;
+        api.isEDSMode       = @getEDSMode;
+        api.getEDSChannels  = @getEDSChannelsAPI;
         api.setEDSChannel   = @(idx, field, val) setEDSChannelAPI(idx, field, val);
-        api.getEDSComposite = @() appData.edsComposite;
+        api.getEDSComposite = @getEDSCompositeAPI;
 
         % EELS API
         api.enterEELS        = @() onEnterEELS([], []);
@@ -7717,6 +7717,20 @@ function varargout = Fermion()
         end
         refreshEDSList();
         if appData.edsMode, compositeEDS(); end
+    end
+
+    function tf = getEDSMode()
+        % Nested accessor — sees live appData (anonymous closures would
+        % capture the struct by value at api-build time).
+        tf = appData.edsMode;
+    end
+
+    function chs = getEDSChannelsAPI()
+        chs = appData.edsChannels;
+    end
+
+    function comp = getEDSCompositeAPI()
+        comp = appData.edsComposite;
     end
 
     % ════════════════════════════════════════════════════════════════════

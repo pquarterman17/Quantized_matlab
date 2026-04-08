@@ -189,9 +189,16 @@ if ~isempty(constraints)
         pName = string(c.paramName);
         dsIdxList = sort(unique(c.datasets(:)'));
 
-        % Resolve param name to index
+        % Resolve param name to index (with ASCII↔Greek alias fallback)
         pNames = modelCell{1}.paramNames;
         pIdx = find(strcmp(pNames, char(pName)), 1);
+        if isempty(pIdx)
+            aliases = greekAliases(char(pName));
+            for ai = 1:numel(aliases)
+                pIdx = find(strcmp(pNames, aliases{ai}), 1);
+                if ~isempty(pIdx), break; end
+            end
+        end
         assert(~isempty(pIdx), ...
             'fitting:globalCurveFit:unknownParam', ...
             'Parameter "%s" not found in model "%s".', ...
@@ -543,6 +550,24 @@ function H = numericalHessian(fun, x0)
             xmm = x0; xmm(i) = xmm(i) - h(i); xmm(j) = xmm(j) - h(j);
             H(i,j) = (fun(xpp) - fun(xpm) - fun(xmp) + fun(xmm)) / (4*h(i)*h(j));
             H(j,i) = H(i,j);
+        end
+    end
+end
+
+function aliases = greekAliases(name)
+%GREEKALIASES  Map ASCII Greek-letter names to their unicode equivalents.
+    map = { ...
+        'sigma','σ'; 'mu','μ'; 'gamma','γ'; 'eta','η'; 'tau','τ'; ...
+        'lambda','λ'; 'alpha','α'; 'beta','β'; 'phi','φ'; 'theta','θ'; ...
+        'omega','ω'; 'pi','π'; 'delta','δ'; 'epsilon','ε'; 'kappa','κ'; ...
+        'rho','ρ'; 'chi','χ'; 'psi','ψ'; 'nu','ν'; 'xi','ξ'};
+    aliases = {};
+    nameLower = lower(name);
+    for k = 1:size(map, 1)
+        if strcmp(nameLower, map{k,1})
+            aliases{end+1} = map{k,2}; %#ok<AGROW>
+        elseif strcmp(name, map{k,2})
+            aliases{end+1} = map{k,1}; %#ok<AGROW>
         end
     end
 end

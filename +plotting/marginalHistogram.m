@@ -148,6 +148,10 @@ end
 % ════════════════════════════════════════════════════════════════════════
 %  Link axes limits
 % ════════════════════════════════════════════════════════════════════════
+% Sync limits explicitly before linking — linkaxes alone defers to a draw
+% callback, which may not have flushed when the caller inspects XLim.
+axTop.XLim   = axMain.XLim;
+axRight.YLim = axMain.YLim;
 linkaxes([axMain, axTop],   'x');
 linkaxes([axMain, axRight], 'y');
 

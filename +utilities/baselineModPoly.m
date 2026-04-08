@@ -89,11 +89,14 @@ function [baseline, params] = baselineModPoly(y, options)
         % Replace points above the fit with the fit values
         yNew = min(yMod, baseline);
 
-        % Convergence check: RMS change in modified signal
+        % Convergence check: RMS change in modified signal, normalised by
+        % signal range so Tol is dimensionless and works across scales.
         rmsChange = sqrt(mean((yNew - yMod).^2));
+        yRange    = max(max(y) - min(y), eps);
+        relChange = rmsChange / yRange;
         yMod = yNew;
 
-        if rmsChange < options.Tol
+        if relChange < options.Tol
             converged = true;
             break;
         end

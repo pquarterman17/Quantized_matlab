@@ -219,15 +219,28 @@ SFD = struct('peakH', NaN, 'peakdMdH', NaN, 'fwhm', NaN);
 dMdH_asc = []; dMdH_desc = [];
 
 if ~isempty(ascending.H) && numel(ascending.H) >= 5
-    [dMdH_asc, ~] = utilities.derivative(ascending.H, ascending.M, PreSmooth=max(3, options.PreSmooth));
-    [pkVal, pkIdx] = max(abs(dMdH_asc));
-    SFD.peakH = ascending.H(pkIdx);
-    SFD.peakdMdH = dMdH_asc(pkIdx);
-    SFD.fwhm = computeFWHM(ascending.H, abs(dMdH_asc), pkIdx);
+    % Ensure strictly monotonic H for gradient — duplicate H gives dx=0 → Inf
+    [Hu, iu] = unique(ascending.H, 'stable');
+    Mu = ascending.M(iu);
+    [Hu, sortIdx] = sort(Hu);
+    Mu = Mu(sortIdx);
+    if numel(Hu) >= 5
+        [dMdH_asc, ~] = utilities.derivative(Hu, Mu, PreSmooth=max(3, options.PreSmooth));
+        [pkVal, pkIdx] = max(abs(dMdH_asc)); %#ok<ASGLU>
+        SFD.peakH = Hu(pkIdx);
+        SFD.peakdMdH = dMdH_asc(pkIdx);
+        SFD.fwhm = computeFWHM(Hu, abs(dMdH_asc), pkIdx);
+    end
 end
 
 if ~isempty(descending.H) && numel(descending.H) >= 5
-    [dMdH_desc, ~] = utilities.derivative(descending.H, descending.M, PreSmooth=max(3, options.PreSmooth));
+    [Hud, iud] = unique(descending.H, 'stable');
+    Mud = descending.M(iud);
+    [Hud, sortIdxD] = sort(Hud);
+    Mud = Mud(sortIdxD);
+    if numel(Hud) >= 5
+        [dMdH_desc, ~] = utilities.derivative(Hud, Mud, PreSmooth=max(3, options.PreSmooth));
+    end
 end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -313,25 +326,62 @@ end
 
 function fw = computeFWHM(x, y, peakIdx)
 %COMPUTEFWHM  Compute full-width at half-maximum of a peak.
+    % Strip non-finite samples so NaN/Inf can't poison comparisons or
+    % linear-interp arithmetic.
+    finiteMask = isfinite(x) & isfinite(y);
+    if ~finiteMask(peakIdx) || nnz(finiteMask) < 3
+        fw = NaN;
+        return;
+    end
     halfMax = y(peakIdx) / 2;
+    if ~isfinite(halfMax) || halfMax <= 0
+        fw = NaN;
+        return;
+    end
+
     % Walk left from peak to find half-max crossing
-    xLeft = x(1);
+    xLeft = NaN;
     for i = peakIdx-1:-1:1
+        if ~finiteMask(i), continue; end
         if y(i) < halfMax
-            % Linear interpolation between points i and i+1
-            frac = (halfMax - y(i)) / max(y(i+1) - y(i), eps);
-            xLeft = x(i) + frac * (x(i+1) - x(i));
+            denom = y(i+1) - y(i);
+            if abs(denom) < eps
+                xLeft = x(i);
+            else
+                frac = (halfMax - y(i)) / denom;
+                xLeft = x(i) + frac * (x(i+1) - x(i));
+            end
             break;
         end
     end
     % Walk right from peak
-    xRight = x(end);
+    xRight = NaN;
     for i = peakIdx+1:numel(y)
+        if ~finiteMask(i), continue; end
         if y(i) < halfMax
-            frac = (halfMax - y(i)) / max(y(i-1) - y(i), eps);
-            xRight = x(i) + frac * (x(i-1) - x(i));
+            denom = y(i-1) - y(i);
+            if abs(denom) < eps
+                xRight = x(i);
+            else
+                frac = (halfMax - y(i)) / denom;
+                xRight = x(i) + frac * (x(i-1) - x(i));
+            end
             break;
         end
     end
-    fw = abs(xRight - xLeft);
+
+    % Fall back to data extents if a crossing wasn't found on one side —
+    % half-width on the side that did resolve, doubled.
+    if isnan(xLeft) && isnan(xRight)
+        fw = NaN;
+    elseif isnan(xLeft)
+        fw = 2 * abs(xRight - x(peakIdx));
+    elseif isnan(xRight)
+        fw = 2 * abs(x(peakIdx) - xLeft);
+    else
+        fw = abs(xRight - xLeft);
+    end
+    if ~isfinite(fw)
+        fw = NaN;
+    end
 end

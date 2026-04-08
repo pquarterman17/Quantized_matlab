@@ -25,14 +25,22 @@ end
 passed = 0;
 failed = 0;
 
+% Globals for closure-captured state (MATLAB script local functions cannot
+% see script workspace, so we route shared mutable state through globals).
+global TUM_CALLS TUM_COUNTER TUM_ORDER
+TUM_CALLS = {};
+TUM_COUNTER = 0;
+TUM_ORDER = {};
+
 % ════════════════════════════════════════════════════════════════════════
 %  A. Push 3 entries, undo all 3
 % ════════════════════════════════════════════════════════════════════════
 
 fprintf('\n══ TEST A1: push 3 entries then undo all 3 ══\n');
 try
-    mgr   = boson.UndoManager();
-    calls = {};
+    mgr = boson.UndoManager();
+    global TUM_CALLS
+    TUM_CALLS = {};
 
     for k = 1:3
         n = k;  % capture loop variable
@@ -71,20 +79,21 @@ end
 fprintf('\n══ TEST B1: undo then redo restores position ══\n');
 try
     mgr = boson.UndoManager();
-    counter = 0;
+    global TUM_COUNTER
+    TUM_COUNTER = 0;
 
     mgr.push(struct('type','t','label','Inc', ...
         'undo', @() decrement(), ...
         'redo', @() increment()));
-    counter = 1;  % simulate state after operation
+    TUM_COUNTER = 1;  % simulate state after operation
 
     mgr.undo();
-    assert(counter == 0, sprintf('undo should decrement; got %d', counter));
+    assert(TUM_COUNTER == 0, sprintf('undo should decrement; got %d', TUM_COUNTER));
     assert(~mgr.canUndo(), 'stack should be empty after single undo');
     assert(mgr.canRedo(),  'redo should be available');
 
     mgr.redo();
-    assert(counter == 1, sprintf('redo should increment; got %d', counter));
+    assert(TUM_COUNTER == 1, sprintf('redo should increment; got %d', TUM_COUNTER));
     assert(mgr.canUndo(),  'undo should be available after redo');
     assert(~mgr.canRedo(), 'redo exhausted');
 
@@ -242,7 +251,8 @@ end
 fprintf('\n══ TEST G3: redo after full undo sequence ══\n');
 try
     mgr = boson.UndoManager();
-    order = {};
+    global TUM_ORDER
+    TUM_ORDER = {};
     for k = 1:3
         n = k;
         mgr.push(struct('type','t','label',sprintf('Op %d',n), ...
@@ -299,21 +309,26 @@ end
 % ════════════════════════════════════════════════════════════════════════
 
     function appendCall(s) %#ok<DEFNU>
-        calls{end+1} = s; %#ok<AGROW>
+        global TUM_CALLS
+        TUM_CALLS{end+1} = s; %#ok<AGROW>
     end
 
     function increment()
-        counter = counter + 1;
+        global TUM_COUNTER
+        TUM_COUNTER = TUM_COUNTER + 1;
     end
 
     function decrement()
-        counter = counter - 1;
+        global TUM_COUNTER
+        TUM_COUNTER = TUM_COUNTER - 1;
     end
 
     function recordUndo(n) %#ok<DEFNU>
-        order{end+1} = sprintf('undo%d', n); %#ok<AGROW>
+        global TUM_ORDER
+        TUM_ORDER{end+1} = sprintf('undo%d', n); %#ok<AGROW>
     end
 
     function recordRedo(n) %#ok<DEFNU>
-        order{end+1} = sprintf('redo%d', n); %#ok<AGROW>
+        global TUM_ORDER
+        TUM_ORDER{end+1} = sprintf('redo%d', n); %#ok<AGROW>
     end

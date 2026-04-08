@@ -363,7 +363,7 @@ offsets = zeros(n, 1);
 if n == 0, return; end
 
 % Use markerR as the bin height in value space
-binH = range(sortedVals);
+binH = max(sortedVals) - min(sortedVals);
 if binH == 0 || n == 1
     % All same value — spread evenly
     spread = min(maxHw, markerR * (n-1));

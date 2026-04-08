@@ -67,7 +67,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 %  Mutable state shared across closure functions
 % ════════════════════════════════════════════════════════════════════════
-state.lastDatenum = getFileDatenum(fpChar);  % 0 if file absent
+[state.lastDatenum, state.lastBytes] = getFileStat(fpChar);  % 0,0 if absent
 state.tmr         = [];
 state.lastModified = [];
 
@@ -75,12 +75,15 @@ state.lastModified = [];
 %  Timer tick callback
 % ════════════════════════════════════════════════════════════════════════
     function onTick(~, ~)
-        dn = getFileDatenum(fpChar);
+        [dn, sz] = getFileStat(fpChar);
         if dn == 0, return; end  % file not present yet
-        if dn == state.lastDatenum, return; end  % not changed
+        % Detect change via mtime OR size (filesystem mtime resolution can be
+        % coarse — bytes flip catches rapid back-to-back writes).
+        if dn == state.lastDatenum && sz == state.lastBytes, return; end
 
         % File has changed
         state.lastDatenum  = dn;
+        state.lastBytes    = sz;
         state.lastModified = datetime('now');
 
         try
@@ -136,6 +139,12 @@ state.lastModified = [];
             'Timer error: %s', eventdata.Data.message);
     end
 
+    function lm = getLastModified()
+        % Nested function — sees live `state` in enclosing workspace.
+        % (Anonymous function would capture state.lastModified by value.)
+        lm = state.lastModified;
+    end
+
 % ════════════════════════════════════════════════════════════════════════
 %  Build and return connector struct
 % ════════════════════════════════════════════════════════════════════════
@@ -143,7 +152,7 @@ connector.start        = @startWatcher;
 connector.stop         = @stopWatcher;
 connector.isRunning    = @isRunning;
 connector.filePath     = fpChar;
-connector.lastModified = @() state.lastModified;
+connector.lastModified = @getLastModified;
 
 if options.AutoStart
     startWatcher();
@@ -155,12 +164,14 @@ end % dataConnector
 % ════════════════════════════════════════════════════════════════════════
 %  Local helper
 % ════════════════════════════════════════════════════════════════════════
-function dn = getFileDatenum(fp)
-%GETFILEDATENUM  Return the datenum of a file's last modification, or 0 if absent.
+function [dn, sz] = getFileStat(fp)
+%GETFILESTAT  Return [datenum, bytes] of a file, or [0,0] if absent.
     info = dir(fp);
     if isempty(info)
         dn = 0;
+        sz = 0;
     else
         dn = info(1).datenum;
+        sz = info(1).bytes;
     end
 end

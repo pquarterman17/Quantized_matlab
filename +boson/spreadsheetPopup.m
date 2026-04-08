@@ -29,7 +29,7 @@ function fig = spreadsheetPopup(dataStruct, Options)
 arguments
     dataStruct  (1,1) struct
     Options.Title    (1,:) char    = ''
-    Options.OnEdit   (1,1)         = []
+    Options.OnEdit                 = []
     Options.ReadOnly (1,1) logical = false
 end
 
@@ -188,7 +188,7 @@ end
             'Data',            state.T, ...
             'ColumnEditable',  colEditable, ...
             'FontSize',        11, ...
-            'CellSelectionChangedFcn', @onCellSelected, ...
+            'CellSelectionCallback',   @onCellSelected, ...
             'CellEditCallback',        @onCellEdit);
         try
             tb.ColumnSortable = true(1, nCols);
