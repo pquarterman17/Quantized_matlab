@@ -147,6 +147,7 @@ SUITES = {
     T('plotting','test_marginalHistogram'), 'plotting', 'marginalHistogram — axes, scatter, histograms, linked limits, KDE'
     T('plotting','test_groupedPlot'),       'plotting', 'groupedPlot — line/scatter/bar/box, legend, numeric groups, error bars'
     T('plotting','test_ternaryPlot'),       'plotting', 'ternaryPlot — three-component compositions on equilateral triangle (phase diagrams, alloy maps)'
+    T('plotting','test_polarContour'),      'plotting', 'polarContour — filled-contour intensity maps on polar coordinates (XRD pole figures, texture plots)'
     % ── Spectral tests ───────────────────────────────────────────────────
     T('calc','test_fftSpectral'),          'spectral','FFT spectral analysis, windows, Welch PSD, cross-correlation'
     % ── Interpolation 2-D tests ──────────────────────────────────────────

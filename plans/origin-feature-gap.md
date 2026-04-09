@@ -144,7 +144,11 @@ quantification, materials property calculator, neutron reflectometry.
       grid at 10% intervals, vertex labels). Tested:
       `tests/plotting/test_ternaryPlot.m` (10 tests). Useful for phase
       diagrams, alloy composition maps, EDS quantification results.
-- [ ] Polar contour plots — rare in thin film work
+- [x] **Polar contour plots** — `plotting.polarContour` (filled/line
+      contour on polar coordinates with configurable ThetaZero/ThetaDir
+      for XRD pole-figure convention). Tested:
+      `tests/plotting/test_polarContour.m` (10 tests including explicit
+      orientation checks for all four top/right × cw/ccw combinations).
 - [ ] ANOVA / t-tests / non-parametric tests — stats package territory (t-test exists in utilities.tTest)
 - [ ] PCA / cluster analysis — niche for our users
 - [ ] Column formulas (auto-recalc) — partially addressed by spreadsheet popup
