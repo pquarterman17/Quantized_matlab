@@ -139,7 +139,11 @@ quantification, materials property calculator, neutron reflectometry.
 
 ## Low Priority (Less Relevant to Our Domain)
 
-- [ ] Ternary plots — useful for phase diagrams but niche
+- [x] **Ternary plots** — `plotting.ternaryPlot` (equilateral triangle,
+      barycentric coords, auto-normalization, value-colored scatter,
+      grid at 10% intervals, vertex labels). Tested:
+      `tests/plotting/test_ternaryPlot.m` (10 tests). Useful for phase
+      diagrams, alloy composition maps, EDS quantification results.
 - [ ] Polar contour plots — rare in thin film work
 - [ ] ANOVA / t-tests / non-parametric tests — stats package territory (t-test exists in utilities.tTest)
 - [ ] PCA / cluster analysis — niche for our users
