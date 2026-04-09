@@ -1,6 +1,6 @@
 # GUI Layout & Resize Guide
 
-All code references are to `Boson.m` unless stated otherwise.
+All code references are to `BosonPlotter.m` unless stated otherwise.
 
 The GUI uses MATLAB's `uigridlayout` nesting — all positions are controlled by grid properties, not pixel coordinates.
 

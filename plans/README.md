@@ -1,16 +1,16 @@
 # Plans Index
 
 Feature roadmaps for the Thin Film Toolkit MATLAB project. Each roadmap is
-organized by domain (Boson, parsers, codebase) and includes only
+organized by domain (BosonPlotter, parsers, codebase) and includes only
 **remaining** work — completed plans are in `archive/`.
 
 ## Active Roadmaps
 
 | Roadmap | Key Items | Priority |
 |---------|-----------|----------|
-| [boson-roadmap.md](boson-roadmap.md) | Corrections panel restructure, XRR fitting, macro integration, large-data performance | Mixed |
+| [bosonPlotter-roadmap.md](bosonPlotter-roadmap.md) | Corrections panel restructure, XRR fitting, macro integration, large-data performance | Mixed |
 | [parser-roadmap.md](parser-roadmap.md) | New parsers (Oxford, Raman, OPUS, SPC) — blocked on example files | Low |
-| [codebase-roadmap.md](codebase-roadmap.md) | Break up Boson.m, documentation refresh | Medium |
+| [codebase-roadmap.md](codebase-roadmap.md) | Break up BosonPlotter.m, documentation refresh | Medium |
 
 ## Archive
 

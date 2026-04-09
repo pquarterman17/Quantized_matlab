@@ -1,12 +1,12 @@
 function results = applyAnalysisTemplate(templatePath, files, options)
-%APPLYANALYSISTEMPLATE  Batch-apply a saved Boson template to multiple files.
+%APPLYANALYSISTEMPLATE  Batch-apply a saved BosonPlotter template to multiple files.
 %
 %   results = scripts.applyAnalysisTemplate('template.mat', {'a.dat','b.dat'})
 %   results = scripts.applyAnalysisTemplate('template.mat', 'data_folder/')
 %   results = scripts.applyAnalysisTemplate(..., 'OutputDir', 'csv_out/')
 %   results = scripts.applyAnalysisTemplate(..., 'ExportPeaks', true)
 %
-%   Loads a template saved from Boson (Templates > Save Template...) and
+%   Loads a template saved from BosonPlotter (Templates > Save Template...) and
 %   applies the same corrections pipeline to each file: import → select columns →
 %   apply corrections (offsets, background, smoothing, normalization, derivative,
 %   trim) → optionally detect peaks → export corrected CSV.
@@ -15,7 +15,7 @@ function results = applyAnalysisTemplate(templatePath, files, options)
 %   on a reference file, save the template, then batch-apply to all your data.
 %
 %   INPUTS:
-%       templatePath — path to a .mat template file saved from Boson
+%       templatePath — path to a .mat template file saved from BosonPlotter
 %       files        — cell array of file paths, OR a directory path (string)
 %                      If a directory, all supported files in it are processed.
 %
@@ -51,7 +51,7 @@ function results = applyAnalysisTemplate(templatePath, files, options)
 %       ok = results(cellfun(@isempty, {results.error}));
 %       fprintf('Processed %d / %d files successfully.\n', numel(ok), numel(results));
 %
-%   See also scripts.batchImport, scripts.batchConvertXRD, Boson
+%   See also scripts.batchImport, scripts.batchConvertXRD, BosonPlotter
 
     arguments
         templatePath       (1,1) string {mustBeFile}

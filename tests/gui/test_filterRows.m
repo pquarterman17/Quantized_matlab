@@ -1,4 +1,4 @@
-%TEST_FILTERROWS  Unit tests for boson.filterRows().
+%TEST_FILTERROWS  Unit tests for bosonPlotter.filterRows().
 %
 %   Run via: runAllTests(Group="gui")
 %   Run standalone: cd tests; run gui/test_filterRows
@@ -51,7 +51,7 @@ d = parser.createDataStruct(xVec, vals, ...
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 1: Simple > comparison ══\n');
 try
-    mask = boson.filterRows(d, 'Temp > 500');
+    mask = bosonPlotter.filterRows(d, 'Temp > 500');
     expected = vals(:,1) > 500;
     assert(isequal(mask, expected), 'mask mismatch for Temp > 500');
     assert(sum(mask) == 5, sprintf('expected 5 passing rows, got %d', sum(mask)));
@@ -65,7 +65,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 2: Simple < comparison ══\n');
 try
-    mask = boson.filterRows(d, 'Field < 0');
+    mask = bosonPlotter.filterRows(d, 'Field < 0');
     expected = vals(:,2) < 0;
     assert(isequal(mask, expected), 'mask mismatch for Field < 0');
     assert(sum(mask) == 4, sprintf('expected 4 passing rows, got %d', sum(mask)));
@@ -79,7 +79,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 3: Compound & (AND) ══\n');
 try
-    mask = boson.filterRows(d, 'Temp > 200 & Field < 3');
+    mask = bosonPlotter.filterRows(d, 'Temp > 200 & Field < 3');
     expected = (vals(:,1) > 200) & (vals(:,2) < 3);
     assert(isequal(mask, expected), 'mask mismatch for AND expression');
     fprintf('  Passing rows: %d (expected %d)\n', sum(mask), sum(expected));
@@ -93,7 +93,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 4: Compound | (OR) ══\n');
 try
-    mask = boson.filterRows(d, 'Temp < 200 | Temp > 900');
+    mask = bosonPlotter.filterRows(d, 'Temp < 200 | Temp > 900');
     expected = (vals(:,1) < 200) | (vals(:,1) > 900);
     assert(isequal(mask, expected), 'mask mismatch for OR expression');
     assert(sum(mask) == 2, sprintf('expected 2 passing rows, got %d', sum(mask)));
@@ -107,7 +107,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 5: between() function ══\n');
 try
-    mask = boson.filterRows(d, 'between(Temp, 300, 700)');
+    mask = bosonPlotter.filterRows(d, 'between(Temp, 300, 700)');
     expected = (vals(:,1) >= 300) & (vals(:,1) <= 700);
     assert(isequal(mask, expected), 'mask mismatch for between(Temp,300,700)');
     assert(sum(mask) == 5, sprintf('expected 5 passing rows, got %d', sum(mask)));
@@ -121,7 +121,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 6: abs() function ══\n');
 try
-    mask = boson.filterRows(d, 'abs(Field) <= 2');
+    mask = bosonPlotter.filterRows(d, 'abs(Field) <= 2');
     expected = abs(vals(:,2)) <= 2;
     assert(isequal(mask, expected), 'mask mismatch for abs(Field) <= 2');
     assert(sum(mask) == 5, sprintf('expected 5 passing rows, got %d', sum(mask)));
@@ -135,7 +135,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 7: ''x'' token → .time ══\n');
 try
-    mask = boson.filterRows(d, 'x >= 5');
+    mask = bosonPlotter.filterRows(d, 'x >= 5');
     expected = xVec >= 5;
     assert(isequal(mask, expected), 'mask mismatch for x >= 5');
     assert(sum(mask) == 6, sprintf('expected 6 passing rows, got %d', sum(mask)));
@@ -149,7 +149,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 8: Empty expression → all-true mask ══\n');
 try
-    mask = boson.filterRows(d, '');
+    mask = bosonPlotter.filterRows(d, '');
     assert(all(mask), 'empty expression should return all-true mask');
     assert(numel(mask) == N, sprintf('mask length should be %d, got %d', N, numel(mask)));
     fprintf('  PASS\n'); passed = passed + 1;
@@ -164,7 +164,7 @@ fprintf('\n══ TEST 9: Invalid column name → error ══\n');
 try
     didError = false;
     try
-        boson.filterRows(d, 'Nonexistent > 0'); %#ok<NASGU>
+        bosonPlotter.filterRows(d, 'Nonexistent > 0'); %#ok<NASGU>
     catch
         didError = true;
     end
@@ -179,9 +179,9 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 10: Case-insensitive label match ══\n');
 try
-    maskLower = boson.filterRows(d, 'temp > 500');
-    maskUpper = boson.filterRows(d, 'TEMP > 500');
-    maskMixed = boson.filterRows(d, 'Temp > 500');
+    maskLower = bosonPlotter.filterRows(d, 'temp > 500');
+    maskUpper = bosonPlotter.filterRows(d, 'TEMP > 500');
+    maskMixed = bosonPlotter.filterRows(d, 'Temp > 500');
     assert(isequal(maskLower, maskMixed), 'lower vs mixed case mismatch');
     assert(isequal(maskUpper, maskMixed), 'upper vs mixed case mismatch');
     fprintf('  PASS\n'); passed = passed + 1;
@@ -198,7 +198,7 @@ try
     dLong = parser.createDataStruct(xVec, vals, ...
         'labels', {'Temperature (K)', 'Field', 'Moment'}, ...
         'units',  {'K', 'Oe', 'emu'});
-    mask = boson.filterRows(dLong, 'Temperature > 500');
+    mask = bosonPlotter.filterRows(dLong, 'Temperature > 500');
     expected = vals(:,1) > 500;
     assert(isequal(mask, expected), 'partial label match failed');
     fprintf('  PASS\n'); passed = passed + 1;
@@ -211,7 +211,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 12: ~= inequality operator ══\n');
 try
-    mask = boson.filterRows(d, 'Field ~= 0');
+    mask = bosonPlotter.filterRows(d, 'Field ~= 0');
     expected = vals(:,2) ~= 0;
     assert(isequal(mask, expected), 'mask mismatch for Field ~= 0');
     assert(sum(mask) == 9, sprintf('expected 9 passing rows, got %d', sum(mask)));
@@ -225,7 +225,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 13: NOT (~) prefix operator ══\n');
 try
-    maskFilter  = boson.filterRows(d, '~(Temp > 500)');
+    maskFilter  = bosonPlotter.filterRows(d, '~(Temp > 500)');
     maskExpected = ~(vals(:,1) > 500);
     assert(isequal(maskFilter, maskExpected), 'NOT operator produced wrong mask');
     fprintf('  PASS\n'); passed = passed + 1;
@@ -238,7 +238,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 14: == equality operator ══\n');
 try
-    mask = boson.filterRows(d, 'Field == 0');
+    mask = bosonPlotter.filterRows(d, 'Field == 0');
     expected = vals(:,2) == 0;
     assert(isequal(mask, expected), 'mask mismatch for Field == 0');
     assert(sum(mask) == 1, sprintf('expected 1 passing row, got %d', sum(mask)));
@@ -252,7 +252,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 15: Nested parentheses and chained operators ══\n');
 try
-    mask = boson.filterRows(d, '(Temp > 200 & Temp < 800) | Field == 5');
+    mask = bosonPlotter.filterRows(d, '(Temp > 200 & Temp < 800) | Field == 5');
     expected = ((vals(:,1) > 200) & (vals(:,1) < 800)) | (vals(:,2) == 5);
     assert(isequal(mask, expected), 'mask mismatch for nested expression');
     fprintf('  Passing rows: %d (expected %d)\n', sum(mask), sum(expected));

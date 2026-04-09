@@ -45,7 +45,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 %  Single GUI instance — shared across all tests
 % ════════════════════════════════════════════════════════════════════════
-api = Boson();
+api = BosonPlotter();
 api.fig.Visible = 'off';
 drawnow;
 C = onCleanup(@() api.close());

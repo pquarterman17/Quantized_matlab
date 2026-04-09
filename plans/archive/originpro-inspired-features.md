@@ -26,10 +26,10 @@ The toolkit currently has:
   OriginPro COM automation, LabTalk script generation, clipboard
 - **Unit conversion:** field, moment, temperature, angle, length
 
-### Key file: `Boson.m`
+### Key file: `BosonPlotter.m`
 - ~11,000-line single-file uifigure GUI.
 - Analysis dialogs (FFT thickness, reflectivity FFT, Williamson-Hall,
-  lattice refinement) are **nested functions** inside `Boson.m`,
+  lattice refinement) are **nested functions** inside `BosonPlotter.m`,
   each launching their own `uifigure` popup with `uigridlayout`.
 - New analysis features should follow the same nested-function popup pattern.
 
@@ -93,7 +93,7 @@ A function returning a struct array of named models. Each model has:
 | XRD | Williamson-Hall line | `m·(4sinθ) + (Kλ/D)` | m (strain), D (size) | W-H plot |
 | Custom | User-defined | parsed expression | user-defined | Anything else |
 
-### 1.2 Fitting dialog: nested function in `Boson.m`
+### 1.2 Fitting dialog: nested function in `BosonPlotter.m`
 
 **Layout (~800 × 650 uifigure):**
 
@@ -202,7 +202,7 @@ function handle using a safe tokenizer (NOT `eval`). The parser should:
 understand their data. The GUI currently shows only plots — no way to see
 the actual numbers.
 
-### 2.1 Data table panel in `Boson.m`
+### 2.1 Data table panel in `BosonPlotter.m`
 
 Add a toggleable panel (button or tab) that shows raw data in a `uitable`:
 - Columns: X-axis + all Y columns, with headers from `.labels` and `.units`
@@ -292,7 +292,7 @@ t = styles.template('aps');
 | `+styles/template.m` | Template loader (returns struct by name) |
 | `+styles/templates/` | Directory for user-saved template `.mat` files |
 | `+plotting/applyTemplate.m` | Apply a template struct to axes + figure |
-| `Boson.m` | Template dropdown + save/apply buttons |
+| `BosonPlotter.m` | Template dropdown + save/apply buttons |
 
 ---
 
@@ -303,7 +303,7 @@ export to Origin just for basic statistics.
 
 ### 4.1 Descriptive statistics dialog
 
-Popup dialog (nested function in `Boson.m`) showing:
+Popup dialog (nested function in `BosonPlotter.m`) showing:
 - Per-column: N, mean, median, σ, SEM, min, max, skewness, kurtosis
 - Histogram of selected column with optional distribution fit
   (normal, log-normal)
@@ -435,7 +435,7 @@ OriginPro's "Quick Peaks" tracks a peak across a series:
 |------|---------|
 | `+fitting/batchFit.m` | Run a model fit across multiple datasets |
 | `+fitting/trackPeak.m` | Track a peak across a dataset series |
-| `Boson.m` | Batch fit dialog + parameter trend plot |
+| `BosonPlotter.m` | Batch fit dialog + parameter trend plot |
 
 ---
 
@@ -475,9 +475,9 @@ OriginPro's "Quick Peaks" tracks a peak across a series:
 | 1 | Phase 1: Curve Fitting Engine | Large | Highest | ✅ Done — `+fitting/` package |
 | 2 | Phase 3: Graph Templates | Small | High | ✅ Done — `+styles/template.m` |
 | 3 | Phase 7: Batch Parameter Extraction | Medium | High | ✅ Done — `+fitting/batchFit.m`, `trackPeak.m` |
-| 4 | Phase 2: Worksheet View | Medium | High | ✅ Already existed in Boson |
-| 5 | Phase 5: Analysis Gadgets | Medium | Medium | ✅ ROI done — `+boson/roiAnalysis.m` |
-| 6 | Phase 6: Multi-Panel Plots | Medium | Medium | ✅ Done — `+boson/multiPanel.m` |
+| 4 | Phase 2: Worksheet View | Medium | High | ✅ Already existed in BosonPlotter |
+| 5 | Phase 5: Analysis Gadgets | Medium | Medium | ✅ ROI done — `+bosonPlotter/roiAnalysis.m` |
+| 6 | Phase 6: Multi-Panel Plots | Medium | Medium | ✅ Done — `+bosonPlotter/multiPanel.m` |
 | 7 | Phase 4: Statistics Panel | Small | Medium | ✅ Core done (no GUI yet) |
 | 8 | Phase 8: QoL & Polish | Large | Medium | ✅ Done — composer, action log, 3D surface, groups |
 
@@ -490,7 +490,7 @@ OriginPro's "Quick Peaks" tracks a peak across a series:
 - **No `eval()`** — custom equation parsing must use safe tokenization,
   not `eval` or `str2func` with dynamic strings.
 - **GUI is monolithic** — new dialogs are nested functions in
-  `Boson.m`. Consider whether the file (already ~11k lines) needs
+  `BosonPlotter.m`. Consider whether the file (already ~11k lines) needs
   to be split before adding more. The curve fitting dialog alone could add
   500-800 lines.
 - **fminsearch limitations** — no native bounds support (use logit

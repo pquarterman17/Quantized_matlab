@@ -68,7 +68,7 @@ guiSaveCSV(d, fp, dRaw, asymData, fmt)  % fmt = 'standard' | 'origin'
 
 ### GUI usage
 
-1. Load a file in `Boson`
+1. Load a file in `BosonPlotter`
 2. Set the **CSV Format** dropdown (below the save path field) to **Origin ASCII**
 3. Click **Save CSV** (or **Batch Export All CSV** for all loaded files)
 4. Open the `.csv` in Origin: **File > Import > CSV** -- column metadata auto-populates

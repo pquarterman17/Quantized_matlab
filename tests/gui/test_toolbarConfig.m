@@ -1,4 +1,4 @@
-%TEST_TOOLBARCONFIG  Headless tests for Boson toolbar customisation.
+%TEST_TOOLBARCONFIG  Headless tests for BosonPlotter toolbar customisation.
 %
 %   Tests the toolbar system without any dialog interaction:
 %     A. Default config contains expected button IDs
@@ -28,7 +28,7 @@ mkdir(tmpDir);
 cleanupTmp = onCleanup(@() rmdir(tmpDir, 's'));
 
 % ── Shared headless GUI instance ─────────────────────────────────────────
-api = Boson();
+api = BosonPlotter();
 api.fig.Visible = 'off';
 drawnow;
 cleanupApi = onCleanup(@() safeClose(api));
@@ -39,7 +39,7 @@ cleanupApi = onCleanup(@() safeClose(api));
 
 fprintf('\n══ TEST A1: toolbarDefaultConfig returns expected IDs ══\n');
 try
-    defaults = boson.toolbarDefaultConfig();
+    defaults = bosonPlotter.toolbarDefaultConfig();
     assert(iscell(defaults),         'result must be a cell array');
     assert(~isempty(defaults),       'default config must not be empty');
     assert(ismember('cursor',    defaults), 'missing: cursor');
@@ -189,7 +189,7 @@ try
             btnKids = btnKids + 1;
         end
     end
-    defaults = boson.toolbarDefaultConfig();
+    defaults = bosonPlotter.toolbarDefaultConfig();
     assert(btnKids == numel(defaults), ...
         sprintf('expected %d default buttons, got %d', numel(defaults), btnKids));
     fprintf('PASS\n');

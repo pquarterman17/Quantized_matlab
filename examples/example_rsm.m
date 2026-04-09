@@ -15,7 +15,7 @@
 %       cd G:\Onedrive\Coding\git\quantized_matlab
 %       run examples/example_rsm
 %
-%   See also parser.importXRDML, Boson
+%   See also parser.importXRDML, BosonPlotter
 
 clear; clc;
 

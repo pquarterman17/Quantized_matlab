@@ -1,6 +1,6 @@
 function layoutSettingsGUI(applyFn, currentSettings, defaultSettings, prefsFile)
 % ════════════════════════════════════════════════════════════════════════
-% GUI for configuring the layout and panel size defaults of Boson.
+% GUI for configuring the layout and panel size defaults of BosonPlotter.
 % ════════════════════════════════════════════════════════════════════════
 %
 % Syntax:
@@ -9,7 +9,7 @@ function layoutSettingsGUI(applyFn, currentSettings, defaultSettings, prefsFile)
 % Inputs:
 %   applyFn         - function handle: @(settings) — called when Apply or
 %                     Save is clicked; receives a settings struct and applies
-%                     dimensions to the live Boson window.
+%                     dimensions to the live BosonPlotter window.
 %   currentSettings - struct with current dimension values (pre-fills spinners).
 %   defaultSettings - struct with factory defaults (used by Reset button).
 %   prefsFile       - char path to the .mat file for persistent defaults.

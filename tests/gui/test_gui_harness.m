@@ -1,4 +1,4 @@
-%TEST_GUI_HARNESS  Automated test harness for Boson programmatic API.
+%TEST_GUI_HARNESS  Automated test harness for BosonPlotter programmatic API.
 %
 %   Tests the GUI through its programmatic API interface:
 %   - File loading and navigation
@@ -40,7 +40,7 @@ failed = 0;
 % ════════════════════════════════════════════════════════════════════════
 %  Launch single shared GUI instance
 % ════════════════════════════════════════════════════════════════════════
-api = Boson();
+api = BosonPlotter();
 api.fig.Visible = 'off';
 drawnow;
 cleanupApi = onCleanup(@() api.close());
@@ -977,11 +977,11 @@ end
 %  Local functions  (must appear after all script code)
 % ════════════════════════════════════════════════════════════════════════
 function api = launchHeadless()
-%LAUNCHHEADLESS  Start Boson with the figure hidden.
+%LAUNCHHEADLESS  Start BosonPlotter with the figure hidden.
 %   Used only for the session reload phase of tests 11 and 12, where a
 %   fresh GUI instance is required to verify that saved state loads
 %   correctly into a clean environment.
-    api = Boson();
+    api = BosonPlotter();
     hideTestFig(api.fig);
     drawnow;
 end

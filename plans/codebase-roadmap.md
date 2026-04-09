@@ -6,21 +6,21 @@ Structural improvements for maintainability.
 
 ## 1. Break up monolithic GUIs
 
-**Boson.m:** reduced from ~14,836 to ~14,514 lines by extracting:
-- `+boson/colorMaps.m` — colormap generation (viridis, plasma, inferno + builtins)
-- `+boson/safeEvalMathExpr.m` — safe recursive-descent expression parser
+**BosonPlotter.m:** reduced from ~14,836 to ~14,514 lines by extracting:
+- `+bosonPlotter/colorMaps.m` — colormap generation (viridis, plasma, inferno + builtins)
+- `+bosonPlotter/safeEvalMathExpr.m` — safe recursive-descent expression parser
 
-Previously extracted subsystems in `+boson/`:
+Previously extracted subsystems in `+bosonPlotter/`:
 - `curveFitting.m`, `figureBuilder.m`, `graphDigitizer.m`
 - `roiAnalysis.m`, `multiPanel.m`, `actionLog.m`, `datasetGroups.m`
 - `applyCorrections.m`, `correctionParams.m`, `reflFitting.m`
 
 ### Extracted (2026-03-26)
-- `+boson/drawOverlays.m` — peak markers, fit curves, annotations, ref lines (~200 lines from drawToAxes)
-- `+boson/peakTools.m` — analysis dialogs (lattice refinement, phase matching, FFT thickness, reflectivity FFT, Williamson-Hall)
-- `+boson/buildPeakWindow.m` — peak window widget construction
-- `+boson/buildMap2DPanel.m` — 2D map panel widget construction
-- Session save/load dialog wrappers merged into `+boson/sessionManager.m`
+- `+bosonPlotter/drawOverlays.m` — peak markers, fit curves, annotations, ref lines (~200 lines from drawToAxes)
+- `+bosonPlotter/peakTools.m` — analysis dialogs (lattice refinement, phase matching, FFT thickness, reflectivity FFT, Williamson-Hall)
+- `+bosonPlotter/buildPeakWindow.m` — peak window widget construction
+- `+bosonPlotter/buildMap2DPanel.m` — 2D map panel widget construction
+- Session save/load dialog wrappers merged into `+bosonPlotter/sessionManager.m`
 
 ### Remaining candidates (lower priority)
 - Core peak detection/fitting callbacks (~1,000 lines) — deep bidirectional coupling with appData + click handlers

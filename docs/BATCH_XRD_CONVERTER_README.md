@@ -8,9 +8,9 @@ Convert multiple XRD data files (XRDML, Rigaku, Bruker) to CSV or Origin ASCII f
 
 ### GUI Method (Easiest)
 
-**From the main Boson:**
+**From the main BosonPlotter:**
 ```matlab
-Boson()
+BosonPlotter()
 ```
 1. Click the **"Batch Convert XRD"** button (green-gold, bottom of the Save panel)
 2. Select a folder containing XRD files
@@ -18,7 +18,7 @@ Boson()
 4. Set output format and options
 5. Click **Convert**
 
-**Standalone (without opening Boson):**
+**Standalone (without opening BosonPlotter):**
 ```matlab
 xrdConvertGUI()
 ```

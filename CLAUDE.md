@@ -9,14 +9,14 @@ Scientific data analysis toolbox for magnetometry and generic lab data. Supports
 ```
 quantized_matlab/
 ├── setupToolbox.m            # Adds toolbox root to MATLAB path
-├── Boson.m             # Main GUI: browse, preview, correct, peaks, export
+├── BosonPlotter.m             # Main GUI: browse, preview, correct, peaks, export
 ├── xrdConvertGUI.m           # Batch XRD file converter GUI
 ├── materialsCalcGUI.m        # Materials calculator (13 tabs)
-├── Fermion.m             # Electron microscopy image viewer
+├── FermiViewer.m             # Electron microscopy image viewer
 ├── runAllTests.m             # Master test runner (see Testing section)
 ├── tests/                    # Test suites organized by domain
 │   ├── parser/               # Parser smoke tests, edge cases, round-trip
-│   ├── gui/                  # Boson headless API tests
+│   ├── gui/                  # BosonPlotter headless API tests
 │   ├── imaging/              # EM parsers, imaging utils, EM GUI, EDS, EELS, diffraction
 │   ├── calc/                 # Calculator module tests (xray, superconductor, CIF, optics, ...)
 │   ├── batch/                # Batch import and XRD converter tests
@@ -29,10 +29,10 @@ quantized_matlab/
 ├── +styles/                  # Visual themes
 ├── +scripts/                 # Batch workflows (see +scripts/README.md)
 ├── +fitting/                 # General curve fitting engine, model library, equation parser
-├── +boson/             # Extracted Boson subsystems
+├── +bosonPlotter/             # Extracted BosonPlotter subsystems
 ├── docs/                     # Detailed feature documentation
-│   ├── gui_boson.md    # Boson features, tools, figure builder
-│   ├── gui_emviewer.md       # Fermion features, EELS, EDS, diffraction
+│   ├── gui_bosonplotter.md    # BosonPlotter features, tools, figure builder
+│   ├── gui_emviewer.md       # FermiViewer features, EELS, EDS, diffraction
 │   └── architecture.md       # Data flow, state management, design patterns
 └── plans/                    # Feature roadmaps and organization plans
 ```
@@ -58,7 +58,7 @@ data = parser.importAuto('sample.dat');         % auto-detect format
 data = parser.importQDVSM('f.dat', 'XAxis', 'field', 'YAxis', 'moment');
 data = parser.importXRDML('scan.xrdml', Intensity='cps');
 data = parser.importCSV('data.csv');
-Boson                                     % interactive GUI
+BosonPlotter                                     % interactive GUI
 scripts.quickPlot('scan.xrdml')                 % one-liner plot
 scripts.batchImport('measurements/', 'Recursive', true);
 ```
@@ -68,7 +68,7 @@ scripts.batchImport('measurements/', 'Recursive', true);
 ```matlab
 runAllTests                          % full suite
 runAllTests(Group="parser")          % parser smoke tests (fast)
-runAllTests(Group="gui")             % headless Boson API tests
+runAllTests(Group="gui")             % headless BosonPlotter API tests
 runAllTests(Group="em")              % EM parsers + imaging utilities
 runAllTests(Group="emgui")           % EM Viewer GUI API tests
 runAllTests(Group="batch")           % batch import + XRD converter
@@ -100,8 +100,8 @@ Feature-level docs are in separate files to keep this context compact:
 
 | Topic | File |
 |-------|------|
-| Boson tools, figure builder, curve fitting, digitizer | [docs/gui_boson.md](docs/gui_boson.md) |
-| Fermion features, EELS, EDS, diffraction | [docs/gui_emviewer.md](docs/gui_emviewer.md) |
+| BosonPlotter tools, figure builder, curve fitting, digitizer | [docs/gui_bosonplotter.md](docs/gui_bosonplotter.md) |
+| FermiViewer features, EELS, EDS, diffraction | [docs/gui_emviewer.md](docs/gui_emviewer.md) |
 | Architecture, data flow, state management | [docs/architecture.md](docs/architecture.md) |
 | Parser formats and dispatch | [+parser/README.md](+parser/README.md) |
 | Imaging utilities | [+imaging/README.md](+imaging/README.md) |
@@ -111,12 +111,12 @@ Feature-level docs are in separate files to keep this context compact:
 
 ## GUI Development Notes
 
-### Boson
+### BosonPlotter
 - `cla()` alone does not remove `HandleVisibility='off'` objects — use `delete(ax.Children)` before `cla()`
 - Each dataset stores axis limits in `ds.axLims` (persisted across switches)
-- Peak Analysis window: see [docs/gui_boson.md](docs/gui_boson.md)
+- Peak Analysis window: see [docs/gui_bosonplotter.md](docs/gui_bosonplotter.md)
 
-### Fermion
+### FermiViewer
 - Image pipeline: `rawPixels` → `filteredPixels` → `displayImg`
 - Enable/disable triad: `displayImage()`, `clearDisplay()`, `setToolsEnabled()`
 - `undoPush()` inside `try` blocks only — prevents phantom undo on failure

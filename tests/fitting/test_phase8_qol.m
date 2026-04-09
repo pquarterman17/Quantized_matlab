@@ -102,9 +102,9 @@ close(r.fig);
 %  ACTION LOG
 % ════════════════════════════════════════════════════════════════════
 
-fprintf('\n--- boson.actionLog ---\n');
+fprintf('\n--- bosonPlotter.actionLog ---\n');
 
-log = boson.actionLog();
+log = bosonPlotter.actionLog();
 
 % Empty log
 if log.nEntries() == 0
@@ -245,9 +245,9 @@ end
 %  DATASET GROUPS
 % ════════════════════════════════════════════════════════════════════
 
-fprintf('\n--- boson.datasetGroups ---\n');
+fprintf('\n--- bosonPlotter.datasetGroups ---\n');
 
-grp = boson.datasetGroups();
+grp = bosonPlotter.datasetGroups();
 
 % Empty
 if grp.nGroups() == 0
@@ -335,7 +335,7 @@ end
 % toStruct / fromStruct round-trip
 grp.createGroup('XRD', [10 11 12]);
 s = grp.toStruct();
-grp2 = boson.datasetGroups();
+grp2 = bosonPlotter.datasetGroups();
 grp2.fromStruct(s);
 if grp2.nGroups() == 2 && isequal(grp2.getGroup('XRD'), [10 11 12])
     fprintf('  PASS: toStruct/fromStruct round-trip\n'); passed = passed + 1;
