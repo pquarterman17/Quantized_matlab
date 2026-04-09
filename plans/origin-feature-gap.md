@@ -141,10 +141,13 @@ quantification, materials property calculator, neutron reflectometry.
 
 - [ ] Ternary plots — useful for phase diagrams but niche
 - [ ] Polar contour plots — rare in thin film work
-- [ ] ANOVA / t-tests / non-parametric tests — stats package territory
+- [ ] ANOVA / t-tests / non-parametric tests — stats package territory (t-test exists in utilities.tTest)
 - [ ] PCA / cluster analysis — niche for our users
 - [ ] Column formulas (auto-recalc) — partially addressed by spreadsheet popup
-- [ ] ODR (orthogonal distance regression) — niche but useful for errorbar-heavy data
+- [x] **ODR (orthogonal distance regression)** — `fitting.odrFit` (Deming
+      regression, closed-form slope, jackknife errors, λ from XError/YError).
+      Tested: `tests/fitting/test_odrFit.m` (10 tests). On symmetric noise
+      with 500 points, ODR is 13× more accurate than OLS.
 
 ---
 
