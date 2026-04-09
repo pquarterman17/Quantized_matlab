@@ -2800,8 +2800,17 @@ function varargout = Boson()
 
     function setToolbarConfigDirect(cfg)
     %SETTOOLBARCONFIGDIRECT  Programmatically set toolbar config and rebuild.
-    %  Used by automated tests.
-        if ~iscell(cfg) || ~isvector(cfg)
+    %  Used by automated tests. An empty cell array ({}) falls back to
+    %  the factory default configuration.
+        if ~iscell(cfg)
+            error('Boson:setToolbarConfigDirect:invalidInput', ...
+                'cfg must be a cell array of action ID strings.');
+        end
+        % Normalize: accept empty cell → factory defaults; accept row or
+        % column vectors; reject multi-dimensional cell arrays.
+        if isempty(cfg)
+            cfg = boson.toolbarDefaultConfig();
+        elseif ~isvector(cfg)
             error('Boson:setToolbarConfigDirect:invalidInput', ...
                 'cfg must be a 1×N cell array of action ID strings.');
         end

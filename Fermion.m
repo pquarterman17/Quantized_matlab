@@ -2058,6 +2058,48 @@ function varargout = Fermion()
         api.noiseEstimate   = @() noiseEstimateAPI();
         api.getMeasStats    = @() getMeasStatsAPI();
 
+        % Interactive measurement/ROI tools — headless wrappers around the
+        % nested execute* functions so tests can drive them with explicit
+        % coordinates (bypassing the two-click capture flow).
+        api.measureDistance = @(x1,y1,x2,y2) executeMeasureDistance(x1,y1,x2,y2);
+        api.measureDSpacing = @(x1,y1,x2,y2) executeDSpacing(x1,y1,x2,y2);
+        api.roiEllipse      = @(cx,cy,ex,ey) executeEllipseROI(cx,cy,ex,ey);
+        api.roiPolygon      = @(pts) executePolygonROI(pts);
+        api.annotRect       = @(x1,y1,x2,y2) executeAnnotRect(x1,y1,x2,y2);
+        api.getOverlays       = @getOverlaysAPI;
+        api.getMeasurementLog = @getMeasurementLogAPI;
+
+        % Contrast stack — headless wrappers for reset, colormap, transform,
+        % invert, and colorbar toggle. These drive the same widget callbacks
+        % used by the mouse, so state stays consistent with the GUI.
+        api.resetContrast        = @() onResetContrast([], []);
+        api.setColormap          = @(name) setColormapAPI(name);
+        api.cycleColormap        = @() cycleColormapAPI();
+        api.getColormap          = @() ddColormap.Value;
+        api.setContrastTransform = @(mode) setContrastTransformAPI(mode);
+        api.getContrastTransform = @getContrastTransformAPI;
+        api.setInvert            = @(tf) setInvertAPI(tf);
+        api.isInverted           = @isInvertedAPI;
+        api.setColorbar          = @(tf) setColorbarAPI(tf);
+        api.isColorbarVisible    = @() logical(cbColorbar.Value);
+
+        % Test hook: inject synthetic EELS spectrum so deconvolve/KK api
+        % wrappers can be exercised headlessly without a DM3/DM4 file.
+        % Priority-3 click-capture bypass wrappers: crop, zoom box,
+        % reset zoom, FFT mask. Each one drives the same logic the
+        % mouse handlers invoke, but takes explicit coordinates so
+        % tests can exercise it headlessly without a click flow.
+        api.cropRect     = @(xMin, yMin, xMax, yMax) cropRectAPI(xMin, yMin, xMax, yMax);
+        api.zoomRect     = @(xMin, yMin, xMax, yMax) zoomRectAPI(xMin, yMin, xMax, yMax);
+        api.resetZoom    = @() onResetZoom([], []);
+        api.getAxLimits  = @() struct('XLim', ax.XLim, 'YLim', ax.YLim);
+        api.fftMask      = @(masks) fftMaskAPI(masks);
+
+        api.injectEELSData       = @(E, I) injectEELSDataAPI(E, I);
+        api.getEELSData          = @getEELSDataAPI;
+        api.getEELSSSD           = @getEELSSSDAPI;
+        api.getEELSKKResult      = @getEELSKKResultAPI;
+
         % EDS composite mode
         api.enterEDS        = @() onEnterEDS([], []);
         api.exitEDS         = @() onExitEDS();
@@ -5570,6 +5612,22 @@ function varargout = Fermion()
         meas.hP1   = hP1;
         meas.hP2   = hP2;
         meas.hText = hTxt;
+        % Store distance value in calibrated units (or px if uncalibrated),
+        % so getMeasStatsAPI can aggregate across measurements.
+        try
+            imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
+            if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
+                [dv, du] = imaging.measureDistance(x1, y1, x2, y2, ...
+                    PixelSize=imgInfo.pixelSize, PixelUnit=imgInfo.pixelUnit);
+            else
+                [dv, du] = imaging.measureDistance(x1, y1, x2, y2);
+            end
+            meas.distance = dv;
+            meas.unit     = du;
+        catch
+            meas.distance = sqrt((x2-x1)^2 + (y2-y1)^2);
+            meas.unit     = 'px';
+        end
         midx = numel(appData.overlays.measurements) + 1;
         appData.overlays.measurements{midx} = meas;
 
@@ -8051,6 +8109,175 @@ function varargout = Fermion()
     function result = noiseEstimateAPI()
     %NOISEESTIMATEAPI  API wrapper for noise estimation.
         result = imaging.noiseEstimate(appData.filteredPixels, Method='both');
+    end
+
+    function ov = getOverlaysAPI()
+    %GETOVERLAYSAPI  Return a live snapshot of appData.overlays (for tests).
+        ov = appData.overlays;
+    end
+
+    function mlog = getMeasurementLogAPI()
+    %GETMEASUREMENTLOGAPI  Return a live snapshot of appData.measurementLog.
+        mlog = appData.measurementLog;
+    end
+
+    function mode = getContrastTransformAPI()
+        mode = appData.contrastTransform;
+    end
+
+    function tf = isInvertedAPI()
+        tf = appData.contrastInvert;
+    end
+
+    function setColormapAPI(name)
+    %SETCOLORMAPAPI  Programmatically set colormap (matches dropdown items).
+        if ~any(strcmp(name, ddColormap.Items))
+            error('Fermion:setColormap:unknown', ...
+                'Unknown colormap "%s". Valid: %s', name, strjoin(ddColormap.Items, ', '));
+        end
+        ddColormap.Value = name;
+        onColormapChanged([], []);
+    end
+
+    function cycleColormapAPI()
+    %CYCLECOLORMAPAPI  Advance to the next colormap in the dropdown list.
+        items = ddColormap.Items;
+        cur = ddColormap.Value;
+        idx = find(strcmp(items, cur), 1);
+        if isempty(idx), idx = 0; end
+        next = items{mod(idx, numel(items)) + 1};
+        ddColormap.Value = next;
+        onColormapChanged([], []);
+    end
+
+    function setContrastTransformAPI(mode)
+    %SETCONTRASTTRANSFORMAPI  Set 'linear' | 'log' | 'sqrt' | 'power'.
+        if ~any(strcmp(mode, ddContrastTransform.Items))
+            error('Fermion:setContrastTransform:unknown', ...
+                'Unknown transform "%s". Valid: %s', mode, ...
+                strjoin(ddContrastTransform.Items, ', '));
+        end
+        ddContrastTransform.Value = mode;
+        onContrastTransformChanged([], []);
+    end
+
+    function setInvertAPI(tf)
+    %SETINVERTAPI  Enable or disable display inversion.
+        cbInvert.Value = logical(tf);
+        onInvertToggle([], []);
+    end
+
+    function setColorbarAPI(tf)
+    %SETCOLORBARAPI  Show or hide the colorbar.
+        cbColorbar.Value = logical(tf);
+        onColorbarToggle([], []);
+    end
+
+    function cropRectAPI(xMin, yMin, xMax, yMax)
+    %CROPRECTAPI  Crop the active image to an explicit rectangle.
+    %   Bypasses the click-capture flow so tests can drive cropping
+    %   directly. Accepts coordinates in image pixel space; they are
+    %   clamped to the current image bounds and rounded.
+        if isempty(appData.filteredPixels), return; end
+        [H, W] = size(appData.filteredPixels);
+        x1 = max(1, round(min(xMin, xMax)));
+        x2 = min(W, round(max(xMin, xMax)));
+        y1 = max(1, round(min(yMin, yMax)));
+        y2 = min(H, round(max(yMin, yMax)));
+        if x2 - x1 < 1 || y2 - y1 < 1
+            setStatus('cropRect: selection too small.');
+            return;
+        end
+        undoPush();
+        appData.rawPixels      = appData.rawPixels(y1:y2, x1:x2);
+        appData.filteredPixels = appData.filteredPixels(y1:y2, x1:x2);
+        rebuildAxesForNewSize();
+        setStatus(sprintf('Cropped to %dx%d px', x2 - x1 + 1, y2 - y1 + 1));
+    end
+
+    function zoomRectAPI(xMin, yMin, xMax, yMax)
+    %ZOOMRECTAPI  Set axes XLim/YLim to an explicit rectangle.
+        if isempty(appData.displayImg) || isempty(ax) || ~isvalid(ax)
+            return;
+        end
+        [H, W] = size(appData.displayImg);
+        x1 = max(0.5,     min(xMin, xMax));
+        x2 = min(W + 0.5, max(xMin, xMax));
+        y1 = max(0.5,     min(yMin, yMax));
+        y2 = min(H + 0.5, max(yMin, yMax));
+        if x2 - x1 < 1 || y2 - y1 < 1
+            setStatus('zoomRect: selection too small.');
+            return;
+        end
+        ax.XLim = [x1, x2];
+        ax.YLim = [y1, y2];
+        setStatus(sprintf('Zoomed to [%.1f:%.1f, %.1f:%.1f]', x1, x2, y1, y2));
+    end
+
+    function fftMaskAPI(masks)
+    %FFTMASKAPI  Apply one or more circular FFT masks headlessly.
+    %   masks is an N-by-3 double array where each row is
+    %   [cx, cy, radius] in fftshift (centered) coordinates. The mask
+    %   is mirrored across the FFT center to preserve Hermitian
+    %   symmetry, so real-space output stays real.
+        if isempty(appData.filteredPixels), return; end
+        if isempty(masks) || size(masks, 2) ~= 3
+            setStatus('fftMask: masks must be N-by-3 [cx cy r].');
+            return;
+        end
+
+        undoPush();
+        pixels = double(appData.filteredPixels);
+        F      = fft2(pixels);
+        Fshift = fftshift(F);
+        [H2, W2] = size(Fshift);
+        mask = ones(H2, W2);
+        [XX, YY] = meshgrid(1:W2, 1:H2);
+        for mi = 1:size(masks, 1)
+            cx = masks(mi, 1);
+            cy = masks(mi, 2);
+            r  = masks(mi, 3);
+            if r <= 0, continue; end
+            d2 = (XX - cx).^2 + (YY - cy).^2;
+            mask(d2 <= r^2) = 0;
+            % Mirror for Hermitian symmetry
+            mcx = W2 + 1 - cx;
+            mcy = H2 + 1 - cy;
+            d2m = (XX - mcx).^2 + (YY - mcy).^2;
+            mask(d2m <= r^2) = 0;
+        end
+        Fmasked = Fshift .* mask;
+        recovered = real(ifft2(ifftshift(Fmasked)));
+        appData.filteredPixels = recovered;
+        refreshDisplay();
+        setStatus(sprintf('FFT mask applied (%d region(s))', size(masks, 1)));
+    end
+
+    function injectEELSDataAPI(E, I)
+    %INJECTEELSDATAAPI  Populate appData.eelsData with a synthetic spectrum
+    %  so the deconvolve / Kramers-Kronig api wrappers can run headlessly
+    %  without needing a real DM3/DM4 EELS file.
+        spec.energyAxis  = E(:);
+        spec.counts      = I(:);
+        spec.energyScale = (E(end) - E(1)) / max(numel(E) - 1, 1);
+        spec.energyOrigin = E(1);
+        spec.energyUnit  = 'eV';
+        spec.nChannels   = numel(E);
+        appData.eelsData = spec;
+        appData.eelsMode = true;
+        appData.eelsEnergyAxis = E(:);
+    end
+
+    function d = getEELSDataAPI()
+        d = appData.eelsData;
+    end
+
+    function s = getEELSSSDAPI()
+        s = appData.eelsSSD;
+    end
+
+    function r = getEELSKKResultAPI()
+        r = appData.eelsKKResult;
     end
 
     function result = getMeasStatsAPI()

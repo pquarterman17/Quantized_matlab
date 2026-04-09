@@ -414,19 +414,24 @@ function idx = resolveQDColumn(spec, colNames, label)
     persistent QD_SHORTHAND_MAP
     if isempty(QD_SHORTHAND_MAP)
         QD_SHORTHAND_MAP = {
-            'field',       'Magnetic Field'
-            'moment',      'Moment'
-            'temp',        'Temperature'
-            'temperature', 'Temperature'
-            'time',        'Time Stamp'
-            'stderr',      'M. Std. Err.'
-            'mass',        'Mass'
-            'pressure',    'Pressure'
-            'frequency',   'Frequency'
-            'amplitude',   'Peak Amplitude'
-            'range',       'Range'
-            'motorcurrent','Motor Current'
-            'coilsignal',  'Coil Signal'
+            'field',            'Magnetic Field'
+            'moment',           'Moment'
+            'dc',               'Moment'
+            'dcmoment',         'Moment'
+            'acmoment',         'AC Moment'
+            'acsusceptibility', 'AC Susceptibility'
+            'acsuscept',        'AC Susceptibility'
+            'temp',             'Temperature'
+            'temperature',      'Temperature'
+            'time',             'Time Stamp'
+            'stderr',           'M. Std. Err.'
+            'mass',             'Mass'
+            'pressure',         'Pressure'
+            'frequency',        'Frequency'
+            'amplitude',        'Peak Amplitude'
+            'range',            'Range'
+            'motorcurrent',     'Motor Current'
+            'coilsignal',       'Coil Signal'
         };
     end
     try
