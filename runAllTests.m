@@ -107,6 +107,7 @@ SUITES = {
     T('imaging','test_em_advanced_api'),    'emgui',  'EM Viewer advanced API: virtualDarkField, eelsDeconvolve, eelsKramersKronig (with injected data)'
     T('imaging','test_em_priority3'),       'emgui',  'EM Viewer Priority-3 click-capture bypass: cropRect, zoomRect, resetZoom, fftMask (synthetic + real DM3/DM4)'
     T('imaging','test_em_gui_real_dm'),     'emgui',  'EM Viewer driven by real DM3/DM4 files: per-file load + full button sweep (contrast, filters, FFT, rotate, crop, export, session)'
+    T('imaging','test_em_gui_button_wiring'), 'emgui','EM Viewer Processing-panel button wiring: every control present, enabled, callback set, parented to its expected tab'
     T('imaging','test_eds_composite'),      'eds',    'EDS multi-channel composite mode API tests'
     T('imaging','test_real_dm3'),           'em',     'Real DM3/TIFF files from +test_datasets/Microscopy'
     T('imaging','test_eels'),              'eels',   'EELS utilities: edge table, background, thickness, ZLP align, extract map'
