@@ -149,8 +149,18 @@ quantification, materials property calculator, neutron reflectometry.
       for XRD pole-figure convention). Tested:
       `tests/plotting/test_polarContour.m` (10 tests including explicit
       orientation checks for all four top/right × cw/ccw combinations).
-- [ ] ANOVA / t-tests / non-parametric tests — stats package territory (t-test exists in utilities.tTest)
-- [ ] PCA / cluster analysis — niche for our users
+- [x] **ANOVA** — `utilities.anova1` (one-way ANOVA, cell-array or flat
+      vector + Group labels, F-distribution p-values via `betainc`,
+      handles unequal group sizes, NaNs dropped). Joins `utilities.tTest`
+      as the second no-toolbox inferential-stats primitive. Tested:
+      `tests/fitting/test_anovaPca.m` (8 ANOVA tests including textbook
+      reference F, null and strong-effect cases, unequal sizes, NaNs).
+- [x] **PCA** — `utilities.pcaAnalysis` (SVD-based, covariance or
+      correlation mode via `Scale=true`, deterministic sign convention,
+      `NumComponents` truncation, returns coeff/score/latent/explained/
+      cumulative/mu/sigma/singular). No Statistics Toolbox dependency.
+      Tested: `tests/fitting/test_anovaPca.m` (10 PCA tests including
+      45°-rotated-ellipse axis recovery and score reconstruction).
 - [ ] Column formulas (auto-recalc) — partially addressed by spreadsheet popup
 - [x] **ODR (orthogonal distance regression)** — `fitting.odrFit` (Deming
       regression, closed-form slope, jackknife errors, λ from XError/YError).

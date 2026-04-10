@@ -22,10 +22,13 @@ Previously extracted subsystems in `+bosonPlotter/`:
 - `+bosonPlotter/buildMap2DPanel.m` — 2D map panel widget construction
 - Session save/load dialog wrappers merged into `+bosonPlotter/sessionManager.m`
 
+### Extracted (2026-04-10)
+- `+bosonPlotter/peakCallbacks.m` — peak detection, fitting, export (~978 lines; 14 callbacks via context struct pattern)
+- `+bosonPlotter/renderPlot.m` — main 1D/2D rendering loop (~902 lines; widget state passed via context struct)
+- BosonPlotter.m reduced from ~15,515 to ~13,659 lines
+
 ### Remaining candidates (lower priority)
-- Core peak detection/fitting callbacks (~1,000 lines) — deep bidirectional coupling with appData + click handlers
-- Main GUI layout construction (~1,500 lines) — creates ~200 widget handles captured by closure
-- drawToAxes main rendering loop (~900 lines after overlay extraction)
+- Main GUI layout construction (~1,500 lines) — creates ~200 widget handles captured by closure; requires callback refactor to extract
 
 ### Fermion.m (~12k lines)
 Less urgent — well-organized internally with clear section dividers.
