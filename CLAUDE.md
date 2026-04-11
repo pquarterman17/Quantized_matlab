@@ -108,6 +108,9 @@ Feature-level docs are in separate files to keep this context compact:
 | Calculator modules | [+calc/README.md](+calc/README.md) |
 | Data processing utilities | [+utilities/README.md](+utilities/README.md) |
 | Batch scripts | [+scripts/README.md](+scripts/README.md) |
+| Plot formatting and export | [+plotting/README.md](+plotting/README.md) |
+| Visual themes and templates | [+styles/README.md](+styles/README.md) |
+| Curve fitting engine and models | [+fitting/README.md](+fitting/README.md) |
 
 ## GUI Development Notes
 
