@@ -98,6 +98,7 @@ SUITES = {
     T('gui','test_layoutIntegrity'),        'gui',    'Layout integrity: walk uigridlayout tree + flag clipped / zero-size / undersized nested grids'
     T('gui','test_magUnitConversion'),      'gui',    'Mag unit conversion: Oe→T live dropdown change + ds.data preservation + missing-mass warn'
     T('gui','test_plotStyleDialog'),        'gui',    'Plot Style dialog (Phase B) + session round-trip (Phase C): overrides, precedence, reset, save/load'
+    T('gui','test_rowLevelMasking'),        'gui',    'Row-level masking: no mask column, context menu, soft-red row style'
     T('gui','test_contour_features'),       'contour','Contour/heatmap: gridding, plot styles, edge cases, export'
     T('gui','test_materials_calc_gui'),     'calcgui','Materials calculator GUI API'
     % ── Imaging tests ─────────────────────────────────────────────────

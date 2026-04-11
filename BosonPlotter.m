@@ -1587,6 +1587,18 @@ function varargout = BosonPlotter()
         'CellEditCallback', @onTableCellEdit, ...
         'CellSelectionCallback', @onTableSelectionChanged, ...
         'FontSize', 9);
+
+    % Right-click context menu for row-level masking (replaces the old
+    % "Masked" column).  Selected rows are taken from appData.tableSelection
+    % which onTableSelectionChanged maintains from the CellSelectionCallback.
+    tblCtxMenu = uicontextmenu(fig);
+    uimenu(tblCtxMenu, 'Text', 'Mask selected rows', ...
+        'MenuSelectedFcn', @onTableMaskSelected);
+    uimenu(tblCtxMenu, 'Text', 'Unmask selected rows', ...
+        'MenuSelectedFcn', @onTableUnmaskSelected);
+    uimenu(tblCtxMenu, 'Separator', 'on', 'Text', 'Unmask all', ...
+        'MenuSelectedFcn', @onTableUnmaskAll);
+    tblData.ContextMenu = tblCtxMenu;
     tblData.Layout.Row = 4;
     appData.tableSelection = [];  % [Nx2] matrix of [row col] pairs
 
@@ -11033,8 +11045,8 @@ function varargout = BosonPlotter()
                     unitCells{end+1} = ''; %#ok<AGROW>
                 end
             end
-            colNames{end+1} = 'Masked';
-            unitCells{end+1} = '';
+            % Mask column removed — masking is now via right-click context
+            % menu on data rows, with masked rows highlighted in soft red.
 
             % Build data matrix with NaN padding
             nDataCols = nElem * 2;
@@ -11047,7 +11059,7 @@ function varargout = BosonPlotter()
                 dataMat(1:nPts, 2*ei)   = cVec;
             end
 
-            % Store working copy (without mask column)
+            % Store working copy (no mask column)
             appData.tableWorkingCopy = dataMat;
             appData.tableEdited = false;
             nRows = maxPts;
@@ -11059,16 +11071,16 @@ function varargout = BosonPlotter()
                 appData.tableMask = false(nRows, 1);
             end
 
-            % Build cell data: units row + data rows + mask column
+            % Build cell data: units row + data rows (no mask column)
             % ── Performance: cap displayed rows (full data in tableWorkingCopy) ──
             cap = min(nRows, appData.tableRowCap);
-            unitsRow = [unitCells(1:end-1), {false}];
-            dataRows = [num2cell(dataMat(1:cap, :)), num2cell(appData.tableMask(1:cap))];
+            unitsRow = unitCells;
+            dataRows = num2cell(dataMat(1:cap, :));
             tableData = [unitsRow; dataRows];
 
             tblData.ColumnName = colNames;
             tblData.Data = tableData;
-            tblData.ColumnEditable = true(1, nDataCols + 1);
+            tblData.ColumnEditable = true(1, nDataCols);
 
         else
             % ── Standard layout: single X + Y channels ────────────────
@@ -11077,7 +11089,7 @@ function varargout = BosonPlotter()
                 xName = d.metadata.parserSpecific.xLabel;
             end
 
-            colNames = [{xName}, d.labels, {'Masked'}];
+            colNames = [{xName}, d.labels];
             nCols = size(d.values, 2);
 
             xCol = d.time(:);
@@ -11092,35 +11104,32 @@ function varargout = BosonPlotter()
             appData.tableWorkingCopy = [xCol, yMat];
             appData.tableEdited = false;
 
-            % Units row: X unit + Y units + mask placeholder
+            % Units row: X unit + Y units (no mask placeholder — masking
+            % is now via right-click context menu with soft-red row highlight)
             xUnit = '';
             if isfield(d.metadata, 'xColumnUnit')
                 xUnit = d.metadata.xColumnUnit;
             end
-            unitCells = [{xUnit}, d.units, {''}];
+            unitCells = [{xUnit}, d.units];
 
             % Build cell data: units row (row 1) + data rows
             % ── Performance: cap displayed rows (full data in tableWorkingCopy) ──
             cap = min(nRows, appData.tableRowCap);
-            unitsRow = [num2cell([NaN, NaN(1, nCols)]), {false}];
-            % Fill units as strings in row 1
-            for ui = 1:numel(unitCells)
-                unitsRow{ui} = unitCells{ui};
-            end
-            dataRows = [num2cell([xCol(1:cap), yMat(1:cap, :)]), num2cell(appData.tableMask(1:cap))];
+            unitsRow = unitCells;
+            dataRows = num2cell([xCol(1:cap), yMat(1:cap, :)]);
             tableData = [unitsRow; dataRows];
 
             tblData.ColumnName = colNames;
             tblData.Data = tableData;
-            tblData.ColumnEditable = [true(1, 1 + nCols), true];
+            tblData.ColumnEditable = true(1, 1 + nCols);
         end
 
         % Store units for editing and export
-        appData.tableUnits = unitCells(1:end-1);  % exclude mask column
+        appData.tableUnits = unitCells;
 
         % Update units label (summary)
         if ~isempty(d.units)
-            lblTableUnits.Text = '  Row 1 = editable units (green)';
+            lblTableUnits.Text = '  Row 1 = editable units (green)  |  Right-click data rows to mask';
         else
             lblTableUnits.Text = '';
         end
@@ -11135,12 +11144,48 @@ function varargout = BosonPlotter()
             lblTableStats.Text = sprintf('%d rows, %d cols, %d masked  ', ...
                 nRows, nDataCols2, nMasked);
         end
+
+        % Apply soft-red row highlighting for masked rows
+        applyMaskStyling();
+    end
+
+    function applyMaskStyling()
+    %APPLYMASKSTYLING  Highlight masked rows in soft red using uistyle/addStyle.
+    %   Clears any existing row styles (they can accumulate across refreshes)
+    %   and reapplies a single BackgroundColor style to each currently masked
+    %   row.  Data rows are offset by 1 in the display to account for the
+    %   units row at table row 1.  Safe to call on an empty/invalid table.
+        if isempty(tblData) || ~isvalid(tblData), return; end
+        try
+            removeStyle(tblData);
+        catch
+            % removeStyle requires R2021b+ — silently skip if unavailable
+            return;
+        end
+
+        if isempty(appData.tableMask) || ~any(appData.tableMask), return; end
+
+        cap = min(numel(appData.tableMask), appData.tableRowCap);
+        maskedDataRows = find(appData.tableMask(1:cap));
+        if isempty(maskedDataRows), return; end
+
+        % Table rows are offset by +1 for the units row
+        tableRowIdx = maskedDataRows + 1;
+
+        softRed = [1.0 0.88 0.88];
+        try
+            s = uistyle('BackgroundColor', softRed);
+            addStyle(tblData, s, 'row', tableRowIdx);
+        catch
+            % If uistyle / addStyle fail (very old MATLAB), do nothing
+        end
     end
 
     function onTableCellEdit(~, evt)
     %ONTABLECELLEDIT  Handle cell edits in the data table.
     %   Row 1 is the units row (string edits update appData.tableUnits).
     %   Rows 2+ are data (numeric edits update appData.tableWorkingCopy).
+    %   Masking is handled separately via the right-click context menu.
         row = evt.Indices(1);
         col = evt.Indices(2);
         nDataCols = size(appData.tableWorkingCopy, 2);
@@ -11160,15 +11205,6 @@ function varargout = BosonPlotter()
                 appData.tableWorkingCopy(dataRow, col) = newVal;
                 appData.tableEdited = true;
             end
-        elseif col == nDataCols + 1 && row >= 2
-            % Mask column toggle (data rows only)
-            dataRow = row - 1;
-            appData.tableMask(dataRow) = logical(evt.NewData);
-            nMasked = sum(appData.tableMask);
-            nRows = size(appData.tableWorkingCopy, 1);
-            lblTableStats.Text = sprintf('%d rows, %d cols, %d masked  ', ...
-                nRows, nDataCols, nMasked);
-            syncTableMaskToDataset();
         end
     end
 
@@ -11210,7 +11246,8 @@ function varargout = BosonPlotter()
 
     function onTableMaskSelected(~, ~)
     %ONTABLEMASKSELECTED  Mask the currently selected rows in the table.
-    %   Skips row 1 (units row). Data rows start at table row 2.
+    %   Skips row 1 (units row).  Applies soft-red row highlighting via
+    %   applyMaskStyling() — no more mask column.
         sel = appData.tableSelection;
         if isempty(sel), return; end
         tableRows = unique(sel(:, 1));
@@ -11218,10 +11255,7 @@ function varargout = BosonPlotter()
         if isempty(tableRows), return; end
         dataRows = tableRows - 1;  % offset for units row
         appData.tableMask(dataRows) = true;
-        % Update mask column in table display
-        for ri = 1:numel(tableRows)
-            tblData.Data{tableRows(ri), end} = true;
-        end
+        applyMaskStyling();
         nMasked = sum(appData.tableMask);
         nRows = size(appData.tableWorkingCopy, 1);
         nCols = size(appData.tableWorkingCopy, 2);
@@ -11229,6 +11263,27 @@ function varargout = BosonPlotter()
             nRows, nCols, nMasked);
         syncTableMaskToDataset();
         setStatus(sprintf('Masked %d rows (%d total masked)', numel(dataRows), nMasked));
+    end
+
+    function onTableUnmaskSelected(~, ~)
+    %ONTABLEUNMASKSELECTED  Unmask the currently selected rows (opposite of onTableMaskSelected).
+        sel = appData.tableSelection;
+        if isempty(sel), return; end
+        tableRows = unique(sel(:, 1));
+        tableRows(tableRows < 2) = [];
+        if isempty(tableRows), return; end
+        dataRows = tableRows - 1;
+        dataRows = dataRows(dataRows >= 1 & dataRows <= numel(appData.tableMask));
+        if isempty(dataRows), return; end
+        appData.tableMask(dataRows) = false;
+        applyMaskStyling();
+        nMasked = sum(appData.tableMask);
+        nRows = size(appData.tableWorkingCopy, 1);
+        nCols = size(appData.tableWorkingCopy, 2);
+        lblTableStats.Text = sprintf('%d rows, %d cols, %d masked  ', ...
+            nRows, nCols, nMasked);
+        syncTableMaskToDataset();
+        setStatus(sprintf('Unmasked %d rows (%d total masked)', numel(dataRows), nMasked));
     end
 
     function onTableUnmaskAll(~, ~)
