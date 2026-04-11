@@ -309,11 +309,13 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         % Row 1: Value + From
         uilabel(gl, 'Text', 'Value:', 'HorizontalAlignment', 'right');
         efValue = uieditfield(gl, 'numeric', 'Value', 1, ...
-            'BackgroundColor', INPUT_BG, 'FontColor', INPUT_FG);
+            'BackgroundColor', INPUT_BG, 'FontColor', INPUT_FG, ...
+            'Tooltip','Numeric value to convert — in the units of the From field');
         efValue.Layout.Row = 1; efValue.Layout.Column = 2;
         uilabel(gl, 'Text', 'From:', 'HorizontalAlignment', 'right');
         efFrom = uieditfield(gl, 'text', 'Value', 'Oe', ...
-            'BackgroundColor', INPUT_BG, 'FontColor', INPUT_FG);
+            'BackgroundColor', INPUT_BG, 'FontColor', INPUT_FG, ...
+            'Tooltip','Source unit symbol — e.g. Oe, emu, eV, Ang, Pa, K, GPa, deg');
         efFrom.Layout.Row = 1; efFrom.Layout.Column = 4;
 
         % Row 2: Result + To
@@ -323,7 +325,8 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         efResult.Layout.Row = 2; efResult.Layout.Column = 2;
         uilabel(gl, 'Text', 'To:', 'HorizontalAlignment', 'right');
         efTo = uieditfield(gl, 'text', 'Value', 'T', ...
-            'BackgroundColor', INPUT_BG, 'FontColor', INPUT_FG);
+            'BackgroundColor', INPUT_BG, 'FontColor', INPUT_FG, ...
+            'Tooltip','Target unit symbol — e.g. T, A*m^2, nm, Torr, C, rad');
         efTo.Layout.Row = 2; efTo.Layout.Column = 4;
 
         % Row 3: Buttons
@@ -484,31 +487,38 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         crystalSystems = {'Cubic','Tetragonal','Orthorhombic','Hexagonal', ...
                           'Trigonal','Monoclinic','Triclinic'};
         ddDSystem = uidropdown(gD, 'Items', crystalSystems, 'Value', 'Cubic', ...
-            'ValueChangedFcn', @(~,~) onCrystalSystemChanged(), 'FontSize', 9);
+            'ValueChangedFcn', @(~,~) onCrystalSystemChanged(), 'FontSize', 9, ...
+            'Tooltip', 'Crystal system — constrains lattice parameters (a=b=c, angles, etc.)');
         ddDSystem.Layout.Row=1; ddDSystem.Layout.Column=2;
         uilabel(gD,'Text','(hkl):','HorizontalAlignment','right','FontSize',9);
         hklPresets = {'Custom','(001)','(100)','(010)','(110)','(111)', ...
                       '(200)','(211)','(220)','(311)','(222)','(002)'};
         ddDHkl = uidropdown(gD, 'Items', hklPresets, 'Value', '(001)', ...
-            'ValueChangedFcn', @(~,~) onHklPresetChanged(), 'FontSize', 9);
+            'ValueChangedFcn', @(~,~) onHklPresetChanged(), 'FontSize', 9, ...
+            'Tooltip', 'Miller index (hkl) preset — pick a common plane or Custom to enter h,k,l manually');
         ddDHkl.Layout.Row=1; ddDHkl.Layout.Column=[4 6];
         subNames = calc.substrates.listSubstrates();
         ddDSub = uidropdown(gD, 'Items', ['(none)', subNames], 'Value', '(none)', ...
-            'ValueChangedFcn', @(~,~) fillDSpacingFromSubstrate(), 'FontSize', 9);
+            'ValueChangedFcn', @(~,~) fillDSpacingFromSubstrate(), 'FontSize', 9, ...
+            'Tooltip', 'Substrate preset — auto-fills lattice parameters from the built-in substrate database');
         ddDSub.Layout.Row=1; ddDSub.Layout.Column=[7 9];
 
         % Row 2: a, b, c, h, k, l
         uilabel(gD,'Text',['a(' char(197) '):'],'HorizontalAlignment','right','FontSize',9);
-        efDa = uieditfield(gD,'numeric','Value',3.905);
+        efDa = uieditfield(gD,'numeric','Value',3.905, ...
+            'Tooltip','Lattice parameter a (Å) — typical 2–15 for inorganic crystals');
         efDa.Layout.Row=2; efDa.Layout.Column=2;
         uilabel(gD,'Text','h:','HorizontalAlignment','right');
-        efDh = uieditfield(gD,'numeric','Value',0);
+        efDh = uieditfield(gD,'numeric','Value',0, ...
+            'Tooltip','Miller index h — integer');
         efDh.Layout.Row=2; efDh.Layout.Column=4;
         uilabel(gD,'Text','k:','HorizontalAlignment','right');
-        efDk = uieditfield(gD,'numeric','Value',0);
+        efDk = uieditfield(gD,'numeric','Value',0, ...
+            'Tooltip','Miller index k — integer');
         efDk.Layout.Row=2; efDk.Layout.Column=6;
         uilabel(gD,'Text','l:','HorizontalAlignment','right');
-        efDl = uieditfield(gD,'numeric','Value',1);
+        efDl = uieditfield(gD,'numeric','Value',1, ...
+            'Tooltip','Miller index l — integer');
         efDl.Layout.Row=2; efDl.Layout.Column=8;
         btnDCalc = uibutton(gD,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -517,21 +527,26 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         % Row 3: b, c, alpha, beta
         uilabel(gD,'Text',['b(' char(197) '):'],'HorizontalAlignment','right','FontSize',9);
-        efDb = uieditfield(gD,'numeric','Value',3.905);
+        efDb = uieditfield(gD,'numeric','Value',3.905, ...
+            'Tooltip','Lattice parameter b (Å) — disabled for Cubic/Tetragonal/Hexagonal');
         efDb.Layout.Row=3; efDb.Layout.Column=2;
         uilabel(gD,'Text',['c(' char(197) '):'],'HorizontalAlignment','right','FontSize',9);
-        efDc = uieditfield(gD,'numeric','Value',3.905);
+        efDc = uieditfield(gD,'numeric','Value',3.905, ...
+            'Tooltip','Lattice parameter c (Å) — disabled for Cubic');
         efDc.Layout.Row=3; efDc.Layout.Column=4;
         uilabel(gD,'Text',[char(945) ':'],'HorizontalAlignment','right');
-        efDal = uieditfield(gD,'numeric','Value',90);
+        efDal = uieditfield(gD,'numeric','Value',90, ...
+            'Tooltip','Lattice angle α (deg) between b and c — 90 for orthogonal systems');
         efDal.Layout.Row=3; efDal.Layout.Column=6;
         uilabel(gD,'Text',[char(946) ':'],'HorizontalAlignment','right');
-        efDbe = uieditfield(gD,'numeric','Value',90);
+        efDbe = uieditfield(gD,'numeric','Value',90, ...
+            'Tooltip','Lattice angle β (deg) between a and c — 90 for orthogonal systems');
         efDbe.Layout.Row=3; efDbe.Layout.Column=8;
 
         % Row 4: gamma, result
         uilabel(gD,'Text',[char(947) ':'],'HorizontalAlignment','right');
-        efDga = uieditfield(gD,'numeric','Value',90);
+        efDga = uieditfield(gD,'numeric','Value',90, ...
+            'Tooltip','Lattice angle γ (deg) between a and b — 90 for orthogonal, 120 for hexagonal');
         efDga.Layout.Row=4; efDga.Layout.Column=2;
         lblDResult = uilabel(gD,'Text','','FontSize',11, ...
             'Interpreter','html');
@@ -636,10 +651,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         g2T.RowSpacing  = 4;
 
         uilabel(g2T,'Text','Value:','HorizontalAlignment','right');
-        ef2TVal = uieditfield(g2T,'numeric','Value',20);
+        ef2TVal = uieditfield(g2T,'numeric','Value',20, ...
+            'Tooltip','Value to convert — 2θ in degrees or d in Å depending on direction');
         ef2TVal.Layout.Row=1; ef2TVal.Layout.Column=2;
         uilabel(g2T,'Text',[char(955) ' (' char(197) '):'],'HorizontalAlignment','right');
-        ef2TLam = uieditfield(g2T,'numeric','Value',1.5406);
+        ef2TLam = uieditfield(g2T,'numeric','Value',1.5406, ...
+            'Tooltip','X-ray wavelength λ (Å) — Cu Kα₁ = 1.5406, Mo Kα = 0.7107');
         ef2TLam.Layout.Row=1; ef2TLam.Layout.Column=4;
         btn2TtoD = uibutton(g2T,'push','Text',['2' char(952) ' ' char(8594) ' d'], ...
             'BackgroundColor',BTN_TOOL,'FontColor',BTN_TOOL_FG, ...
@@ -693,15 +710,18 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gMM.RowSpacing  = 4;
 
         uilabel(gMM,'Text','a Film (Å):','HorizontalAlignment','right');
-        efMMFilm = uieditfield(gMM,'numeric','Value',3.876);
+        efMMFilm = uieditfield(gMM,'numeric','Value',3.876, ...
+            'Tooltip','Film lattice parameter (Å) — in-plane value that mismatches the substrate');
         efMMFilm.Layout.Row=1; efMMFilm.Layout.Column=2;
         uilabel(gMM,'Text','a Sub (Å):','HorizontalAlignment','right');
-        efMMSub = uieditfield(gMM,'numeric','Value',3.905);
+        efMMSub = uieditfield(gMM,'numeric','Value',3.905, ...
+            'Tooltip','Substrate lattice parameter (Å) — reference for mismatch f=(a_f−a_s)/a_s');
         efMMSub.Layout.Row=1; efMMSub.Layout.Column=4;
 
         % Substrate fill for aSub
         ddMMSub = uidropdown(gMM,'Items',['(none)',subNames],'Value','(none)', ...
-            'ValueChangedFcn',@(~,~) fillMMSubstrate());
+            'ValueChangedFcn',@(~,~) fillMMSubstrate(), ...
+            'Tooltip','Substrate preset — auto-fills a_sub from the built-in database');
         ddMMSub.Layout.Row=1; ddMMSub.Layout.Column=[5 6];
 
         lblMMResult = uilabel(gMM,'Text','','FontSize',11, ...
@@ -757,20 +777,25 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gVC.RowSpacing  = 4;
 
         uilabel(gVC,'Text','a (Å):','HorizontalAlignment','right');
-        efVCa = uieditfield(gVC,'numeric','Value',3.905);
+        efVCa = uieditfield(gVC,'numeric','Value',3.905, ...
+            'Tooltip','Lattice parameter a (Å)');
         efVCa.Layout.Row=1; efVCa.Layout.Column=2;
         uilabel(gVC,'Text','b (Å):','HorizontalAlignment','right');
-        efVCb = uieditfield(gVC,'numeric','Value',3.905);
+        efVCb = uieditfield(gVC,'numeric','Value',3.905, ...
+            'Tooltip','Lattice parameter b (Å)');
         efVCb.Layout.Row=1; efVCb.Layout.Column=4;
         uilabel(gVC,'Text','c (Å):','HorizontalAlignment','right');
-        efVCc = uieditfield(gVC,'numeric','Value',3.905);
+        efVCc = uieditfield(gVC,'numeric','Value',3.905, ...
+            'Tooltip','Lattice parameter c (Å)');
         efVCc.Layout.Row=1; efVCc.Layout.Column=6;
 
         uilabel(gVC,'Text','Z:','HorizontalAlignment','right');
-        efVCZ = uieditfield(gVC,'numeric','Value',1);
+        efVCZ = uieditfield(gVC,'numeric','Value',1, ...
+            'Tooltip','Formula units per unit cell — e.g. Z=4 for NaCl, Z=2 for BCC');
         efVCZ.Layout.Row=2; efVCZ.Layout.Column=2;
         uilabel(gVC,'Text','M (g/mol):','HorizontalAlignment','right');
-        efVCM = uieditfield(gVC,'numeric','Value',183.84);
+        efVCM = uieditfield(gVC,'numeric','Value',183.84, ...
+            'Tooltip','Molar mass of the formula unit (g/mol)');
         efVCM.Layout.Row=2; efVCM.Layout.Column=4;
 
         lblVCResult = uilabel(gVC,'Text','','FontSize',11, ...
@@ -813,17 +838,20 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gPS, 'Text', 'Centering:', 'HorizontalAlignment', 'right');
         ddPSCent = uidropdown(gPS, 'Items', {'P','F','I','A','B','C','R'}, ...
-            'Value', 'P');
+            'Value', 'P', ...
+            'Tooltip','Bravais centering — P primitive, F face-centered, I body-centered, R rhombohedral');
         ddPSCent.Layout.Row = 1; ddPSCent.Layout.Column = 2;
 
         uilabel(gPS, 'Text', 'Max hkl:', 'HorizontalAlignment', 'right');
         efPSMax = uieditfield(gPS, 'numeric', 'Value', 5, ...
-            'Limits', [1 10], 'RoundFractionalValues', 'on');
+            'Limits', [1 10], 'RoundFractionalValues', 'on', ...
+            'Tooltip','Maximum |h|, |k|, |l| to enumerate — integer 1–10');
         efPSMax.Layout.Row = 1; efPSMax.Layout.Column = 4;
 
         uilabel(gPS, 'Text', [char(955) ' (' char(197) '):'], ...
             'HorizontalAlignment', 'right');
-        efPSLam = uieditfield(gPS, 'numeric', 'Value', 1.5406);
+        efPSLam = uieditfield(gPS, 'numeric', 'Value', 1.5406, ...
+            'Tooltip','X-ray wavelength λ (Å) — used to compute 2θ via Bragg''s law');
         efPSLam.Layout.Row = 1; efPSLam.Layout.Column = 6;
 
         btnPSCalc = uibutton(gPS, 'push', 'Text', 'Generate', ...
@@ -946,10 +974,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gRS.RowSpacing  = 4;
 
         uilabel(gRS,'Text',['Rs (' char(937) '/sq):'],'HorizontalAlignment','right');
-        efRsVal = uieditfield(gRS,'numeric','Value',100);
+        efRsVal = uieditfield(gRS,'numeric','Value',100, ...
+            'Tooltip','Sheet resistance Rs (Ω/sq) — typical 1–10⁴ for thin metal/TCO films');
         efRsVal.Layout.Row=1; efRsVal.Layout.Column=2;
         uilabel(gRS,'Text','t (nm):','HorizontalAlignment','right');
-        efRsTh = uieditfield(gRS,'numeric','Value',10);
+        efRsTh = uieditfield(gRS,'numeric','Value',10, ...
+            'Tooltip','Film thickness t (nm) — used in ρ = Rs·t');
         efRsTh.Layout.Row=1; efRsTh.Layout.Column=4;
 
         lblRsResult = uilabel(gRS,'Text','','FontSize',11, ...
@@ -962,7 +992,8 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         btnRsToRho.Layout.Row=2; btnRsToRho.Layout.Column=5;
 
         uilabel(gRS,'Text',[char(961) ' (' char(937) char(183) 'cm):'],'HorizontalAlignment','right');
-        efRhoVal = uieditfield(gRS,'numeric','Value',1e-4);
+        efRhoVal = uieditfield(gRS,'numeric','Value',1e-4, ...
+            'Tooltip','Bulk resistivity ρ (Ω·cm) — metals ~10⁻⁶, semiconductors 10⁻³–10⁶');
         efRhoVal.Layout.Row=3; efRhoVal.Layout.Column=2;
 
         lblRhoResult = uilabel(gRS,'Text','','FontSize',11, ...
@@ -1012,7 +1043,8 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gCond.RowSpacing  = 4;
 
         uilabel(gCond,'Text',[char(961) ' (' char(937) char(183) 'cm):'],'HorizontalAlignment','right');
-        efCondRho = uieditfield(gCond,'numeric','Value',1e-4);
+        efCondRho = uieditfield(gCond,'numeric','Value',1e-4, ...
+            'Tooltip','Resistivity ρ (Ω·cm) — conductivity σ = 1/ρ in S/cm');
         efCondRho.Layout.Row=1; efCondRho.Layout.Column=2;
         btnCondCalc = uibutton(gCond,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -1047,10 +1079,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gMob.RowSpacing  = 4;
 
         uilabel(gMob,'Text',[char(961) ' (' char(937) char(183) 'cm):'],'HorizontalAlignment','right');
-        efMobRho = uieditfield(gMob,'numeric','Value',1e-2);
+        efMobRho = uieditfield(gMob,'numeric','Value',1e-2, ...
+            'Tooltip','Resistivity ρ (Ω·cm) — used with n in μ = 1/(nqρ)');
         efMobRho.Layout.Row=1; efMobRho.Layout.Column=2;
         uilabel(gMob,'Text','n (cm\^-3):','HorizontalAlignment','right');
-        efMobN = uieditfield(gMob,'numeric','Value',1e17);
+        efMobN = uieditfield(gMob,'numeric','Value',1e17, ...
+            'Tooltip','Carrier concentration n (cm⁻³) — typical 10¹⁵–10²⁰ for doped semiconductors');
         efMobN.Layout.Row=1; efMobN.Layout.Column=4;
         btnMobCalc = uibutton(gMob,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -1084,10 +1118,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gJD.RowSpacing  = 4;
 
         uilabel(gJD,'Text','I (A):','HorizontalAlignment','right');
-        efJDI = uieditfield(gJD,'numeric','Value',1e-3);
+        efJDI = uieditfield(gJD,'numeric','Value',1e-3, ...
+            'Tooltip','Current I (A) — e.g. 1 mA = 1e-3');
         efJDI.Layout.Row=1; efJDI.Layout.Column=2;
         uilabel(gJD,'Text',['Area (cm' char(178) '):'],'HorizontalAlignment','right');
-        efJDA = uieditfield(gJD,'numeric','Value',1);
+        efJDA = uieditfield(gJD,'numeric','Value',1, ...
+            'Tooltip','Cross-sectional area (cm²) — J = I/A in A/cm²');
         efJDA.Layout.Row=1; efJDA.Layout.Column=4;
         btnJDCalc = uibutton(gJD,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -1117,10 +1153,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gHall.Padding = [6 4 6 4]; gHall.RowSpacing = 4;
 
         uilabel(gHall,'Text','V<sub>H</sub> (V):','HorizontalAlignment','right','Interpreter','html');
-        efHallVH = uieditfield(gHall,'numeric','Value',1e-3);
+        efHallVH = uieditfield(gHall,'numeric','Value',1e-3, ...
+            'Tooltip','Hall voltage V_H (V) — transverse voltage from V_H = R_H·I·B/t');
         efHallVH.Layout.Row=1; efHallVH.Layout.Column=2;
         uilabel(gHall,'Text','I (A):','HorizontalAlignment','right');
-        efHallI = uieditfield(gHall,'numeric','Value',1e-3);
+        efHallI = uieditfield(gHall,'numeric','Value',1e-3, ...
+            'Tooltip','Longitudinal current I (A) through the Hall bar');
         efHallI.Layout.Row=1; efHallI.Layout.Column=4;
         btnHallCalc = uibutton(gHall,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -1128,10 +1166,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         btnHallCalc.Layout.Row=1; btnHallCalc.Layout.Column=5;
 
         uilabel(gHall,'Text','B (T):','HorizontalAlignment','right');
-        efHallB = uieditfield(gHall,'numeric','Value',1);
+        efHallB = uieditfield(gHall,'numeric','Value',1, ...
+            'Tooltip','Magnetic field B (T) — applied perpendicular to current and voltage');
         efHallB.Layout.Row=2; efHallB.Layout.Column=2;
         uilabel(gHall,'Text','t (nm):','HorizontalAlignment','right');
-        efHallT = uieditfield(gHall,'numeric','Value',100);
+        efHallT = uieditfield(gHall,'numeric','Value',100, ...
+            'Tooltip','Sample thickness t (nm) along the field direction');
         efHallT.Layout.Row=2; efHallT.Layout.Column=4;
 
         lblHallResult = uilabel(gHall,'Text','','FontSize',11,'Interpreter','html');
@@ -1193,20 +1233,25 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gNi,'Text','Material:','HorizontalAlignment','right');
         ddNiMat = uidropdown(gNi,'Items',['(manual)',matNames],'Value','Si', ...
-            'ValueChangedFcn',@(~,~) fillNiFromMaterial());
+            'ValueChangedFcn',@(~,~) fillNiFromMaterial(), ...
+            'Tooltip','Material preset — auto-fills Eg, m_e*, m_h* from the +calc.semiconductor database');
         ddNiMat.Layout.Row=1; ddNiMat.Layout.Column=2;
         uilabel(gNi,'Text','T (K):','HorizontalAlignment','right');
-        efNiT = uieditfield(gNi,'numeric','Value',300);
+        efNiT = uieditfield(gNi,'numeric','Value',300, ...
+            'Tooltip','Temperature (K) — always Kelvin, never Celsius');
         efNiT.Layout.Row=1; efNiT.Layout.Column=4;
 
         uilabel(gNi,'Text','Eg (eV):','HorizontalAlignment','right');
-        efNiEg = uieditfield(gNi,'numeric','Value',1.12);
+        efNiEg = uieditfield(gNi,'numeric','Value',1.12, ...
+            'Tooltip','Band gap E_g (eV) — 1.12 Si, 0.66 Ge, 1.42 GaAs, 3.4 GaN');
         efNiEg.Layout.Row=2; efNiEg.Layout.Column=2;
         uilabel(gNi,'Text','me*:','HorizontalAlignment','right');
-        efNiMe = uieditfield(gNi,'numeric','Value',1.08);
+        efNiMe = uieditfield(gNi,'numeric','Value',1.08, ...
+            'Tooltip','Electron DOS effective mass m_e*/m_0 (dimensionless) — Si 1.08, GaAs 0.067');
         efNiMe.Layout.Row=2; efNiMe.Layout.Column=4;
         uilabel(gNi,'Text','mh*:','HorizontalAlignment','right');
-        efNiMh = uieditfield(gNi,'numeric','Value',0.81);
+        efNiMh = uieditfield(gNi,'numeric','Value',0.81, ...
+            'Tooltip','Hole DOS effective mass m_h*/m_0 (dimensionless) — Si 0.81, GaAs 0.47');
         efNiMh.Layout.Row=2; efNiMh.Layout.Column=6;
 
         lblNiResult = uilabel(gNi,'Text','','FontSize',11, ...
@@ -1261,13 +1306,16 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gDop.RowSpacing  = 4;
 
         uilabel(gDop,'Text',['Nd (cm' char(8315) char(179) '):'],'HorizontalAlignment','right');
-        efDopNd = uieditfield(gDop,'numeric','Value',1e16);
+        efDopNd = uieditfield(gDop,'numeric','Value',1e16, ...
+            'Tooltip','Donor concentration N_d (cm⁻³) — typical 10¹⁴–10²⁰');
         efDopNd.Layout.Row=1; efDopNd.Layout.Column=2;
         uilabel(gDop,'Text',['Na (cm' char(8315) char(179) '):'],'HorizontalAlignment','right');
-        efDopNa = uieditfield(gDop,'numeric','Value',0);
+        efDopNa = uieditfield(gDop,'numeric','Value',0, ...
+            'Tooltip','Acceptor concentration N_a (cm⁻³) — 0 for purely n-type');
         efDopNa.Layout.Row=1; efDopNa.Layout.Column=4;
         uilabel(gDop,'Text',['ni (cm' char(8315) char(179) '):'],'HorizontalAlignment','right');
-        efDopNi = uieditfield(gDop,'numeric','Value',1.5e10);
+        efDopNi = uieditfield(gDop,'numeric','Value',1.5e10, ...
+            'Tooltip','Intrinsic carrier concentration n_i (cm⁻³) — Si 1.5e10 at 300 K');
         efDopNi.Layout.Row=1; efDopNi.Layout.Column=6;
 
         lblDopResult = uilabel(gDop,'Text','','FontSize',11, ...
@@ -1310,20 +1358,25 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gDep.RowSpacing  = 4;
 
         uilabel(gDep,'Text','Material:','HorizontalAlignment','right');
-        ddDepMat = uidropdown(gDep,'Items',['(manual)',matNames],'Value','Si');
+        ddDepMat = uidropdown(gDep,'Items',['(manual)',matNames],'Value','Si', ...
+            'Tooltip','Material preset — auto-fills ε_r for the semiconductor');
         ddDepMat.Layout.Row=1; ddDepMat.Layout.Column=2;
         uilabel(gDep,'Text',[char(949) char(8339) ':'],'HorizontalAlignment','right');
-        efDepEps = uieditfield(gDep,'numeric','Value',11.7);
+        efDepEps = uieditfield(gDep,'numeric','Value',11.7, ...
+            'Tooltip','Relative permittivity ε_r (dimensionless) — Si 11.7, GaAs 12.9');
         efDepEps.Layout.Row=1; efDepEps.Layout.Column=4;
 
         uilabel(gDep,'Text','Vbi (V):','HorizontalAlignment','right');
-        efDepVbi = uieditfield(gDep,'numeric','Value',0.7);
+        efDepVbi = uieditfield(gDep,'numeric','Value',0.7, ...
+            'Tooltip','Built-in potential V_bi (V) — typically 0.6–1.0 for Si junctions');
         efDepVbi.Layout.Row=2; efDepVbi.Layout.Column=2;
         uilabel(gDep,'Text',['Na (cm' char(8315) char(179) '):'],'HorizontalAlignment','right');
-        efDepNa = uieditfield(gDep,'numeric','Value',1e16);
+        efDepNa = uieditfield(gDep,'numeric','Value',1e16, ...
+            'Tooltip','Acceptor doping on p-side N_a (cm⁻³)');
         efDepNa.Layout.Row=2; efDepNa.Layout.Column=4;
         uilabel(gDep,'Text',['Nd (cm' char(8315) char(179) '):'],'HorizontalAlignment','right');
-        efDepNd = uieditfield(gDep,'numeric','Value',1e17);
+        efDepNd = uieditfield(gDep,'numeric','Value',1e17, ...
+            'Tooltip','Donor doping on n-side N_d (cm⁻³)');
         efDepNd.Layout.Row=2; efDepNd.Layout.Column=6;
 
         lblDepResult = uilabel(gDep,'Text','','FontSize',11, ...
@@ -1379,10 +1432,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gTrans.RowSpacing  = 4;
 
         uilabel(gTrans,'Text',[char(956) ' (cm' char(178) '/V' char(183) 's):'],'HorizontalAlignment','right');
-        efTransMu = uieditfield(gTrans,'numeric','Value',1400);
+        efTransMu = uieditfield(gTrans,'numeric','Value',1400, ...
+            'Tooltip','Carrier mobility μ (cm²/V·s) — Si electrons 1400, holes 450 at 300 K');
         efTransMu.Layout.Row=1; efTransMu.Layout.Column=2;
         uilabel(gTrans,'Text','\tau (s):','HorizontalAlignment','right');
-        efTransTau = uieditfield(gTrans,'numeric','Value',1e-6);
+        efTransTau = uieditfield(gTrans,'numeric','Value',1e-6, ...
+            'Tooltip','Minority-carrier lifetime τ (s) — typical 1 ns–1 ms');
         efTransTau.Layout.Row=1; efTransTau.Layout.Column=4;
 
         btnTransCalc = uibutton(gTrans,'push','Text','Calculate', ...
@@ -1458,10 +1513,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gDR.RowSpacing  = 4;
 
         uilabel(gDR,'Text','Thickness (Å):','HorizontalAlignment','right');
-        efDRThick = uieditfield(gDR,'numeric','Value',1000);
+        efDRThick = uieditfield(gDR,'numeric','Value',1000, ...
+            'Tooltip','Deposited film thickness (Å) — target film amount');
         efDRThick.Layout.Row=1; efDRThick.Layout.Column=2;
         uilabel(gDR,'Text','Time (s):','HorizontalAlignment','right');
-        efDRTime = uieditfield(gDR,'numeric','Value',60);
+        efDRTime = uieditfield(gDR,'numeric','Value',60, ...
+            'Tooltip','Deposition time (s) — rate = thickness/time');
         efDRTime.Layout.Row=1; efDRTime.Layout.Column=4;
         btnDRCalc = uibutton(gDR,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -1494,7 +1551,8 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gKT.RowSpacing  = 4;
 
         uilabel(gKT,'Text',[char(916) 'Q (' char(197) char(8315) char(185) '):'],'HorizontalAlignment','right');
-        efKTdQ = uieditfield(gKT,'numeric','Value',0.1);
+        efKTdQ = uieditfield(gKT,'numeric','Value',0.1, ...
+            'Tooltip','Fringe spacing ΔQ (Å⁻¹) from adjacent Kiessig fringes — t = 2π/ΔQ');
         efKTdQ.Layout.Row=1; efKTdQ.Layout.Column=2;
         btnKTCalc = uibutton(gKT,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -1529,20 +1587,25 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gSS.RowSpacing  = 4;
 
         uilabel(gSS,'Text','Es (GPa):','HorizontalAlignment','right');
-        efSSEs = uieditfield(gSS,'numeric','Value',130);
+        efSSEs = uieditfield(gSS,'numeric','Value',130, ...
+            'Tooltip','Substrate Young''s modulus E_s (GPa) — Si 130, sapphire 345');
         efSSEs.Layout.Row=1; efSSEs.Layout.Column=2;
         uilabel(gSS,'Text',[char(957) 's:'],'HorizontalAlignment','right');
-        efSSNus = uieditfield(gSS,'numeric','Value',0.28);
+        efSSNus = uieditfield(gSS,'numeric','Value',0.28, ...
+            'Tooltip','Substrate Poisson ratio ν_s (dimensionless) — typically 0.2–0.35');
         efSSNus.Layout.Row=1; efSSNus.Layout.Column=4;
         uilabel(gSS,'Text',['ts (' char(956) 'm):'],'HorizontalAlignment','right');
-        efSSts = uieditfield(gSS,'numeric','Value',500);
+        efSSts = uieditfield(gSS,'numeric','Value',500, ...
+            'Tooltip','Substrate thickness t_s (μm) — typical Si wafer 300–700');
         efSSts.Layout.Row=1; efSSts.Layout.Column=6;
 
         uilabel(gSS,'Text','tf (nm):','HorizontalAlignment','right');
-        efSStf = uieditfield(gSS,'numeric','Value',100);
+        efSStf = uieditfield(gSS,'numeric','Value',100, ...
+            'Tooltip','Film thickness t_f (nm) — Stoney assumes t_f ≪ t_s');
         efSStf.Layout.Row=2; efSStf.Layout.Column=2;
         uilabel(gSS,'Text','R (m):','HorizontalAlignment','right');
-        efSSR = uieditfield(gSS,'numeric','Value',10);
+        efSSR = uieditfield(gSS,'numeric','Value',10, ...
+            'Tooltip','Wafer radius of curvature R (m) — positive = tensile, negative = compressive');
         efSSR.Layout.Row=2; efSSR.Layout.Column=4;
 
         lblSSResult = uilabel(gSS,'Text','','FontSize',11, ...
@@ -1582,24 +1645,30 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gTM.RowSpacing  = 4;
 
         uilabel(gTM,'Text',[char(945) ' film (1/K):'],'HorizontalAlignment','right');
-        efTMAlF = uieditfield(gTM,'numeric','Value',17e-6);
+        efTMAlF = uieditfield(gTM,'numeric','Value',17e-6, ...
+            'Tooltip','Film CTE α_f (1/K) — metals ~10–20e-6, oxides ~5–15e-6');
         efTMAlF.Layout.Row=1; efTMAlF.Layout.Column=2;
         uilabel(gTM,'Text',[char(945) ' sub (1/K):'],'HorizontalAlignment','right');
-        efTMAlS = uieditfield(gTM,'numeric','Value',3e-6);
+        efTMAlS = uieditfield(gTM,'numeric','Value',3e-6, ...
+            'Tooltip','Substrate CTE α_s (1/K) — Si 2.6e-6, Al₂O₃ 7.5e-6');
         efTMAlS.Layout.Row=1; efTMAlS.Layout.Column=4;
 
         ddTMSub = uidropdown(gTM,'Items',['(manual)',subNames],'Value','(manual)', ...
-            'ValueChangedFcn',@(~,~) fillTMSubstrate());
+            'ValueChangedFcn',@(~,~) fillTMSubstrate(), ...
+            'Tooltip','Substrate preset — auto-fills α_s from the substrate database');
         ddTMSub.Layout.Row=1; ddTMSub.Layout.Column=6;
 
         uilabel(gTM,'Text',[char(916) 'T (K):'],'HorizontalAlignment','right');
-        efTMdT = uieditfield(gTM,'numeric','Value',-500);
+        efTMdT = uieditfield(gTM,'numeric','Value',-500, ...
+            'Tooltip','Temperature change ΔT (K) — negative = cooling from deposition');
         efTMdT.Layout.Row=2; efTMdT.Layout.Column=2;
         uilabel(gTM,'Text','E (GPa):','HorizontalAlignment','right');
-        efTME = uieditfield(gTM,'numeric','Value',200);
+        efTME = uieditfield(gTM,'numeric','Value',200, ...
+            'Tooltip','Film Young''s modulus E_f (GPa) — metals 50–400');
         efTME.Layout.Row=2; efTME.Layout.Column=4;
         uilabel(gTM,'Text',[char(957) ':'],'HorizontalAlignment','right');
-        efTMNu = uieditfield(gTM,'numeric','Value',0.28);
+        efTMNu = uieditfield(gTM,'numeric','Value',0.28, ...
+            'Tooltip','Film Poisson ratio ν_f (dimensionless) — typically 0.2–0.35');
         efTMNu.Layout.Row=2; efTMNu.Layout.Column=6;
 
         lblTMStrain = uilabel(gTM,'Text','','FontSize',11, ...
@@ -1652,13 +1721,16 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gID.RowSpacing  = 4;
 
         uilabel(gID,'Text','Current (A):','HorizontalAlignment','right');
-        efIDCurr = uieditfield(gID,'numeric','Value',1e-6);
+        efIDCurr = uieditfield(gID,'numeric','Value',1e-6, ...
+            'Tooltip','Ion beam current I (A) — assumes singly-charged ions');
         efIDCurr.Layout.Row=1; efIDCurr.Layout.Column=2;
         uilabel(gID,'Text','Time (s):','HorizontalAlignment','right');
-        efIDTime = uieditfield(gID,'numeric','Value',60);
+        efIDTime = uieditfield(gID,'numeric','Value',60, ...
+            'Tooltip','Exposure time t (s)');
         efIDTime.Layout.Row=1; efIDTime.Layout.Column=4;
         uilabel(gID,'Text',['Area (cm' char(178) '):'],'HorizontalAlignment','right');
-        efIDArea = uieditfield(gID,'numeric','Value',1);
+        efIDArea = uieditfield(gID,'numeric','Value',1, ...
+            'Tooltip','Implant area (cm²) — dose = I·t/(q·A) in ions/cm²');
         efIDArea.Layout.Row=1; efIDArea.Layout.Column=6;
         btnIDCalc = uibutton(gID,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -1689,13 +1761,16 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gSch.Padding = [6 4 6 4]; gSch.RowSpacing = 4;
 
         uilabel(gSch,'Text','FWHM:','HorizontalAlignment','right');
-        efSchFWHM = uieditfield(gSch,'numeric','Value',0.5);
+        efSchFWHM = uieditfield(gSch,'numeric','Value',0.5, ...
+            'Tooltip','Peak FWHM β (deg, 2θ) — instrument-corrected integral breadth');
         efSchFWHM.Layout.Row=1; efSchFWHM.Layout.Column=2;
         uilabel(gSch,'Text',[char(955) ':'],'HorizontalAlignment','right');
-        efSchLam = uieditfield(gSch,'numeric','Value',1.5406);
+        efSchLam = uieditfield(gSch,'numeric','Value',1.5406, ...
+            'Tooltip','X-ray wavelength λ (Å) — Cu Kα₁ = 1.5406');
         efSchLam.Layout.Row=1; efSchLam.Layout.Column=4;
         uilabel(gSch,'Text',['2' char(952) ':'],'HorizontalAlignment','right');
-        efSch2T = uieditfield(gSch,'numeric','Value',33);
+        efSch2T = uieditfield(gSch,'numeric','Value',33, ...
+            'Tooltip','Bragg peak position 2θ (deg)');
         efSch2T.Layout.Row=1; efSch2T.Layout.Column=6;
         btnSchCalc = uibutton(gSch,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -2080,10 +2155,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gNSLD.RowSpacing  = 4;
 
         uilabel(gNSLD,'Text','Formula:','HorizontalAlignment','right');
-        efNSLDFormula = uieditfield(gNSLD,'text','Value','SrTiO3');
+        efNSLDFormula = uieditfield(gNSLD,'text','Value','SrTiO3', ...
+            'Tooltip','Chemical formula — case-sensitive element symbols, e.g. SrTiO3, Fe2O3, Al2O3');
         efNSLDFormula.Layout.Row=1; efNSLDFormula.Layout.Column=2;
         uilabel(gNSLD,'Text','Density (g/cm³):','HorizontalAlignment','right');
-        efNSLDDensity = uieditfield(gNSLD,'numeric','Value',5.12);
+        efNSLDDensity = uieditfield(gNSLD,'numeric','Value',5.12, ...
+            'Tooltip','Mass density ρ (g/cm³) — SrTiO₃ 5.12, Si 2.33, Fe₂O₃ 5.24');
         efNSLDDensity.Layout.Row=1; efNSLDDensity.Layout.Column=4;
         btnNSLDCalc = uibutton(gNSLD,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -2164,10 +2241,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gQ2T.RowSpacing  = 4;
 
         uilabel(gQ2T,'Text','Value:','HorizontalAlignment','right');
-        efQ2TVal = uieditfield(gQ2T,'numeric','Value',1.0);
+        efQ2TVal = uieditfield(gQ2T,'numeric','Value',1.0, ...
+            'Tooltip','Value to convert — Q in Å⁻¹ or 2θ in degrees depending on direction');
         efQ2TVal.Layout.Row=1; efQ2TVal.Layout.Column=2;
         uilabel(gQ2T,'Text',[char(955) ' (' char(197) '):'],'HorizontalAlignment','right');
-        efQ2TLam = uieditfield(gQ2T,'numeric','Value',1.5406);
+        efQ2TLam = uieditfield(gQ2T,'numeric','Value',1.5406, ...
+            'Tooltip','Radiation wavelength λ (Å) — Cu Kα 1.5406, Mo Kα 0.7107, neutrons 1–5');
         efQ2TLam.Layout.Row=1; efQ2TLam.Layout.Column=4;
 
         % Row 2: wavelength presets
@@ -2230,7 +2309,8 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gMW.RowSpacing  = 4;
 
         uilabel(gMW,'Text','Formula:','HorizontalAlignment','right');
-        efMWFormula = uieditfield(gMW,'text','Value','Fe2O3');
+        efMWFormula = uieditfield(gMW,'text','Value','Fe2O3', ...
+            'Tooltip','Chemical formula — returns molar mass in g/mol');
         efMWFormula.Layout.Row=1; efMWFormula.Layout.Column=2;
         btnMWCalc = uibutton(gMW,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
