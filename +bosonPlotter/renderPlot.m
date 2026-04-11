@@ -74,17 +74,22 @@ function renderPlot(targetAx, ctx)
         xUnit  = ctx.xUnit;
         xLabel = ctx.xLabel;
 
-        % Override axis labels when magnetometry unit conversion is active
+        % ── Axis-label preparation for magnetometry unit conversion ────
+        % The ACTUAL numerical conversion happens per-dataset inside the
+        % main plot loop via applyMagUnitConv (see below).  Here we only
+        % prepare the axis-label strings from the active dataset's
+        % requested units, so the label matches what renderPlot is about
+        % to draw.  No data mutation.
         magYLabel = '';
-        isMagActive = ~isempty(activeDs.corrData) && ...
-            ismember(guiTernary(isfield(activeDs,'parserName'), activeDs.parserName, ''), ...
-                {'importQDVSM','importPPMS','importMPMS','importLakeShore'});
-        if isMagActive
+        magWarnings = '';   % accumulates conversion warnings per-dataset
+        isMagActiveParser = ismember( ...
+            guiTernary(isfield(activeDs,'parserName'), activeDs.parserName, ''), ...
+            {'importQDVSM','importPPMS','importMPMS','importLakeShore'});
+        if isMagActiveParser
             fu = guiTernary(isfield(activeDs,'fieldUnit'),  activeDs.fieldUnit,  'Oe');
             mu = guiTernary(isfield(activeDs,'momentUnit'), activeDs.momentUnit, 'emu');
             if ~strcmp(fu, 'Oe')
-                fuClean = regexprep(fu, ' \(raw\)', '');
-                xLabel = sprintf('Magnetic Field (%s)', fuClean);
+                xLabel = sprintf('Magnetic Field (%s)', fu);
             end
             if ~strcmp(mu, 'emu')
                 magYLabel = sprintf('Magnetization (%s)', mu);
@@ -237,6 +242,35 @@ function renderPlot(targetAx, ctx)
             hasCorrData = ~isempty(ds.corrData);
             showRawOver = hasCorrData && ctx.showRaw;
             primaryD    = guiTernary(hasCorrData, ds.corrData, d);
+
+            % ── On-the-fly magnetometry unit conversion ──────────────────
+            % Rewrites primaryD.time / primaryD.values (and d for raw
+            % overlay) into the requested field / moment units WITHOUT
+            % mutating ds.data or ds.corrData.  MATLAB struct copy-on-
+            % write guarantees that assigning .time / .values on the
+            % local primaryD / d variables doesn't touch the parent
+            % dataset — that's the "raw data preservation" rule.
+            isMagParser = ismember( ...
+                guiTernary(isfield(ds,'parserName'), ds.parserName, ''), ...
+                {'importQDVSM','importPPMS','importMPMS','importLakeShore'});
+            if isMagParser
+                toFU = guiTernary(isfield(ds,'fieldUnit'),  ds.fieldUnit,  'Oe');
+                toMU = guiTernary(isfield(ds,'momentUnit'), ds.momentUnit, 'emu');
+                if ~strcmp(toFU, 'Oe') || ~strcmp(toMU, 'emu')
+                    sampleMass = guiTernary(isfield(ds,'sampleMass'),   ds.sampleMass,   0);
+                    sampleVol  = computeSampleVolumeCm3(ds);
+                    [primaryD, convWarn1] = applyMagUnitConv(primaryD, toFU, toMU, sampleMass, sampleVol);
+                    if ~isempty(convWarn1)
+                        magWarnings = appendWarnMsg(magWarnings, convWarn1);
+                    end
+                    if showRawOver
+                        [d, convWarn2] = applyMagUnitConv(d, toFU, toMU, sampleMass, sampleVol);
+                        if ~isempty(convWarn2)
+                            magWarnings = appendWarnMsg(magWarnings, convWarn2);
+                        end
+                    end
+                end
+            end
 
             % ── Build display mask ───────────────────────────────────────
             if isfield(ds, 'mask') && ~isempty(ds.mask) && any(~ds.mask)
@@ -822,6 +856,16 @@ function renderPlot(targetAx, ctx)
             ctx.recreateFringeMarkers();
         end
 
+        % ── Surface accumulated mag-unit conversion warnings ─────────────
+        % These fire when the user requested emu/g (or emu/cm³, kA/m) but
+        % sampleMass / sampleVolume is 0.  The render still succeeded with
+        % the data left unchanged in its original unit; we notify via the
+        % status bar so the user knows why the plot isn't in the unit they
+        % asked for.
+        if exist('magWarnings','var') && ~isempty(magWarnings) && ctx.isMainAx
+            try ctx.setStatus(['Unit conversion: ' magWarnings]); catch, end
+        end
+
     catch ME
         fprintf(2, '\n[BosonPlotter] Plot error: %s\n', ME.message);
         for si = 1:numel(ME.stack)
@@ -929,6 +973,124 @@ function marker = effectiveMarker(a, cycleIdx)
 %   through guiLineSpec (e.g. the neutron polarization and asymmetry paths).
     marker = resolveMarkerToken(a, cycleIdx);
 end
+
+
+% ════════════════════════════════════════════════════════════════════════
+%  Magnetometry unit conversion (raw-preserving)
+% ════════════════════════════════════════════════════════════════════════
+
+function [dOut, warnMsg] = applyMagUnitConv(dIn, toFieldU, toMomentU, sampleMass_g, sampleVol_cm3)
+%APPLYMAGUNITCONV  Return a COPY of the data struct with field/moment arrays
+%   converted to the requested units.  Leaves the input struct untouched
+%   (MATLAB struct value semantics: field assignments on a local variable
+%   don't propagate to the parent).
+%
+%   Rules:
+%     - Convert dIn.time only when its xColumnUnit is 'Oe' (case-insensitive)
+%       and the target field unit is not 'Oe'.
+%     - Convert each dIn.values(:,k) where dIn.units{k} is 'emu' and the
+%       target moment unit is not 'emu'.
+%     - Labels (xColumnUnit, units{k}) are updated to reflect the new unit.
+%     - If a conversion needs mass or volume that is not set, the column
+%       is left unchanged and warnMsg explains why — the caller should
+%       surface this but NOT abort the render.
+    dOut    = dIn;
+    warnMsg = '';
+
+    % ── Field / x-axis conversion ────────────────────────────────────
+    xU = '';
+    if isfield(dIn, 'metadata') && isfield(dIn.metadata, 'xColumnUnit')
+        xU = char(dIn.metadata.xColumnUnit);
+    end
+    if strcmpi(xU, 'Oe') && ~strcmp(toFieldU, 'Oe') && isnumeric(dIn.time)
+        [xNew, ~, xuNew, ~, w] = utilities.convertMagUnits( ...
+            dIn.time(:), zeros(numel(dIn.time),1), ...
+            'FromField', 'Oe', 'ToField', toFieldU);
+        if isempty(w)
+            dOut.time = reshape(xNew, size(dIn.time));
+            dOut.metadata.xColumnUnit = xuNew;
+        else
+            warnMsg = appendWarnMsg(warnMsg, w);
+        end
+    end
+
+    % ── Moment / y-column conversion (per column) ────────────────────
+    if isfield(dIn, 'units') && iscell(dIn.units) && ~strcmp(toMomentU, 'emu')
+        for k = 1:numel(dIn.units)
+            if k > size(dIn.values, 2), break; end
+            if strcmpi(char(dIn.units{k}), 'emu')
+                yCol = dIn.values(:, k);
+                [~, yNew, ~, yuNew, w] = utilities.convertMagUnits( ...
+                    zeros(numel(yCol),1), yCol, ...
+                    'FromMoment', 'emu', 'ToMoment', toMomentU, ...
+                    'SampleMass', sampleMass_g, 'SampleVolume', sampleVol_cm3);
+                if isempty(w)
+                    dOut.values(:, k) = yNew;
+                    dOut.units{k} = yuNew;
+                else
+                    warnMsg = appendWarnMsg(warnMsg, w);
+                    % On warning: leave the column alone and keep its
+                    % original 'emu' label.  Breaking out of the loop
+                    % avoids repeating the same "missing mass" warning
+                    % for every moment column.
+                    break;
+                end
+            end
+        end
+    end
+end
+
+
+function v = computeSampleVolumeCm3(ds)
+%COMPUTESAMPLEVOLUMECM3  Convert stored sample dimensions to cm³.
+%   BosonPlotter stores width, height, thickness in ds with a unit
+%   dropdown (mm or cm for W/H; nm or Å for thickness).  Returns 0
+%   when any dimension is missing or zero — caller treats this as
+%   "no volume available" and refuses the conversion.
+    v = 0;
+    w = getOrZero(ds, 'sampleWidth');
+    h = getOrZero(ds, 'sampleHeight');
+    t = getOrZero(ds, 'sampleThick');
+    if w <= 0 || h <= 0 || t <= 0, return; end
+
+    % In-plane unit: mm or cm
+    dimU = '';
+    if isfield(ds, 'dimUnit'), dimU = char(ds.dimUnit); end
+    switch lower(dimU)
+        case 'mm',  dimToCm = 0.1;
+        case 'cm',  dimToCm = 1.0;
+        otherwise,  dimToCm = 0.1;   % default to mm
+    end
+
+    % Thickness unit: nm or Å
+    thkU = '';
+    if isfield(ds, 'thickUnit'), thkU = char(ds.thickUnit); end
+    switch lower(thkU)
+        case 'nm',                  thkToCm = 1e-7;
+        case {char(197), 'a', 'ang'}, thkToCm = 1e-8;   % Å
+        otherwise,                  thkToCm = 1e-7;   % default to nm
+    end
+
+    v = (w * dimToCm) * (h * dimToCm) * (t * thkToCm);
+end
+
+
+function x = getOrZero(s, field)
+    if isfield(s, field) && isnumeric(s.(field)) && ~isempty(s.(field))
+        x = double(s.(field));
+    else
+        x = 0;
+    end
+end
+
+
+function s = appendWarnMsg(s, msg)
+    if isempty(msg), return; end
+    if isempty(s), s = char(msg);
+    else, s = sprintf('%s  |  %s', s, char(msg));
+    end
+end
+
 
 function tf = is2DDataset(ds)
     tf = isfield(ds, 'data') && isfield(ds.data, 'metadata') && ...

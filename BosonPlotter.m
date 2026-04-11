@@ -2228,6 +2228,9 @@ function varargout = BosonPlotter()
     api.getTemplate         = @() appData.activeTemplate;
     api.getAppearance       = @resolveActiveAppearance;
     api.getAxes             = @() ax;
+    % Mag unit conversion API (Stage A/C)
+    api.setFieldUnit        = @setFieldUnitDirect;
+    api.setMomentUnit       = @setMomentUnitDirect;
     api.setMap2DColormap    = @setMap2DColormapDirect;
     api.maskRegion          = @maskRegionDirect;
     api.unmaskAll           = @() onUnmaskAll([],[]);
@@ -4820,6 +4823,24 @@ function varargout = BosonPlotter()
             uialert(fig, sprintf('Failed to apply template:\n%s', ME.message), ...
                 'Template error');
             logGUIError('onTemplateChanged', 'template apply failed', ME);
+        end
+    end
+
+    function setFieldUnitDirect(u)
+    %SETFIELDUNITDIRECT  Programmatic api.setFieldUnit — mirrors dropdown change.
+        u = char(u);
+        if any(strcmp(ddFieldUnit.Items, u))
+            ddFieldUnit.Value = u;
+            onMagUnitChanged([], []);
+        end
+    end
+
+    function setMomentUnitDirect(u)
+    %SETMOMENTUNITDIRECT  Programmatic api.setMomentUnit — mirrors dropdown change.
+        u = char(u);
+        if any(strcmp(ddMomentUnit.Items, u))
+            ddMomentUnit.Value = u;
+            onMagUnitChanged([], []);
         end
     end
 
