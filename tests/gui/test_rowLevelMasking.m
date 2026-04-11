@@ -32,12 +32,19 @@ function test_rowLevelMasking
     api.setActiveIdx(1);
     drawnow;
 
-    % Locate the data table.  Tag not set, so pick by Type.
-    tbl = findall(api.fig, 'Type', 'uitable');
+    % Locate the data table and units table by tag (both uitables coexist
+    % after the Phase G scroll-performance split).
+    tbl = findall(api.fig, 'Type', 'uitable', 'Tag', 'BosonDataTable');
     if isempty(tbl)
-        error('test_rowLevelMasking:noTable', 'Could not find data table');
+        error('test_rowLevelMasking:noTable', 'Could not find BosonDataTable');
     end
     tbl = tbl(1);
+
+    tblU = findall(api.fig, 'Type', 'uitable', 'Tag', 'BosonUnitsTable');
+    if isempty(tblU)
+        error('test_rowLevelMasking:noUnits', 'Could not find BosonUnitsTable');
+    end
+    tblU = tblU(1);
 
     % ════════════════════════════════════════════════════════════════════
     %  TEST 1: Table no longer contains a 'Masked' column
@@ -48,8 +55,9 @@ function test_rowLevelMasking
         check('ColumnName does NOT contain "Masked"', ...
               ~any(strcmp(colNames, 'Masked')));
 
-        % Data struct should match column count (no trailing boolean)
-        if iscell(tbl.Data) && ~isempty(tbl.Data)
+        % Data is now a numeric matrix (post-split).  Column count
+        % should still match ColumnName count.
+        if ~isempty(tbl.Data)
             nTableCols = size(tbl.Data, 2);
             check('Data column count == ColumnName count', ...
                   nTableCols == numel(colNames));
@@ -156,17 +164,20 @@ function test_rowLevelMasking
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  TEST 5: units row is NOT styled red (only data rows get the style)
+    %  TEST 5: tblUnits holds a 1-row cell of unit strings; tblData is
+    %           pure numeric (post-split scroll-performance refactor)
     % ════════════════════════════════════════════════════════════════════
-    fprintf('\n== TEST 5: units row retains its own appearance ==\n');
+    fprintf('\n== TEST 5: units live in dedicated tblUnits ==\n');
     try
-        % Row 1 is the units row.  Its text content should be strings
-        % (unit labels), not numbers or booleans.
-        if ~isempty(tbl.Data) && size(tbl.Data, 1) >= 1
-            unitsRow = tbl.Data(1, :);
-            allStrings = all(cellfun(@(c) ischar(c) || isstring(c) || isempty(c), unitsRow));
-            check('row 1 is all strings (units row)', allStrings);
+        check('tblUnits.Data is a cell array', iscell(tblU.Data));
+        check('tblUnits has exactly 1 row',     size(tblU.Data, 1) == 1);
+        if iscell(tblU.Data) && ~isempty(tblU.Data)
+            allStrings = all(cellfun(@(c) ischar(c) || isstring(c) || isempty(c), tblU.Data(1, :)));
+            check('tblUnits row is all strings', allStrings);
         end
+        check('tblData.Data is numeric',        isnumeric(tbl.Data));
+        check('tblData column count matches tblUnits', ...
+              size(tbl.Data, 2) == size(tblU.Data, 2));
     catch ME
         recordCrash('TEST 5', ME);
     end

@@ -1479,8 +1479,8 @@ function varargout = BosonPlotter()
     dataTablePanel.Layout.Row = 2; dataTablePanel.Layout.Column = 2;
 
     % ── Data Table contents (toolbar + filter bar + units + editable table) ──
-    dataTableInnerGL = uigridlayout(dataTablePanel, [4 1], ...
-        'RowHeight', {22, 22, 14, '1x'}, 'Padding', [2 2 2 2], 'RowSpacing', 1);
+    dataTableInnerGL = uigridlayout(dataTablePanel, [5 1], ...
+        'RowHeight', {22, 22, 14, 26, '1x'}, 'Padding', [2 2 2 2], 'RowSpacing', 1);
 
     % Toolbar row
     tableBarGL = uigridlayout(dataTableInnerGL, [1 7], ...
@@ -1579,10 +1579,31 @@ function varargout = BosonPlotter()
         'BackgroundColor', [0.16 0.16 0.16]);
     lblTableUnits.Layout.Row = 3;
 
-    % Editable data table
-    tblData = uitable(dataTableInnerGL, ...
+    % ── Units row (separate 1-row uitable for performance) ────────────
+    % Before the split, the main data table stored row 1 as unit strings
+    % which forced the whole Data property to be a cell array.  Cell-
+    % array uitables render ~10× slower than numeric matrices on scroll,
+    % so we split units into their own tiny table and keep the main data
+    % table pure numeric.  Column widths are kept in sync via an explicit
+    % ColumnWidth array set on both tables.
+    tblUnits = uitable(dataTableInnerGL, ...
+        'Tag', 'BosonUnitsTable', ...
         'ColumnName', {'(no data)'}, ...
         'Data', {}, ...
+        'ColumnEditable', true, ...
+        'RowName', {'units'}, ...
+        'CellEditCallback', @onUnitsCellEdit, ...
+        'CellSelectionCallback', @onUnitsCellSelection, ...
+        'FontSize', 9, ...
+        'BackgroundColor', [0.96 0.98 0.93], ...
+        'ForegroundColor', [0.0 0.35 0.0]);
+    tblUnits.Layout.Row = 4;
+
+    % Editable data table (pure numeric data — big scroll-perf win)
+    tblData = uitable(dataTableInnerGL, ...
+        'Tag', 'BosonDataTable', ...
+        'ColumnName', {'(no data)'}, ...
+        'Data', [], ...
         'ColumnEditable', true, ...
         'CellEditCallback', @onTableCellEdit, ...
         'CellSelectionCallback', @onTableSelectionChanged, ...
@@ -1599,7 +1620,7 @@ function varargout = BosonPlotter()
     uimenu(tblCtxMenu, 'Separator', 'on', 'Text', 'Unmask all', ...
         'MenuSelectedFcn', @onTableUnmaskAll);
     tblData.ContextMenu = tblCtxMenu;
-    tblData.Layout.Row = 4;
+    tblData.Layout.Row = 5;
     appData.tableSelection = [];  % [Nx2] matrix of [row col] pairs
 
     axLimGL = uigridlayout(axLimPanel,[5 6], ...
@@ -11055,7 +11076,9 @@ function varargout = BosonPlotter()
     %   Depth/Conc columns instead of a single shared X column.
         if appData.activeIdx < 1 || isempty(appData.datasets)
             tblData.ColumnName = {'(no data)'};
-            tblData.Data = {};
+            tblData.Data = [];
+            tblUnits.ColumnName = {'(no data)'};
+            tblUnits.Data = {};
             lblTableUnits.Text = '';
             lblTableStats.Text = '';
             return;
@@ -11065,7 +11088,9 @@ function varargout = BosonPlotter()
         % the 1D projection data is not meaningful in 2D map mode.
         if is2DDataset(appData.datasets{appData.activeIdx})
             tblData.ColumnName = {'(2D map — table hidden)'};
-            tblData.Data = {};
+            tblData.Data = [];
+            tblUnits.ColumnName = {'(2D map — table hidden)'};
+            tblUnits.Data = {};
             lblTableUnits.Text = '';
             lblTableStats.Text = '';
             return;
@@ -11137,16 +11162,20 @@ function varargout = BosonPlotter()
                 appData.tableMask = false(nRows, 1);
             end
 
-            % Build cell data: units row + data rows (no mask column)
-            % ── Performance: cap displayed rows (full data in tableWorkingCopy) ──
+            % Pure numeric data rows — ~10× faster scroll than num2cell.
+            % Row cap keeps render cost bounded even on very long scans;
+            % the full matrix lives in appData.tableWorkingCopy and is
+            % still available for export / analysis.
             cap = min(nRows, appData.tableRowCap);
-            unitsRow = unitCells;
-            dataRows = num2cell(dataMat(1:cap, :));
-            tableData = [unitsRow; dataRows];
-
             tblData.ColumnName = colNames;
-            tblData.Data = tableData;
+            tblData.Data = dataMat(1:cap, :);
             tblData.ColumnEditable = true(1, nDataCols);
+
+            % Units row lives in its own 1-row uitable above tblData
+            tblUnits.ColumnName = colNames;
+            tblUnits.Data = unitCells;
+            tblUnits.ColumnEditable = true(1, nDataCols);
+            syncUnitsColumnWidths(nDataCols);
 
         else
             % ── Standard layout: single X + Y channels ────────────────
@@ -11170,24 +11199,26 @@ function varargout = BosonPlotter()
             appData.tableWorkingCopy = [xCol, yMat];
             appData.tableEdited = false;
 
-            % Units row: X unit + Y units (no mask placeholder — masking
-            % is now via right-click context menu with soft-red row highlight)
+            % Units row: X unit + Y units.  Lives in its own 1-row
+            % uitable above tblData so tblData.Data can be a pure
+            % numeric matrix — the big scroll-performance win.
             xUnit = '';
             if isfield(d.metadata, 'xColumnUnit')
                 xUnit = d.metadata.xColumnUnit;
             end
             unitCells = [{xUnit}, d.units];
 
-            % Build cell data: units row (row 1) + data rows
-            % ── Performance: cap displayed rows (full data in tableWorkingCopy) ──
+            % Pure numeric data rows
             cap = min(nRows, appData.tableRowCap);
-            unitsRow = unitCells;
-            dataRows = num2cell([xCol(1:cap), yMat(1:cap, :)]);
-            tableData = [unitsRow; dataRows];
-
             tblData.ColumnName = colNames;
-            tblData.Data = tableData;
+            tblData.Data = [xCol(1:cap), yMat(1:cap, :)];
             tblData.ColumnEditable = true(1, 1 + nCols);
+
+            % Units table (1 row, editable)
+            tblUnits.ColumnName = colNames;
+            tblUnits.Data = unitCells;
+            tblUnits.ColumnEditable = true(1, 1 + nCols);
+            syncUnitsColumnWidths(1 + nCols);
         end
 
         % Store units for editing and export
@@ -11235,91 +11266,105 @@ function varargout = BosonPlotter()
         maskedDataRows = find(appData.tableMask(1:cap));
         if isempty(maskedDataRows), return; end
 
-        % Table rows are offset by +1 for the units row
-        tableRowIdx = maskedDataRows + 1;
-
+        % Post-split: tblData rows map 1:1 to data rows — no units row
+        % to offset around.
         softRed = [1.0 0.88 0.88];
         try
             s = uistyle('BackgroundColor', softRed);
-            addStyle(tblData, s, 'row', tableRowIdx);
+            addStyle(tblData, s, 'row', maskedDataRows);
         catch
             % If uistyle / addStyle fail (very old MATLAB), do nothing
         end
     end
 
     function onTableCellEdit(~, evt)
-    %ONTABLECELLEDIT  Handle cell edits in the data table.
-    %   Row 1 is the units row (string edits update appData.tableUnits).
-    %   Rows 2+ are data (numeric edits update appData.tableWorkingCopy).
-    %   Masking is handled separately via the right-click context menu.
+    %ONTABLECELLEDIT  Handle cell edits in the main data table.
+    %   Post-split: tblData holds only numeric data rows (no units
+    %   row).  Units live in a separate tblUnits uitable handled by
+    %   onUnitsCellEdit below.
         row = evt.Indices(1);
         col = evt.Indices(2);
         nDataCols = size(appData.tableWorkingCopy, 2);
+        if col > nDataCols, return; end
 
-        if row == 1 && col <= nDataCols
-            % Units row edit — store updated unit string
-            newVal = evt.NewData;
-            if ischar(newVal) || isstring(newVal)
-                appData.tableUnits{col} = char(newVal);
-                appData.tableEdited = true;
-            end
-        elseif row >= 2 && col <= nDataCols
-            % Data row edit (offset by 1 for units row)
-            dataRow = row - 1;
-            newVal = evt.NewData;
-            if isnumeric(newVal)
-                appData.tableWorkingCopy(dataRow, col) = newVal;
-                appData.tableEdited = true;
-            end
+        newVal = evt.NewData;
+        if isnumeric(newVal)
+            appData.tableWorkingCopy(row, col) = newVal;
+            appData.tableEdited = true;
         end
     end
 
-    function onTableSelectionChanged(~, evt)
-    %ONTABLESELECTIONCHANGED  Track selected cells; arm column drag on row-1 click.
-    %   Row 1 of tblData is the units row, which sits directly below the column
-    %   header.  Clicking any cell in row 1 is the closest proxy to "clicking a
-    %   column header" available via CellSelectionCallback.  We use that click
-    %   to arm the drag-to-plot gesture.
-        appData.tableSelection = evt.Indices;
-
-        % Arm column drag when a cell in row 1 (units row) is selected
-        if ~isempty(evt.Indices) && evt.Indices(1,1) == 1
-            col = evt.Indices(1,2);
-            colNames = tblData.ColumnName;
-            % Mask column (last column) and row-index column (first column)
-            % should not be dragged as channels.
-            if col < 1 || col > numel(colNames), return; end
-            % Strip any unit annotation that may be appended to the header
-            rawName = colNames{col};
-            % Column headers in the table use the raw label (or label + unit).
-            % Match against the active dataset's labels to find the clean name.
-            if isempty(appData.datasets) || appData.activeIdx < 1, return; end
-            ds = appData.datasets{appData.activeIdx};
-            d  = ds.data;
-            xName     = guiXName(d.metadata);
-            allLabels = [{xName}, d.labels];
-            % Find the best matching label (exact, then prefix match)
-            matched = allLabels(strcmp(allLabels, rawName));
-            if isempty(matched)
-                % Try stripping units suffix " (unit)"
-                cleanName = regexprep(rawName, '\s*\(.*\)\s*$', '');
-                matched = allLabels(strcmp(allLabels, cleanName));
-            end
-            if isempty(matched), return; end
-            onColumnDragStart(matched{1});
+    function onUnitsCellEdit(~, evt)
+    %ONUNITSCELLEDIT  Handle edits in the 1-row units uitable.
+    %   Stores the new unit string in appData.tableUnits.  Cell edit
+    %   event rows are always 1 for the units table.
+        col = evt.Indices(2);
+        if col < 1 || col > numel(appData.tableUnits), return; end
+        newVal = evt.NewData;
+        if ischar(newVal) || isstring(newVal)
+            appData.tableUnits{col} = char(newVal);
+            appData.tableEdited = true;
         end
+    end
+
+    function syncUnitsColumnWidths(nCols)
+    %SYNCUNITSCOLUMNWIDTHS  Match tblUnits column widths to tblData.
+    %   MATLAB uitable auto-sizes each column to its own content by
+    %   default — on two separate tables that means the units table
+    %   and data table would diverge.  Use an explicit ColumnWidth
+    %   array on BOTH tables so the columns stay aligned no matter
+    %   what values are in the cells.
+        w = cell(1, nCols);
+        for ci = 1:nCols, w{ci} = 90; end
+        try tblData.ColumnWidth  = w; catch, end
+        try tblUnits.ColumnWidth = w; catch, end
+    end
+
+    function onTableSelectionChanged(~, evt)
+    %ONTABLESELECTIONCHANGED  Track selected cells for mask actions.
+    %   Selected [row col] pairs are cached in appData.tableSelection
+    %   for onTableMaskSelected / onTableUnmaskSelected to read.
+    %   Column drag-to-plot is handled by onUnitsCellSelection below
+    %   (fires when the user clicks a cell in tblUnits, which is
+    %   visually adjacent to tblData's column header).
+        appData.tableSelection = evt.Indices;
+    end
+
+    function onUnitsCellSelection(~, evt)
+    %ONUNITSCELLSELECTION  Arm the column drag-to-plot gesture.
+    %   Replaces the pre-split "click row 1 of the data table"
+    %   pathway.  tblUnits sits directly below the column header and
+    %   is the visual proxy for clicking a column; selecting any cell
+    %   in it arms the drag for that column's channel.
+        if isempty(evt.Indices), return; end
+        col = evt.Indices(1,2);
+        colNames = tblUnits.ColumnName;
+        if col < 1 || col > numel(colNames), return; end
+        rawName = colNames{col};
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        ds = appData.datasets{appData.activeIdx};
+        d  = ds.data;
+        xName     = guiXName(d.metadata);
+        allLabels = [{xName}, d.labels];
+        matched = allLabels(strcmp(allLabels, rawName));
+        if isempty(matched)
+            cleanName = regexprep(rawName, '\s*\(.*\)\s*$', '');
+            matched = allLabels(strcmp(allLabels, cleanName));
+        end
+        if isempty(matched), return; end
+        onColumnDragStart(matched{1});
     end
 
     function onTableMaskSelected(~, ~)
     %ONTABLEMASKSELECTED  Mask the currently selected rows in the table.
-    %   Skips row 1 (units row).  Applies soft-red row highlighting via
-    %   applyMaskStyling() — no more mask column.
+    %   Post-split: tblData rows map 1:1 to data rows (no units row
+    %   offset).  Applies soft-red row highlighting via applyMaskStyling.
         sel = appData.tableSelection;
         if isempty(sel), return; end
-        tableRows = unique(sel(:, 1));
-        tableRows(tableRows < 2) = [];  % skip units row
-        if isempty(tableRows), return; end
-        dataRows = tableRows - 1;  % offset for units row
+        dataRows = unique(sel(:, 1));
+        dataRows(dataRows < 1) = [];
+        if isempty(dataRows), return; end
+        if max(dataRows) > size(appData.tableWorkingCopy, 1), return; end
         appData.tableMask(dataRows) = true;
         applyMaskStyling();
         nMasked = sum(appData.tableMask);
@@ -11335,10 +11380,7 @@ function varargout = BosonPlotter()
     %ONTABLEUNMASKSELECTED  Unmask the currently selected rows (opposite of onTableMaskSelected).
         sel = appData.tableSelection;
         if isempty(sel), return; end
-        tableRows = unique(sel(:, 1));
-        tableRows(tableRows < 2) = [];
-        if isempty(tableRows), return; end
-        dataRows = tableRows - 1;
+        dataRows = unique(sel(:, 1));
         dataRows = dataRows(dataRows >= 1 & dataRows <= numel(appData.tableMask));
         if isempty(dataRows), return; end
         appData.tableMask(dataRows) = false;
