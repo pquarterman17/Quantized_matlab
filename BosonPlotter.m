@@ -3134,7 +3134,7 @@ function varargout = BosonPlotter()
             end
 
             % Evaluate expression safely — no eval(); uses dispatch-based parser
-            yResult = safeEvalMathExpr(expr, vars);
+            yResult = bosonPlotter.safeEvalMathExpr(expr, vars);
             if ~isnumeric(yResult) || numel(yResult) ~= numel(xBase)
                 error('Expression did not produce a vector of the correct length.');
             end
@@ -10784,7 +10784,7 @@ function varargout = BosonPlotter()
                 colVars.(sprintf('C%d', ci)) = d.values(:, ci);
             end
             % Evaluate via safe recursive-descent parser (no eval)
-            yResult = safeEvalMathExpr(expr, colVars);
+            yResult = bosonPlotter.safeEvalMathExpr(expr, colVars);
             if ~isnumeric(yResult) || numel(yResult) ~= size(d.values, 1)
                 error('Result must be a vector with %d elements.', size(d.values, 1));
             end
@@ -13895,13 +13895,6 @@ function wl_A = extractWavelength_A(ds)
             return
         end
     end
-end
-
-
-function result = safeEvalMathExpr(expr, vars)
-%SAFEEVALMATHEXPR  Evaluate a dataset-math expression without eval().
-%   Delegates to bosonPlotter.safeEvalMathExpr for the actual implementation.
-    result = bosonPlotter.safeEvalMathExpr(expr, vars);
 end
 
 
