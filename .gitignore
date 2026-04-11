@@ -13,3 +13,4 @@ claude.md
 # MATLAB runtime state
 *.asv
 .emviewer_recent.mat
+gui_bug_log.txt
