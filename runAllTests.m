@@ -163,6 +163,7 @@ SUITES = {
     T('calc','test_errorProp'),            'errorprop','Error propagation: linear Taylor, Monte Carlo, wrappers'
     % ── Utilities tests ──────────────────────────────────────────────────
     T('utilities','test_toOrigin'),        'utilities','Origin COM bridge: call sequence, qualified path, log handling (mock COM)'
+    T('utilities','test_convertMagUnits'), 'utilities','Magnetometry unit conversion: Oe/T/mT/A/m, emu/A·m²/emu·g⁻¹/kA·m⁻¹, raw-preserve'
 };
 
 % Filter by group
