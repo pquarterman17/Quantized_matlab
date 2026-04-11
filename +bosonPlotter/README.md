@@ -8,7 +8,7 @@ Functions extracted from the monolithic `BosonPlotter.m` to reduce its size and 
 |----------|-------------|-----------|
 | `applyCorrections` | Core corrections pipeline (trim, offset, background, smooth, normalize, derivative) | `BosonPlotter.onApplyCorrections`, `scripts.applyAnalysisTemplate` |
 | `correctionParams` | Build params struct from dataset + UI widget values | `BosonPlotter.onApplyCorrections` |
-| `curveFitting` | General curve fitting dialog (15 built-in models, fminsearch) | `BosonPlotter.onOpenCurveFitDialog` |
+| `curveFitting` | General curve fitting dialog (24 built-in models, fminsearch) | `BosonPlotter.onOpenCurveFitDialog` |
 | `graphDigitizer` | Graph digitizer: extract data from graph screenshots | `BosonPlotter.onOpenDigitizer` |
 | `figureBuilder` | Advanced Figure Builder (10 figure types, journal templates) | `BosonPlotter.onAdvancedFigureBuilder` |
 
