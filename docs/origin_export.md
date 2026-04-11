@@ -179,11 +179,13 @@ ok = utilities.toOrigin(data, ...
 ### What the function does internally
 
 1. Calls `actxserver('Origin.Application')` to connect to Origin
-2. Creates a new workbook via LabTalk: `win -t data BookName`
-3. Adds columns and sets their type (4=X, 1=Y, 3=yErr), long name, and unit
-4. Transfers data via `origin.PutWorksheet(sheetName, matrix, 0, 0)`
-5. Optionally sets axis scales and labels via LabTalk
-6. Releases the COM object (guaranteed by `onCleanup`)
+2. Creates a new workbook via LabTalk: `newbook bk:="BookName" name:="BookName" sheet:=1 option:=lsname` (sets both short and long names atomically)
+3. Reads back the *actual* short name from `origin.WorksheetPages` in case Origin auto-suffixed on a name collision
+4. Activates the new book (`win -a`) and renames its default worksheet to `SheetName`
+5. Sizes the worksheet to the right column count (`wks.nCols = N`) and sets each column's type (4=X, 1=Y, 3=yErr), long name, and unit
+6. Transfers data via `origin.PutWorksheet('[BookName]SheetName!', matrix, 0, 0)` — the **fully-qualified range path** is required; passing only a sheet name fails silently
+7. Optionally sets axis scales and labels via LabTalk
+8. Releases the COM object (guaranteed by `onCleanup`)
 
 ### Graceful failure
 
