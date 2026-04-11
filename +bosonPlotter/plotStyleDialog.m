@@ -318,15 +318,21 @@ function plotStyleDialog(parentFig, ctx)
     uilabel(gLeg, 'Text', '', 'FontColor', lblFg);
 
     % ── Section 8: Apply scope (uibuttongroup gives mutual exclusion) ─
+    % IMPORTANT: uiradiobutton's parent validator REJECTS a nested
+    % uigridlayout — it must be the uibuttongroup directly.  We used
+    % to wrap gScope around the three buttons and it happened to work
+    % in some R202x builds but crashes in R2025b with
+    %   "'Parent' value must be specified as a ButtonGroup object."
+    % So the buttons are now direct children with absolute Position.
+    % The dialog is Resize='off' so fixed pixel layout is fine.
     bgScope = uibuttongroup(root, 'Title', 'Apply to', 'FontWeight', 'bold');
     bgScope.Layout.Row = 8;
-    gScope = uigridlayout(bgScope, [1 3], ...
-        'RowHeight', {24}, ...
-        'ColumnWidth', {'1x','1x','1x'}, ...
-        'Padding', [8 12 8 8], 'ColumnSpacing', 4);
-    rbAll = uiradiobutton(gScope, 'Text', 'Whole plot', 'Value', true, 'FontColor', lblFg); %#ok<NASGU>
-    rbDs  = uiradiobutton(gScope, 'Text', 'Active dataset', 'FontColor', lblFg); %#ok<NASGU>
-    rbCh  = uiradiobutton(gScope, 'Text', 'Active channel', 'FontColor', lblFg); %#ok<NASGU>
+    rbAll = uiradiobutton(bgScope, 'Text', 'Whole plot',     'Value', true, ...
+                          'Position', [ 10 8 110 22]); %#ok<NASGU>
+    rbDs  = uiradiobutton(bgScope, 'Text', 'Active dataset', ...
+                          'Position', [130 8 130 22]); %#ok<NASGU>
+    rbCh  = uiradiobutton(bgScope, 'Text', 'Active channel', ...
+                          'Position', [270 8 130 22]); %#ok<NASGU>
 
     % ── Row 9: Bottom buttons (Reset / Apply / Close) ─────────────────
     btnRow = uigridlayout(root, [1 4], ...

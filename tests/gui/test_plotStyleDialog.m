@@ -163,6 +163,13 @@ function test_plotStyleDialog
             if ~isempty(rbs)
                 allRbLight = all(arrayfun(@(h) mean(h.FontColor) > 0.5, rbs));
                 check('all radiobuttons have light font color', allRbLight);
+                % Regression net: radiobuttons must have a ButtonGroup
+                % parent directly (not a nested grid).  This crashed
+                % the whole dialog in R2025b before the fix because
+                % uiradiobutton's validator rejects anything else.
+                allRbParented = all(arrayfun( ...
+                    @(h) isa(h.Parent, 'matlab.ui.container.ButtonGroup'), rbs));
+                check('radiobuttons are direct children of ButtonGroup', allRbParented);
             end
 
             delete(d);
