@@ -221,6 +221,55 @@ function test_plotStyleDialog
     end
 
     % ════════════════════════════════════════════════════════════════════
+    %  TEST 2b: Active-dataset scope actually lands on the rendered line
+    %
+    %  Regression net: before the per-dataset cascade fix, clicking
+    %  Apply with "Active dataset" scope wrote to ds.styleOverride but
+    %  renderPlot never read it back for lineWidth / markerSize /
+    %  alpha / markerFaceMode, so the plot visibly didn't change.
+    %  The user reported this as "changing the plot styles doesn't
+    %  seem to do anything on the plot."
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 2b: Active-dataset scope reaches the plot ==\n');
+    try
+        api.fig.Visible = 'on';
+        drawnow;
+        api.setStyleOverrides(struct());
+        api.setTemplate('screen');    % force a fresh replot
+        drawnow;
+
+        api.setDatasetStyleOverride(struct('lineWidth', 6.5));
+        drawnow;
+
+        ax = api.getAxes();
+        % Use findall without HandleVisibility filter since VSM data
+        % renders as errorbar + line overlays
+        allKids = findall(ax, '-not', 'Tag', 'GUIFringeMarker', ...
+                              '-not', 'Tag', 'GUIMaskedPoints', ...
+                              '-not', 'Tag', 'GUIPeakAnnotation');
+        types = arrayfun(@(h) lower(get(h, 'Type')), allKids, ...
+                         'UniformOutput', false);
+        dataMask = ismember(types, {'line', 'errorbar'});
+        dataKids = allKids(dataMask);
+
+        check('Active dataset has drawn handles', ~isempty(dataKids));
+        if ~isempty(dataKids)
+            widths = arrayfun(@(h) get(h,'LineWidth'), dataKids);
+            check('ds.styleOverride.lineWidth reaches the rendered line', ...
+                  any(abs(widths - 6.5) < 1e-6));
+        end
+
+        % Reset and restore visibility
+        api.setDatasetStyleOverride(struct());
+        api.setTemplate('screen');
+        drawnow;
+        api.fig.Visible = 'off';
+    catch ME
+        try api.fig.Visible = 'off'; catch, end
+        recordCrash('TEST 2b', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
     %  TEST 3: Per-dataset styleOverride wins over global
     % ════════════════════════════════════════════════════════════════════
     fprintf('\n== TEST 3: ds.styleOverride precedence ==\n');

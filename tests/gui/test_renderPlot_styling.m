@@ -182,7 +182,7 @@ function test_renderPlot_styling
     %  BosonPlotter integration wire it up."  Second half verifies the
     %  main GUI path end-to-end.
     % ════════════════════════════════════════════════════════════════════
-    fprintf('\n== TEST 7a: applyPostRenderStyle on synthetic axes ==\n');
+    fprintf('\n== TEST 7a: applyAlphaToLine direct helper ==\n');
     try
         fSyn = figure('Visible','off');
         axSyn = axes(fSyn);
@@ -190,9 +190,7 @@ function test_renderPlot_styling
         hold(axSyn, 'on');
         drawnow;
 
-        appr = bosonPlotter.resolveStyle(styles.template('screen'), ...
-                                         struct('alpha', 0.4));
-        bosonPlotter.applyPostRenderStyle(axSyn, appr);
+        bosonPlotter.applyAlphaToLine(h1, 0.4);
         drawnow;
 
         % Verify via the Edge primitive (where MATLAB actually stores

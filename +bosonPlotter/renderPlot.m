@@ -254,11 +254,36 @@ function renderPlot(targetAx, ctx)
             end
         end
 
+        % Save the global (template + globalOverride) appearance so we
+        % can restore it after each per-dataset iteration below.  Inside
+        % the loop we shadow `a` with a per-dataset version that layers
+        % ds.styleOverride on top — this is what makes "Apply to Active
+        % dataset" actually change the line properties in the plot.
+        aGlobal_ = a;
+
         for si = 1:nDS
             di          = plotIdx(si);
             ds          = appData.datasets{di};
             if isfield(ds, 'visible') && ~ds.visible, continue; end
             if isfield(ds, 'hiddenForAsymmetry') && ds.hiddenForAsymmetry, continue; end
+
+            % ── Per-dataset appearance override (Phase G fix) ────────
+            % Layer ds.styleOverride and (later) channelStyles{k} on
+            % top of the global appearance for this iteration.  Shadow
+            % `a` so every a.lineWidth / a.markerSize / a.alpha /
+            % a.markerFaceMode reference below picks up the per-dataset
+            % value without having to change every call site.  Rebuild
+            % the line spec helpers from the shadowed `a` for the same
+            % reason — they capture lineWidth / markerSize at build time.
+            a = bosonPlotter.applyDsOverride(aGlobal_, ds);
+            lsPrimary = guiLineSpec(ctx.style, a);
+            lsRight   = guiLineSpec_right(ctx.style, a);
+            lsRaw     = guiLineSpec_raw(ctx.style, a);
+
+            % Track the axes-child count BEFORE this iteration's plot
+            % calls so we can apply alpha / markerFaceMode to only the
+            % newly-added lines afterwards (per-dataset, not global).
+            preKidCount_ = numel(targetAx.Children);
 
             d           = ds.data;
             hasCorrData = ~isempty(ds.corrData);
@@ -553,7 +578,35 @@ function renderPlot(targetAx, ctx)
                 end
                 yyaxis(targetAx, 'left');
             end
+
+            % ── Per-dataset post-draw: apply alpha / markerFaceMode ──
+            % to every new line the iteration just drew.  MATLAB
+            % prepends new children, so Children(1:delta) are the
+            % newest lines.  Filtering by HandleVisibility='on' skips
+            % auxiliary whiskers / masked-point overlays.
+            postKidCount_ = numel(targetAx.Children);
+            delta_ = postKidCount_ - preKidCount_;
+            if delta_ > 0
+                newKids_ = targetAx.Children(1:delta_);
+                for kk_ = 1:numel(newKids_)
+                    h_ = newKids_(kk_);
+                    if ~isvalid(h_), continue; end
+                    if ~strcmp(get(h_, 'HandleVisibility'), 'on'), continue; end
+                    t_ = lower(get(h_, 'Type'));
+                    if any(strcmp(t_, {'line','errorbar'}))
+                        bosonPlotter.applyAlphaToLine(h_, a.alpha);
+                        bosonPlotter.applyFaceModeToLine(h_, a.markerFaceMode);
+                    end
+                end
+            end
+
+            % Restore the global appearance for the next iteration.
+            a = aGlobal_;
         end
+
+        % After the per-dataset loop, `a` has been restored to the
+        % global appearance.  Use it for the axes-level settings below
+        % (fonts, tick direction, legend — all shared across datasets).
 
         % ── Spin asymmetry calculation ────────────────────────────────────
         if ctx.calculateAsymmetry && isNeutronParser(ctx.resolvedCorrStyle())
