@@ -80,13 +80,13 @@ function renderPlot(targetAx, ctx)
             ismember(guiTernary(isfield(activeDs,'parserName'), activeDs.parserName, ''), ...
                 {'importQDVSM','importPPMS','importMPMS','importLakeShore'});
         if isMagActive
-            fu = guiTernary(isfield(activeDs,'fieldUnit'),  activeDs.fieldUnit,  'Oe (raw)');
-            mu = guiTernary(isfield(activeDs,'momentUnit'), activeDs.momentUnit, 'emu (raw)');
-            if ~strcmp(fu, 'Oe (raw)')
+            fu = guiTernary(isfield(activeDs,'fieldUnit'),  activeDs.fieldUnit,  'Oe');
+            mu = guiTernary(isfield(activeDs,'momentUnit'), activeDs.momentUnit, 'emu');
+            if ~strcmp(fu, 'Oe')
                 fuClean = regexprep(fu, ' \(raw\)', '');
                 xLabel = sprintf('Magnetic Field (%s)', fuClean);
             end
-            if ~strcmp(mu, 'emu (raw)')
+            if ~strcmp(mu, 'emu')
                 magYLabel = sprintf('Magnetization (%s)', mu);
             end
         end

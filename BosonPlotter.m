@@ -1352,19 +1352,21 @@ function varargout = BosonPlotter()
     lblFieldUnit.Layout.Row = CROW.MAG_UNITS; lblFieldUnit.Layout.Column = 1;
 
     ddFieldUnit = uidropdown(corrGL, ...
-        'Items',   {'Oe (raw)', 'T', 'mT', 'A/m'}, ...
-        'Value',   'Oe (raw)', ...
-        'Tooltip', 'Convert magnetic field x-axis units (Oe → T, mT, or A/m)');
+        'Items',   {'Oe', 'T', 'mT', 'A/m'}, ...
+        'Value',   'Oe', ...
+        'Tooltip', 'Convert magnetic field x-axis units (Oe → T, mT, or A/m)', ...
+        'ValueChangedFcn', @onMagUnitChanged);
     ddFieldUnit.Layout.Row = CROW.MAG_UNITS; ddFieldUnit.Layout.Column = 2;
 
     lblMomentUnit = uilabel(corrGL,'Text','Moment:','FontSize',10,'HorizontalAlignment','right');
     lblMomentUnit.Layout.Row = CROW.MAG_UNITS; lblMomentUnit.Layout.Column = 3;
 
     ddMomentUnit = uidropdown(corrGL, ...
-        'Items',   {'emu (raw)', 'emu/g', 'emu/cm³', 'A·m²', 'kA/m'}, ...
-        'Value',   'emu (raw)', ...
+        'Items',   {'emu', 'emu/g', 'emu/cm³', 'A·m²', 'kA/m'}, ...
+        'Value',   'emu', ...
         'Tooltip', ['Normalize moment: emu/g (divide by mass), emu/cm' char(179) ...
-                    ' (divide by volume), A' char(183) 'm' char(178) ' (SI moment), kA/m (SI magnetization)']);
+                    ' (divide by volume), A' char(183) 'm' char(178) ' (SI moment), kA/m (SI magnetization)'], ...
+        'ValueChangedFcn', @onMagUnitChanged);
     ddMomentUnit.Layout.Row = CROW.MAG_UNITS; ddMomentUnit.Layout.Column = 4;
 
     % Row MAG_AUTO: Auto BG+Offset button + scope dropdown (magnetometry only)
@@ -3515,8 +3517,8 @@ function varargout = BosonPlotter()
         ddDimUnit.Value      = guiTernary(isfield(ds,'dimUnit'),      ds.dimUnit,      'mm');
         efSampleThick.Value  = guiTernary(isfield(ds,'sampleThick'),  ds.sampleThick,  0);
         ddThickUnit.Value    = guiTernary(isfield(ds,'thickUnit'),    ds.thickUnit,    'nm');
-        ddMomentUnit.Value   = guiTernary(isfield(ds,'momentUnit'),   ds.momentUnit,   'emu (raw)');
-        ddFieldUnit.Value    = guiTernary(isfield(ds,'fieldUnit'),    ds.fieldUnit,    'Oe (raw)');
+        ddMomentUnit.Value   = guiTernary(isfield(ds,'momentUnit'),   ds.momentUnit,   'emu');
+        ddFieldUnit.Value    = guiTernary(isfield(ds,'fieldUnit'),    ds.fieldUnit,    'Oe');
         ddUnitSystem.Value   = guiTernary(isfield(ds,'unitSystem'),   ds.unitSystem,   'CGS');
 
         % Restore wavelength override field; auto-fill from metadata if no override set
@@ -4033,8 +4035,8 @@ function varargout = BosonPlotter()
     %ONUNITSYSTEMCHANGED  Quick-set field and moment units from CGS/SI toggle.
         switch ddUnitSystem.Value
             case 'CGS'
-                ddFieldUnit.Value  = 'Oe (raw)';
-                ddMomentUnit.Value = 'emu (raw)';
+                ddFieldUnit.Value  = 'Oe';
+                ddMomentUnit.Value = 'emu';
             case 'SI'
                 ddFieldUnit.Value  = 'T';
                 ddMomentUnit.Value = 'A·m²';
@@ -4821,6 +4823,20 @@ function varargout = BosonPlotter()
         end
     end
 
+    function onMagUnitChanged(~, ~)
+    %ONMAGUNITCHANGED  Trigger a replot when the field or moment unit changes.
+    %   Writes the new value into the active dataset so it persists across
+    %   dataset switches and survives session save/load.  The actual
+    %   numerical conversion happens inside renderPlot / applyDisplayUnits
+    %   on-the-fly — ds.data is NEVER mutated (raw values preserved).
+        if appData.activeIdx < 1 || isempty(appData.datasets), return; end
+        ds = appData.datasets{appData.activeIdx};
+        ds.fieldUnit  = ddFieldUnit.Value;
+        ds.momentUnit = ddMomentUnit.Value;
+        appData.datasets{appData.activeIdx} = ds;
+        onPlot([],[]);
+    end
+
     function setTemplateDirect(name)
     %SETTEMPLATEDIRECT  Programmatic template change (api.setTemplate).
     %   Mirrors the ddTemplate dropdown change — updates the widget value
@@ -5220,7 +5236,7 @@ function varargout = BosonPlotter()
                 'smoothMethod', smoothMeth, ...
                 'normMethod', normVal, ...
                 'derivativeMode', 'None', ...
-                'fieldUnit', 'Oe (raw)', 'momentUnit', 'emu (raw)');
+                'fieldUnit', 'Oe', 'momentUnit', 'emu');
             corrParams = bosonPlotter.correctionParams(ds, uiVals);
             bgArgs = {};
             if cbSubtractBG.Value && ~isempty(appData.bgDataset)
@@ -5296,8 +5312,8 @@ function varargout = BosonPlotter()
         undoState.dimUnit     = guiTernary(isfield(ds,'dimUnit'),     ds.dimUnit,     'mm');
         undoState.sampleThick = guiTernary(isfield(ds,'sampleThick'), ds.sampleThick, 0);
         undoState.thickUnit   = guiTernary(isfield(ds,'thickUnit'),   ds.thickUnit,   'nm');
-        undoState.momentUnit  = guiTernary(isfield(ds,'momentUnit'),  ds.momentUnit,  'emu (raw)');
-        undoState.fieldUnit   = guiTernary(isfield(ds,'fieldUnit'),   ds.fieldUnit,   'Oe (raw)');
+        undoState.momentUnit  = guiTernary(isfield(ds,'momentUnit'),  ds.momentUnit,  'emu');
+        undoState.fieldUnit   = guiTernary(isfield(ds,'fieldUnit'),   ds.fieldUnit,   'Oe');
         undoState.unitSystem  = guiTernary(isfield(ds,'unitSystem'),  ds.unitSystem,  'CGS');
         % Multi-level undo stack (#13): push onto stack, cap at 5
         if ~isfield(ds, 'undoStack') || ~iscell(ds.undoStack)
@@ -5402,7 +5418,7 @@ function varargout = BosonPlotter()
                     'smoothEnabled', false, 'smoothWindow', 5, ...
                     'smoothMethod', 'Moving', ...
                     'normMethod', normVal, 'derivativeMode', 'None', ...
-                    'fieldUnit', 'Oe (raw)', 'momentUnit', 'emu (raw)');
+                    'fieldUnit', 'Oe', 'momentUnit', 'emu');
                 pParams = bosonPlotter.correctionParams(pds, pUiVals);
                 pCorr = bosonPlotter.applyCorrections(pds.data, pParams);
                 pds.corrData   = pCorr;
@@ -5453,8 +5469,8 @@ function varargout = BosonPlotter()
         newState.dimUnit        = guiTernary(isfield(ds,'dimUnit'),     ds.dimUnit,     'mm');
         newState.sampleThick    = guiTernary(isfield(ds,'sampleThick'), ds.sampleThick, 0);
         newState.thickUnit      = guiTernary(isfield(ds,'thickUnit'),   ds.thickUnit,   'nm');
-        newState.momentUnit     = guiTernary(isfield(ds,'momentUnit'),  ds.momentUnit,  'emu (raw)');
-        newState.fieldUnit      = guiTernary(isfield(ds,'fieldUnit'),   ds.fieldUnit,   'Oe (raw)');
+        newState.momentUnit     = guiTernary(isfield(ds,'momentUnit'),  ds.momentUnit,  'emu');
+        newState.fieldUnit      = guiTernary(isfield(ds,'fieldUnit'),   ds.fieldUnit,   'Oe');
         newState.unitSystem     = guiTernary(isfield(ds,'unitSystem'),  ds.unitSystem,  'CGS');
         activeIdxAtPush = appData.activeIdx;
         pushUndoCorrectionEntry(activeIdxAtPush, undoState, newState, 'Apply Corrections');
@@ -5650,8 +5666,8 @@ function varargout = BosonPlotter()
         ddDimUnit.Value      = 'mm';
         efSampleThick.Value  = 0;
         ddThickUnit.Value    = 'nm';
-        ddMomentUnit.Value   = 'emu (raw)';
-        ddFieldUnit.Value    = 'Oe (raw)';
+        ddMomentUnit.Value   = 'emu';
+        ddFieldUnit.Value    = 'Oe';
         ddUnitSystem.Value   = 'CGS';
 
         if appData.activeIdx >= 1 && ~isempty(appData.datasets)
@@ -5675,8 +5691,8 @@ function varargout = BosonPlotter()
             ds.dimUnit       = 'mm';
             ds.sampleThick   = 0;
             ds.thickUnit     = 'nm';
-            ds.momentUnit    = 'emu (raw)';
-            ds.fieldUnit     = 'Oe (raw)';
+            ds.momentUnit    = 'emu';
+            ds.fieldUnit     = 'Oe';
             ds.unitSystem    = 'CGS';
             ds.peaks         = struct('center',{},'fwhm',{},'height',{},'area',{}, ...
                                       'xRange',{},'status',{},'bg',{},'model',{},'eta',{});
@@ -5765,8 +5781,8 @@ function varargout = BosonPlotter()
         ddDimUnit.Value      = guiTernary(isfield(ds,'dimUnit'),      ds.dimUnit,      'mm');
         efSampleThick.Value  = guiTernary(isfield(ds,'sampleThick'),  ds.sampleThick,  0);
         ddThickUnit.Value    = guiTernary(isfield(ds,'thickUnit'),    ds.thickUnit,    'nm');
-        ddMomentUnit.Value   = guiTernary(isfield(ds,'momentUnit'),   ds.momentUnit,   'emu (raw)');
-        ddFieldUnit.Value    = guiTernary(isfield(ds,'fieldUnit'),    ds.fieldUnit,    'Oe (raw)');
+        ddMomentUnit.Value   = guiTernary(isfield(ds,'momentUnit'),   ds.momentUnit,   'emu');
+        ddFieldUnit.Value    = guiTernary(isfield(ds,'fieldUnit'),    ds.fieldUnit,    'Oe');
         ddUnitSystem.Value   = guiTernary(isfield(ds,'unitSystem'),   ds.unitSystem,   'CGS');
 
         % Refresh the plot
@@ -5859,6 +5875,10 @@ function varargout = BosonPlotter()
         if isfield(s,'momentUnit'),    ds.momentUnit    = s.momentUnit;    end
         if isfield(s,'fieldUnit'),     ds.fieldUnit     = s.fieldUnit;     end
         if isfield(s,'unitSystem'),    ds.unitSystem    = s.unitSystem;    end
+        % Migration: old sessions used 'Oe (raw)' / 'emu (raw)' as the
+        % un-converted state; the "(raw)" suffix was dropped in 2026-04.
+        if isfield(ds,'fieldUnit')  && strcmp(ds.fieldUnit,  'Oe (raw)'),  ds.fieldUnit  = 'Oe';  end
+        if isfield(ds,'momentUnit') && strcmp(ds.momentUnit, 'emu (raw)'), ds.momentUnit = 'emu'; end
         appData.datasets{dsIdx} = ds;
 
         % Sync UI widgets only when this is the active dataset
@@ -5882,8 +5902,8 @@ function varargout = BosonPlotter()
             ddDimUnit.Value      = guiTernary(isfield(ds,'dimUnit'),      ds.dimUnit,      'mm');
             efSampleThick.Value  = guiTernary(isfield(ds,'sampleThick'),  ds.sampleThick,  0);
             ddThickUnit.Value    = guiTernary(isfield(ds,'thickUnit'),    ds.thickUnit,    'nm');
-            ddMomentUnit.Value   = guiTernary(isfield(ds,'momentUnit'),   ds.momentUnit,   'emu (raw)');
-            ddFieldUnit.Value    = guiTernary(isfield(ds,'fieldUnit'),    ds.fieldUnit,    'Oe (raw)');
+            ddMomentUnit.Value   = guiTernary(isfield(ds,'momentUnit'),   ds.momentUnit,   'emu');
+            ddFieldUnit.Value    = guiTernary(isfield(ds,'fieldUnit'),    ds.fieldUnit,    'Oe');
             ddUnitSystem.Value   = guiTernary(isfield(ds,'unitSystem'),   ds.unitSystem,   'CGS');
         end
     end
@@ -6884,17 +6904,17 @@ function varargout = BosonPlotter()
         isMag = ismember(guiTernary(isfield(ds,'parserName'), ds.parserName, ''), ...
                     {'importQDVSM','importPPMS','importMPMS','importLakeShore'});
         if isMag && ~isempty(ds.corrData)
-            fu = guiTernary(isfield(ds,'fieldUnit'),  ds.fieldUnit,  'Oe (raw)');
-            mu = guiTernary(isfield(ds,'momentUnit'), ds.momentUnit, 'emu (raw)');
+            fu = guiTernary(isfield(ds,'fieldUnit'),  ds.fieldUnit,  'Oe');
+            mu = guiTernary(isfield(ds,'momentUnit'), ds.momentUnit, 'emu');
             % Update x-axis unit in metadata
-            if ~strcmp(fu, 'Oe (raw)')
+            if ~strcmp(fu, 'Oe')
                 fuClean = regexprep(fu, ' \(raw\)', '');
                 if isfield(d, 'metadata') && isfield(d.metadata, 'xColumnUnit')
                     d.metadata.xColumnUnit = fuClean;
                 end
             end
             % Update y-channel units
-            if ~strcmp(mu, 'emu (raw)')
+            if ~strcmp(mu, 'emu')
                 for k = 1:numel(d.units)
                     d.units{k} = mu;
                 end
@@ -12971,8 +12991,8 @@ function ds = buildDs(fp, data, parserName)
     ds.dimUnit       = 'mm';      % 'mm' or 'cm'
     ds.sampleThick   = 0;         % in units of ds.thickUnit (0 = not set)
     ds.thickUnit     = 'nm';      % 'nm' or 'Å'
-    ds.momentUnit    = 'emu (raw)';  % target moment unit
-    ds.fieldUnit     = 'Oe (raw)';   % target field unit
+    ds.momentUnit    = 'emu';  % target moment unit
+    ds.fieldUnit     = 'Oe';   % target field unit
     ds.unitSystem    = 'CGS';        % 'CGS' or 'SI' — quick-set toggle
     ds.refLines       = {};       % Cell array of structs: {orientation, value, color, style}
     ds.mask            = true(size(data.time));  % logical; true = included, false = masked
