@@ -36,7 +36,11 @@ function rgb = palette(name, n)
     key = lower(strtrim(char(name)));
 
     switch key
-        case {'default', ''}
+        case {'default', 'template_default', ''}
+            % 'template_default' is the dialog-side sentinel — kept as
+            % a synonym for 'default' because the literal string
+            % 'default' is a reserved MATLAB set() keyword and can't
+            % be used as a uidropdown ItemsData value.
             rgb = [];
             return;
 

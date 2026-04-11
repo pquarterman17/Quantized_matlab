@@ -2307,6 +2307,7 @@ function varargout = BosonPlotter()
     api.setDatasetStyleOverride = @setDatasetStyleOverrideDirect;
     api.setStyle                = @(s) onStylePick(s);
     api.setShowLegend           = @setShowLegendDirect;
+    api.setTheme                = @(name) setThemeDirect(name);
 
     % ════════════════════════════════════════════════════════════════════
     %  NESTED CALLBACKS  (share appData + all control handles via closure)
@@ -4996,6 +4997,16 @@ function varargout = BosonPlotter()
         onPlot([], []);
     end
 
+    function setThemeDirect(name)
+    %SETTHEMEDIRECT  Test hook: flip appData.theme and retheme the
+    %   main window.  Mirrors what applyThemeFromDialog does via the
+    %   Settings dialog, minus the settings-dialog side-effects.
+        name = char(name);
+        if ~any(strcmp({'Light','Dark'}, name)), return; end
+        appData.theme = name;
+        onThemeChanged([], []);
+    end
+
     function ds = getActiveDatasetSafe()
         if appData.activeIdx > 0 && appData.activeIdx <= numel(appData.datasets)
             ds = appData.datasets{appData.activeIdx};
@@ -5305,7 +5316,11 @@ function varargout = BosonPlotter()
         ax.Color     = axBg;
         ax.XColor    = axFg;
         ax.YColor    = axFg;
-        ax.GridColor = guiTernary(isDark, th.gridColor, [0.15 0.15 0.15]);
+        if isDark && isfield(th, 'gridColor')
+            ax.GridColor = th.gridColor;
+        else
+            ax.GridColor = [0.15 0.15 0.15];
+        end
 
         % Apply to all panels and their children recursively
         applyThemeToChildren(fig, panC, fgC, btnC, btnF, lstC, lstF, edtC, edtF);

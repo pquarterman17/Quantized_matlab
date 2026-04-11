@@ -68,15 +68,34 @@ function plotStyleDialog(parentFig, ctx)
         'Resize',   'off', ...
         'Tag',      'BosonPlotStyleDialog');
 
+    % ── Theme: assemble a full colour set so every widget can be
+    %    coloured without ternary sprinkling.  Dark mode pulls from
+    %    styles.dark(); light mode uses the system defaults that
+    %    MATLAB's uifigure widgets ship with.  Every helper below
+    %    references theme.* without caring which mode is active.
     isDark = strcmp(ctx.theme, 'Dark');
     if isDark
-        th = styles.dark();
-        dlg.Color = th.bgColor;
-        lblFg     = th.fgColor;
+        darkTh = styles.dark();
+        theme.bgColor       = darkTh.bgColor;
+        theme.fgColor       = darkTh.fgColor;
+        theme.panelBgColor  = darkTh.panelBgColor;
+        theme.panelFgColor  = darkTh.fgColor;
+        theme.editBgColor   = darkTh.editBgColor;
+        theme.editFgColor   = darkTh.editFgColor;
+        theme.buttonBgColor = darkTh.buttonBgColor;
+        theme.buttonFgColor = darkTh.buttonFgColor;
     else
-        dlg.Color = [0.94 0.94 0.94];
-        lblFg     = [0 0 0];
+        theme.bgColor       = [0.94 0.94 0.94];
+        theme.fgColor       = [0    0    0   ];
+        theme.panelBgColor  = [0.94 0.94 0.94];
+        theme.panelFgColor  = [0    0    0   ];
+        theme.editBgColor   = [1    1    1   ];
+        theme.editFgColor   = [0    0    0   ];
+        theme.buttonBgColor = [0.94 0.94 0.94];
+        theme.buttonFgColor = [0    0    0   ];
     end
+    dlg.Color = theme.bgColor;
+    lblFg     = theme.fgColor;   % kept for backward-compat with existing label refs
 
     % Single column of section panels + a button row at the bottom.
     % Rows:
@@ -252,9 +271,14 @@ function plotStyleDialog(parentFig, ctx)
     uilabel(gPal, 'Text', 'Colours:', 'FontColor', lblFg, ...
         'Tooltip', 'Override the dataset colour cycle (takes precedence over the main colormap dropdown)');
     paletteItems     = {'Template default','Tab10','Viridis','Plasma', ...
-                        'Tol bright (CB)','Tol muted (CB)','Okabe–Ito (CB)', ...
+                        'Tol bright (CB)','Tol muted (CB)','Okabe-Ito (CB)', ...
                         'APS-like','Nature-like','Grayscale'};
-    paletteItemsData = {'default','tab10','viridis','plasma', ...
+    % NOTE: 'template_default' sentinel — the literal 'default' is a
+    % reserved MATLAB set() keyword that resets a property to its
+    % factory default, which makes uidropdown reject Value='default'
+    % even when 'default' is in ItemsData.  Renamed to dodge the
+    % collision; styles.palette accepts both as synonyms.
+    paletteItemsData = {'template_default','tab10','viridis','plasma', ...
                         'tol_bright','tol_muted','okabe_ito', ...
                         'aps','nature','grayscale'};
     ddPalette = uidropdown(gPal, ...
@@ -321,6 +345,16 @@ function plotStyleDialog(parentFig, ctx)
         'ButtonPushedFcn', @onApply); %#ok<NASGU>
     btnClose = uibutton(btnRow, 'Text', 'Close', ...
         'ButtonPushedFcn', @(~,~) delete(dlg)); %#ok<NASGU>
+
+    % ── Apply theme to every widget in one pass ─────────────────────
+    % Walks the whole tree so we don't have to sprinkle colour args
+    % through every creation call.  The Apply button keeps its custom
+    % green background — the helper skips widgets tagged 'primary'.
+    try
+        btnApply.Tag = 'primary';   % exempt from theme walk
+        applyThemeRecursive(dlg, theme);
+    catch
+    end
 
 
     % ════════════════════════════════════════════════════════════════
@@ -413,13 +447,13 @@ function plotStyleDialog(parentFig, ctx)
         s.legendBox        = cbLegBox.Value;
         s.legendFontWeight = ddLegWeight.Value;
 
-        % Palette: empty/'default' means "no override".  We write to
-        % .paletteOverride (not .colors) so the template's own colour
-        % cycle stays untouched — renderPlot checks paletteOverride
-        % first and falls back to the main colormap dropdown when
-        % empty, preserving pre-Phase-G behaviour.
+        % Palette: 'template_default' (or empty) means "no override".
+        % We write to .paletteOverride (not .colors) so the template's
+        % own colour cycle stays untouched — renderPlot checks
+        % paletteOverride first and falls back to the main colormap
+        % dropdown when empty, preserving pre-Phase-G behaviour.
         palKey = ddPalette.Value;
-        if ~strcmpi(palKey, 'default') && ~isempty(palKey)
+        if ~strcmpi(palKey, 'template_default') && ~strcmpi(palKey, 'default') && ~isempty(palKey)
             try
                 s.paletteOverride = styles.palette(palKey);
             catch
@@ -583,6 +617,79 @@ function v = pickClosest(candidates, target)
     v = candidates{1};
 end
 
+function applyThemeRecursive(node, theme)
+%APPLYTHEMERECURSIVE  Walk a uifigure subtree and colour each widget.
+%
+%   Handles the widget classes used by plotStyleDialog:
+%       uifigure, uigridlayout, uipanel, uibuttongroup,
+%       uilabel, uidropdown, uispinner, uicheckbox, uiradiobutton,
+%       uibutton
+%
+%   Widgets tagged 'primary' (the green Apply button) are exempt so
+%   they keep their custom colours.  Unknown types are walked-through
+%   for children but not recoloured.
+    if ~isvalid(node), return; end
+
+    % Skip exempt widgets (their Children are still walked below)
+    tag = '';
+    try tag = char(get(node, 'Tag')); catch, end
+    exempt = strcmp(tag, 'primary');
+
+    if ~exempt
+        cls = class(node);
+        switch cls
+            case 'matlab.ui.Figure'
+                try node.Color = theme.bgColor; catch, end
+
+            case {'matlab.ui.container.GridLayout'}
+                try node.BackgroundColor = theme.bgColor; catch, end
+
+            case 'matlab.ui.container.Panel'
+                try node.BackgroundColor     = theme.panelBgColor; catch, end
+                try node.ForegroundColor     = theme.panelFgColor; catch, end
+
+            case 'matlab.ui.container.ButtonGroup'
+                try node.BackgroundColor = theme.panelBgColor; catch, end
+                try node.ForegroundColor = theme.panelFgColor; catch, end
+
+            case 'matlab.ui.control.Label'
+                try node.FontColor = theme.fgColor; catch, end
+
+            case 'matlab.ui.control.DropDown'
+                try node.BackgroundColor = theme.editBgColor; catch, end
+                try node.FontColor       = theme.editFgColor; catch, end
+
+            case 'matlab.ui.control.Spinner'
+                try node.BackgroundColor = theme.editBgColor; catch, end
+                try node.FontColor       = theme.editFgColor; catch, end
+
+            case 'matlab.ui.control.EditField'
+                try node.BackgroundColor = theme.editBgColor; catch, end
+                try node.FontColor       = theme.editFgColor; catch, end
+
+            case 'matlab.ui.control.CheckBox'
+                try node.FontColor = theme.fgColor; catch, end
+
+            case 'matlab.ui.control.RadioButton'
+                try node.FontColor = theme.fgColor; catch, end
+
+            case 'matlab.ui.control.Button'
+                try node.BackgroundColor = theme.buttonBgColor; catch, end
+                try node.FontColor       = theme.buttonFgColor; catch, end
+        end
+    end
+
+    % Recurse into children
+    try
+        kids = node.Children;
+    catch
+        return;
+    end
+    for k = 1:numel(kids)
+        applyThemeRecursive(kids(k), theme);
+    end
+end
+
 function v = matchOrDefault(candidates, target, fallback)
 %MATCHORDEFAULT  If target is in candidates, return it; else return fallback.
     if any(strcmp(candidates, target))
@@ -594,12 +701,17 @@ end
 
 function key = detectCurrentPalette(eff, candidates)
 %DETECTCURRENTPALETTE  Guess which palette key matches eff.paletteOverride.
-%   Returns 'default' if the effective appearance has no palette
-%   override, otherwise walks the known palettes and returns the first
-%   whose RGB matrix matches within a small tolerance.  This lets the
-%   dialog round-trip a saved session's palette selection without
-%   storing the key explicitly.
-    key = 'default';
+%   Returns the 'template_default' sentinel if the effective
+%   appearance has no palette override, otherwise walks the known
+%   palettes and returns the first whose RGB matrix matches within a
+%   small tolerance.  This lets the dialog round-trip a saved
+%   session's palette selection without storing the key explicitly.
+    % Find the sentinel key dynamically so this helper stays in sync
+    % with whatever the dialog's ItemsData uses.
+    key = 'template_default';
+    if ~any(strcmp(candidates, key)) && any(strcmp(candidates, 'default'))
+        key = 'default';   % older callers may still use 'default'
+    end
     if ~isfield(eff, 'paletteOverride') || isempty(eff.paletteOverride) || ...
        ~isnumeric(eff.paletteOverride)
         return;
@@ -608,7 +720,7 @@ function key = detectCurrentPalette(eff, candidates)
     src = double(eff.paletteOverride);
     for i = 1:numel(candidates)
         c = candidates{i};
-        if strcmpi(c, 'default'), continue; end
+        if strcmpi(c, 'template_default') || strcmpi(c, 'default'), continue; end
         try
             ref = styles.palette(c);
         catch

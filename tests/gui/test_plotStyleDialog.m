@@ -70,6 +70,116 @@ function test_plotStyleDialog
     end
 
     % ════════════════════════════════════════════════════════════════════
+    %  TEST 1b: Dialog opens cleanly in Dark mode and applies the
+    %  dark theme to every widget
+    %
+    %  Regression net for two bugs observed in Phase G:
+    %    1. 'default' as an ItemsData value crashes uidropdown because
+    %       MATLAB's set() treats 'default' as a "reset to factory"
+    %       keyword.  We now use 'template_default' as the sentinel.
+    %    2. New widgets (panels, spinners, dropdowns) in the Phase G
+    %       sections were not picking up the dark theme — text stayed
+    %       black on dark background and was unreadable.  The theme
+    %       walker now recolours every widget in the tree.
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 1b: dark-mode dialog theming ==\n');
+    try
+        api.setTheme('Dark');
+        drawnow;
+
+        api.fig.Visible = 'on';
+        drawnow;
+        api.openPlotStyle();
+        drawnow;
+
+        dlg = findall(groot, 'Type', 'figure', 'Tag', 'BosonPlotStyleDialog');
+        check('dark dialog opened without error', ~isempty(dlg) && isvalid(dlg(1)));
+
+        if ~isempty(dlg)
+            d = dlg(1);
+
+            % Figure background should be dark
+            isDarkFigBg = mean(d.Color) < 0.5;
+            check('dialog figure background is dark', isDarkFigBg);
+
+            % Every panel should have dark background + light foreground
+            panels = findall(d, 'Type', 'uipanel');
+            if ~isempty(panels)
+                allPanelsDark  = true;
+                allPanelsLight = true;
+                for i = 1:numel(panels)
+                    if mean(panels(i).BackgroundColor) >= 0.5, allPanelsDark = false; end
+                    if mean(panels(i).ForegroundColor) <= 0.5, allPanelsLight = false; end
+                end
+                check('all panels have dark background',  allPanelsDark);
+                check('all panel titles have light text',  allPanelsLight);
+            end
+
+            % Every label should have light font
+            lbls = findall(d, 'Type', 'uilabel');
+            if ~isempty(lbls)
+                allLightText = true;
+                for i = 1:numel(lbls)
+                    if mean(lbls(i).FontColor) <= 0.5
+                        allLightText = false;
+                    end
+                end
+                check('all labels have light font color', allLightText);
+            end
+
+            % Every dropdown should have dark bg + light fg
+            dds = findall(d, 'Type', 'uidropdown');
+            if ~isempty(dds)
+                allDdDark  = true;
+                allDdLight = true;
+                for i = 1:numel(dds)
+                    if mean(dds(i).BackgroundColor) >= 0.5, allDdDark  = false; end
+                    if mean(dds(i).FontColor)       <= 0.5, allDdLight = false; end
+                end
+                check('all dropdowns have dark background', allDdDark);
+                check('all dropdowns have light font color', allDdLight);
+            end
+
+            % Every spinner too
+            sps = findall(d, 'Type', 'uispinner');
+            if ~isempty(sps)
+                allSpDark  = true;
+                allSpLight = true;
+                for i = 1:numel(sps)
+                    if mean(sps(i).BackgroundColor) >= 0.5, allSpDark  = false; end
+                    if mean(sps(i).FontColor)       <= 0.5, allSpLight = false; end
+                end
+                check('all spinners have dark background', allSpDark);
+                check('all spinners have light font color', allSpLight);
+            end
+
+            % Checkboxes and radiobuttons
+            cbs = findall(d, 'Type', 'uicheckbox');
+            if ~isempty(cbs)
+                allCbLight = all(arrayfun(@(h) mean(h.FontColor) > 0.5, cbs));
+                check('all checkboxes have light font color', allCbLight);
+            end
+            rbs = findall(d, 'Type', 'uiradiobutton');
+            if ~isempty(rbs)
+                allRbLight = all(arrayfun(@(h) mean(h.FontColor) > 0.5, rbs));
+                check('all radiobuttons have light font color', allRbLight);
+            end
+
+            delete(d);
+        end
+
+        drawnow;
+        api.fig.Visible = 'off';
+        % Restore light mode for subsequent tests
+        api.setTheme('Light');
+        drawnow;
+    catch ME
+        try api.fig.Visible = 'off'; catch, end
+        try api.setTheme('Light'); catch, end
+        recordCrash('TEST 1b', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
     %  TEST 2: setStyleOverrides flows into the live plot
     % ════════════════════════════════════════════════════════════════════
     fprintf('\n== TEST 2: global override applied to axes ==\n');
