@@ -2299,6 +2299,15 @@ function varargout = BosonPlotter()
         'pending',  appData.columnDragPending, ...
         'colName',  appData.columnDragColName);
 
+    % ── Phase G style API (for testing) ──────────────────────────────
+    % These let headless tests exercise the per-dataset override
+    % cascade and the plot-style switches without clicking through the
+    % dialog.  They write appData state directly, then trigger a
+    % replot so the changes land on the visible axes.
+    api.setDatasetStyleOverride = @setDatasetStyleOverrideDirect;
+    api.setStyle                = @(s) onStylePick(s);
+    api.setShowLegend           = @setShowLegendDirect;
+
     % ════════════════════════════════════════════════════════════════════
     %  NESTED CALLBACKS  (share appData + all control handles via closure)
     % ════════════════════════════════════════════════════════════════════
@@ -4964,6 +4973,27 @@ function varargout = BosonPlotter()
 
     function assignStyleOverrides(s)
         appData.styleOverrides = s;
+    end
+
+    function setDatasetStyleOverrideDirect(s)
+    %SETDATASETSTYLEOVERRIDEDIRECT  Test hook: write a sparse style
+    %   override onto the active dataset and replot.  The production
+    %   path (Plot Style dialog with "Apply to: Active dataset") does
+    %   the same mutation via setActiveDataset.  Headless tests use
+    %   this to verify the per-dataset override layer without clicking.
+        if appData.activeIdx <= 0 || isempty(appData.datasets), return; end
+        ds = appData.datasets{appData.activeIdx};
+        ds.styleOverride = s;
+        appData.datasets{appData.activeIdx} = ds;
+        onPlot([], []);
+    end
+
+    function setShowLegendDirect(tf)
+    %SETSHOWLEGENDDIRECT  Test hook: toggle the show-legend checkbox
+    %   and replot.  Mirrors the user clicking the "Show legend"
+    %   checkbox in the main window.
+        cbShowLegend.Value = logical(tf);
+        onPlot([], []);
     end
 
     function ds = getActiveDatasetSafe()
@@ -8263,9 +8293,16 @@ function varargout = BosonPlotter()
         % the "line width / marker size" concept — but they do have axes
         % typography, tick direction, box, and grid that should match
         % the main preview so switching the Template dropdown propagates
-        % to the 2D heatmap as well.
+        % to the 2D heatmap as well.  Phase G extends this to the
+        % colorbar, which is a second axes with its own FontName,
+        % TickDirection, TickLength, and Label font — all previously
+        % stuck at MATLAB defaults regardless of the active template.
         try
-            bosonPlotter.applyAppearanceToAxes(targetAx, resolveActiveAppearance());
+            appr2D = resolveActiveAppearance();
+            bosonPlotter.applyAppearanceToAxes(targetAx, appr2D);
+            if exist('cbh', 'var') && ~isempty(cbh) && isvalid(cbh)
+                bosonPlotter.applyAppearanceToColorbar(cbh, appr2D);
+            end
         catch
             % Never let a styling failure break the map render
         end

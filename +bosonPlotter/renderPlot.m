@@ -103,6 +103,16 @@ function renderPlot(targetAx, ctx)
         nY2   = numel(y2Sel);
         hasY2 = nY2 > 0;
 
+        % ── Resolve appearance early ─────────────────────────────────────
+        % Needed up here so the palette override (appearance.colors) can
+        % be honoured when deriving per-dataset colours below.  The same
+        % struct is reused later for the legend and post-render pass.
+        if isfield(ctx, 'appearance') && ~isempty(ctx.appearance) && isstruct(ctx.appearance)
+            a = ctx.appearance;
+        else
+            a = bosonPlotter.resolveStyle(styles.template('screen'));
+        end
+
         % ── Colour allocation ─────────────────────────────────────────────
         colormapName = ctx.colormapName;
         nColors = max(nDS * (nY + nY2), 1);
@@ -119,6 +129,25 @@ function renderPlot(targetAx, ctx)
                 for gk = 1:nY2
                     colors(nDS*nY + (gi-1)*nY2 + gk, :) = gradCmap(gi, :);
                 end
+            end
+        elseif isfield(a, 'paletteOverride') && ~isempty(a.paletteOverride) && ...
+               isnumeric(a.paletteOverride) && size(a.paletteOverride, 2) == 3
+            % Palette override from the Plot Style dialog wins over the
+            % main GUI colormap dropdown.  Distinct from a.colors (which
+            % every template populates) — paletteOverride is ONLY set
+            % when the user picks a non-default palette in the dialog,
+            % so the main colormap dropdown remains the default source.
+            srcPal = a.paletteOverride;
+            nSrc = size(srcPal, 1);
+            if nSrc == nColors
+                colors = srcPal;
+            elseif nColors <= nSrc
+                colors = srcPal(1:nColors, :);
+            else
+                % cycle: repeat the palette until we have nColors rows
+                reps = ceil(nColors / nSrc);
+                colors = repmat(srcPal, reps, 1);
+                colors = colors(1:nColors, :);
             end
         else
             colors = ctx.getColorsFromMap(colormapName, nColors);
@@ -177,17 +206,10 @@ function renderPlot(targetAx, ctx)
             yyaxis(targetAx,'right'); hold(targetAx,'on');
             yyaxis(targetAx,'left');
         end
-        % ── Resolve the visual appearance struct ────────────────────────
-        % ctx.appearance is built upstream from the active template +
-        % global dialog overrides (Phase A).  If an older caller forgot
-        % to populate it, fall back to the 'screen' template so the plot
-        % still renders with sensible defaults.
-        if isfield(ctx, 'appearance') && ~isempty(ctx.appearance) && isstruct(ctx.appearance)
-            a = ctx.appearance;
-        else
-            a = bosonPlotter.resolveStyle(styles.template('screen'));
-        end
-
+        % `a` was resolved earlier (above the colour block) so the
+        % palette override could apply.  Reuse it here without re-
+        % resolving — the template or session-scoped overrides don't
+        % change within a single render call.
         lsPrimary    = guiLineSpec(ctx.style, a);
         lsRight      = guiLineSpec_right(ctx.style, a);
         lsRaw        = guiLineSpec_raw(ctx.style, a);
@@ -322,10 +344,30 @@ function renderPlot(targetAx, ctx)
                 ctFactor = guiCountingTime(ds);
             end
 
+            % Per-dataset colour override.  Preference order:
+            %   1. ds.styleOverride.datasetColor   (Phase B — cascade)
+            %   2. ds.color                        (legacy pre-Phase-A field)
+            % This closes the Phase A migration loop that previously
+            % surfaced datasetColor in the resolver but never read it in
+            % the renderer.  Falling back to ds.color keeps old sessions
+            % working.
             dsColorOverride  = [];
-            if isfield(ds,'color')  && ~isempty(ds.color),  dsColorOverride  = ds.color;  end
             dsColorROverride = [];
-            if isfield(ds,'colorR') && ~isempty(ds.colorR), dsColorROverride = ds.colorR; end
+            if isfield(ds, 'styleOverride') && isstruct(ds.styleOverride)
+                so = ds.styleOverride;
+                if isfield(so, 'datasetColor') && ~isempty(so.datasetColor)
+                    dsColorOverride = so.datasetColor;
+                end
+                if isfield(so, 'datasetColorR') && ~isempty(so.datasetColorR)
+                    dsColorROverride = so.datasetColorR;
+                end
+            end
+            if isempty(dsColorOverride) && isfield(ds,'color') && ~isempty(ds.color)
+                dsColorOverride = ds.color;
+            end
+            if isempty(dsColorROverride) && isfield(ds,'colorR') && ~isempty(ds.colorR)
+                dsColorROverride = ds.colorR;
+            end
 
             isSIMSds = isfield(ds,'parserName') && strcmp(ds.parserName,'importSIMS');
 
@@ -628,6 +670,9 @@ function renderPlot(targetAx, ctx)
             if isprop(lgd, 'Box')
                 lgd.Box = guiTernary(a.legendBox, 'on', 'off');
             end
+            if isprop(lgd, 'FontWeight') && isfield(a, 'legendFontWeight') && ~isempty(a.legendFontWeight)
+                try lgd.FontWeight = a.legendFontWeight; catch, end
+            end
         else
             legend(targetAx,'off');
         end
@@ -854,6 +899,18 @@ function renderPlot(targetAx, ctx)
         % ── Fringe markers ────────────────────────────────────────────────
         if ctx.isMainAx && appData.fringeClickCount == 2 && all(~isnan(appData.fringeQ))
             ctx.recreateFringeMarkers();
+        end
+
+        % ── Post-render style pass ───────────────────────────────────────
+        % Walk the axes children once and apply fields that are cheaper
+        % to fix up after rendering than to plumb through every plot()
+        % call site: line/marker alpha (RGBA promotion), marker face
+        % colour mode, legend font weight.  Safe no-op when alpha=1 and
+        % markerFaceMode='none' (the defaults).
+        try
+            bosonPlotter.applyPostRenderStyle(targetAx, a);
+        catch
+            % Styling must never break the render
         end
 
         % ── Surface accumulated mag-unit conversion warnings ─────────────

@@ -77,6 +77,78 @@ function test_2dMapStyling
     end
 
     % ════════════════════════════════════════════════════════════════════
+    %  TEST 3: Colorbar inherits template font / tick direction (Phase G)
+    %
+    %  Pre-fix bug: Phase F applied template font/tick to the 2D axes,
+    %  but the colorbar (a second axes) was created with only
+    %  Label.String set — its FontName, FontSize, TickDirection,
+    %  TickLength, and Label.FontName stayed at MATLAB defaults, so an
+    %  APS-styled 2D map showed Helvetica axes but a default-font
+    %  colorbar.  applyAppearanceToColorbar closes this gap.
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 3: colorbar inherits APS template (Phase G) ==\n');
+    try
+        api.setTemplate('aps');
+        drawnow;
+
+        aps = styles.template('aps');
+        ax = api.getAxes();
+        cbh = [];
+        try
+            cbh = ax.Colorbar;
+        catch
+        end
+        if isempty(cbh) || ~isvalid(cbh)
+            % Alternative lookup: walk the parent figure's children
+            fg = ancestor(ax, 'figure');
+            cList = findall(fg, 'Type', 'ColorBar');
+            if ~isempty(cList), cbh = cList(1); end
+        end
+
+        check('colorbar handle exists after 2D render', ~isempty(cbh) && isvalid(cbh));
+        if ~isempty(cbh) && isvalid(cbh)
+            check('colorbar FontName matches aps', strcmp(cbh.FontName, aps.fontName));
+            check('colorbar FontSize matches aps', cbh.FontSize == aps.fontSize);
+            % TickDirection on colorbars uses the same string as TickDir
+            % on axes ('in' / 'out' / 'both')
+            if isprop(cbh, 'TickDirection')
+                check('colorbar TickDirection matches aps.tickDir', ...
+                      strcmp(cbh.TickDirection, aps.tickDir));
+            end
+            check('colorbar Label FontName matches aps', ...
+                  strcmp(cbh.Label.FontName, aps.fontName));
+        end
+    catch ME
+        recordCrash('TEST 3', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  TEST 4: Switching to Nature re-skins the colorbar too
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 4: colorbar re-skins on template switch ==\n');
+    try
+        api.setTemplate('nature');
+        drawnow;
+
+        nat = styles.template('nature');
+        ax = api.getAxes();
+        cbh = [];
+        try cbh = ax.Colorbar; catch, end
+        if isempty(cbh) || ~isvalid(cbh)
+            fg = ancestor(ax, 'figure');
+            cList = findall(fg, 'Type', 'ColorBar');
+            if ~isempty(cList), cbh = cList(1); end
+        end
+
+        if ~isempty(cbh) && isvalid(cbh)
+            check('colorbar FontName follows nature', strcmp(cbh.FontName, nat.fontName));
+            check('colorbar FontSize follows nature', cbh.FontSize == nat.fontSize);
+        end
+    catch ME
+        recordCrash('TEST 4', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
     %  Summary
     % ════════════════════════════════════════════════════════════════════
     fprintf('\n%s\n', repmat('=', 1, 68));

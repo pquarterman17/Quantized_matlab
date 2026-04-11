@@ -226,6 +226,81 @@ function test_styleResolution
     end
 
     % ════════════════════════════════════════════════════════════════════
+    %  TEST 10: Phase G default fields (markerFaceMode, legendFontWeight,
+    %           paletteOverride, tickLength)
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 10: Phase G default fields ==\n');
+    try
+        t = styles.template('screen');
+        a = bosonPlotter.resolveStyle(t);
+        check('has markerFaceMode',  isfield(a, 'markerFaceMode'));
+        check('has legendFontWeight',isfield(a, 'legendFontWeight'));
+        check('has paletteOverride', isfield(a, 'paletteOverride'));
+        check('has tickLength',      isfield(a, 'tickLength'));
+
+        check('markerFaceMode default is ''none''',    strcmp(a.markerFaceMode, 'none'));
+        check('legendFontWeight default is ''normal''', strcmp(a.legendFontWeight, 'normal'));
+        check('paletteOverride default is empty',       isempty(a.paletteOverride));
+
+        % Override markerFaceMode via the cascade
+        a2 = bosonPlotter.resolveStyle(t, struct('markerFaceMode', 'auto'));
+        check('markerFaceMode override applied',        strcmp(a2.markerFaceMode, 'auto'));
+
+        % legendFontWeight override
+        a3 = bosonPlotter.resolveStyle(t, struct('legendFontWeight', 'bold'));
+        check('legendFontWeight override applied',      strcmp(a3.legendFontWeight, 'bold'));
+
+        % paletteOverride takes a numeric matrix
+        pal = styles.palette('tab10');
+        a4 = bosonPlotter.resolveStyle(t, struct('paletteOverride', pal));
+        check('paletteOverride matrix survives merge',  isequal(a4.paletteOverride, pal));
+
+        % tickLength override (numeric 2-vector)
+        a5 = bosonPlotter.resolveStyle(t, struct('tickLength', [0.03 0.015]));
+        check('tickLength override applied', isequal(a5.tickLength, [0.03 0.015]));
+    catch ME
+        recordCrash('TEST 10', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  TEST 11: styles.palette returns valid RGB matrices
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 11: styles.palette library ==\n');
+    try
+        % 'default' returns empty (no override)
+        check('default palette returns empty', isempty(styles.palette('default')));
+
+        % Every named palette returns an N×3 matrix with values in [0,1]
+        names = {'tab10','viridis','plasma','tol_bright','tol_muted', ...
+                 'okabe_ito','aps','nature','grayscale'};
+        for i = 1:numel(names)
+            pal = styles.palette(names{i});
+            check(sprintf('%s is non-empty',  names{i}), ~isempty(pal));
+            check(sprintf('%s has 3 columns', names{i}), size(pal, 2) == 3);
+            check(sprintf('%s values in [0,1]', names{i}), ...
+                  all(pal(:) >= 0) && all(pal(:) <= 1));
+        end
+
+        % Interpolation / resampling
+        pal12 = styles.palette('viridis', 12);
+        check('viridis resampled to 12 rows', size(pal12, 1) == 12);
+
+        pal3 = styles.palette('tab10', 3);
+        check('tab10 downsampled to 3 rows',  size(pal3, 1) == 3);
+
+        % Unknown name errors
+        crashed = false;
+        try
+            styles.palette('not_a_real_palette');
+        catch
+            crashed = true;
+        end
+        check('unknown palette name raises', crashed);
+    catch ME
+        recordCrash('TEST 11', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
     %  Summary
     % ════════════════════════════════════════════════════════════════════
     fprintf('\n%s\n', repmat('=', 1, 68));

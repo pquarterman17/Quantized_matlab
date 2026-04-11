@@ -171,6 +171,295 @@ function test_renderPlot_styling
     end
 
     % ════════════════════════════════════════════════════════════════════
+    %  TEST 7: Line alpha is wired from appearance to rendered lines
+    %
+    %  Pre-fix bug: spAlpha in the dialog was writing to
+    %  styleOverrides.alpha but renderPlot never consumed it.  Verify
+    %  that alpha < 1 now promotes line Color to a 4-element RGBA.
+    %
+    %  First half is a standalone test of applyPostRenderStyle on a
+    %  synthetic axes — isolates "does the helper work" from "does the
+    %  BosonPlotter integration wire it up."  Second half verifies the
+    %  main GUI path end-to-end.
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 7a: applyPostRenderStyle on synthetic axes ==\n');
+    try
+        fSyn = figure('Visible','off');
+        axSyn = axes(fSyn);
+        h1 = plot(axSyn, 1:10, rand(1,10), '-o', 'Color', [0.2 0.5 0.8]);
+        hold(axSyn, 'on');
+        drawnow;
+
+        appr = bosonPlotter.resolveStyle(styles.template('screen'), ...
+                                         struct('alpha', 0.4));
+        bosonPlotter.applyPostRenderStyle(axSyn, appr);
+        drawnow;
+
+        % Verify via the Edge primitive (where MATLAB actually stores
+        % line transparency — the documented Color property silently
+        % drops the 4th element)
+        haveEdge = false;
+        try
+            e = h1.Edge;
+            haveEdge = ~isempty(e) && isvalid(e);
+        catch
+        end
+        check('line.Edge primitive is accessible', haveEdge);
+        if haveEdge
+            check('Edge.ColorType is truecoloralpha', ...
+                  strcmp(h1.Edge.ColorType, 'truecoloralpha'));
+            cd = h1.Edge.ColorData;
+            check('Edge.ColorData has 4 bytes', numel(cd) == 4);
+            if numel(cd) == 4
+                % Alpha 0.4 → round(0.4 * 255) = 102
+                check('Edge.ColorData(4) ≈ 102 (0.4*255)', abs(double(cd(4)) - 102) <= 1);
+                % RGB preserved within rounding
+                check('Edge.ColorData(1) preserved', abs(double(cd(1)) - 51) <= 1);
+            end
+        end
+
+        close(fSyn);
+    catch ME
+        try close(fSyn); catch, end
+        recordCrash('TEST 7a', ME);
+    end
+
+    fprintf('\n== TEST 7b: alpha override in main GUI ==\n');
+    try
+        api.setStyleOverrides(struct());
+        api.setTemplate('screen');
+        drawnow;
+
+        ax = api.getAxes();
+        dataKids = findDataLines(ax);
+        check('baseline has data lines', ~isempty(dataKids));
+
+        api.setStyleOverrides(struct('alpha', 0.35));
+        api.setTemplate('screen');
+        drawnow;
+
+        ax = api.getAxes();
+        dataKids = findDataLines(ax);
+        check('alpha override has data lines', ~isempty(dataKids));
+        if ~isempty(dataKids)
+            % Data objects may be Line (→ .Edge primitive) or
+            % ErrorBar (→ .Bar primitive).  Both store the alpha'd
+            % colour as uint8 RGBA in ColorData via ColorType=
+            % 'truecoloralpha'.  Walk every data object and check
+            % whichever primitive it exposes.
+            anyTruecoloralpha = false;
+            matchedAlpha = false;
+            for di = 1:numel(dataKids)
+                h = dataKids(di);
+                prim = [];
+                try
+                    if isprop(h, 'Edge'), prim = h.Edge; end
+                catch
+                end
+                if isempty(prim) || ~isvalid(prim)
+                    try
+                        if isprop(h, 'Bar'), prim = h.Bar; end
+                    catch
+                    end
+                end
+                if ~isempty(prim) && isvalid(prim)
+                    try
+                        if strcmp(prim.ColorType, 'truecoloralpha')
+                            anyTruecoloralpha = true;
+                            cd = prim.ColorData;
+                            if numel(cd) == 4 && abs(double(cd(4)) - 89) <= 1
+                                matchedAlpha = true;
+                            end
+                        end
+                    catch
+                    end
+                end
+            end
+            check('at least one data line/errorbar has truecoloralpha', anyTruecoloralpha);
+            check('at least one primitive ColorData(4) ≈ 89 (0.35*255)', matchedAlpha);
+        end
+
+        api.setStyleOverrides(struct());
+        api.setTemplate('screen');
+        drawnow;
+    catch ME
+        recordCrash('TEST 7b', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  TEST 8: ds.styleOverride.datasetColor reaches the plotted line
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 8: ds.styleOverride.datasetColor reaches rendered line ==\n');
+    try
+        api.setStyleOverrides(struct());
+        api.setTemplate('screen');
+
+        targetColor = [0.1 0.8 0.3];
+        api.setDatasetStyleOverride(struct('datasetColor', targetColor));
+        drawnow;
+
+        ax = api.getAxes();
+        dataKids = findDataLines(ax);
+        check('dataset-colour override has data lines', ~isempty(dataKids));
+        if ~isempty(dataKids)
+            c = get(dataKids(1), 'Color');
+            if numel(c) >= 3
+                check('line Color(1:3) matches ds.styleOverride.datasetColor', ...
+                      all(abs(c(1:3) - targetColor) < 1e-6));
+            else
+                check('line Color has at least 3 elements', false);
+            end
+        end
+
+        api.setDatasetStyleOverride(struct());
+        drawnow;
+    catch ME
+        recordCrash('TEST 8', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  TEST 9: markerFaceMode='auto' fills markers with line colour
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 9: markerFaceMode auto/none ==\n');
+    try
+        api.setStyleOverrides(struct());
+        api.setTemplate('screen');
+        api.setStyle('Scatter');
+        drawnow;
+
+        ax = api.getAxes();
+        dataKids = findDataLines(ax);
+        check('scatter has data lines', ~isempty(dataKids));
+        if ~isempty(dataKids)
+            mfc = get(dataKids(1), 'MarkerFaceColor');
+            check('default MarkerFaceColor is ''none''', ...
+                  (ischar(mfc) || isstring(mfc)) && strcmpi(char(mfc), 'none'));
+        end
+
+        api.setStyleOverrides(struct('markerFaceMode', 'auto'));
+        api.setTemplate('screen');
+        drawnow;
+
+        ax = api.getAxes();
+        dataKids = findDataLines(ax);
+        if ~isempty(dataKids)
+            mfc = get(dataKids(1), 'MarkerFaceColor');
+            lineCol = get(dataKids(1), 'Color');
+            check('MarkerFaceColor is numeric RGB when markerFaceMode=auto', ...
+                  isnumeric(mfc) && numel(mfc) == 3);
+            if isnumeric(mfc) && numel(mfc) == 3 && numel(lineCol) >= 3
+                check('MarkerFaceColor matches line Color(1:3)', ...
+                      all(abs(mfc - lineCol(1:3)) < 1e-6));
+            end
+        end
+
+        api.setStyleOverrides(struct());
+        api.setStyle('Line');
+        drawnow;
+    catch ME
+        recordCrash('TEST 9', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  TEST 10: Palette override replaces the default colour cycle
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 10: paletteOverride changes rendered colours ==\n');
+    try
+        api.setStyleOverrides(struct());
+        api.setTemplate('screen');
+        drawnow;
+
+        ax = api.getAxes();
+        kids0 = findDataLines(ax);
+        baselineColor = [];
+        if ~isempty(kids0)
+            c0 = get(kids0(1), 'Color');
+            if numel(c0) >= 3, baselineColor = c0(1:3); end
+        end
+
+        tabPal = styles.palette('tab10');
+        api.setStyleOverrides(struct('paletteOverride', tabPal));
+        api.setTemplate('screen');
+        drawnow;
+
+        ax = api.getAxes();
+        kids1 = findDataLines(ax);
+        if ~isempty(kids1) && ~isempty(baselineColor)
+            c1 = get(kids1(1), 'Color');
+            check('line Color matches Tab10 first stop', ...
+                  numel(c1) >= 3 && all(abs(c1(1:3) - tabPal(1,:)) < 1e-6));
+            check('line Color differs from baseline template colour', ...
+                  ~isequal(c1(1:3), baselineColor));
+        end
+
+        api.setStyleOverrides(struct());
+        api.setTemplate('screen');
+        drawnow;
+    catch ME
+        recordCrash('TEST 10', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  TEST 11: tickLength from appearance lands on the axes
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 11: tickLength override lands on axes ==\n');
+    try
+        api.setStyleOverrides(struct());
+        api.setTemplate('screen');
+        drawnow;
+
+        api.setStyleOverrides(struct('tickLength', [0.025 0.0125]));
+        api.setTemplate('screen');
+        drawnow;
+
+        ax = api.getAxes();
+        check('ax.TickLength(1) matches override', ...
+              abs(ax.TickLength(1) - 0.025) < 1e-6);
+
+        api.setStyleOverrides(struct());
+        api.setTemplate('screen');
+        drawnow;
+    catch ME
+        recordCrash('TEST 11', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  TEST 12: legendFontWeight flows via applyPostRenderStyle
+    %
+    %  We test the helper directly on a synthetic axes so we don't have
+    %  to orchestrate BosonPlotter's "is a legend drawn?" heuristic
+    %  (which depends on dataset count and show-legend state).  The
+    %  renderPlot wiring is covered by test_plotStyleDialog ensuring
+    %  the struct reaches the resolver.
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 12: legendFontWeight via applyPostRenderStyle ==\n');
+    try
+        fSyn = figure('Visible','off');
+        axSyn = axes(fSyn);
+        plot(axSyn, 1:10, rand(1,10), 'DisplayName', 'a');
+        hold(axSyn, 'on');
+        plot(axSyn, 1:10, rand(1,10), 'DisplayName', 'b');
+        lgd = legend(axSyn);
+        drawnow;
+
+        check('synthetic legend default is normal weight', ...
+              strcmpi(lgd.FontWeight, 'normal'));
+
+        appr = bosonPlotter.resolveStyle(styles.template('screen'), ...
+                                         struct('legendFontWeight', 'bold'));
+        bosonPlotter.applyPostRenderStyle(axSyn, appr);
+        drawnow;
+
+        check('legend FontWeight is bold after applyPostRenderStyle', ...
+              strcmpi(lgd.FontWeight, 'bold'));
+
+        close(fSyn);
+    catch ME
+        try close(fSyn); catch, end
+        recordCrash('TEST 12', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
     %  Summary
     % ════════════════════════════════════════════════════════════════════
     fprintf('\n%s\n', repmat('=', 1, 68));
@@ -207,4 +496,24 @@ end
 % ════════════════════════════════════════════════════════════════════════
 function s = onOff(tf)
     if tf, s = 'on'; else, s = 'off'; end
+end
+
+function dataKids = findDataLines(ax)
+%FINDDATALINES  Return axes children that represent data series.
+%   Filters out auxiliary chrome (fringe markers, masked-point
+%   overlay, SNIP background) by tag so colour/alpha checks only
+%   hit the real data lines.
+    allKids = findall(ax, '-not', 'Tag', 'GUIFringeMarker', ...
+                          '-not', 'Tag', 'GUIMaskedPoints', ...
+                          '-not', 'Tag', 'GUISNIPBackground', ...
+                          '-not', 'Tag', 'GUIPeakAnnotation');
+    types = arrayfun(@(h) lower(get(h, 'Type')), allKids, ...
+                     'UniformOutput', false);
+    dataMask = ismember(types, {'line', 'errorbar'});
+    dataKids = allKids(dataMask);
+    if ~isempty(dataKids)
+        % Only visible series (HandleVisibility='on') are real data
+        visible = arrayfun(@(h) strcmp(get(h, 'HandleVisibility'), 'on'), dataKids);
+        dataKids = dataKids(visible);
+    end
 end

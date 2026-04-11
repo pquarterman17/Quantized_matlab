@@ -40,7 +40,7 @@ function plotStyleDialog(parentFig, ctx)
     end
 
     figPos = parentFig.Position;
-    dlgW = 380; dlgH = 660;
+    dlgW = 400; dlgH = 780;
     dlgX = figPos(1) + round((figPos(3) - dlgW) / 2);
     dlgY = figPos(2) + round((figPos(4) - dlgH) / 2);
 
@@ -78,9 +78,19 @@ function plotStyleDialog(parentFig, ctx)
         lblFg     = [0 0 0];
     end
 
-    % Single column of section panels + a button row at the bottom
-    root = uigridlayout(dlg, [8 1], ...
-        'RowHeight',  {28, 112, 96, 96, 96, 72, 60, 44}, ...
+    % Single column of section panels + a button row at the bottom.
+    % Rows:
+    %   1  Template selector             28 px
+    %   2  Typography                    112 px (2 rows × 4 cols)
+    %   3  Lines                          96 px (2 rows × 4 cols)
+    %   4  Markers                       120 px (3 rows × 4 cols — row 3 = face mode)
+    %   5  Axes                          120 px (3 rows × 4 cols — row 3 = tick length)
+    %   6  Palette                        56 px (1 row × 2 cols)
+    %   7  Legend                         96 px (2 rows × 4 cols — row 2 = font weight)
+    %   8  Apply-to radio group           60 px
+    %   9  Button row                     44 px
+    root = uigridlayout(dlg, [9 1], ...
+        'RowHeight',  {28, 112, 96, 96, 120, 56, 96, 60, 44}, ...
         'ColumnWidth', {'1x'}, ...
         'Padding',    [12 12 12 12], ...
         'RowSpacing', 6);
@@ -175,17 +185,24 @@ function plotStyleDialog(parentFig, ctx)
         'ItemsData', {'o','s','^','d','v','x','+','*','auto','none'}, ...
         'Value', matchOrDefault({'o','s','^','d','v','x','+','*','auto','none'}, effective.markerShape, 'o'));
 
-    % Row-2 of markers section: leave blank for future (e.g. marker face color)
-    uilabel(gMark, 'Text', '', 'FontColor', lblFg);
-    uilabel(gMark, 'Text', '', 'FontColor', lblFg);
+    % Row 2: marker face mode
+    uilabel(gMark, 'Text', 'Face:', 'FontColor', lblFg, ...
+        'Tooltip', 'none = outline only, filled = match line colour');
+    ddMarkerFace = uidropdown(gMark, ...
+        'Items',     {'outline','filled'}, ...
+        'ItemsData', {'none','auto'}, ...
+        'Value', matchOrDefault({'none','auto'}, effective.markerFaceMode, 'none'));
+
+    % Keep the marker grid 2 rows × 4 cols — placeholder labels for the
+    % empty cells on row 2 (future: explicit marker face colour picker).
     uilabel(gMark, 'Text', '', 'FontColor', lblFg);
     uilabel(gMark, 'Text', '', 'FontColor', lblFg);
 
     % ── Section 5: Axes ───────────────────────────────────────────────
     pAx = uipanel(root, 'Title', 'Axes', 'FontWeight', 'bold');
     pAx.Layout.Row = 5;
-    gAx = uigridlayout(pAx, [2 4], ...
-        'RowHeight', {24, 24}, ...
+    gAx = uigridlayout(pAx, [3 4], ...
+        'RowHeight', {24, 24, 24}, ...
         'ColumnWidth', {80, '1x', 80, '1x'}, ...
         'Padding', [8 8 8 8], 'RowSpacing', 4, 'ColumnSpacing', 6);
 
@@ -206,13 +223,52 @@ function plotStyleDialog(parentFig, ctx)
         'Tooltip', 'Show minor ticks');
     cbMinorTicks = uicheckbox(gAx, 'Text', '', 'Value', logical(effective.minorTicks));
 
-    % ── Section 6: Legend ─────────────────────────────────────────────
-    pLeg = uipanel(root, 'Title', 'Legend', 'FontWeight', 'bold');
-    pLeg.Layout.Row = 6;
-    gLeg = uigridlayout(pLeg, [1 4], ...
+    % Row 3: tick length.  MATLAB axes store [major minor] as a fraction
+    % of the long axis; we expose just the major value and keep the
+    % minor tick at half the major (the APS/Nature convention).
+    uilabel(gAx, 'Text', 'Tick len:', 'FontColor', lblFg, ...
+        'Tooltip', 'Major tick length (fraction of long axis, 0.005–0.05 typical)');
+    majorInit = 0.01;
+    if isnumeric(effective.tickLength) && ~isempty(effective.tickLength)
+        majorInit = effective.tickLength(1);
+    end
+    spTickLenMajor = uispinner(gAx, 'Limits', [0 0.1], 'Step', 0.005, ...
+        'ValueDisplayFormat', '%.3f', 'Value', majorInit);
+
+    uilabel(gAx, 'Text', '', 'FontColor', lblFg);
+    uilabel(gAx, 'Text', '', 'FontColor', lblFg);
+
+    % ── Section 6: Palette ────────────────────────────────────────────
+    % Lets the user swap the colour cycle without switching templates.
+    % 'Template default' means "don't override" — leaves appearance.colors
+    % empty so renderPlot falls through to the main GUI colormap dropdown.
+    pPal = uipanel(root, 'Title', 'Palette', 'FontWeight', 'bold');
+    pPal.Layout.Row = 6;
+    gPal = uigridlayout(pPal, [1 2], ...
         'RowHeight', {24}, ...
-        'ColumnWidth', {80, '1x', 80, '1x'}, ...
+        'ColumnWidth', {80, '1x'}, ...
         'Padding', [8 8 8 8], 'ColumnSpacing', 6);
+
+    uilabel(gPal, 'Text', 'Colours:', 'FontColor', lblFg, ...
+        'Tooltip', 'Override the dataset colour cycle (takes precedence over the main colormap dropdown)');
+    paletteItems     = {'Template default','Tab10','Viridis','Plasma', ...
+                        'Tol bright (CB)','Tol muted (CB)','Okabe–Ito (CB)', ...
+                        'APS-like','Nature-like','Grayscale'};
+    paletteItemsData = {'default','tab10','viridis','plasma', ...
+                        'tol_bright','tol_muted','okabe_ito', ...
+                        'aps','nature','grayscale'};
+    ddPalette = uidropdown(gPal, ...
+        'Items',     paletteItems, ...
+        'ItemsData', paletteItemsData, ...
+        'Value', detectCurrentPalette(effective, paletteItemsData));
+
+    % ── Section 7: Legend ─────────────────────────────────────────────
+    pLeg = uipanel(root, 'Title', 'Legend', 'FontWeight', 'bold');
+    pLeg.Layout.Row = 7;
+    gLeg = uigridlayout(pLeg, [2 4], ...
+        'RowHeight', {24, 24}, ...
+        'ColumnWidth', {80, '1x', 80, '1x'}, ...
+        'Padding', [8 8 8 8], 'RowSpacing', 4, 'ColumnSpacing', 6);
 
     uilabel(gLeg, 'Text', 'Position:', 'FontColor', lblFg);
     ddLegLoc = uidropdown(gLeg, ...
@@ -226,9 +282,20 @@ function plotStyleDialog(parentFig, ctx)
     uilabel(gLeg, 'Text', 'Box:', 'FontColor', lblFg);
     cbLegBox = uicheckbox(gLeg, 'Text', '', 'Value', logical(effective.legendBox));
 
-    % ── Section 7: Apply scope (uibuttongroup gives mutual exclusion) ─
+    % Row 2: legend font weight
+    uilabel(gLeg, 'Text', 'Weight:', 'FontColor', lblFg, ...
+        'Tooltip', 'Legend text weight');
+    ddLegWeight = uidropdown(gLeg, ...
+        'Items',     {'normal','bold'}, ...
+        'Value', matchOrDefault({'normal','bold'}, effective.legendFontWeight, 'normal'));
+
+    % Keep the legend grid symmetric (2×4) — spacers for the empty cells.
+    uilabel(gLeg, 'Text', '', 'FontColor', lblFg);
+    uilabel(gLeg, 'Text', '', 'FontColor', lblFg);
+
+    % ── Section 8: Apply scope (uibuttongroup gives mutual exclusion) ─
     bgScope = uibuttongroup(root, 'Title', 'Apply to', 'FontWeight', 'bold');
-    bgScope.Layout.Row = 7;
+    bgScope.Layout.Row = 8;
     gScope = uigridlayout(bgScope, [1 3], ...
         'RowHeight', {24}, ...
         'ColumnWidth', {'1x','1x','1x'}, ...
@@ -237,12 +304,12 @@ function plotStyleDialog(parentFig, ctx)
     rbDs  = uiradiobutton(gScope, 'Text', 'Active dataset', 'FontColor', lblFg); %#ok<NASGU>
     rbCh  = uiradiobutton(gScope, 'Text', 'Active channel', 'FontColor', lblFg); %#ok<NASGU>
 
-    % ── Row 8: Bottom buttons (Reset / Apply / Close) ─────────────────
+    % ── Row 9: Bottom buttons (Reset / Apply / Close) ─────────────────
     btnRow = uigridlayout(root, [1 4], ...
         'RowHeight', {30}, ...
         'ColumnWidth', {'1x', 80, 80, 80}, ...
         'Padding', [0 0 0 0], 'ColumnSpacing', 6);
-    btnRow.Layout.Row = 8;
+    btnRow.Layout.Row = 9;
 
     uilabel(btnRow, 'Text', '');   % spacer to right-align buttons
     btnReset = uibutton(btnRow, 'Text', 'Reset', ...
@@ -283,24 +350,38 @@ function plotStyleDialog(parentFig, ctx)
                 newTpl = styles.template(src.Value);
             end
             newEff = bosonPlotter.resolveStyle(newTpl, ctx.getStyleOverrides());
-            ddFontName.Value    = pickClosest(ddFontName.Items, newEff.fontName);
-            spFontSize.Value    = newEff.fontSize;
-            spTitleSize.Value   = newEff.titleFontSize;
-            spLegendSize.Value  = newEff.legendFontSize;
-            spLineWidth.Value   = newEff.lineWidth;
-            spLineWidthThin.Value = newEff.lineWidthThin;
-            ddLineStyle.Value   = newEff.lineStyle;
-            spAlpha.Value       = newEff.alpha;
-            spMarkerSize.Value  = newEff.markerSize;
-            ddMarkerShape.Value = matchOrDefault(ddMarkerShape.ItemsData, newEff.markerShape, 'o');
-            ddTickDir.Value     = newEff.tickDir;
-            cbBox.Value         = logical(newEff.boxOn);
-            spGridAlpha.Value   = newEff.gridAlpha;
-            cbMinorTicks.Value  = logical(newEff.minorTicks);
-            ddLegLoc.Value      = matchOrDefault(ddLegLoc.Items, newEff.legendLocation, 'best');
-            cbLegBox.Value      = logical(newEff.legendBox);
+            pushEffectiveToDialog(newEff);
         catch
         end
+    end
+
+    function pushEffectiveToDialog(eff)
+    %PUSHEFFECTIVETODIALOG  Apply a resolved appearance struct to every
+    %   widget in the dialog.  Used by onTemplateChanged and onReset so
+    %   the two code paths can't drift apart — every new control added
+    %   to the dialog needs to be handled in exactly one place.
+        ddFontName.Value      = pickClosest(ddFontName.Items, eff.fontName);
+        spFontSize.Value      = eff.fontSize;
+        spTitleSize.Value     = eff.titleFontSize;
+        spLegendSize.Value    = eff.legendFontSize;
+        spLineWidth.Value     = eff.lineWidth;
+        spLineWidthThin.Value = eff.lineWidthThin;
+        ddLineStyle.Value     = eff.lineStyle;
+        spAlpha.Value         = eff.alpha;
+        spMarkerSize.Value    = eff.markerSize;
+        ddMarkerShape.Value   = matchOrDefault(ddMarkerShape.ItemsData, eff.markerShape, 'o');
+        ddMarkerFace.Value    = matchOrDefault(ddMarkerFace.ItemsData, eff.markerFaceMode, 'none');
+        ddTickDir.Value       = eff.tickDir;
+        cbBox.Value           = logical(eff.boxOn);
+        spGridAlpha.Value     = eff.gridAlpha;
+        cbMinorTicks.Value    = logical(eff.minorTicks);
+        if isnumeric(eff.tickLength) && ~isempty(eff.tickLength)
+            spTickLenMajor.Value = eff.tickLength(1);
+        end
+        ddPalette.Value       = detectCurrentPalette(eff, ddPalette.ItemsData);
+        ddLegLoc.Value        = matchOrDefault(ddLegLoc.Items, eff.legendLocation, 'best');
+        cbLegBox.Value        = logical(eff.legendBox);
+        ddLegWeight.Value     = matchOrDefault(ddLegWeight.Items, eff.legendFontWeight, 'normal');
     end
 
     function s = collectDialogStyle()
@@ -309,22 +390,42 @@ function plotStyleDialog(parentFig, ctx)
     %   shows gets written (the user saw the value, so consider it
     %   explicitly set).  Reset is the only way to empty an override.
         s = struct();
-        s.fontName       = ddFontName.Value;
-        s.fontSize       = spFontSize.Value;
-        s.titleFontSize  = spTitleSize.Value;
-        s.legendFontSize = spLegendSize.Value;
-        s.lineWidth      = spLineWidth.Value;
-        s.lineWidthThin  = spLineWidthThin.Value;
-        s.lineStyle      = ddLineStyle.Value;
-        s.alpha          = spAlpha.Value;
-        s.markerSize     = spMarkerSize.Value;
-        s.markerShape    = ddMarkerShape.Value;
-        s.tickDir        = ddTickDir.Value;
-        s.boxOn          = cbBox.Value;
-        s.gridAlpha      = spGridAlpha.Value;
-        s.minorTicks     = cbMinorTicks.Value;
-        s.legendLocation = ddLegLoc.Value;
-        s.legendBox      = cbLegBox.Value;
+        s.fontName         = ddFontName.Value;
+        s.fontSize         = spFontSize.Value;
+        s.titleFontSize    = spTitleSize.Value;
+        s.legendFontSize   = spLegendSize.Value;
+        s.lineWidth        = spLineWidth.Value;
+        s.lineWidthThin    = spLineWidthThin.Value;
+        s.lineStyle        = ddLineStyle.Value;
+        s.alpha            = spAlpha.Value;
+        s.markerSize       = spMarkerSize.Value;
+        s.markerShape      = ddMarkerShape.Value;
+        s.markerFaceMode   = ddMarkerFace.Value;
+        s.tickDir          = ddTickDir.Value;
+        s.boxOn            = cbBox.Value;
+        s.gridAlpha        = spGridAlpha.Value;
+        s.minorTicks       = cbMinorTicks.Value;
+        % tickLength: expose the major value, keep minor at half the
+        % major (MATLAB convention for publication plots).
+        majorLen = spTickLenMajor.Value;
+        s.tickLength       = [majorLen, majorLen/2];
+        s.legendLocation   = ddLegLoc.Value;
+        s.legendBox        = cbLegBox.Value;
+        s.legendFontWeight = ddLegWeight.Value;
+
+        % Palette: empty/'default' means "no override".  We write to
+        % .paletteOverride (not .colors) so the template's own colour
+        % cycle stays untouched — renderPlot checks paletteOverride
+        % first and falls back to the main colormap dropdown when
+        % empty, preserving pre-Phase-G behaviour.
+        palKey = ddPalette.Value;
+        if ~strcmpi(palKey, 'default') && ~isempty(palKey)
+            try
+                s.paletteOverride = styles.palette(palKey);
+            catch
+                % Unknown palette name — leave override unset
+            end
+        end
     end
 
     function onApply(~, ~)
@@ -384,22 +485,7 @@ function plotStyleDialog(parentFig, ctx)
                 tpl0 = styles.template(ddTpl.Value);
             end
             eff0 = bosonPlotter.resolveStyle(tpl0);
-            ddFontName.Value    = pickClosest(ddFontName.Items, eff0.fontName);
-            spFontSize.Value    = eff0.fontSize;
-            spTitleSize.Value   = eff0.titleFontSize;
-            spLegendSize.Value  = eff0.legendFontSize;
-            spLineWidth.Value   = eff0.lineWidth;
-            spLineWidthThin.Value = eff0.lineWidthThin;
-            ddLineStyle.Value   = eff0.lineStyle;
-            spAlpha.Value       = eff0.alpha;
-            spMarkerSize.Value  = eff0.markerSize;
-            ddMarkerShape.Value = matchOrDefault(ddMarkerShape.ItemsData, eff0.markerShape, 'o');
-            ddTickDir.Value     = eff0.tickDir;
-            cbBox.Value         = logical(eff0.boxOn);
-            spGridAlpha.Value   = eff0.gridAlpha;
-            cbMinorTicks.Value  = logical(eff0.minorTicks);
-            ddLegLoc.Value      = matchOrDefault(ddLegLoc.Items, eff0.legendLocation, 'best');
-            cbLegBox.Value      = logical(eff0.legendBox);
+            pushEffectiveToDialog(eff0);
         catch
         end
 
@@ -503,5 +589,36 @@ function v = matchOrDefault(candidates, target, fallback)
         v = target;
     else
         v = fallback;
+    end
+end
+
+function key = detectCurrentPalette(eff, candidates)
+%DETECTCURRENTPALETTE  Guess which palette key matches eff.paletteOverride.
+%   Returns 'default' if the effective appearance has no palette
+%   override, otherwise walks the known palettes and returns the first
+%   whose RGB matrix matches within a small tolerance.  This lets the
+%   dialog round-trip a saved session's palette selection without
+%   storing the key explicitly.
+    key = 'default';
+    if ~isfield(eff, 'paletteOverride') || isempty(eff.paletteOverride) || ...
+       ~isnumeric(eff.paletteOverride)
+        return;
+    end
+    tol = 1e-3;
+    src = double(eff.paletteOverride);
+    for i = 1:numel(candidates)
+        c = candidates{i};
+        if strcmpi(c, 'default'), continue; end
+        try
+            ref = styles.palette(c);
+        catch
+            continue;
+        end
+        if isempty(ref), continue; end
+        if size(ref, 1) == size(src, 1) && size(ref, 2) == size(src, 2) ...
+           && all(abs(ref(:) - src(:)) < tol)
+            key = c;
+            return;
+        end
     end
 end
