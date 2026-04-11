@@ -8070,7 +8070,9 @@ function varargout = BosonPlotter()
         mapData.intensity = map.intensity;
         mapData.axis1     = map.axis1;
         mapData.axis2     = map.axis2;
-        bosonPlotter.surfaceFitDialog(mapData, Title="Surface Fit — " + ds.name);
+        bosonPlotter.surfaceFitDialog(mapData, ...
+            Title="Surface Fit — " + ds.name, ...
+            Appearance=resolveActiveAppearance());
     end
 
     function onPoleFigure(~,~)
@@ -12050,7 +12052,8 @@ function varargout = BosonPlotter()
         bosonPlotter.peakAnalysis(appData.datasets, appData.activeIdx, ax, ...
             'StatusFcn', @setStatus, ...
             'PeakUpdateCallback', @peakAnalysisApply, ...
-            'ButtonColors', struct('primary', BTN_PRIMARY, 'tool', BTN_TOOL, 'fg', BTN_FG));
+            'ButtonColors', struct('primary', BTN_PRIMARY, 'tool', BTN_TOOL, 'fg', BTN_FG), ...
+            'Appearance',  resolveActiveAppearance());
 
         function peakAnalysisApply(peaksResult, bgEst)
         %PEAKANALYSISAPPLY  Receive peaks from advanced analysis dialog.
@@ -12314,7 +12317,8 @@ function varargout = BosonPlotter()
         end
         bosonPlotter.curveFitting(appData.datasets, appData.activeIdx, ax, ...
             'StatusFcn', @setStatus, ...
-            'ButtonColors', struct('primary', BTN_PRIMARY, 'tool', BTN_TOOL, 'fg', BTN_FG));
+            'ButtonColors', struct('primary', BTN_PRIMARY, 'tool', BTN_TOOL, 'fg', BTN_FG), ...
+            'Appearance',  resolveActiveAppearance());
     end
 
     function onOpenHysteresisDialog(~, ~)
@@ -12560,7 +12564,8 @@ function varargout = BosonPlotter()
         end
         bosonPlotter.reflFitting(appData.datasets, appData.activeIdx, ax, ...
             'StatusFcn', @setStatus, ...
-            'ButtonColors', struct('primary', BTN_PRIMARY, 'tool', BTN_TOOL, 'fg', BTN_FG));
+            'ButtonColors', struct('primary', BTN_PRIMARY, 'tool', BTN_TOOL, 'fg', BTN_FG), ...
+            'Appearance',  resolveActiveAppearance());
     end
 
 %{

@@ -25,7 +25,8 @@ function surfaceFitDialog(mapData, options)
 
 arguments
     mapData  struct
-    options.Title  (1,1) string = "Surface Fit"
+    options.Title      (1,1) string = "Surface Fit"
+    options.Appearance struct       = bosonPlotter.resolveStyle(styles.template('screen'))
 end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -172,12 +173,15 @@ vizGL = uigridlayout(vizPanel, [1 3], ...
 
 axOrig = uiaxes(vizGL);
 axOrig.Layout.Row = 1; axOrig.Layout.Column = 1;
+bosonPlotter.applyAppearanceToAxes(axOrig, options.Appearance);
 
 axFit = uiaxes(vizGL);
 axFit.Layout.Row = 1; axFit.Layout.Column = 2;
+bosonPlotter.applyAppearanceToAxes(axFit, options.Appearance);
 
 axRes = uiaxes(vizGL);
 axRes.Layout.Row = 1; axRes.Layout.Column = 3;
+bosonPlotter.applyAppearanceToAxes(axRes, options.Appearance);
 
 % ════════════════════════════════════════════════════════════════════════
 % Initial render

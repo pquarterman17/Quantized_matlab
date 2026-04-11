@@ -39,6 +39,7 @@ arguments
         'tool',    [0.22 0.22 0.28], ...
         'fg',      [0.95 0.95 0.95])
     options.ExportCallback function_handle = function_handle.empty
+    options.Appearance     struct          = bosonPlotter.resolveStyle(styles.template('screen'))
 end
 
 % ════════════════════════════════════════════════════════════════════════

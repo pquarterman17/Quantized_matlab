@@ -22,6 +22,7 @@ arguments
         'primary', [0.15 0.45 0.75], ...
         'tool',    [0.22 0.22 0.28], ...
         'fg',      [0.95 0.95 0.95])
+    options.Appearance  struct = bosonPlotter.resolveStyle(styles.template('screen'))
 end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -105,6 +106,7 @@ axSLD.Layout.Row = 2; axSLD.Layout.Column = 2;
 title(axSLD, 'SLD Profile');
 xlabel(axSLD, 'Depth (Å)'); ylabel(axSLD, 'SLD (10^{-6} Å^{-2})');
 axSLD.Box = 'on'; grid(axSLD, 'on');
+bosonPlotter.applyAppearanceToAxes(axSLD, options.Appearance);
 
 % ── Row 3: R(Q) plot (full width) ───────────────────────────────────
 rfAxPanel = uigridlayout(rfRoot, [2 1], ...
@@ -116,12 +118,14 @@ axRQ.Layout.Row = 1;
 title(axRQ, 'R(Q)');
 xlabel(axRQ, 'Q (Å^{-1})'); ylabel(axRQ, 'Reflectivity');
 axRQ.YScale = 'log'; axRQ.Box = 'on'; grid(axRQ, 'on');
+bosonPlotter.applyAppearanceToAxes(axRQ, options.Appearance);
 
 axRes = uiaxes(rfAxPanel);
 axRes.Layout.Row = 2;
 title(axRes, 'Residuals');
 xlabel(axRes, 'Q (Å^{-1})'); ylabel(axRes, 'log(R) residual');
 axRes.Box = 'on'; grid(axRes, 'on');
+bosonPlotter.applyAppearanceToAxes(axRes, options.Appearance);
 
 % ── Row 4: Scale/BG controls + close ────────────────────────────────
 bottomGL = uigridlayout(rfRoot, [1 7], ...

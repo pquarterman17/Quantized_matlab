@@ -23,6 +23,7 @@ arguments
         'primary', [0.15 0.45 0.75], ...
         'tool',    [0.22 0.22 0.28], ...
         'fg',      [0.95 0.95 0.95])
+    options.Appearance         struct = bosonPlotter.resolveStyle(styles.template('screen'))
 end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -232,6 +233,7 @@ axMain.YColor = [0.7 0.7 0.7];
 title(axMain, 'Peak Detection Preview', 'Color', [0.8 0.8 0.8]);
 xlabel(axMain, plotD.labels{1}, 'Color', [0.7 0.7 0.7]);
 ylabel(axMain, 'Intensity', 'Color', [0.7 0.7 0.7]);
+bosonPlotter.applyAppearanceToAxes(axMain, options.Appearance);
 
 axResidual = uiaxes(previewGL);
 axResidual.Layout.Row = 2;
@@ -240,6 +242,7 @@ axResidual.XColor = [0.7 0.7 0.7];
 axResidual.YColor = [0.7 0.7 0.7];
 title(axResidual, 'Residual (data − background)', 'Color', [0.8 0.8 0.8]);
 ylabel(axResidual, 'Residual', 'Color', [0.7 0.7 0.7]);
+bosonPlotter.applyAppearanceToAxes(axResidual, options.Appearance);
 
 % Peak table
 peakTable = uitable(previewGL, ...

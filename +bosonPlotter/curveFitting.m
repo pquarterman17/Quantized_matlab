@@ -37,6 +37,7 @@ arguments
         'primary', [0.15 0.45 0.75], ...
         'tool',    [0.22 0.22 0.28], ...
         'fg',      [0.95 0.95 0.95])
+    options.Appearance  struct = bosonPlotter.resolveStyle(styles.template('screen'))
 end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -205,12 +206,14 @@ cfAxFit.Layout.Row = 1;
 title(cfAxFit, 'Fit Result');
 xlabel(cfAxFit, 'X'); ylabel(cfAxFit, 'Y');
 cfAxFit.Box = 'on'; grid(cfAxFit, 'on');
+bosonPlotter.applyAppearanceToAxes(cfAxFit, options.Appearance);
 
 cfAxRes = uiaxes(cfAxPanel);
 cfAxRes.Layout.Row = 2;
 title(cfAxRes, 'Residuals');
 xlabel(cfAxRes, 'X'); ylabel(cfAxRes, 'Residual');
 cfAxRes.Box = 'on'; grid(cfAxRes, 'on');
+bosonPlotter.applyAppearanceToAxes(cfAxRes, options.Appearance);
 
 % ── Row 4: Parameter table ───────────────────────────────────────────
 tblCFParams = uitable(cfRootGL, ...
