@@ -13079,7 +13079,8 @@ function varargout = BosonPlotter()
             uialert(fig,'Load at least one file first.','No data'); return;
         end
         bosonPlotter.figureBuilder(appData.datasets, appData.activeIdx, ...
-            'ButtonColors', struct('primary', BTN_PRIMARY, 'tool', BTN_TOOL, 'fg', BTN_FG));
+            'ButtonColors', struct('primary', BTN_PRIMARY, 'tool', BTN_TOOL, 'fg', BTN_FG), ...
+            'Appearance',   resolveActiveAppearance());
     end  % onAdvancedFigureBuilder
 
     if nargout > 0

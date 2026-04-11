@@ -16,6 +16,7 @@ arguments
     datasets   cell
     activeIdx  double
     options.ButtonColors struct = struct('primary', [0.15 0.45 0.75], 'tool', [0.22 0.22 0.28], 'fg', [0.95 0.95 0.95])
+    options.Appearance   struct = bosonPlotter.resolveStyle(styles.template('screen'))
 end
 
 BTN_PRIMARY  = options.ButtonColors.primary;
@@ -111,20 +112,34 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         cbGrayscale = uicheckbox(gGL,'Text','Grayscale','Value',false,'FontSize',9);
         uilabel(gGL,'Text','');
 
-        % Row 2: dimensions, font
+        % Row 2: dimensions, font — initial values pulled from the active
+        % template so Figure Builder opens with the same look as the main
+        % preview (Phase E unification).  User can still override these.
+        appr = options.Appearance;
+        initFigW  = 7;   % inches — template figWidth is in cm, convert /2.54
+        initFigH  = 5;
+        if isfield(appr,'figWidth_cm')  && appr.figWidth_cm  > 0, initFigW = appr.figWidth_cm  / 2.54; end
+        if isfield(appr,'figHeight_cm') && appr.figHeight_cm > 0, initFigH = appr.figHeight_cm / 2.54; end
+        initFont  = 10;
+        if isfield(appr,'fontSize') && appr.fontSize > 0, initFont = appr.fontSize; end
+        initFName = 'Helvetica';
+        if isfield(appr,'fontName') && ~isempty(appr.fontName), initFName = char(appr.fontName); end
+
         uilabel(gGL,'Text','Width (in):','HorizontalAlignment','right','FontSize',9);
-        spBFigW = uispinner(gGL,'Value',7,'Limits',[2 20],'Step',0.5,'FontSize',9);
+        spBFigW = uispinner(gGL,'Value',initFigW,'Limits',[2 20],'Step',0.5,'FontSize',9);
 
         uilabel(gGL,'Text','Height:','HorizontalAlignment','right','FontSize',9);
-        spBFigH = uispinner(gGL,'Value',5,'Limits',[2 24],'Step',0.5,'FontSize',9);
+        spBFigH = uispinner(gGL,'Value',initFigH,'Limits',[2 24],'Step',0.5,'FontSize',9);
 
         uilabel(gGL,'Text','Font (pt):','HorizontalAlignment','right','FontSize',9);
-        spFont = uispinner(gGL,'Value',10,'Limits',[6 24],'Step',1,'FontSize',9);
+        spFont = uispinner(gGL,'Value',initFont,'Limits',[6 24],'Step',1,'FontSize',9);
 
         uilabel(gGL,'Text','Font:','HorizontalAlignment','right','FontSize',9);
+        fontItems = {'Helvetica','Arial','Times New Roman','CMU Serif','Courier'};
+        if ~any(strcmp(fontItems, initFName)), fontItems{end+1} = initFName; end
         ddFontName = uidropdown(gGL, ...
-            'Items', {'Helvetica','Arial','Times New Roman','CMU Serif','Courier'}, ...
-            'Value', 'Helvetica', 'FontSize', 9);
+            'Items', fontItems, ...
+            'Value', initFName, 'FontSize', 9);
 
         % ════════════════════════════════════════════════════════════════
         %  Row 4: Buttons
