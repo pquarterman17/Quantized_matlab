@@ -40,9 +40,23 @@ function plotStyleDialog(parentFig, ctx)
     end
 
     figPos = parentFig.Position;
-    dlgW = 400; dlgH = 780;
+    dlgW = 400;
+    % ── Dynamic height: fit within the current screen so the Apply
+    %    button stays reachable on laptops (1366×768 etc.).  Reserve
+    %    ~120 px for title bar + taskbar + top/bottom margin.  If the
+    %    screen is tall enough the dialog uses its natural 780 px; on
+    %    short screens it shrinks and the root uigridlayout becomes
+    %    scrollable (see Scrollable='on' below).
+    try
+        screenSize = get(0, 'ScreenSize');
+        maxDlgH    = max(400, screenSize(4) - 120);
+    catch
+        maxDlgH = 780;
+    end
+    dlgH = min(780, maxDlgH);
     dlgX = figPos(1) + round((figPos(3) - dlgW) / 2);
     dlgY = figPos(2) + round((figPos(4) - dlgH) / 2);
+    if dlgY < 20, dlgY = 20; end   % keep title bar on-screen
 
     % ── Pull current state to pre-populate the fields ─────────────────
     activeTemplateName = ctx.getActiveTemplate();
@@ -63,9 +77,12 @@ function plotStyleDialog(parentFig, ctx)
     effective = bosonPlotter.resolveStyle(tpl, overrides);
 
     % ── Build the dialog window ───────────────────────────────────────
+    % Resize='on' lets users grow the window on tall screens; the
+    % root uigridlayout below is Scrollable='on' so small screens
+    % get a scrollbar instead of an unreachable Apply button.
     dlg = uifigure('Name', 'Plot Style', ...
         'Position', [dlgX dlgY dlgW dlgH], ...
-        'Resize',   'off', ...
+        'Resize',   'on', ...
         'Tag',      'BosonPlotStyleDialog');
 
     % ── Theme: assemble a full colour set so every widget can be
@@ -112,7 +129,8 @@ function plotStyleDialog(parentFig, ctx)
         'RowHeight',  {28, 112, 96, 96, 120, 56, 96, 60, 44}, ...
         'ColumnWidth', {'1x'}, ...
         'Padding',    [12 12 12 12], ...
-        'RowSpacing', 6);
+        'RowSpacing', 6, ...
+        'Scrollable', 'on');
 
     % ── Row 1: Template row (dropdown + Save As + Delete) ─────────────
     tplRow = uigridlayout(root, [1 4], ...

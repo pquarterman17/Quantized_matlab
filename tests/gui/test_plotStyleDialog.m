@@ -60,6 +60,30 @@ function test_plotStyleDialog
             check(sprintf('dialog has zero structural violations (found %d)', structural), structural == 0);
             check(sprintf('dialog has zero zero-size leaves (found %d)', zeroSize), zeroSize == 0);
 
+            % Regression net: dialog must fit within the current
+            % screen so the Apply button is reachable on laptops
+            % (1366×768 etc.).  Pre-fix the dialog was hard-coded to
+            % 780 px + Resize='off' which made it unreachable on
+            % short screens.  Now Resize='on' and the root grid is
+            % Scrollable='on', and dlgH = min(780, screenH - 120).
+            screenSize = get(0, 'ScreenSize');
+            check('dialog fits on screen (Position(4) ≤ screenH - 60)', ...
+                  dlg(1).Position(4) <= screenSize(4) - 60);
+            check('dialog is resizable',  strcmp(dlg(1).Resize, 'on'));
+
+            rootGrid = [];
+            kids = dlg(1).Children;
+            for kk = 1:numel(kids)
+                if isa(kids(kk), 'matlab.ui.container.GridLayout')
+                    rootGrid = kids(kk);
+                    break;
+                end
+            end
+            check('root grid exists', ~isempty(rootGrid) && isvalid(rootGrid));
+            if ~isempty(rootGrid)
+                check('root grid is Scrollable=on', strcmp(rootGrid.Scrollable, 'on'));
+            end
+
             delete(dlg);
         end
         drawnow;
