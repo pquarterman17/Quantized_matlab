@@ -7860,8 +7860,6 @@ function varargout = BosonPlotter()
 
     function onPlot(~,~)
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
-        % Invalidate line cache on full redraw — cache will be rebuilt by drawToAxes
-        appData.lineCache.valid = false;
         drawToAxes(ax);
     end
 
