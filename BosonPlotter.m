@@ -8258,6 +8258,18 @@ function varargout = BosonPlotter()
         end
         title(targetAx, sName, 'Interpreter', 'none');
 
+        % ── Apply active template's axes-level properties (Phase F) ────
+        % 2D maps are rendered with imagesc / contourf which don't have
+        % the "line width / marker size" concept — but they do have axes
+        % typography, tick direction, box, and grid that should match
+        % the main preview so switching the Template dropdown propagates
+        % to the 2D heatmap as well.
+        try
+            bosonPlotter.applyAppearanceToAxes(targetAx, resolveActiveAppearance());
+        catch
+            % Never let a styling failure break the map render
+        end
+
         % Restore saved axis limits if present
         if isfield(ds, 'axLims')
             aL  = ds.axLims;
