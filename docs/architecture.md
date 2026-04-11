@@ -58,7 +58,7 @@
      │    ds.corrData ← corrected data struct
      │        │
      │        ▼
-     │    drawToAxes(ax) ← renders to plot
+     │    bosonPlotter.renderPlot(ax) ← renders to plot
      │
      ├──► FermiViewer loads as image
      │        rawPixels → filteredPixels → displayImg
@@ -71,12 +71,14 @@
 ### appData (main state container)
 
 ```matlab
-appData.datasets    % {1×N cell} of dataset structs (ds)
-appData.activeIdx   % scalar — index of currently active dataset
-appData.bgDataset   % background dataset for subtraction (or [])
-appData.peakMode    % 'xrd' | 'reflectometry' | 'none'
-appData.overlayMode % logical — multi-dataset overlay on/off
-appData.captureMode % '' | 'cursor' | 'zoom' | 'mask' | 'annotate' | ...
+appData.datasets       % {1×N cell} of dataset structs (ds)
+appData.activeIdx      % scalar — index of currently active dataset
+appData.bgDataset      % background dataset for subtraction (or [])
+appData.peakMode       % 'xrd' | 'reflectometry' | 'none'
+appData.overlayMode    % logical — multi-dataset overlay on/off
+appData.captureMode    % '' | 'cursor' | 'zoom' | 'mask' | 'annotate' | ...
+appData.styleOverrides % struct — global plot style overrides from Plot Style dialog
+appData.activeTemplate % string — name of the currently-selected publication template
 ```
 
 ### Dataset struct (ds)
@@ -136,7 +138,7 @@ User clicks "Apply Corrections"
         → bosonPlotter.applyCorrections(data, params) → corrData
         → saves corrData + params back to ds
         → if neutron: propagates to sibling datasets
-        → onPlot() → drawToAxes()
+        → onPlot() → bosonPlotter.renderPlot()
 ```
 
 ```
@@ -148,13 +150,74 @@ User clicks in plot (peak detection, cursor, mask, etc.)
 
 ## Extracted Subsystems (+bosonPlotter/)
 
-| Module | Description | Lines saved from BosonPlotter |
-|--------|-------------|-----|
-| `applyCorrections.m` | Core corrections pipeline (pure function) | ~300 |
-| `correctionParams.m` | Build params struct from dataset + UI values | ~60 |
-| `curveFitting.m` | General curve fitting dialog (15 models) | ~390 |
-| `graphDigitizer.m` | Graph digitizer dialog (image → data points) | ~340 |
-| `figureBuilder.m` | Advanced Figure Builder (10 figure types) | ~2430 |
+The package contains 37 files. Below is the full function index grouped by area.
+
+### Render pipeline
+
+| Module | Description |
+|--------|-------------|
+| `renderPlot.m` | Master render entry point — dispatches to 1D/2D/overlay rendering |
+| `resolveStyle.m` | Resolve per-dataset style (color, line, marker) from template + overrides |
+| `applyPostRenderStyle.m` | Apply post-render style properties (font, axes box, grid, etc.) |
+| `applyDsOverride.m` | Apply per-dataset style overrides onto a rendered line/patch |
+| `applyAlphaToLine.m` | Set line/patch alpha (transparency) |
+| `applyFaceModeToLine.m` | Set face/edge mode on patch/area objects |
+| `applyAppearanceToAxes.m` | Apply Appearance struct properties to axes |
+| `applyAppearanceToColorbar.m` | Apply Appearance struct to colorbar (font, label, ticks) |
+| `colorMaps.m` | Custom colormap definitions (viridis, plasma, etc.) |
+| `buildMap2DPanel.m` | Build the 2D reciprocal-space map panel and colorbar |
+| `drawOverlays.m` | Draw annotations, scale bars, and cursor overlays onto axes |
+
+### Style system
+
+| Module | Description |
+|--------|-------------|
+| `plotStyleDialog.m` | Plot Style dialog — edit global style overrides stored in `appData.styleOverrides` |
+| `userTemplates.m` | Load, save, and manage user-defined publication templates |
+| `safeEvalMathExpr.m` | Safely evaluate math expressions from style input fields (no eval) |
+
+### Dialogs
+
+| Module | Description |
+|--------|-------------|
+| `curveFitting.m` | General curve fitting dialog (24 built-in models, fminsearch) |
+| `graphDigitizer.m` | Graph digitizer: extract (x,y) data from graph screenshots |
+| `figureBuilder.m` | Advanced Figure Builder (10 figure types, journal templates) |
+| `multiPanel.m` | Multi-panel figure composer |
+| `hysteresisDialog.m` | Hysteresis loop analysis dialog (coercivity, remanence, saturation) |
+| `reflFitting.m` | Neutron/X-ray reflectometry fitting dialog |
+| `surfaceFitDialog.m` | 2D surface / polynomial fit dialog |
+| `spreadsheetPopup.m` | Inline spreadsheet popup for viewing/editing dataset table |
+| `roiAnalysis.m` | Region-of-interest statistics dialog |
+
+### State & session
+
+| Module | Description |
+|--------|-------------|
+| `AppState.m` | Centralised appData accessors (get/set with validation) |
+| `sessionManager.m` | Save and restore full GUI session to/from MAT file |
+| `UndoManager.m` | Undo stack management (push, pop, cap enforcement) |
+| `actionLog.m` | Append entries to the in-memory action log |
+| `toolbarConfig.m` | Declare toolbar button layout and initial enabled state |
+| `toolbarDefaultConfig.m` | Default toolbar configuration struct |
+
+### Peak & fitting
+
+| Module | Description |
+|--------|-------------|
+| `peakAnalysis.m` | Peak detection, fitting, and reporting logic |
+| `peakCallbacks.m` | UI callbacks for the Peak Analysis window |
+| `peakTools.m` | Utility functions shared by peakAnalysis and peakCallbacks |
+| `buildPeakWindow.m` | Construct the Peak Analysis uifigure and controls |
+
+### Data subsystems
+
+| Module | Description |
+|--------|-------------|
+| `applyCorrections.m` | Core corrections pipeline — pure function (trim, offset, bg, smooth, norm, deriv) |
+| `correctionParams.m` | Build params struct from dataset + UI widget values |
+| `datasetGroups.m` | Dataset grouping logic (group-by, batch operations) |
+| `filterRows.m` | Row-level data masking and filter application |
 
 ## FermiViewer Image Pipeline
 
