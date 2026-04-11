@@ -647,10 +647,10 @@ function varargout = BosonPlotter()
     'Tooltip','Force a full redraw of the current plot');
     btnPlot.Layout.Column = 2;
 
-    % Row 8: Annotation mode + Plot Options button
-    annotPlotGL = uigridlayout(ctrlGL,[1 2], ...
+    % Row 8: Annotation mode + Style… + Plot Options button
+    annotPlotGL = uigridlayout(ctrlGL,[1 3], ...
         'Padding',[0 0 0 0],'ColumnSpacing',3, ...
-        'ColumnWidth',{'1x','1x'});
+        'ColumnWidth',{'1x','1x','1x'});
     annotPlotGL.Layout.Row = 8;
 
     cbAnnotationMode = uicheckbox(annotPlotGL, ...
@@ -660,12 +660,19 @@ function varargout = BosonPlotter()
         'ValueChangedFcn', @onAnnotationModeChanged);
     cbAnnotationMode.Layout.Column = 1;
 
+    btnPlotStyle = uibutton(annotPlotGL,'Text','Style…', ...
+        'ButtonPushedFcn',@(~,~) onOpenPlotStyleDialog(), ...
+        'BackgroundColor',[0.35 0.40 0.55],'FontColor',[1 1 1], ...
+        'FontSize',10, ...
+        'Tooltip','Fine-grained visual overrides: font, line width, marker, grid, legend (Phase B)');
+    btnPlotStyle.Layout.Column = 2;
+
     btnPlotOptions = uibutton(annotPlotGL,'Text',['Plot ' char(9662)], ...
         'ButtonPushedFcn',@onShowPlotOptionsMenu, ...
         'BackgroundColor',[0.22 0.35 0.55],'FontColor',[1 1 1], ...
         'FontSize',10, ...
         'Tooltip','Plot types, visualization options, and unit conversion');
-    btnPlotOptions.Layout.Column = 2;
+    btnPlotOptions.Layout.Column = 3;
 
     % ── Right: preview axes ───────────────────────────────────────────────
     axPanel = uipanel(contentGL,'Title','Preview','FontSize',11);
@@ -2231,6 +2238,11 @@ function varargout = BosonPlotter()
     % Mag unit conversion API (Stage A/C)
     api.setFieldUnit        = @setFieldUnitDirect;
     api.setMomentUnit       = @setMomentUnitDirect;
+    % Phase B plot style overrides API
+    api.openPlotStyle       = @onOpenPlotStyleDialog;
+    api.getStyleOverrides   = @() appData.styleOverrides;
+    api.setStyleOverrides   = @assignStyleOverrides;
+    api.getActiveDataset    = @getActiveDatasetSafe;
     api.setMap2DColormap    = @setMap2DColormapDirect;
     api.maskRegion          = @maskRegionDirect;
     api.unmaskAll           = @() onUnmaskAll([],[]);
@@ -2562,6 +2574,19 @@ function varargout = BosonPlotter()
         appData.bgDataset = restored.bgDataset;
         appData.style     = restored.style;
         appData.lastDir   = restored.lastDir;
+        % Phase A/B visual state (shared with onLoadSession)
+        if isfield(restored, 'activeTemplate') && ~isempty(restored.activeTemplate)
+            appData.activeTemplate = restored.activeTemplate;
+        end
+        if isfield(restored, 'styleOverrides') && isstruct(restored.styleOverrides)
+            appData.styleOverrides = restored.styleOverrides;
+        end
+        % Sync the Template dropdown so the UI matches restored state
+        try refreshTemplateDropdown(); catch, end
+        if ~isempty(ddTemplate) && isvalid(ddTemplate) && ...
+           any(strcmp(ddTemplate.Items, appData.activeTemplate))
+            ddTemplate.Value = appData.activeTemplate;
+        end
 
         widgets = buildSessionWidgets_();
         bosonPlotter.sessionManager.applyGuiState(restored.guiState, widgets);
@@ -4865,6 +4890,10 @@ function varargout = BosonPlotter()
     %   triggers a replot.
         name = char(name);
         if ~isempty(ddTemplate) && isvalid(ddTemplate)
+            if ~any(strcmp(ddTemplate.Items, name))
+                % User template not yet in the dropdown list — refresh first
+                refreshTemplateDropdown();
+            end
             if any(strcmp(ddTemplate.Items, name))
                 ddTemplate.Value = name;
             end
@@ -4873,6 +4902,91 @@ function varargout = BosonPlotter()
         if appData.activeIdx > 0 && ~isempty(appData.datasets)
             onPlot([],[]);
         end
+    end
+
+    function refreshTemplateDropdown()
+    %REFRESHTEMPLATEDROPDOWN  Rebuild ddTemplate.Items from built-ins + user templates.
+        BUILTIN = {'screen','aps','aps_double','nature','nature_double', ...
+                   'thesis','presentation','poster'};
+        items = BUILTIN;
+        try
+            userList = bosonPlotter.userTemplates.list();
+            for utIdx2 = 1:numel(userList)
+                items{end+1} = ['user:' userList{utIdx2}]; %#ok<AGROW>
+            end
+        catch
+        end
+        if ~isempty(ddTemplate) && isvalid(ddTemplate)
+            cur = ddTemplate.Value;
+            ddTemplate.Items = items;
+            if any(strcmp(items, cur))
+                ddTemplate.Value = cur;
+            end
+        end
+    end
+
+    function onOpenPlotStyleDialog()
+    %ONOPENPLOTSTYLEDIALOG  Launch the Phase B modal style editor.
+        dlgCtx = struct();
+        dlgCtx.fig                 = fig;
+        dlgCtx.theme               = appData.theme;
+        dlgCtx.getStyleOverrides   = @() appData.styleOverrides;
+        dlgCtx.setStyleOverrides   = @(s) assignStyleOverrides(s);
+        dlgCtx.getActiveTemplate   = @() appData.activeTemplate;
+        dlgCtx.setActiveTemplate   = @setTemplateDirect;
+        dlgCtx.getActiveDataset    = @getActiveDatasetSafe;
+        dlgCtx.setActiveDataset    = @setActiveDatasetSafe;
+        dlgCtx.getActiveChannelIdx = @getActiveChannelIdxSafe;
+        dlgCtx.getActiveChannelName= @getActiveChannelNameSafe;
+        dlgCtx.replot              = @() onPlot([],[]);
+        dlgCtx.refreshTemplateList = @refreshTemplateDropdown;
+
+        try
+            bosonPlotter.plotStyleDialog(fig, dlgCtx);
+        catch ME
+            uialert(fig, sprintf('Plot Style dialog failed:\n%s', ME.message), ...
+                'Style dialog error');
+            logGUIError('onOpenPlotStyleDialog', 'dialog failed', ME);
+        end
+    end
+
+    function assignStyleOverrides(s)
+        appData.styleOverrides = s;
+    end
+
+    function ds = getActiveDatasetSafe()
+        if appData.activeIdx > 0 && appData.activeIdx <= numel(appData.datasets)
+            ds = appData.datasets{appData.activeIdx};
+        else
+            ds = [];
+        end
+    end
+
+    function setActiveDatasetSafe(ds)
+        if appData.activeIdx > 0 && appData.activeIdx <= numel(appData.datasets)
+            appData.datasets{appData.activeIdx} = ds;
+        end
+    end
+
+    function idx = getActiveChannelIdxSafe()
+        % Return the index (within ds.data.labels) of the first selected
+        % Y channel on the main listbox, or [] if none / no dataset.
+        idx = [];
+        ds = getActiveDatasetSafe();
+        if isempty(ds) || ~isfield(ds, 'data'), return; end
+        sel = lbY.Value;
+        if isempty(sel), return; end
+        if ~iscell(sel), sel = {sel}; end
+        firstName = char(sel{1});
+        iFound = find(strcmp(ds.data.labels, firstName), 1);
+        if ~isempty(iFound), idx = iFound; end
+    end
+
+    function nm = getActiveChannelNameSafe()
+        nm = '';
+        sel = lbY.Value;
+        if isempty(sel), return; end
+        if iscell(sel), nm = char(sel{1}); else, nm = char(sel); end
     end
 
     function onOpenSettings()
@@ -9609,6 +9723,20 @@ function varargout = BosonPlotter()
         appData.bgDataset = restored.bgDataset;
         appData.style     = restored.style;
         appData.lastDir   = restored.lastDir;
+        % Phase A/B visual state
+        if isfield(restored, 'activeTemplate') && ~isempty(restored.activeTemplate)
+            appData.activeTemplate = restored.activeTemplate;
+        end
+        if isfield(restored, 'styleOverrides') && isstruct(restored.styleOverrides)
+            appData.styleOverrides = restored.styleOverrides;
+        end
+        % Sync the Template dropdown so the UI reflects the restored state
+        refreshTemplateDropdown();
+        if ~isempty(ddTemplate) && isvalid(ddTemplate)
+            if any(strcmp(ddTemplate.Items, appData.activeTemplate))
+                ddTemplate.Value = appData.activeTemplate;
+            end
+        end
 
         if isempty(appData.datasets)
             rebuildDatasetList(false);
