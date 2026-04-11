@@ -180,7 +180,7 @@ The package contains 37 files. Below is the full function index grouped by area.
 
 | Module | Description |
 |--------|-------------|
-| `curveFitting.m` | General curve fitting dialog (24 built-in models, fminsearch) |
+| `curveFitting.m` | General curve fitting dialog (fminsearch; see [`+fitting/README.md`](../+fitting/README.md) for model catalog) |
 | `graphDigitizer.m` | Graph digitizer: extract (x,y) data from graph screenshots |
 | `figureBuilder.m` | Advanced Figure Builder (10 figure types, journal templates) |
 | `multiPanel.m` | Multi-panel figure composer |

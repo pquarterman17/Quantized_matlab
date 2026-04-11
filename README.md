@@ -7,7 +7,7 @@ A MATLAB toolbox for importing, analyzing, and visualizing scientific data from 
 ## Highlights
 
 - **25+ parsers** for Quantum Design PPMS/VSM/DynaCool/MPMS, Rigaku, PANalytical XRDML (incl. 2D area-detector RSM), Bruker, Lake Shore, NCNR neutron reflectometry, SIMS, generic CSV/TSV/Excel, Gatan DigitalMicrograph DM3/DM4, MRC, SER, and more.
-- **BosonPlotter** — interactive GUI for browse, preview, correct, fit, and export of 1D/2D datasets. Corrections pipeline, peak analysis (Lorentzian/Voigt/pseudo-Voigt), general curve fitting with 23 models, multi-panel figure builder, graph digitizer, macro recorder, customizable toolbar.
+- **BosonPlotter** — interactive GUI for browse, preview, correct, fit, and export of 1D/2D datasets. Corrections pipeline, peak analysis (Lorentzian/Voigt/pseudo-Voigt), general curve fitting (see [`+fitting/README.md`](+fitting/README.md) for the model catalog), multi-panel figure builder, graph digitizer, macro recorder, customizable toolbar.
 - **FermiViewer** — electron microscopy image viewer. 55+ processing tools organized into 5 tabs (Transform, Filter, FFT & Analysis, Surface & Stack, Export & Style). Line profiles, ROI stats, FFT mask, CLAHE, EELS/EDS/diffraction analysis, GPA strain, CTF estimation, journal export presets.
 - **materialsCalcGUI** — 13-tab materials property calculator: crystal structure, X-ray/neutron SLD, semiconductor band structure, thin-film optics, superconductor parameters, vacuum, electrochemistry, and more.
 - **Unified data contract** — every parser returns `.time`, `.values`, `.labels`, `.units`, `.metadata` via `parser.createDataStruct()`, so downstream code is parser-agnostic.

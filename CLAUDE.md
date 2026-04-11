@@ -83,7 +83,7 @@ Groups: `parser`, `batch`, `xrd2d`, `gui`, `sims`, `em`, `emgui`, `eds`, `xrayne
 - **Auto-detection heuristics** — delimiter, header row, data start, units all inferred
 - **Unified data struct** — parser-agnostic GUI and plotting code
 - **Peak fitting** — Lorentzian model (appropriate for XRD Bragg peaks)
-- **General curve fitting** — `+fitting/` package with 24 models, bounds, parameter errors, custom equations, batch fitting, peak tracking
+- **General curve fitting** — `+fitting/` package with bounds, parameter errors, custom equations, batch fitting, peak tracking (see [+fitting/README.md](+fitting/README.md) for the full model catalog)
 - **Publication templates** — `styles.template('aps')` etc. for journal-ready figures
 - **Statistics** — t-tests, linear regression, descriptive stats (no Statistics Toolbox)
 

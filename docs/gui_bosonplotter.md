@@ -68,7 +68,7 @@ Collapsible panel below the plot axes. Toggle via the "▾ Data Table" bar.
 
 ## General Curve Fitting (Advanced > Curve Fit...)
 
-Separate dialog with 24 built-in models:
+Separate dialog with a catalog of built-in models (see [`+fitting/README.md`](../+fitting/README.md) for the canonical list). Summary by category:
 
 | Category | Models |
 |----------|--------|
