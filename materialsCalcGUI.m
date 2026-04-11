@@ -2388,20 +2388,24 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         uilabel(gLondon,'Text','Material:','HorizontalAlignment','right');
         ddLondonMat = uidropdown(gLondon, ...
             'Items',['(custom)',scMats],'Value','Nb', ...
-            'ValueChangedFcn',@(~,~) fillLondonFromPreset());
+            'ValueChangedFcn',@(~,~) fillLondonFromPreset(), ...
+            'Tooltip','Superconductor preset — auto-fills λ₀ and T_c');
         ddLondonMat.Layout.Row=1; ddLondonMat.Layout.Column=2;
 
         uilabel(gLondon,'Text','<html>&lambda;<sub>0</sub> depth (nm):</html>', ...
             'HorizontalAlignment','right','Interpreter','html');
-        efLondonLam0 = uieditfield(gLondon,'numeric','Value',39);
+        efLondonLam0 = uieditfield(gLondon,'numeric','Value',39, ...
+            'Tooltip','Zero-temperature London depth λ₀ (nm) — Nb 39, Al 16, YBCO ~150');
         efLondonLam0.Layout.Row=1; efLondonLam0.Layout.Column=4;
 
         uilabel(gLondon,'Text','Crit. temp T<sub>c</sub> (K):', ...
             'HorizontalAlignment','right','Interpreter','html');
-        efLondonTc = uieditfield(gLondon,'numeric','Value',9.25);
+        efLondonTc = uieditfield(gLondon,'numeric','Value',9.25, ...
+            'Tooltip','Superconducting critical temperature T_c (K) — Nb 9.25, Al 1.2, YBCO 93');
         efLondonTc.Layout.Row=2; efLondonTc.Layout.Column=2;
         uilabel(gLondon,'Text','Meas. temp (K):','HorizontalAlignment','right');
-        efLondonT = uieditfield(gLondon,'numeric','Value',4.2);
+        efLondonT = uieditfield(gLondon,'numeric','Value',4.2, ...
+            'Tooltip','Measurement temperature T (K) — must satisfy T < T_c');
         efLondonT.Layout.Row=2; efLondonT.Layout.Column=4;
 
         btnLondonCalc = uibutton(gLondon,'push','Text','Calculate', ...
@@ -2457,20 +2461,24 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         uilabel(gXi,'Text','Material:','HorizontalAlignment','right');
         ddXiMat = uidropdown(gXi, ...
             'Items',['(custom)',scMats],'Value','Nb', ...
-            'ValueChangedFcn',@(~,~) fillXiFromPreset());
+            'ValueChangedFcn',@(~,~) fillXiFromPreset(), ...
+            'Tooltip','Superconductor preset — auto-fills ξ₀ and T_c');
         ddXiMat.Layout.Row=1; ddXiMat.Layout.Column=2;
 
         uilabel(gXi,'Text','<html>&xi;<sub>0</sub> length (nm):</html>', ...
             'HorizontalAlignment','right','Interpreter','html');
-        efXi0 = uieditfield(gXi,'numeric','Value',38);
+        efXi0 = uieditfield(gXi,'numeric','Value',38, ...
+            'Tooltip','Zero-temperature coherence length ξ₀ (nm) — Nb 38, Al 1600, YBCO ~2');
         efXi0.Layout.Row=1; efXi0.Layout.Column=4;
 
         uilabel(gXi,'Text','Crit. temp T<sub>c</sub> (K):', ...
             'HorizontalAlignment','right','Interpreter','html');
-        efXiTc = uieditfield(gXi,'numeric','Value',9.25);
+        efXiTc = uieditfield(gXi,'numeric','Value',9.25, ...
+            'Tooltip','Critical temperature T_c (K)');
         efXiTc.Layout.Row=2; efXiTc.Layout.Column=2;
         uilabel(gXi,'Text','Meas. temp (K):','HorizontalAlignment','right');
-        efXiT = uieditfield(gXi,'numeric','Value',4.2);
+        efXiT = uieditfield(gXi,'numeric','Value',4.2, ...
+            'Tooltip','Measurement temperature T (K) — must satisfy T < T_c');
         efXiT.Layout.Row=2; efXiT.Layout.Column=4;
         btnXiCalc = uibutton(gXi,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -2517,11 +2525,13 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gGL,'Text','<html>Pen. depth &lambda; (nm):</html>', ...
             'HorizontalAlignment','right','Interpreter','html');
-        efGLLam = uieditfield(gGL,'numeric','Value',39);
+        efGLLam = uieditfield(gGL,'numeric','Value',39, ...
+            'Tooltip','Penetration depth λ (nm) — at the measurement temperature');
         efGLLam.Layout.Row=1; efGLLam.Layout.Column=2;
         uilabel(gGL,'Text','<html>Coher. &xi; (nm):</html>', ...
             'HorizontalAlignment','right','Interpreter','html');
-        efGLXi = uieditfield(gGL,'numeric','Value',38);
+        efGLXi = uieditfield(gGL,'numeric','Value',38, ...
+            'Tooltip','Coherence length ξ (nm) — κ = λ/ξ; >1/√2 is Type II');
         efGLXi.Layout.Row=1; efGLXi.Layout.Column=4;
         btnGLCalc = uibutton(gGL,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -2562,20 +2572,24 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         uilabel(gHc,'Text','Material:','HorizontalAlignment','right');
         ddHcMat = uidropdown(gHc, ...
             'Items',['(custom)',scMats],'Value','Nb', ...
-            'ValueChangedFcn',@(~,~) fillHcFromPreset());
+            'ValueChangedFcn',@(~,~) fillHcFromPreset(), ...
+            'Tooltip','Superconductor preset — auto-fills H_c0 and T_c');
         ddHcMat.Layout.Row=1; ddHcMat.Layout.Column=2;
 
         uilabel(gHc,'Text','Crit. field H<sub>c0</sub> (Oe):', ...
             'HorizontalAlignment','right','Interpreter','html');
-        efHcHc0 = uieditfield(gHc,'numeric','Value',1980);
+        efHcHc0 = uieditfield(gHc,'numeric','Value',1980, ...
+            'Tooltip','Zero-T thermodynamic critical field H_c0 (Oe) — Nb ~1980, Al ~100');
         efHcHc0.Layout.Row=1; efHcHc0.Layout.Column=4;
 
         uilabel(gHc,'Text','Crit. temp T<sub>c</sub> (K):', ...
             'HorizontalAlignment','right','Interpreter','html');
-        efHcTc = uieditfield(gHc,'numeric','Value',9.25);
+        efHcTc = uieditfield(gHc,'numeric','Value',9.25, ...
+            'Tooltip','Critical temperature T_c (K)');
         efHcTc.Layout.Row=2; efHcTc.Layout.Column=2;
         uilabel(gHc,'Text','Meas. temp (K):','HorizontalAlignment','right');
-        efHcT = uieditfield(gHc,'numeric','Value',4.2);
+        efHcT = uieditfield(gHc,'numeric','Value',4.2, ...
+            'Tooltip','Measurement temperature T (K) — H_c(T) = H_c0·[1-(T/T_c)²]');
         efHcT.Layout.Row=2; efHcT.Layout.Column=4;
         btnHcCalc = uibutton(gHc,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -2663,11 +2677,13 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gMom.Padding = [6 4 6 4]; gMom.RowSpacing = 4;
 
         uilabel(gMom,'Text','Moment:','HorizontalAlignment','right');
-        efMomVal = uieditfield(gMom,'numeric','Value',1e-3);
+        efMomVal = uieditfield(gMom,'numeric','Value',1e-3, ...
+            'Tooltip','Magnetic moment value — unit selected in the dropdown to the right');
         efMomVal.Layout.Row=1; efMomVal.Layout.Column=2;
         uilabel(gMom,'Text','Unit:','HorizontalAlignment','right');
         ddMomUnit = uidropdown(gMom,'Items',{'emu','A*m^2','memu','uemu'}, ...
-            'ItemsData',{1, 1e3, 1e-3, 1e-6},'Value',1);
+            'ItemsData',{1, 1e3, 1e-3, 1e-6},'Value',1, ...
+            'Tooltip','Input unit — emu (CGS), A·m² (SI), memu, or μemu');
         ddMomUnit.Layout.Row=1; ddMomUnit.Layout.Column=4;
         btnMomCalc = uibutton(gMom,'push','Text','Convert', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -2676,10 +2692,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         % Row 2: optional parameters for per-atom
         uilabel(gMom,'Text','Volume (cm³):','HorizontalAlignment','right');
-        efMomVol = uieditfield(gMom,'numeric','Value',0);
+        efMomVol = uieditfield(gMom,'numeric','Value',0, ...
+            'Tooltip','Sample volume (cm³) — optional, enables magnetization M = m/V output');
         efMomVol.Layout.Row=2; efMomVol.Layout.Column=2;
         uilabel(gMom,'Text','Atoms:','HorizontalAlignment','right');
-        efMomAtoms = uieditfield(gMom,'numeric','Value',0);
+        efMomAtoms = uieditfield(gMom,'numeric','Value',0, ...
+            'Tooltip','Number of magnetic atoms — optional, enables μ_B/atom output');
         efMomAtoms.Layout.Row=2; efMomAtoms.Layout.Column=4;
 
         lblMomResult = uilabel(gMom,'Text','','FontSize',11,'Interpreter','html');
@@ -2722,7 +2740,8 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         ddDemagShape = uidropdown(gDemag, ...
             'Items',{'Sphere','Thin film (in-plane)','Thin film (out-of-plane)', ...
                      'Long cylinder (axial)','Long cylinder (transverse)'}, ...
-            'Value','Sphere');
+            'Value','Sphere', ...
+            'Tooltip','Sample geometry — returns demagnetization factor N along chosen axis');
         ddDemagShape.Layout.Row=1; ddDemagShape.Layout.Column=2;
         btnDemagCalc = uibutton(gDemag,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -2756,10 +2775,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gCW.Padding = [6 4 6 4]; gCW.RowSpacing = 4;
 
         uilabel(gCW,'Text','C (emu K/mol):','HorizontalAlignment','right');
-        efCWC = uieditfield(gCW,'numeric','Value',4.375);
+        efCWC = uieditfield(gCW,'numeric','Value',4.375, ...
+            'Tooltip','Curie constant C (emu·K/mol) — from slope of 1/χ vs T');
         efCWC.Layout.Row=1; efCWC.Layout.Column=2;
         uilabel(gCW,'Text',[char(952) ' (K):'],'HorizontalAlignment','right');
-        efCWTheta = uieditfield(gCW,'numeric','Value',-50);
+        efCWTheta = uieditfield(gCW,'numeric','Value',-50, ...
+            'Tooltip','Curie-Weiss temperature θ (K) — positive = FM, negative = AFM');
         efCWTheta.Layout.Row=1; efCWTheta.Layout.Column=4;
         btnCWCalc = uibutton(gCW,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -2801,10 +2822,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gLang.Padding = [6 4 6 4]; gLang.RowSpacing = 4;
 
         uilabel(gLang,'Text',[char(956) ' (emu):'],'HorizontalAlignment','right');
-        efLangMu = uieditfield(gLang,'numeric','Value',1e-16);
+        efLangMu = uieditfield(gLang,'numeric','Value',1e-16, ...
+            'Tooltip','Single-particle magnetic moment μ (emu) — typical nanoparticle 10⁻¹⁶–10⁻¹⁴');
         efLangMu.Layout.Row=1; efLangMu.Layout.Column=2;
         uilabel(gLang,'Text','H (Oe):','HorizontalAlignment','right');
-        efLangH = uieditfield(gLang,'numeric','Value',10000);
+        efLangH = uieditfield(gLang,'numeric','Value',10000, ...
+            'Tooltip','Applied field H (Oe) — CGS, 1 T = 10⁴ Oe');
         efLangH.Layout.Row=1; efLangH.Layout.Column=4;
         btnLangCalc = uibutton(gLang,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -2841,10 +2864,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gDW.Padding = [6 4 6 4]; gDW.RowSpacing = 4;
 
         uilabel(gDW,'Text','A (erg/cm):','HorizontalAlignment','right');
-        efDWA = uieditfield(gDW,'numeric','Value',2e-6);
+        efDWA = uieditfield(gDW,'numeric','Value',2e-6, ...
+            'Tooltip','Exchange stiffness A (erg/cm, CGS) — Fe 2e-6, Co 3e-6, Ni 0.9e-6');
         efDWA.Layout.Row=1; efDWA.Layout.Column=2;
         uilabel(gDW,'Text',['K (erg/cm' char(179) '):'],'HorizontalAlignment','right');
-        efDWK = uieditfield(gDW,'numeric','Value',4.8e6);
+        efDWK = uieditfield(gDW,'numeric','Value',4.8e6, ...
+            'Tooltip','Anisotropy constant K (erg/cm³, CGS) — Co ~4.5e6, Fe ~0.5e6');
         efDWK.Layout.Row=1; efDWK.Layout.Column=4;
         btnDWCalc = uibutton(gDW,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -2887,11 +2912,14 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gFres.RowHeight = {24,24,24}; gFres.ColumnWidth = {60,'1x',60,'1x',60,'1x',90};
         gFres.Padding = [6 4 6 4]; gFres.RowSpacing = 4;
         uilabel(gFres,'Text','n1:','HorizontalAlignment','right');
-        efFN1 = uieditfield(gFres,'numeric','Value',1.0); efFN1.Layout.Row=1; efFN1.Layout.Column=2;
+        efFN1 = uieditfield(gFres,'numeric','Value',1.0, ...
+            'Tooltip','Incident medium refractive index n₁ — air ≈ 1.00'); efFN1.Layout.Row=1; efFN1.Layout.Column=2;
         uilabel(gFres,'Text','n2:','HorizontalAlignment','right');
-        efFN2 = uieditfield(gFres,'numeric','Value',1.5); efFN2.Layout.Row=1; efFN2.Layout.Column=4;
+        efFN2 = uieditfield(gFres,'numeric','Value',1.5, ...
+            'Tooltip','Substrate refractive index n₂ — glass 1.5, Si ~3.9 (visible)'); efFN2.Layout.Row=1; efFN2.Layout.Column=4;
         uilabel(gFres,'Text',[char(952) ' (' char(176) '):'],'HorizontalAlignment','right');
-        efFTh = uieditfield(gFres,'numeric','Value',45); efFTh.Layout.Row=1; efFTh.Layout.Column=6;
+        efFTh = uieditfield(gFres,'numeric','Value',45, ...
+            'Tooltip','Angle of incidence θ (deg, from normal) — 0–90'); efFTh.Layout.Row=1; efFTh.Layout.Column=6;
         btnFres = uibutton(gFres,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doFresnel()); btnFres.Layout.Row=1; btnFres.Layout.Column=7;
         lblFresR = uilabel(gFres,'Text','','FontSize',11,'Interpreter','html');
@@ -2916,9 +2944,11 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gAng.RowHeight = {24,24}; gAng.ColumnWidth = {50,'1x',50,'1x',90};
         gAng.Padding = [6 4 6 4]; gAng.RowSpacing = 4;
         uilabel(gAng,'Text','n1:','HorizontalAlignment','right');
-        efAN1 = uieditfield(gAng,'numeric','Value',1.5); efAN1.Layout.Row=1; efAN1.Layout.Column=2;
+        efAN1 = uieditfield(gAng,'numeric','Value',1.5, ...
+            'Tooltip','Incident (denser) medium n₁ — critical angle requires n₁ > n₂'); efAN1.Layout.Row=1; efAN1.Layout.Column=2;
         uilabel(gAng,'Text','n2:','HorizontalAlignment','right');
-        efAN2 = uieditfield(gAng,'numeric','Value',1.0); efAN2.Layout.Row=1; efAN2.Layout.Column=4;
+        efAN2 = uieditfield(gAng,'numeric','Value',1.0, ...
+            'Tooltip','Transmitted medium n₂ — e.g. air = 1.0'); efAN2.Layout.Row=1; efAN2.Layout.Column=4;
         btnAng = uibutton(gAng,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doAngles()); btnAng.Layout.Row=1; btnAng.Layout.Column=5;
         lblAngR = uilabel(gAng,'Text','','FontSize',11,'Interpreter','html');
@@ -2942,11 +2972,14 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gPen.RowHeight = {24,24}; gPen.ColumnWidth = {30,'1x',30,'1x',50,'1x',90};
         gPen.Padding = [6 4 6 4]; gPen.RowSpacing = 4;
         uilabel(gPen,'Text','n:','HorizontalAlignment','right');
-        efPN = uieditfield(gPen,'numeric','Value',1.0); efPN.Layout.Row=1; efPN.Layout.Column=2;
+        efPN = uieditfield(gPen,'numeric','Value',1.0, ...
+            'Tooltip','Real part of refractive index n — real material > 1'); efPN.Layout.Row=1; efPN.Layout.Column=2;
         uilabel(gPen,'Text','k:','HorizontalAlignment','right');
-        efPK = uieditfield(gPen,'numeric','Value',0.001); efPK.Layout.Row=1; efPK.Layout.Column=4;
+        efPK = uieditfield(gPen,'numeric','Value',0.001, ...
+            'Tooltip','Extinction coefficient k — imaginary part; absorbers 0.1–10, dielectrics ~0'); efPK.Layout.Row=1; efPK.Layout.Column=4;
         uilabel(gPen,'Text',[char(955) ':'],'HorizontalAlignment','right');
-        efPLam = uieditfield(gPen,'numeric','Value',1.5406); efPLam.Layout.Row=1; efPLam.Layout.Column=6;
+        efPLam = uieditfield(gPen,'numeric','Value',1.5406, ...
+            'Tooltip','Wavelength λ (same unit as output) — penetration depth = λ/(4πk)'); efPLam.Layout.Row=1; efPLam.Layout.Column=6;
         btnPen = uibutton(gPen,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doPenDepth()); btnPen.Layout.Row=1; btnPen.Layout.Column=7;
         lblPenR = uilabel(gPen,'Text','','FontSize',11,'Interpreter','html');
@@ -2967,9 +3000,11 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gSkin.RowHeight = {24,24}; gSkin.ColumnWidth = {80,'1x',80,'1x',90};
         gSkin.Padding = [6 4 6 4]; gSkin.RowSpacing = 4;
         uilabel(gSkin,'Text',[char(961) ' (' char(937) char(183) 'm):'],'HorizontalAlignment','right');
-        efSRho = uieditfield(gSkin,'numeric','Value',1.7e-8); efSRho.Layout.Row=1; efSRho.Layout.Column=2;
+        efSRho = uieditfield(gSkin,'numeric','Value',1.7e-8, ...
+            'Tooltip','Resistivity ρ (Ω·m, SI) — Cu 1.7e-8, Au 2.4e-8, Al 2.8e-8'); efSRho.Layout.Row=1; efSRho.Layout.Column=2;
         uilabel(gSkin,'Text','f (Hz):','HorizontalAlignment','right');
-        efSFreq = uieditfield(gSkin,'numeric','Value',1e9); efSFreq.Layout.Row=1; efSFreq.Layout.Column=4;
+        efSFreq = uieditfield(gSkin,'numeric','Value',1e9, ...
+            'Tooltip','Frequency f (Hz) — typical RF 10⁶–10¹⁰'); efSFreq.Layout.Row=1; efSFreq.Layout.Column=4;
         btnSkin = uibutton(gSkin,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doSkinDepth()); btnSkin.Layout.Row=1; btnSkin.Layout.Column=5;
         lblSkinR = uilabel(gSkin,'Text','','FontSize',11,'Interpreter','html');
@@ -3006,14 +3041,17 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gMFP.RowHeight = {24,24}; gMFP.ColumnWidth = {50,'1x',40,'1x',40,'1x',90};
         gMFP.Padding = [6 4 6 4]; gMFP.RowSpacing = 4;
         uilabel(gMFP,'Text','P (Pa):','HorizontalAlignment','right');
-        efMFPP = uieditfield(gMFP,'numeric','Value',1e-4); efMFPP.Layout.Row=1; efMFPP.Layout.Column=2;
+        efMFPP = uieditfield(gMFP,'numeric','Value',1e-4, ...
+            'Tooltip','Gas pressure P (Pa, SI) — 1 atm ≈ 10⁵, HV 10⁻⁴, UHV 10⁻⁸'); efMFPP.Layout.Row=1; efMFPP.Layout.Column=2;
         uilabel(gMFP,'Text','T (K):','HorizontalAlignment','right');
-        efMFPT = uieditfield(gMFP,'numeric','Value',300); efMFPT.Layout.Row=1; efMFPT.Layout.Column=4;
+        efMFPT = uieditfield(gMFP,'numeric','Value',300, ...
+            'Tooltip','Temperature (K) — room temperature = 300'); efMFPT.Layout.Row=1; efMFPT.Layout.Column=4;
         uilabel(gMFP,'Text','Gas:','HorizontalAlignment','right');
         ddMFPGas = uidropdown(gMFP, ...
             'Items', {'N2 (air)', 'He', 'Ar', 'H2', 'O2', 'Xe', 'Kr'}, ...
             'ItemsData', {3.64e-10, 2.60e-10, 3.40e-10, 2.89e-10, 3.46e-10, 4.32e-10, 3.60e-10}, ...
-            'Value', 3.64e-10);
+            'Value', 3.64e-10, ...
+            'Tooltip','Gas species — sets molecular diameter d used in λ = kT/(√2 π d² P)');
         ddMFPGas.Layout.Row=1; ddMFPGas.Layout.Column=6;
         btnMFP = uibutton(gMFP,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doMFP()); btnMFP.Layout.Row=1; btnMFP.Layout.Column=7;
@@ -3039,7 +3077,8 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gMono.RowHeight = {24,24}; gMono.ColumnWidth = {80,'1x',90};
         gMono.Padding = [6 4 6 4]; gMono.RowSpacing = 4;
         uilabel(gMono,'Text','P (Pa):','HorizontalAlignment','right');
-        efMonoP = uieditfield(gMono,'numeric','Value',1.33e-4); efMonoP.Layout.Row=1; efMonoP.Layout.Column=2;
+        efMonoP = uieditfield(gMono,'numeric','Value',1.33e-4, ...
+            'Tooltip','Residual gas pressure P (Pa) — 1.33e-4 Pa = 1e-6 Torr; 1 Langmuir ≈ 1 s at this P'); efMonoP.Layout.Row=1; efMonoP.Layout.Column=2;
         btnMono = uibutton(gMono,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doMono()); btnMono.Layout.Row=1; btnMono.Layout.Column=3;
         lblMonoR = uilabel(gMono,'Text','','FontSize',11,'Interpreter','html');
@@ -3060,11 +3099,14 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gSY.RowHeight = {24,24,24}; gSY.ColumnWidth = {70,'1x',70,'1x',90};
         gSY.Padding = [6 4 6 4]; gSY.RowSpacing = 4;
         uilabel(gSY,'Text','Target:','HorizontalAlignment','right');
-        efSYMat = uieditfield(gSY,'text','Value','Si'); efSYMat.Layout.Row=1; efSYMat.Layout.Column=2;
+        efSYMat = uieditfield(gSY,'text','Value','Si', ...
+            'Tooltip','Target material symbol — e.g. Si, Cu, Al, Au'); efSYMat.Layout.Row=1; efSYMat.Layout.Column=2;
         uilabel(gSY,'Text','Ion:','HorizontalAlignment','right');
-        efSYIon = uieditfield(gSY,'text','Value','Ar'); efSYIon.Layout.Row=1; efSYIon.Layout.Column=4;
+        efSYIon = uieditfield(gSY,'text','Value','Ar', ...
+            'Tooltip','Incident ion symbol — typically Ar, Xe, or Kr'); efSYIon.Layout.Row=1; efSYIon.Layout.Column=4;
         uilabel(gSY,'Text','E (eV):','HorizontalAlignment','right');
-        efSYE = uieditfield(gSY,'numeric','Value',500); efSYE.Layout.Row=2; efSYE.Layout.Column=2;
+        efSYE = uieditfield(gSY,'numeric','Value',500, ...
+            'Tooltip','Ion energy E (eV) — typical sputtering 100–2000'); efSYE.Layout.Row=2; efSYE.Layout.Column=2;
         btnSY = uibutton(gSY,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doSputterYield()); btnSY.Layout.Row=2; btnSY.Layout.Column=5;
         lblSYR = uilabel(gSY,'Text','','FontSize',11,'Interpreter','html');
@@ -3085,13 +3127,17 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gPump.RowHeight = {24,24}; gPump.ColumnWidth = {60,'1x',60,'1x',60,'1x',60,'1x',90};
         gPump.Padding = [6 4 6 4]; gPump.RowSpacing = 4;
         uilabel(gPump,'Text','V (L):','HorizontalAlignment','right');
-        efPV = uieditfield(gPump,'numeric','Value',50); efPV.Layout.Row=1; efPV.Layout.Column=2;
+        efPV = uieditfield(gPump,'numeric','Value',50, ...
+            'Tooltip','Chamber volume V (L)'); efPV.Layout.Row=1; efPV.Layout.Column=2;
         uilabel(gPump,'Text','S (L/s):','HorizontalAlignment','right');
-        efPS = uieditfield(gPump,'numeric','Value',100); efPS.Layout.Row=1; efPS.Layout.Column=4;
+        efPS = uieditfield(gPump,'numeric','Value',100, ...
+            'Tooltip','Pump effective pumping speed S (L/s) — turbo ~100–1000'); efPS.Layout.Row=1; efPS.Layout.Column=4;
         uilabel(gPump,'Text','P0 (Pa):','HorizontalAlignment','right');
-        efPP0 = uieditfield(gPump,'numeric','Value',1e5); efPP0.Layout.Row=1; efPP0.Layout.Column=6;
+        efPP0 = uieditfield(gPump,'numeric','Value',1e5, ...
+            'Tooltip','Starting pressure P₀ (Pa) — atmospheric ≈ 1e5'); efPP0.Layout.Row=1; efPP0.Layout.Column=6;
         uilabel(gPump,'Text','Pf (Pa):','HorizontalAlignment','right');
-        efPPf = uieditfield(gPump,'numeric','Value',1e-4); efPPf.Layout.Row=1; efPPf.Layout.Column=8;
+        efPPf = uieditfield(gPump,'numeric','Value',1e-4, ...
+            'Tooltip','Target final pressure P_f (Pa) — HV 10⁻⁴, UHV 10⁻⁷'); efPPf.Layout.Row=1; efPPf.Layout.Column=8;
         btnPump = uibutton(gPump,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doPump()); btnPump.Layout.Row=1; btnPump.Layout.Column=9;
         lblPumpR = uilabel(gPump,'Text','','FontSize',11,'Interpreter','html');
@@ -3128,11 +3174,14 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gNer.RowHeight = {24,24,24}; gNer.ColumnWidth = {70,'1x',30,'1x',50,'1x',90};
         gNer.Padding = [6 4 6 4]; gNer.RowSpacing = 4;
         uilabel(gNer,'Text','E0 (V):','HorizontalAlignment','right');
-        efNerE0 = uieditfield(gNer,'numeric','Value',0.77); efNerE0.Layout.Row=1; efNerE0.Layout.Column=2;
+        efNerE0 = uieditfield(gNer,'numeric','Value',0.77, ...
+            'Tooltip','Standard electrode potential E⁰ (V vs SHE) — Fe³⁺/Fe²⁺ = 0.77'); efNerE0.Layout.Row=1; efNerE0.Layout.Column=2;
         uilabel(gNer,'Text','n:','HorizontalAlignment','right');
-        efNerN = uieditfield(gNer,'numeric','Value',1); efNerN.Layout.Row=1; efNerN.Layout.Column=4;
+        efNerN = uieditfield(gNer,'numeric','Value',1, ...
+            'Tooltip','Number of electrons transferred n — integer, typically 1–4'); efNerN.Layout.Row=1; efNerN.Layout.Column=4;
         uilabel(gNer,'Text','Q:','HorizontalAlignment','right');
-        efNerQ = uieditfield(gNer,'numeric','Value',0.01); efNerQ.Layout.Row=1; efNerQ.Layout.Column=6;
+        efNerQ = uieditfield(gNer,'numeric','Value',0.01, ...
+            'Tooltip','Reaction quotient Q — ratio of product to reactant activities (dimensionless)'); efNerQ.Layout.Row=1; efNerQ.Layout.Column=6;
         btnNer = uibutton(gNer,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doNernst()); btnNer.Layout.Row=1; btnNer.Layout.Column=7;
         lblNerR = uilabel(gNer,'Text','','FontSize',11,'Interpreter','html');
@@ -3157,11 +3206,14 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gBV.RowHeight = {24,24}; gBV.ColumnWidth = {60,'1x',60,'1x',60,'1x',90};
         gBV.Padding = [6 4 6 4]; gBV.RowSpacing = 4;
         uilabel(gBV,'Text','j0:','HorizontalAlignment','right');
-        efBVJ0 = uieditfield(gBV,'numeric','Value',1e-3); efBVJ0.Layout.Row=1; efBVJ0.Layout.Column=2;
+        efBVJ0 = uieditfield(gBV,'numeric','Value',1e-3, ...
+            'Tooltip','Exchange current density j₀ (A/cm²) — typical 10⁻⁶–10⁻³'); efBVJ0.Layout.Row=1; efBVJ0.Layout.Column=2;
         uilabel(gBV,'Text',[char(951) ' (V):'],'HorizontalAlignment','right');
-        efBVEta = uieditfield(gBV,'numeric','Value',0.1); efBVEta.Layout.Row=1; efBVEta.Layout.Column=4;
+        efBVEta = uieditfield(gBV,'numeric','Value',0.1, ...
+            'Tooltip','Overpotential η (V) — deviation from equilibrium potential'); efBVEta.Layout.Row=1; efBVEta.Layout.Column=4;
         uilabel(gBV,'Text',[char(945) ':'],'HorizontalAlignment','right');
-        efBVAlpha = uieditfield(gBV,'numeric','Value',0.5); efBVAlpha.Layout.Row=1; efBVAlpha.Layout.Column=6;
+        efBVAlpha = uieditfield(gBV,'numeric','Value',0.5, ...
+            'Tooltip','Charge-transfer coefficient α (dimensionless) — typically 0.3–0.7'); efBVAlpha.Layout.Row=1; efBVAlpha.Layout.Column=6;
         btnBV = uibutton(gBV,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doBV()); btnBV.Layout.Row=1; btnBV.Layout.Column=7;
         lblBVR = uilabel(gBV,'Text','','FontSize',11,'Interpreter','html');
@@ -3182,9 +3234,11 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gTaf.RowHeight = {24,24}; gTaf.ColumnWidth = {60,'1x',60,'1x',90};
         gTaf.Padding = [6 4 6 4]; gTaf.RowSpacing = 4;
         uilabel(gTaf,'Text',[char(945) ':'],'HorizontalAlignment','right');
-        efTafA = uieditfield(gTaf,'numeric','Value',0.5); efTafA.Layout.Row=1; efTafA.Layout.Column=2;
+        efTafA = uieditfield(gTaf,'numeric','Value',0.5, ...
+            'Tooltip','Charge-transfer coefficient α (dimensionless)'); efTafA.Layout.Row=1; efTafA.Layout.Column=2;
         uilabel(gTaf,'Text','T (K):','HorizontalAlignment','right');
-        efTafT = uieditfield(gTaf,'numeric','Value',298.15); efTafT.Layout.Row=1; efTafT.Layout.Column=4;
+        efTafT = uieditfield(gTaf,'numeric','Value',298.15, ...
+            'Tooltip','Temperature (K) — 298.15 K = 25 °C, standard conditions'); efTafT.Layout.Row=1; efTafT.Layout.Column=4;
         btnTaf = uibutton(gTaf,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doTafel()); btnTaf.Layout.Row=1; btnTaf.Layout.Column=5;
         lblTafR = uilabel(gTaf,'Text','','FontSize',11,'Interpreter','html');
@@ -3205,11 +3259,14 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gDLC.RowHeight = {24,24}; gDLC.ColumnWidth = {60,'1x',60,'1x',60,'1x',90};
         gDLC.Padding = [6 4 6 4]; gDLC.RowSpacing = 4;
         uilabel(gDLC,'Text',[char(949) '_r:'],'HorizontalAlignment','right');
-        efDLCE = uieditfield(gDLC,'numeric','Value',78); efDLCE.Layout.Row=1; efDLCE.Layout.Column=2;
+        efDLCE = uieditfield(gDLC,'numeric','Value',78, ...
+            'Tooltip','Electrolyte dielectric constant ε_r — water ~78, organic ~10–40'); efDLCE.Layout.Row=1; efDLCE.Layout.Column=2;
         uilabel(gDLC,'Text','d (nm):','HorizontalAlignment','right');
-        efDLCD = uieditfield(gDLC,'numeric','Value',0.5); efDLCD.Layout.Row=1; efDLCD.Layout.Column=4;
+        efDLCD = uieditfield(gDLC,'numeric','Value',0.5, ...
+            'Tooltip','Helmholtz layer thickness d (nm) — typical 0.3–1 nm'); efDLCD.Layout.Row=1; efDLCD.Layout.Column=4;
         uilabel(gDLC,'Text','A (cm2):','HorizontalAlignment','right');
-        efDLCA = uieditfield(gDLC,'numeric','Value',1.0); efDLCA.Layout.Row=1; efDLCA.Layout.Column=6;
+        efDLCA = uieditfield(gDLC,'numeric','Value',1.0, ...
+            'Tooltip','Electrode surface area (cm²)'); efDLCA.Layout.Row=1; efDLCA.Layout.Column=6;
         btnDLC = uibutton(gDLC,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doDLC()); btnDLC.Layout.Row=1; btnDLC.Layout.Column=7;
         lblDLCR = uilabel(gDLC,'Text','','FontSize',11,'Interpreter','html');
@@ -3247,10 +3304,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gWF.Padding = [6 4 6 4]; gWF.RowSpacing = 4;
 
         uilabel(gWF,'Text',[char(963) ' (S/cm):'],'HorizontalAlignment','right');
-        efWFSigma = uieditfield(gWF,'numeric','Value',6e5);
+        efWFSigma = uieditfield(gWF,'numeric','Value',6e5, ...
+            'Tooltip','Electrical conductivity σ (S/cm) — Cu 6e5, Au 4.5e5, Al 3.8e5');
         efWFSigma.Layout.Row=1; efWFSigma.Layout.Column=2;
         uilabel(gWF,'Text','T (K):','HorizontalAlignment','right');
-        efWFT = uieditfield(gWF,'numeric','Value',300);
+        efWFT = uieditfield(gWF,'numeric','Value',300, ...
+            'Tooltip','Temperature (K) — Wiedemann-Franz κ = L₀σT');
         efWFT.Layout.Row=1; efWFT.Layout.Column=4;
         btnWFCalc = uibutton(gWF,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -3280,10 +3339,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gDeb.Padding = [6 4 6 4]; gDeb.RowSpacing = 4;
 
         uilabel(gDeb,'Text','v_s (m/s):','HorizontalAlignment','right');
-        efDebVs = uieditfield(gDeb,'numeric','Value',5000);
+        efDebVs = uieditfield(gDeb,'numeric','Value',5000, ...
+            'Tooltip','Average sound velocity v_s (m/s) — typical 2000–8000 in solids');
         efDebVs.Layout.Row=1; efDebVs.Layout.Column=2;
         uilabel(gDeb,'Text','n (atoms/m³):','HorizontalAlignment','right');
-        efDebN = uieditfield(gDeb,'numeric','Value',5e28);
+        efDebN = uieditfield(gDeb,'numeric','Value',5e28, ...
+            'Tooltip','Atom number density (atoms/m³) — typical metals ~5e28');
         efDebN.Layout.Row=1; efDebN.Layout.Column=4;
         btnDebCalc = uibutton(gDeb,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -3313,13 +3374,16 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gDiff.Padding = [6 4 6 4]; gDiff.RowSpacing = 4;
 
         uilabel(gDiff,'Text',[char(954) ' (W/mK):'],'HorizontalAlignment','right');
-        efDiffK = uieditfield(gDiff,'numeric','Value',150);
+        efDiffK = uieditfield(gDiff,'numeric','Value',150, ...
+            'Tooltip','Thermal conductivity κ (W/m·K) — Si 150, Cu 400, Al₂O₃ 30');
         efDiffK.Layout.Row=1; efDiffK.Layout.Column=2;
         uilabel(gDiff,'Text',[char(961) ' (kg/m³):'],'HorizontalAlignment','right');
-        efDiffRho = uieditfield(gDiff,'numeric','Value',2329);
+        efDiffRho = uieditfield(gDiff,'numeric','Value',2329, ...
+            'Tooltip','Mass density ρ (kg/m³) — Si 2329, Cu 8960');
         efDiffRho.Layout.Row=1; efDiffRho.Layout.Column=4;
         uilabel(gDiff,'Text','c_p (J/kgK):','HorizontalAlignment','right');
-        efDiffCp = uieditfield(gDiff,'numeric','Value',700);
+        efDiffCp = uieditfield(gDiff,'numeric','Value',700, ...
+            'Tooltip','Specific heat c_p (J/kg·K) — Si 700, Cu 385');
         efDiffCp.Layout.Row=1; efDiffCp.Layout.Column=6;
         btnDiffCalc = uibutton(gDiff,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -3362,13 +3426,16 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gArr.Padding = [6 4 6 4]; gArr.RowSpacing = 4;
 
         uilabel(gArr,'Text','D0 (cm²/s):','HorizontalAlignment','right');
-        efArrD0 = uieditfield(gArr,'numeric','Value',0.1);
+        efArrD0 = uieditfield(gArr,'numeric','Value',0.1, ...
+            'Tooltip','Pre-exponential factor D₀ (cm²/s) — typical 1e-4 to 10');
         efArrD0.Layout.Row=1; efArrD0.Layout.Column=2;
         uilabel(gArr,'Text','Ea (eV):','HorizontalAlignment','right');
-        efArrEa = uieditfield(gArr,'numeric','Value',1.0);
+        efArrEa = uieditfield(gArr,'numeric','Value',1.0, ...
+            'Tooltip','Activation energy E_a (eV) — typical 0.5–5 for diffusion');
         efArrEa.Layout.Row=1; efArrEa.Layout.Column=4;
         uilabel(gArr,'Text','T (K):','HorizontalAlignment','right');
-        efArrT = uieditfield(gArr,'numeric','Value',1000);
+        efArrT = uieditfield(gArr,'numeric','Value',1000, ...
+            'Tooltip','Temperature T (K) — e.g. typical Si diffusion 1000–1200');
         efArrT.Layout.Row=1; efArrT.Layout.Column=6;
         btnArrCalc = uibutton(gArr,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
