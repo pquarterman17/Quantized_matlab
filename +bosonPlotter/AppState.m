@@ -188,6 +188,14 @@ classdef AppState < handle
 
         % ── Smoothing live preview ─────────────────────────────────
         smoothPreviewLine            = []   % line handle for dashed smooth overlay; [] when inactive
+
+        % ── Visual style (Phase A) ─────────────────────────────────
+        % activeTemplate names a built-in template from styles.template()
+        % or a user template (prefixed 'user:'); styleOverrides is a
+        % sparse struct of fields that win over the template.  Resolved
+        % into rCtx_.appearance by drawToAxes via bosonPlotter.resolveStyle.
+        activeTemplate   char   = 'screen'
+        styleOverrides   struct = struct()
     end
 
     methods

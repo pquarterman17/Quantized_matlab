@@ -504,7 +504,7 @@ function varargout = BosonPlotter()
     ctrlPanel.Layout.Column = 2;
 
     ctrlGL = uigridlayout(ctrlPanel,[8 1], ...
-        'RowHeight', {24,'2x','1x',22,66,22,22,20}, ...
+        'RowHeight', {24,'2x','1x',44,66,22,22,20}, ...
         'Padding',   [4 4 4 4], ...
         'RowSpacing', 2);
 
@@ -534,10 +534,10 @@ function varargout = BosonPlotter()
         'ValueChangedFcn',@(~,~) onPlot([],[]));
     lbY2.Layout.Row = 2; lbY2.Layout.Column = 1;
 
-    % Colormap selector (row 4) — theme + plot style moved to Settings dialog
-    styleGL = uigridlayout(ctrlGL,[1 4], ...
+    % Colormap + Template selectors (row 4) — two stacked sub-rows
+    styleGL = uigridlayout(ctrlGL,[2 4], ...
         'Padding',[0 0 0 0],'ColumnSpacing',2,'RowSpacing',2, ...
-        'ColumnWidth',{'1x','1x','1x','1x'},'RowHeight',{18});
+        'ColumnWidth',{'1x','1x','1x','1x'},'RowHeight',{18,18});
     styleGL.Layout.Row = 4;
 
     lblColormap = uilabel(styleGL,'Text','Colormap:','FontSize',10);
@@ -550,6 +550,33 @@ function varargout = BosonPlotter()
         'Tooltip', 'Color palette for multi-dataset plots', ...
         'ValueChangedFcn', @(~,~) onPlot([],[]));
     ddColormap.Layout.Row = 1; ddColormap.Layout.Column = [2 4];
+
+    % ── Template selector (Phase A) ─────────────────────────────────
+    % Selects a built-in visual template (screen / aps / nature / thesis /
+    % presentation / poster) or a user-saved template.  Changes font,
+    % line width, marker size, tick direction, grid, etc. on the live
+    % preview so the GUI is WYSIWYG with exported figures.
+    lblTemplate = uilabel(styleGL,'Text','Template:','FontSize',10);
+    lblTemplate.Layout.Row = 2; lblTemplate.Layout.Column = 1;
+
+    BUILTIN_TEMPLATES = {'screen','aps','aps_double','nature','nature_double', ...
+                         'thesis','presentation','poster'};
+    tplItems = BUILTIN_TEMPLATES;
+    try
+        userList = bosonPlotter.userTemplates.list();
+        for utIdx = 1:numel(userList)
+            tplItems{end+1} = ['user:' userList{utIdx}]; %#ok<AGROW>
+        end
+    catch
+    end
+    ddTemplate = uidropdown(styleGL, 'Items', tplItems, ...
+        'Value', 'screen', ...
+        'Tooltip', ['Visual template (font / line width / marker size / ' ...
+                    'tick direction / grid).  Built-ins: screen (default), ' ...
+                    'aps, nature, thesis, presentation, poster.  User ' ...
+                    'templates appear with a "user:" prefix.'], ...
+        'ValueChangedFcn', @onTemplateChanged);
+    ddTemplate.Layout.Row = 2; ddTemplate.Layout.Column = [2 4];
 
     % Theme value stored here but UI moved to Settings dialog
     appData.theme = 'Light';
@@ -2194,6 +2221,11 @@ function varargout = BosonPlotter()
     api.setQSpace           = @setQSpaceDirect;
     api.setContourLevels    = @setContourLevelsDirect;
     api.setColormap         = @setColormapDirect;
+    % Phase A style API
+    api.setTemplate         = @setTemplateDirect;
+    api.getTemplate         = @() appData.activeTemplate;
+    api.getAppearance       = @resolveActiveAppearance;
+    api.getAxes             = @() ax;
     api.setMap2DColormap    = @setMap2DColormapDirect;
     api.maskRegion          = @maskRegionDirect;
     api.unmaskAll           = @() onUnmaskAll([],[]);
@@ -4767,6 +4799,40 @@ function varargout = BosonPlotter()
 
     function onStylePick(styleName)
         appData.style = styleName;
+        if appData.activeIdx > 0 && ~isempty(appData.datasets)
+            onPlot([],[]);
+        end
+    end
+
+    function onTemplateChanged(src, ~)
+    %ONTEMPLATECHANGED  Apply a new visual template and re-render.
+    %   Writes the template name into appData.activeTemplate.  Per-dataset
+    %   overrides (ds.styleOverride) survive template switches; only the
+    %   base layer of the style precedence chain changes.
+        try
+            appData.activeTemplate = src.Value;
+            if appData.activeIdx > 0 && ~isempty(appData.datasets)
+                onPlot([],[]);
+            end
+        catch ME
+            uialert(fig, sprintf('Failed to apply template:\n%s', ME.message), ...
+                'Template error');
+            logGUIError('onTemplateChanged', 'template apply failed', ME);
+        end
+    end
+
+    function setTemplateDirect(name)
+    %SETTEMPLATEDIRECT  Programmatic template change (api.setTemplate).
+    %   Mirrors the ddTemplate dropdown change — updates the widget value
+    %   so the UI stays in sync, writes appData.activeTemplate, and
+    %   triggers a replot.
+        name = char(name);
+        if ~isempty(ddTemplate) && isvalid(ddTemplate)
+            if any(strcmp(ddTemplate.Items, name))
+                ddTemplate.Value = name;
+            end
+        end
+        appData.activeTemplate = name;
         if appData.activeIdx > 0 && ~isempty(appData.datasets)
             onPlot([],[]);
         end
@@ -7638,6 +7704,13 @@ function varargout = BosonPlotter()
         rCtx_.showRaw            = cbShowRaw.Value;
         rCtx_.countsPerSec       = cbCountsPerSec.Value;
         rCtx_.style              = appData.style;
+
+        % ── Resolve visual appearance (Phase A) ──────────────────────────
+        % Merge the active template + global dialog overrides via
+        % bosonPlotter.resolveStyle; per-dataset / per-channel overrides
+        % are applied inside renderPlot when it iterates the loop.
+        rCtx_.appearance = resolveActiveAppearance();
+
         rCtx_.ddMap2DType        = ddMap2DType.Value;
         rCtx_.calculateAsymmetry = cbCalculateAsymmetry.Value;
         rCtx_.asymFormula        = ddAsymFormula.Value;
@@ -7679,6 +7752,40 @@ function varargout = BosonPlotter()
         rCtx_.logGUIError                  = @logGUIError;
 
         bosonPlotter.renderPlot(targetAx, rCtx_);
+    end
+
+
+    function appearance = resolveActiveAppearance()
+    %RESOLVEACTIVEAPPEARANCE  Build the effective visual style struct.
+    %   Layers: styles.template(name) → appData.styleOverrides.  Per-
+    %   dataset / per-channel layers are applied inside renderPlot where
+    %   each dataset is iterated.  User templates are recognised by the
+    %   'user:' prefix and loaded via bosonPlotter.userTemplates.load.
+        try
+            tname = appData.activeTemplate;
+            if isempty(tname), tname = 'screen'; end
+            if startsWith(tname, 'user:')
+                tpl = bosonPlotter.userTemplates.load(tname(6:end));
+            else
+                tpl = styles.template(tname);
+            end
+        catch
+            tpl = styles.template('screen');
+        end
+
+        % Colormap dropdown overrides template palette when the user has
+        % explicitly picked one (anything other than the 'lines' default
+        % means they made a choice — template palette takes the back seat)
+        try
+            cmapName = ddColormap.Value;
+            if ~strcmp(cmapName, 'lines (MATLAB default)')
+                n = max(6, size(tpl.colors, 1));
+                tpl.colors = getColorsFromMap(cmapName, n);
+            end
+        catch
+        end
+
+        appearance = bosonPlotter.resolveStyle(tpl, appData.styleOverrides);
     end
 
 

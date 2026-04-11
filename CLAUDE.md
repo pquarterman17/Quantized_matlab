@@ -111,6 +111,14 @@ Feature-level docs are in separate files to keep this context compact:
 
 ## GUI Development Notes
 
+### Layout integrity — catch clipped widgets early
+MATLAB silently allows `uigridlayout` clipping: if a parent row allocates 22 px and a nested grid needs 44 px, the widget renders but is partially or fully invisible with no warning.  This has bitten us multiple times (e.g. the Phase A Template dropdown was clipped out of sight).
+
+- **Detection helper:** `tests/gui/checkClippedLayouts.m` walks every `uigridlayout` and flags nested grids whose fixed pixel row/column spec overflows the slot the parent allocates.  Also flags leaf widgets with `Position(3|4) == 0` after `drawnow`.  Treats allocated == 0 as "collapsed section" (legitimate), not clipping.
+- **Regression test:** `tests/gui/test_layoutIntegrity.m` — run via `runAllTests(Group="gui")`.  Includes synthetic broken layouts to verify the detector itself works.
+- **Workflow:** after editing any `uigridlayout` `RowHeight` / `ColumnWidth` in BosonPlotter.m or `+bosonPlotter/*.m`, run `runAllTests(Group="gui")` before assuming the layout works.  The `ux-frontend-expert` agent should invoke `checkClippedLayouts(fig)` during any GUI layout review.
+- **Common fix:** if the detector reports `Nested grid needs N px but parent row allocates M px`, bump the parent `uigridlayout` `RowHeight{row}` entry from M to at least N.
+
 ### BosonPlotter
 - `cla()` alone does not remove `HandleVisibility='off'` objects — use `delete(ax.Children)` before `cla()`
 - Each dataset stores axis limits in `ds.axLims` (persisted across switches)

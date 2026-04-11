@@ -56,7 +56,7 @@ options.Group = validatestring(options.Group, ...
     ["all", "parser", "batch", "xrd2d", "gui", "calcgui", "sims", "em", "emgui", "eds", ...
      "xrayneutron", "superconductor", "cif", "optics", "vacuum", "electrochemistry", ...
      "eels", "eels_adv", "diffindex", "diff_sim", "edsquant", "contour", "fitting", "plotting", ...
-     "spectral", "interp2d", "baseline", "errorprop"]);
+     "spectral", "interp2d", "baseline", "errorprop", "utilities"]);
 
 % Build absolute paths to test scripts so `run` works regardless of CWD.
 % Tests are organized into subdirectories: parser/, gui/, imaging/, calc/, batch/
@@ -93,6 +93,9 @@ SUITES = {
     T('gui','test_filterRows'),             'gui',    'filterRows: expression parser, operators, functions, edge cases'
     T('gui','test_spreadsheetPopup'),       'gui',    'Spreadsheet popup: open, widget, stats, export, ReadOnly, sort, edit'
     T('gui','test_dragToPlot'),             'gui',    'Drag-column-to-plot: AppState props, setChannelFromDrag API, no-ops'
+    T('gui','test_styleResolution'),        'gui',    'Style resolution: template/global/ds/channel precedence chain + user templates'
+    T('gui','test_renderPlot_styling'),     'gui',    'renderPlot styling: live template switches apply FontName/Size/LineWidth/TickDir to axes'
+    T('gui','test_layoutIntegrity'),        'gui',    'Layout integrity: walk uigridlayout tree + flag clipped / zero-size / undersized nested grids'
     T('gui','test_contour_features'),       'contour','Contour/heatmap: gridding, plot styles, edge cases, export'
     T('gui','test_materials_calc_gui'),     'calcgui','Materials calculator GUI API'
     % ── Imaging tests ─────────────────────────────────────────────────
@@ -158,6 +161,8 @@ SUITES = {
     T('calc','test_baselines'),            'baseline','Baseline estimation: ALS, rolling ball, modified polynomial'
     % ── Error propagation tests ──────────────────────────────────────────
     T('calc','test_errorProp'),            'errorprop','Error propagation: linear Taylor, Monte Carlo, wrappers'
+    % ── Utilities tests ──────────────────────────────────────────────────
+    T('utilities','test_toOrigin'),        'utilities','Origin COM bridge: call sequence, qualified path, log handling (mock COM)'
 };
 
 % Filter by group

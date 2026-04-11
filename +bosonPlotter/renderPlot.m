@@ -172,9 +172,20 @@ function renderPlot(targetAx, ctx)
             yyaxis(targetAx,'right'); hold(targetAx,'on');
             yyaxis(targetAx,'left');
         end
-        lsPrimary    = guiLineSpec(ctx.style);
-        lsRight      = guiLineSpec_right(ctx.style);
-        lsRaw        = guiLineSpec_raw(ctx.style);
+        % ── Resolve the visual appearance struct ────────────────────────
+        % ctx.appearance is built upstream from the active template +
+        % global dialog overrides (Phase A).  If an older caller forgot
+        % to populate it, fall back to the 'screen' template so the plot
+        % still renders with sensible defaults.
+        if isfield(ctx, 'appearance') && ~isempty(ctx.appearance) && isstruct(ctx.appearance)
+            a = ctx.appearance;
+        else
+            a = bosonPlotter.resolveStyle(styles.template('screen'));
+        end
+
+        lsPrimary    = guiLineSpec(ctx.style, a);
+        lsRight      = guiLineSpec_right(ctx.style, a);
+        lsRaw        = guiLineSpec_raw(ctx.style, a);
         anyRawShown  = false;
 
         % ── Waterfall offset ──────────────────────────────────────────────
@@ -337,10 +348,10 @@ function renderPlot(targetAx, ctx)
                             xWhiskers(wi+2) = NaN; yWhiskers(wi+2) = NaN;
                         end
                         plot(targetAx, xWhiskers, yWhiskers, '-', ...
-                            'Color', whiskerColor, 'LineWidth', 1.2, 'HitTest', 'off', 'HandleVisibility', 'off');
+                            'Color', whiskerColor, 'LineWidth', a.lineWidthThin, 'HitTest', 'off', 'HandleVisibility', 'off');
                     end
-                    plot(targetAx, xGood, yGood, 'o', ...
-                        'Color', baseColor, 'MarkerSize', 4.5, 'LineWidth', 1.0, ...
+                    plot(targetAx, xGood, yGood, effectiveMarker(a, si), ...
+                        'Color', baseColor, 'MarkerSize', a.markerSize, 'LineWidth', a.lineWidth, ...
                         'HitTest', 'off', 'DisplayName', dispName);
 
                     iTheory = find(strcmp(primaryD.labels, 'theory'), 1);
@@ -356,7 +367,7 @@ function renderPlot(targetAx, ctx)
                         goodT = ~isnan(xVecPrimary) & ~isnan(yTheory);
                         if any(goodT)
                             plot(targetAx, xVecPrimary(goodT), yTheory(goodT), '-', ...
-                                'Color', theoryColor, 'LineWidth', 1.2, 'HitTest', 'off', ...
+                                'Color', theoryColor, 'LineWidth', a.lineWidthThin, 'HitTest', 'off', ...
                                 'DisplayName', [polLabel ' theory']);
                         end
                     end
@@ -417,7 +428,7 @@ function renderPlot(targetAx, ctx)
                                 'Color', baseColor, 'HitTest', 'off', 'DisplayName', dispName);
                         else
                             errorbar(targetAx, xVecPrimary(good), yPrimary(good), yErrGood, ...
-                                'Color', baseColor, 'LineWidth', 1.0, 'CapSize', 3, ...
+                                'Color', baseColor, 'LineWidth', a.lineWidth, 'CapSize', 3, ...
                                 'HitTest', 'off', 'DisplayName', dispName);
                         end
                     else
@@ -437,7 +448,7 @@ function renderPlot(targetAx, ctx)
                     masked = ~displayMask & ~isnan(double(xVecPrimary)) & ~isnan(yM);
                     if any(masked)
                         plot(targetAx, xVecPrimary(masked), yM(masked), '.', ...
-                            'Color', [0.55 0.55 0.55], 'MarkerSize', 4, ...
+                            'Color', [0.55 0.55 0.55], 'MarkerSize', max(3, a.markerSize * 0.85), ...
                             'HitTest', 'off', 'HandleVisibility', 'off', 'Tag', 'GUIMaskedPoints');
                     end
                 end
@@ -527,9 +538,9 @@ function renderPlot(targetAx, ctx)
                     xWhiskers(wi+2) = NaN; yWhiskers(wi+2) = NaN;
                 end
                 plot(targetAx, xWhiskers, yWhiskers, '-', ...
-                    'Color', whiskerColor, 'LineWidth', 1.0, 'HitTest', 'off', 'HandleVisibility', 'off');
-                plot(targetAx, xGood, yGood, 'o', ...
-                    'Color', asymColor, 'MarkerSize', 4.5, 'LineWidth', 1.0, ...
+                    'Color', whiskerColor, 'LineWidth', a.lineWidthThin, 'HitTest', 'off', 'HandleVisibility', 'off');
+                plot(targetAx, xGood, yGood, effectiveMarker(a, 1), ...
+                    'Color', asymColor, 'MarkerSize', a.markerSize, 'LineWidth', a.lineWidth, ...
                     'HitTest', 'off', 'DisplayName', asymLegend);
                 % Theoretical asymmetry overlay
                 iThPP = find(strcmpi(primaryPP.labels, 'theory'), 1);
@@ -550,7 +561,7 @@ function renderPlot(targetAx, ctx)
                     if any(goodTh)
                         theoryColor = 0.55 * asymColor + 0.45 * [1 1 1];
                         plot(targetAx, xAsym(goodTh), asymTheory(goodTh), '-', ...
-                            'Color', theoryColor, 'LineWidth', 1.2, 'HitTest', 'off', ...
+                            'Color', theoryColor, 'LineWidth', a.lineWidthThin, 'HitTest', 'off', ...
                             'DisplayName', [asymLegend ' theory']);
                     end
                 end
@@ -575,7 +586,14 @@ function renderPlot(targetAx, ctx)
 
         % Legend
         if ctx.showLegend && (nY > 1 || nDS > 1 || anyRawShown || hasY2)
-            legend(targetAx,'Location','best','Interpreter','none');
+            lgd = legend(targetAx, ...
+                'Location',    a.legendLocation, ...
+                'Interpreter', 'none', ...
+                'FontSize',    a.legendFontSize, ...
+                'FontName',    a.fontName);
+            if isprop(lgd, 'Box')
+                lgd.Box = guiTernary(a.legendBox, 'on', 'off');
+            end
         else
             legend(targetAx,'off');
         end
@@ -629,9 +647,33 @@ function renderPlot(targetAx, ctx)
         cleanupWarn = onCleanup(@() warning(warnState));
         targetAx.XScale = guiTernary(strcmp(ctx.scaleX, 'Log'),'log','linear');
         targetAx.YScale = guiTernary(strcmp(ctx.scaleY, 'Log'),'log','linear');
-        grid(targetAx,'on');
-        targetAx.FontSize       = 13;
-        targetAx.Title.FontSize = 14;
+
+        % ── Axes appearance from the resolved style ──────────────────────
+        % Grid behaviour: gridAlpha == 0 means "off"; any positive value
+        % turns the grid on and sets its transparency.
+        if a.gridAlpha > 0
+            grid(targetAx, 'on');
+            try targetAx.GridAlpha = a.gridAlpha; catch, end
+        else
+            grid(targetAx, 'off');
+        end
+
+        targetAx.FontName       = a.fontName;
+        targetAx.FontSize       = a.fontSize;
+        targetAx.Title.FontName = a.fontName;
+        targetAx.Title.FontSize = a.titleFontSize;
+        targetAx.Box            = guiTernary(a.boxOn, 'on', 'off');
+        targetAx.TickDir        = a.tickDir;
+        try targetAx.TickLength = a.tickLength; catch, end
+
+        % Minor ticks — toggle on each ruler (Y rulers may be 1 or 2 for Y2)
+        try targetAx.XAxis.MinorTick = guiTernary(a.minorTicks, 'on', 'off'); catch, end
+        try
+            for yi = 1:numel(targetAx.YAxis)
+                targetAx.YAxis(yi).MinorTick = guiTernary(a.minorTicks, 'on', 'off');
+            end
+        catch
+        end
 
         % ── Manual axis limits ────────────────────────────────────────────
         xMinV  = str2double(ctx.xMin);
@@ -824,26 +866,68 @@ function s = guiLabel(name, unit)
     else, s = sprintf('%s (%s)', name, unit); end
 end
 
-function ls = guiLineSpec(style)
+function ls = guiLineSpec(style, a)
+%GUILINESPEC  Build the primary-line plot spec using appearance `a`.
+%   `a` is a resolved style struct (from bosonPlotter.resolveStyle).
+    ls0 = resolveLineStyleToken(a);       % '-', '--', ':', '-.' (maybe 'auto')
     switch style
-        case 'Scatter',   ls = {'o', 'MarkerSize', 4, 'LineWidth', 1};
-        case 'ErrorBand', ls = {'-', 'LineWidth', 1.2};
-        otherwise,        ls = {'-', 'LineWidth', 1.2};  % 'Line' default
+        case 'Scatter'
+            ls = {resolveMarkerToken(a, 1), ...
+                  'MarkerSize', a.markerSize, 'LineWidth', a.lineWidth};
+        case 'ErrorBand'
+            ls = {ls0, 'LineWidth', a.lineWidth};
+        otherwise  % 'Line' default
+            ls = {ls0, 'LineWidth', a.lineWidth};
     end
 end
 
-function ls = guiLineSpec_raw(style)
+function ls = guiLineSpec_raw(style, a)
+%GUILINESPEC_RAW  Raw-overlay spec — thinner and faded relative to the primary.
     switch style
-        case 'Scatter', ls = {'x', 'MarkerSize', 3, 'LineWidth', 0.8};
-        otherwise,      ls = {'--', 'LineWidth', 0.8};
+        case 'Scatter'
+            ls = {'x', 'MarkerSize', max(2, a.markerSize * 0.7), ...
+                       'LineWidth',  max(0.5, a.lineWidthThin * 0.8)};
+        otherwise
+            ls = {'--', 'LineWidth', max(0.5, a.lineWidthThin * 0.8)};
     end
 end
 
-function ls = guiLineSpec_right(style)
+function ls = guiLineSpec_right(style, a)
+%GUILINESPEC_RIGHT  Right-axis (Y2) spec — uses a distinct line style by default.
     switch style
-        case 'Scatter', ls = {'s', 'MarkerSize', 4, 'LineWidth', 1};
-        otherwise,      ls = {'-.', 'LineWidth', 1.2};
+        case 'Scatter'
+            ls = {'s', 'MarkerSize', a.markerSize, 'LineWidth', a.lineWidth};
+        otherwise
+            ls = {'-.', 'LineWidth', a.lineWidth};
     end
+end
+
+function token = resolveMarkerToken(a, cycleIdx)
+%RESOLVEMARKERTOKEN  Return the marker character for the current style.
+%   If a.markerShape is 'auto', cycle through a fixed library by the
+%   dataset index so that multi-dataset plots get distinct shapes.
+    if strcmpi(a.markerShape, 'auto')
+        shapes = {'o', 's', '^', 'd', 'v', 'x', '+', '*'};
+        token = shapes{mod(cycleIdx - 1, numel(shapes)) + 1};
+    else
+        token = a.markerShape;
+    end
+end
+
+function token = resolveLineStyleToken(a)
+%RESOLVELINESTYLETOKEN  Return the line-style character (no auto-cycling here —
+%   the caller handles cycling for multi-dataset contexts if needed).
+    if strcmpi(a.lineStyle, 'auto')
+        token = '-';
+    else
+        token = a.lineStyle;
+    end
+end
+
+function marker = effectiveMarker(a, cycleIdx)
+%EFFECTIVEMARKER  Marker character for direct plot() calls that don't go
+%   through guiLineSpec (e.g. the neutron polarization and asymmetry paths).
+    marker = resolveMarkerToken(a, cycleIdx);
 end
 
 function tf = is2DDataset(ds)

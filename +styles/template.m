@@ -156,5 +156,14 @@ function t = baseTemplate(name, fontName, fontSize, titleFS, legendFS, ...
     t.tickDir        = 'in';
     t.boxOn          = true;
     t.legendLocation = 'best';
+
+    % ── Phase A visual-style fields ──────────────────────────────────
+    % Read by bosonPlotter.resolveStyle and consumed by renderPlot so the
+    % live preview matches the exported figure.  Individual templates
+    % below may override any of these.
+    t.markerShape    = 'o';       % 'auto' = cycle per dataset (o,s,^,d,v,x,+,*)
+    t.lineStyle      = '-';       % 'auto' = cycle per dataset (-,--,-.,:)
+    t.alpha          = 1.0;       % 0..1 line/marker transparency
+    t.minorTicks     = false;     % minor tick visibility
     % tickLength, gridAlpha, legendBox set by caller
 end
