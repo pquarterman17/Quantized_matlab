@@ -65,6 +65,7 @@ arguments
     options.YLabels   cell = {}
     options.FigureSize (1,:) double = []
     options.Residuals        = []
+    options.Appearance struct = struct()   % pre-resolved style from bosonPlotter.resolveStyle
 end
 
 nDS = numel(datasets);
@@ -105,8 +106,17 @@ colWidths = repmat({'1x'}, 1, nCols);
 % Create figure
 % ════════════════════════════════════════════════════════════════════════
 
-% Apply template if specified
-if options.Template ~= ""
+% Apply template in precedence order:
+%   1. Appearance struct (full pre-resolved from bosonPlotter.resolveStyle)
+%   2. Template string name  (legacy path)
+%   3. styles.default() with a few Helvetica-screen overrides
+if ~isempty(fieldnames(options.Appearance))
+    tmpl = options.Appearance;
+    % Back-fill any legacy fields multiPanel expects but resolveStyle
+    % may not have populated (figWidth_cm / figHeight_cm).
+    if ~isfield(tmpl,'figWidth_cm')  || isempty(tmpl.figWidth_cm),  tmpl.figWidth_cm  = 14; end
+    if ~isfield(tmpl,'figHeight_cm') || isempty(tmpl.figHeight_cm), tmpl.figHeight_cm = 10; end
+elseif options.Template ~= ""
     tmpl = styles.template(options.Template);
 else
     tmpl = styles.default();

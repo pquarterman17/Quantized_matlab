@@ -214,6 +214,37 @@ end
 close(r.fig);
 
 % ════════════════════════════════════════════════════════════════════
+%  Appearance pre-resolved struct (multi-panel unification)
+% ════════════════════════════════════════════════════════════════════
+
+% Pass a pre-resolved style struct via Appearance — should override the
+% legacy Template path and populate the axes font accordingly.
+apprStruct = bosonPlotter.resolveStyle(styles.template('aps'));
+r = bosonPlotter.multiPanel({d1, d2}, Layout='2x1', Appearance=apprStruct);
+if strcmpi(r.axes(1).FontName, apprStruct.fontName) && ...
+   r.axes(1).FontSize == apprStruct.fontSize
+    fprintf('  PASS: Appearance struct propagates FontName + FontSize\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: Appearance not applied (FontName=%s FontSize=%g, expected %s %g)\n', ...
+        r.axes(1).FontName, r.axes(1).FontSize, apprStruct.fontName, apprStruct.fontSize);
+    failed = failed + 1;
+end
+close(r.fig);
+
+% Appearance takes precedence over Template string
+apprPres = bosonPlotter.resolveStyle(styles.template('presentation'));
+r = bosonPlotter.multiPanel({d1}, Layout='1x1', ...
+    Template='aps', Appearance=apprPres);
+if r.axes(1).FontSize == apprPres.fontSize
+    fprintf('  PASS: Appearance wins over Template=aps string\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: Appearance did not override Template string (got %g, expected %g)\n', ...
+        r.axes(1).FontSize, apprPres.fontSize);
+    failed = failed + 1;
+end
+close(r.fig);
+
+% ════════════════════════════════════════════════════════════════════
 %  SUMMARY
 % ════════════════════════════════════════════════════════════════════
 
