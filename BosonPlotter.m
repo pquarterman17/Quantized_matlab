@@ -11622,22 +11622,19 @@ function varargout = BosonPlotter()
                 allCell    = [headerCell; unitsCell; dataCell];
                 writecell(allCell, outPath);
             else
-                % CSV: write header, units, then data
+                % CSV: write header + units rows, then bulk-write data
                 fidOut = fopen(outPath, 'w');
                 if fidOut == -1
                     error('Cannot open file: %s', outPath);
                 end
-                cleanF = onCleanup(@() fclose(fidOut));
                 % Header row
                 fprintf(fidOut, '%s\n', strjoin(colNames, ','));
                 % Units row
                 fprintf(fidOut, '%s\n', strjoin(appData.tableUnits, ','));
-                % Data rows
-                for ri = 1:size(wc, 1)
-                    vals = arrayfun(@(v) sprintf('%.10g', v), wc(ri, :), ...
-                        'UniformOutput', false);
-                    fprintf(fidOut, '%s\n', strjoin(vals, ','));
-                end
+                fclose(fidOut);
+                % Data rows — single writematrix call replaces O(N) loop
+                writematrix(wc, outPath, 'Delimiter', ',', ...
+                    'WriteMode', 'append', 'Precision', 10);
             end
             setStatus(sprintf('Table saved: %s (%d rows + units)', fn, size(wc, 1)));
         catch ME
