@@ -1,0 +1,16 @@
+{
+    "_comment": "PPMS standard resistivity — 4-probe R vs T",
+    "name": "PPMS — Resistivity",
+    "version": 1,
+    "type": "tabular",
+    "match": {
+        "parserName": "importPPMS",
+        "columnNames": ["Temperature (K)", "Resistance Ch1 (Ohms)", "Resistance Ch2 (Ohms)"],
+        "instrument": "PPMS"
+    },
+    "overrides": {
+        "labels": {},
+        "units": {}
+    },
+    "source": "shipped"
+}

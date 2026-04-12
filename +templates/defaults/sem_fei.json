@@ -1,0 +1,15 @@
+{
+    "_comment": "FEI/Thermo SEM TIFF — common metadata fields to override",
+    "name": "SEM — FEI/Thermo",
+    "version": 1,
+    "type": "image_metadata",
+    "match": {
+        "parserName": "importTIFF",
+        "instrument": "Helios"
+    },
+    "overrides": {
+        "sampleName": "",
+        "operator": ""
+    },
+    "source": "shipped"
+}

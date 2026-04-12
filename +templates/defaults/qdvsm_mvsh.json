@@ -1,0 +1,16 @@
+{
+    "_comment": "QD VSM M vs H — standard magnetization hysteresis loop",
+    "name": "QD VSM — M vs H",
+    "version": 1,
+    "type": "tabular",
+    "match": {
+        "parserName": "importQDVSM",
+        "columnNames": ["Magnetic Field (Oe)", "Moment (emu)", "M. Std. Err. (emu)"],
+        "instrument": "VSM"
+    },
+    "overrides": {
+        "labels": {},
+        "units": {}
+    },
+    "source": "shipped"
+}

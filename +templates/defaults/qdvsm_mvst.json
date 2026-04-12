@@ -1,0 +1,16 @@
+{
+    "_comment": "QD VSM M vs T — magnetization vs temperature (FC/ZFC)",
+    "name": "QD VSM — M vs T",
+    "version": 1,
+    "type": "tabular",
+    "match": {
+        "parserName": "importQDVSM",
+        "columnNames": ["Temperature (K)", "Moment (emu)", "M. Std. Err. (emu)"],
+        "instrument": "VSM"
+    },
+    "overrides": {
+        "labels": {},
+        "units": {}
+    },
+    "source": "shipped"
+}

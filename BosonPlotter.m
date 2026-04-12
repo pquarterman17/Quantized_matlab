@@ -2658,6 +2658,35 @@ function varargout = BosonPlotter(options)
             % ── Normal single-parser import ──────────────────────────────
             try
                 [data, parserName] = guiImport(fp);
+
+                % Template matching: auto-apply or suggest overrides
+                try
+                    [tmpl, conf] = templates.TemplateEngine.match(data, Type='tabular');
+                    if conf >= 0.8 && ~isempty(tmpl)
+                        data = templates.TemplateEngine.apply(data, tmpl);
+                        setStatus(sprintf('Applied template: %s', tmpl.name));
+                    elseif conf >= 0.4 && ~isempty(tmpl)
+                        sel = uiconfirm(fig, ...
+                            sprintf('Suggested template: "%s" (%.0f%% match)\nApply it?', tmpl.name, conf*100), ...
+                            'Template Suggestion', ...
+                            'Options', {'Apply', 'Edit...', 'Ignore'}, ...
+                            'DefaultOption', 'Apply', 'CancelOption', 'Ignore');
+                        if strcmp(sel, 'Apply')
+                            data = templates.TemplateEngine.apply(data, tmpl);
+                        elseif strcmp(sel, 'Edit...')
+                            edited = templates.ColumnMapper(data, Template=tmpl, ParentFig=fig);
+                            if ~isempty(edited), data = edited; end
+                        end
+                    elseif conf < 0.4 && ismember(parserName, {'importCSV', 'importExcel'})
+                        % Generic parsers: offer Column Mapper for unknown layouts
+                        edited = templates.ColumnMapper(data, ParentFig=fig);
+                        if ~isempty(edited), data = edited; end
+                    end
+                catch ME_tmpl
+                    % Template matching is non-critical — log and continue
+                    fprintf(2, '[BosonPlotter] Template match warning: %s\n', ME_tmpl.message);
+                end
+
                 ds = buildDs(fp, data, parserName);
                 appData.datasets{end+1} = ds;
                 nLoaded = nLoaded + 1;
@@ -10870,6 +10899,40 @@ function varargout = BosonPlotter(options)
                     uialert(fig, sprintf('Reload failed:\n%s', ME.message), 'Reload Error');
                 end
         end
+    end
+
+    function onEditColumnMapping()
+    %ONEDITCOLUMNMAPPING  Open the Column Mapper dialog for the active dataset.
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        ds = appData.datasets{appData.activeIdx};
+        corrected = templates.ColumnMapper(ds.data, ParentFig=fig);
+        if ~isempty(corrected)
+            appData.datasets{appData.activeIdx}.data = corrected;
+            appData.datasets{appData.activeIdx}.corrData = [];
+            updateControlsForActiveDataset();
+            onPlot([], []);
+            setStatus('Column mapping updated.');
+        end
+    end
+
+    function onSaveAsTemplate()
+    %ONSAVEASTEMPLATE  Save the active dataset's column layout as a template.
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        ds = appData.datasets{appData.activeIdx};
+        answer = inputdlg('Template name:', 'Save as Template', [1 60], {''});
+        if isempty(answer) || isempty(strtrim(answer{1})), return; end
+
+        tmpl = struct();
+        tmpl.name = strtrim(answer{1});
+        tmpl.type = 'tabular';
+        tmpl.match.headerFingerprint = templates.TemplateEngine.fingerprint(ds.data);
+        tmpl.match.columnNames = ds.data.labels;
+        if isfield(ds.data.metadata, 'parserName')
+            tmpl.match.parserName = ds.data.metadata.parserName;
+        end
+        tmpl.overrides = struct('labels', struct(), 'units', struct());
+        templates.TemplateEngine.save(tmpl);
+        setStatus(sprintf('Template "%s" saved.', tmpl.name));
     end
 
     function onAddHRefLine(~,~)

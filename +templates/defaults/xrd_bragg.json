@@ -1,0 +1,15 @@
+{
+    "_comment": "Generic XRD Bragg scan — 2theta vs intensity",
+    "name": "XRD — Bragg Scan",
+    "version": 1,
+    "type": "tabular",
+    "match": {
+        "parserName": "importXRDML",
+        "filePattern": "*.xrdml"
+    },
+    "overrides": {
+        "labels": {},
+        "units": {}
+    },
+    "source": "shipped"
+}

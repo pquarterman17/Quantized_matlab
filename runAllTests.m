@@ -168,6 +168,8 @@ SUITES = {
     % ── Utilities tests ──────────────────────────────────────────────────
     T('utilities','test_toOrigin'),        'utilities','Origin COM bridge: call sequence, qualified path, log handling (mock COM)'
     T('utilities','test_convertMagUnits'), 'utilities','Magnetometry unit conversion: Oe/T/mT/A/m, emu/A·m²/emu·g⁻¹/kA·m⁻¹, raw-preserve'
+    % ── Template tests ───────────────────────────────────────────────────
+    T('templates','test_templateEngine'),  'templates','Template engine: fingerprint, match cascade, apply, save/load/delete round-trip'
 };
 
 % Filter by group

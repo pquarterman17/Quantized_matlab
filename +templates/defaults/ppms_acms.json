@@ -1,0 +1,16 @@
+{
+    "_comment": "PPMS AC susceptibility — chi' and chi'' vs temperature",
+    "name": "PPMS — AC Susceptibility",
+    "version": 1,
+    "type": "tabular",
+    "match": {
+        "parserName": "importPPMS",
+        "columnNames": ["Temperature (K)", "AC Chi' (emu/Oe)", "AC Chi'' (emu/Oe)", "AC Frequency (Hz)"],
+        "instrument": "PPMS"
+    },
+    "overrides": {
+        "labels": {},
+        "units": {}
+    },
+    "source": "shipped"
+}
