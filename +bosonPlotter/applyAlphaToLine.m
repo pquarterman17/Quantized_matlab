@@ -28,12 +28,16 @@ function applyAlphaToLine(h, alphaVal)
     c3 = double(c(1:3));
     aVal = max(0, min(1, double(alphaVal)));
 
-    % ── R2024b+ native alpha ─────────────────────────────────────────
-    % Line.Color accepts [R G B A] as a documented feature.
-    if ~isMATLABReleaseOlderThan('R2024b')
-        try
-            set(h, 'Color', [c3(:).', aVal]);
-            % Markers too
+    % ── Native alpha probe ─────────────────────────────────────────
+    % MATLAB may eventually support [R G B A] in Line.Color as a
+    % documented feature.  Probe by setting it and checking whether the
+    % 4th element persists.  If it doesn't (R2025b and earlier silently
+    % truncate to 3), fall through to the undocumented primitive path.
+    try
+        set(h, 'Color', [c3(:).', aVal]);
+        cTest = get(h, 'Color');
+        if numel(cTest) >= 4 && abs(cTest(4) - aVal) < 0.02
+            % Native alpha worked — also set markers
             if isprop(h, 'MarkerEdgeColor') && ~strcmp(get(h,'MarkerEdgeColor'), 'none')
                 set(h, 'MarkerEdgeColor', [c3(:).', aVal]);
             end
@@ -41,9 +45,10 @@ function applyAlphaToLine(h, alphaVal)
                 set(h, 'MarkerFaceColor', [c3(:).', aVal]);
             end
             return;
-        catch
-            % Fall through to undocumented path
         end
+        % Restore original color (set truncated it)
+        set(h, 'Color', c3);
+    catch
     end
 
     % ── Pre-R2024b: undocumented primitive approach ──────────────────

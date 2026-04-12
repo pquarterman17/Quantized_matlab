@@ -274,14 +274,8 @@ if nPanels > 1
 end
 
 % Tight layout
-if exist('exportgraphics', 'file')
-    % Available in R2020a+; just tighten spacing
-    try
-        for pi = 1:nPanels
-            axHandles(pi).LooseInset = max(axHandles(pi).TightInset, 0.02);
-        end
-    catch
-    end
+for pi = 1:nPanels
+    axHandles(pi).LooseInset = max(axHandles(pi).TightInset, 0.02);
 end
 
 % ════════════════════════════════════════════════════════════════════════

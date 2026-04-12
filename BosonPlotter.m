@@ -9168,13 +9168,8 @@ function varargout = BosonPlotter(options)
         tmpFig = figure('Visible', 'off', 'Color', 'w', ...
             'Units', 'pixels', 'Position', [100 100 800 500]);
         tmpAx = axes(tmpFig);
-        try
-            drawToAxes(tmpAx);
-            copygraphics(tmpFig, 'Resolution', 200);
-        catch
-            % copygraphics not available before R2020a — fall back to print
-            print(tmpFig, '-dbitmap', '-clipboard');
-        end
+        drawToAxes(tmpAx);
+        copygraphics(tmpFig, 'Resolution', 200);
         delete(tmpFig);
     end
 
@@ -9830,23 +9825,7 @@ function varargout = BosonPlotter(options)
         grid(tmpAx,'on');
         drawToAxes(tmpAx);
         styleAxesForExport(tmpAx);
-        try
-            % copygraphics (R2020a+): vector EMF with transparent background
-            copygraphics(tmpAx, 'ContentType','vector', 'BackgroundColor','none');
-        catch ME
-            % Fallback: bitmap copy via print (Windows only)
-            try
-                print(tmpFig, '-clipboard', '-dmeta');
-            catch ME2
-                delete(tmpFig);
-                uialert(fig, ...
-                    sprintf(['Clipboard copy failed.\n\n' ...
-                             '(%s)\n\nUse "Export to Figure" and copy from there.'], ...
-                            ME2.message), ...
-                    'Copy to clipboard failed');
-                return;
-            end
-        end
+        copygraphics(tmpAx, 'ContentType','vector', 'BackgroundColor','none');
         delete(tmpFig);
     end
 
@@ -11576,12 +11555,7 @@ function varargout = BosonPlotter(options)
     %   row.  Data rows are offset by 1 in the display to account for the
     %   units row at table row 1.  Safe to call on an empty/invalid table.
         if isempty(tblData) || ~isvalid(tblData), return; end
-        try
-            removeStyle(tblData);
-        catch
-            % removeStyle requires R2021b+ — silently skip if unavailable
-            return;
-        end
+        removeStyle(tblData);
 
         if isempty(appData.tableMask) || ~any(appData.tableMask), return; end
 
@@ -11592,12 +11566,8 @@ function varargout = BosonPlotter(options)
         % Post-split: tblData rows map 1:1 to data rows — no units row
         % to offset around.
         softRed = [1.0 0.88 0.88];
-        try
-            s = uistyle('BackgroundColor', softRed);
-            addStyle(tblData, s, 'row', maskedDataRows);
-        catch
-            % If uistyle / addStyle fail (very old MATLAB), do nothing
-        end
+        s = uistyle('BackgroundColor', softRed);
+        addStyle(tblData, s, 'row', maskedDataRows);
     end
 
     function onTableCellEdit(~, evt)

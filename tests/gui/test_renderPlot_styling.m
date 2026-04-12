@@ -192,17 +192,16 @@ function test_renderPlot_styling
         bosonPlotter.applyAlphaToLine(h1, 0.4);
         drawnow;
 
-        % R2024b+ uses documented 4-element Color; older uses Edge primitive
-        if ~isMATLABReleaseOlderThan('R2024b')
-            % Native alpha path — Color should be [R G B A]
-            c = get(h1, 'Color');
-            check('Color has 4 elements (native alpha)', numel(c) == 4);
-            if numel(c) == 4
-                check('Color(4) ≈ 0.4', abs(c(4) - 0.4) < 0.02);
-                check('Color(1) preserved', abs(c(1) - 0.2) < 0.02);
-            end
+        % Probe-based: check whether native 4-element Color took effect,
+        % or the undocumented Edge primitive path was used instead.
+        c = get(h1, 'Color');
+        if numel(c) >= 4 && abs(c(4) - 0.4) < 0.02
+            % Native alpha path succeeded
+            check('Color has 4 elements (native alpha)', true);
+            check('Color(4) approx 0.4', abs(c(4) - 0.4) < 0.02);
+            check('Color(1) preserved', abs(c(1) - 0.2) < 0.02);
         else
-            % Undocumented Edge primitive path
+            % Undocumented Edge primitive path (R2025b and earlier)
             haveEdge = false;
             try
                 e = h1.Edge;
@@ -216,8 +215,7 @@ function test_renderPlot_styling
                 cd = h1.Edge.ColorData;
                 check('Edge.ColorData has 4 bytes', numel(cd) == 4);
                 if numel(cd) == 4
-                    % Alpha 0.4 → round(0.4 * 255) = 102
-                    check('Edge.ColorData(4) ≈ 102 (0.4*255)', abs(double(cd(4)) - 102) <= 1);
+                    check('Edge.ColorData(4) approx 102', abs(double(cd(4)) - 102) <= 1);
                     check('Edge.ColorData(1) preserved', abs(double(cd(1)) - 51) <= 1);
                 end
             end
