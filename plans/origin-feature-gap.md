@@ -1,9 +1,101 @@
 # OriginPro Feature Gap Analysis
 
-Comparison of OriginPro features vs thin_film_toolkit (MATLAB + Python port).
-Focused on features relevant to thin film / magnetometry / XRD / EM workflows.
+Comparison of OriginPro features vs the MATLAB toolkit + Python port. All high and
+medium priority items are implemented in MATLAB. Remaining work is Python porting
+and one low-priority niche item.
 
-## Already at Parity
+**Status:** Active
+**Created:** 2026-03
+**Updated:** 2026-04-11
+
+---
+
+## Context
+
+### How the pieces fit together
+Features span multiple packages: `+fitting/` (curve fitting, bands, diagnostics, surface,
+global, ODR), `+plotting/` (box/violin, ternary, polar contour), `+utilities/` (ANOVA, PCA,
+filter rows), and `+bosonPlotter/` (undo manager, spreadsheet popup, toolbar config, drag
+columns). Each MATLAB feature needs a corresponding Python implementation in
+`thin_film_toolkit/`.
+
+### Data / control flow
+```
+OriginPro feature → MATLAB implementation (+fitting, +plotting, +utilities, +bosonPlotter)
+                  → Python port (thin_film_toolkit backend → FastAPI → Vue 3 frontend)
+```
+
+### Dependency map
+All Python ports are independent of each other. Each requires the MATLAB implementation
+as a reference (all complete).
+
+---
+
+## Tier 1 — High Impact
+
+1. **Fit Comparison Metrics (AIC / BIC / F-test)** — rank competing models objectively
+   - [ ] Port to Python (`thin_film_toolkit`)
+   - [ ] Test Python implementation
+
+2. **Plot Templates (Save / Reuse Custom Styles)** — user-defined reusable formatting
+   - [ ] Port to Python
+   - [ ] Test Python implementation
+
+3. **Box / Violin / Bee-Swarm Plots** — distribution visualization
+   - [ ] Port to Python
+   - [ ] Test Python implementation
+
+4. **Auto-Recalculate on Parameter Change** — reactive data flow
+   - [ ] Port to Python
+   - [ ] Test Python implementation
+
+5. **Global Parameter Sharing Across Datasets** — shared constraints in curve fitting
+   - [ ] Port to Python
+   - [ ] Test Python implementation
+
+6. **Confidence / Prediction Bands on Curve Fits** — fit uncertainty visualization
+   - [ ] Port to Python
+   - [ ] Test Python implementation
+
+## Tier 2 — Medium Impact
+
+7. **Unlimited Undo** — full undo history for all operations
+   - [ ] Port to Python
+   - [ ] Test Python implementation
+
+8. **Data Filter (Conditional Row Visibility)** — expression-based row filtering
+   - [ ] Port to Python
+   - [ ] Test Python implementation
+
+9. **Fit Residual Diagnostics** — Q-Q plot, Durbin-Watson, runs test
+   - [ ] Port to Python
+   - [ ] Test Python implementation
+
+10. **Surface / 3D Fitting** — z = f(x, y) for RSM peak extraction
+    - [ ] Port to Python
+    - [ ] Test Python implementation
+
+11. **Spreadsheet Popup** — native table view with uispreadsheet
+    - [ ] Port to Python
+    - [ ] Test Python implementation
+
+12. **Customizable Toolbar** — dynamic toolbar builder, persist to prefs
+    - [ ] Port to Python
+    - [ ] Test Python implementation
+
+13. **Drag Columns to Plot** — column drag from data table to axes
+    - [ ] Port to Python
+    - [ ] Test Python implementation
+
+## Tier 3 — Nice-to-Have
+
+14. **Column formulas (auto-recalc)** — partially addressed by spreadsheet popup
+    - [ ] Design approach for Python
+    - [ ] Implement
+
+---
+
+## Already at parity (MATLAB)
 
 Multi-format import, curve fitting (23 models), peak analysis, batch processing,
 publication figures (journal templates, vector export), data corrections, session
@@ -13,162 +105,23 @@ quantification, materials property calculator, neutron reflectometry.
 
 ---
 
-## High Priority (Relevant to Our Users)
+## Completed
 
-### 1. Fit Comparison Metrics (AIC / BIC / F-test)
-- [x] Implemented (MATLAB) — `+fitting/fitCompare.m`, Compare Models button in curveFitting
-- [x] Tested (MATLAB) — `tests/fitting/test_fitCompare.m` (28 tests)
-- [ ] Implemented (Python)
-- [ ] Tested (Python)
-
-**Origin:** Ranks competing models by AIC, BIC, F-test, adjusted R².
-**Us:** R² and RMSE only. No way to objectively pick between e.g. Gaussian vs Voigt.
-**Effort:** Small — compute AIC/BIC from residuals + parameter count.
-
-### 2. Plot Templates (Save / Reuse Custom Styles)
-- [x] Implemented (MATLAB) — `+plotting/plotTemplate.m`, `+plotting/templateDialog.m`, wired into figureBuilder
-- [x] Tested (MATLAB) — `tests/plotting/test_plotTemplate.m` (7 tests)
-- [ ] Implemented (Python)
-- [ ] Tested (Python)
-
-**Origin:** Save axis formatting, colors, labels as reusable templates. Apply to new data.
-**Us:** Journal presets only (APS, Nature, ACS, Elsevier). No user-defined templates.
-**Effort:** Medium — serialize axis props, line styles, colors to .mat/.json, apply on load.
-
-### 3. Box / Violin / Bee-Swarm Plots
-- [x] Implemented (MATLAB) — `+plotting/boxViolinSwarm.m`, new type in figureBuilder
-- [x] Tested (MATLAB) — `tests/plotting/test_boxViolinSwarm.m` (12 tests)
-- [ ] Implemented (Python)
-- [ ] Tested (Python)
-
-**Origin:** Built-in statistical plot types for distribution visualization.
-**Us:** None. Useful for showing measurement spread across samples or conditions.
-**Effort:** Medium — box plot is straightforward; violin needs kernel density estimation.
-
-### 4. Auto-Recalculate on Parameter Change
-- [x] Implemented (MATLAB) — "Auto" checkbox + debounced timer in BosonPlotter.m
-- [x] Tested (MATLAB) — manual verification (timer-based, hard to automate)
-- [ ] Implemented (Python)
-- [ ] Tested (Python)
-
-**Origin:** Change a correction or fit parameter, downstream plots update live.
-**Us:** Manual "Apply" button required. No reactive data flow.
-**Effort:** Large — requires event-driven architecture or listener callbacks on all widgets.
-
-### 5. Global Parameter Sharing Across Arbitrary Datasets
-- [x] Implemented (MATLAB) — `+fitting/globalCurveFit.m`, Global Fit button in curveFitting with constraint UI
-- [x] Tested (MATLAB) — `tests/fitting/test_globalCurveFit.m` (18 assertions across 8 groups)
-- [ ] Implemented (Python)
-- [ ] Tested (Python)
-
-**Origin:** Share fit parameters (e.g., peak width) across multiple datasets in one fit.
-**Us:** Global fit exists but only for XRD multi-peak. Not generalized.
-**Effort:** Medium — extend fitting engine to accept shared parameter constraints.
-
-### 6. Confidence / Prediction Bands on Curve Fits
-- [x] Implemented (MATLAB) — `+fitting/fitBands.m`, Show Bands checkbox in curveFitting
-- [x] Tested (MATLAB) — `tests/fitting/test_fitBands.m` (8 tests)
-- [ ] Implemented (Python)
-- [ ] Tested (Python)
-
-**Origin:** Overlay confidence and prediction intervals on fitted curves.
-**Us:** `confidenceBand` utility exists for repeat datasets, but not for fit uncertainty.
-**Effort:** Small — compute from Jacobian covariance matrix after fit.
-
----
-
-## Medium Priority
-
-### 7. Unlimited Undo
-- [x] Implemented (MATLAB) — `+bosonPlotter/UndoManager.m` handle class, full wiring in BosonPlotter.m with Redo button + Ctrl+Z/Y
-- [x] Tested (MATLAB) — `tests/gui/test_undoManager.m` (9 tests)
-- [ ] Implemented (Python)
-- [ ] Tested (Python)
-
-**Origin:** Full undo history for all operations.
-**Us:** 5-level undo, corrections only. No undo for peak edits, figure changes, etc.
-**Effort:** Medium — generalize undo stack to all state-mutating operations.
-
-### 8. Data Filter (Conditional Row Visibility)
-- [x] Implemented (MATLAB) — `+bosonPlotter/filterRows.m` (recursive descent parser), filter bar in BosonPlotter
-- [x] Tested (MATLAB) — `tests/gui/test_filterRows.m` (15 tests)
-- [ ] Implemented (Python)
-- [ ] Tested (Python)
-
-**Origin:** Show/hide rows by column condition (e.g., "T > 300 K").
-**Us:** Manual mask selection only. No expression-based filtering.
-**Effort:** Small — parse simple conditions, apply as mask.
-
-### 9. Fit Residual Diagnostics
-- [x] Implemented (MATLAB) — `+fitting/residualDiagnostics.m`, Diagnostics button in curveFitting
-- [x] Tested (MATLAB) — `tests/fitting/test_residualDiagnostics.m` (9 tests)
-- [ ] Implemented (Python)
-- [ ] Tested (Python)
-
-**Origin:** Residual plots, Q-Q plots, Durbin-Watson, runs test.
-**Us:** Residual overlay only. No statistical diagnostics.
-**Effort:** Small-Medium — add Q-Q plot and basic residual statistics.
-
-### 10. Surface / 3D Fitting
-- [x] Implemented (MATLAB) — `+fitting/surfaceFit.m`, `surfaceModels.m` (7 models), `surfaceFitDialog.m`, wired into 2D map panel
-- [x] Tested (MATLAB) — `tests/fitting/test_surfaceFit.m` (15 tests)
-- [ ] Implemented (Python)
-- [ ] Tested (Python)
-
-**Origin:** Fit z = f(x, y) surfaces to 2D data (e.g., RSM peak fitting).
-**Us:** No 2D fitting. Would be useful for RSM substrate/film peak extraction.
-**Effort:** Medium — extend curveFit to 2D, add 2D model catalog.
-
----
-
-## Additional Features Implemented (Beyond Original Gap List)
-
-### 11. Spreadsheet Popup (Native MATLAB Table)
-- [x] Implemented (MATLAB) — `+bosonPlotter/spreadsheetPopup.m` with uispreadsheet (R2025a+) / uitable fallback
-- [x] Tested (MATLAB) — `tests/gui/test_spreadsheetPopup.m` (11 tests)
-
-### 12. Customizable Toolbar
-- [x] Implemented (MATLAB) — `+bosonPlotter/toolbarConfig.m`, dynamic toolbar builder, persist to prefdir
-- [x] Tested (MATLAB) — `tests/gui/test_toolbarConfig.m` (7 tests)
-
-### 13. Drag Columns to Plot
-- [x] Implemented (MATLAB) — Column drag from data table to axes (X/Y/Y2 drop zones)
-- [x] Tested (MATLAB) — `tests/gui/test_dragToPlot.m` (7 tests)
-
----
-
-## Low Priority (Less Relevant to Our Domain)
-
-- [x] **Ternary plots** — `plotting.ternaryPlot` (equilateral triangle,
-      barycentric coords, auto-normalization, value-colored scatter,
-      grid at 10% intervals, vertex labels). Tested:
-      `tests/plotting/test_ternaryPlot.m` (10 tests). Useful for phase
-      diagrams, alloy composition maps, EDS quantification results.
-- [x] **Polar contour plots** — `plotting.polarContour` (filled/line
-      contour on polar coordinates with configurable ThetaZero/ThetaDir
-      for XRD pole-figure convention). Tested:
-      `tests/plotting/test_polarContour.m` (10 tests including explicit
-      orientation checks for all four top/right × cw/ccw combinations).
-- [x] **ANOVA** — `utilities.anova1` (one-way ANOVA, cell-array or flat
-      vector + Group labels, F-distribution p-values via `betainc`,
-      handles unequal group sizes, NaNs dropped). Joins `utilities.tTest`
-      as the second no-toolbox inferential-stats primitive. Tested:
-      `tests/fitting/test_anovaPca.m` (8 ANOVA tests including textbook
-      reference F, null and strong-effect cases, unequal sizes, NaNs).
-- [x] **PCA** — `utilities.pcaAnalysis` (SVD-based, covariance or
-      correlation mode via `Scale=true`, deterministic sign convention,
-      `NumComponents` truncation, returns coeff/score/latent/explained/
-      cumulative/mu/sigma/singular). No Statistics Toolbox dependency.
-      Tested: `tests/fitting/test_anovaPca.m` (10 PCA tests including
-      45°-rotated-ellipse axis recovery and score reconstruction).
-- [ ] Column formulas (auto-recalc) — partially addressed by spreadsheet popup
-- [x] **ODR (orthogonal distance regression)** — `fitting.odrFit` (Deming
-      regression, closed-form slope, jackknife errors, λ from XError/YError).
-      Tested: `tests/fitting/test_odrFit.m` (10 tests). On symmetric noise
-      with 500 points, ODR is 13× more accurate than OLS.
-
----
-
-## Status
-
-**All high and medium priority items are implemented in MATLAB.** Only Python ports and low-priority niche features remain.
+- ~~**Fit Comparison Metrics**~~ (MATLAB) — `+fitting/fitCompare.m`, 28 tests
+- ~~**Plot Templates**~~ (MATLAB) — `+plotting/plotTemplate.m` + `templateDialog.m`, 7 tests
+- ~~**Box / Violin / Bee-Swarm**~~ (MATLAB) — `+plotting/boxViolinSwarm.m`, 12 tests
+- ~~**Auto-Recalculate**~~ (MATLAB) — "Auto" checkbox + debounced timer in BosonPlotter
+- ~~**Global Parameter Sharing**~~ (MATLAB) — `+fitting/globalCurveFit.m`, 18 assertions
+- ~~**Confidence / Prediction Bands**~~ (MATLAB) — `+fitting/fitBands.m`, 8 tests
+- ~~**Unlimited Undo**~~ (MATLAB) — `+bosonPlotter/UndoManager.m`, 9 tests
+- ~~**Data Filter**~~ (MATLAB) — `+bosonPlotter/filterRows.m`, 15 tests
+- ~~**Fit Residual Diagnostics**~~ (MATLAB) — `+fitting/residualDiagnostics.m`, 9 tests
+- ~~**Surface / 3D Fitting**~~ (MATLAB) — `+fitting/surfaceFit.m` + 7 models, 15 tests
+- ~~**Spreadsheet Popup**~~ (MATLAB) — `+bosonPlotter/spreadsheetPopup.m`, 11 tests
+- ~~**Customizable Toolbar**~~ (MATLAB) — `+bosonPlotter/toolbarConfig.m`, 7 tests
+- ~~**Drag Columns to Plot**~~ (MATLAB) — column drag to X/Y/Y2 drop zones, 7 tests
+- ~~**Ternary plots**~~ (MATLAB) — `+plotting/ternaryPlot.m`, 10 tests
+- ~~**Polar contour plots**~~ (MATLAB) — `+plotting/polarContour.m`, 10 tests
+- ~~**ANOVA**~~ (MATLAB) — `+utilities/anova1.m`, 8 tests
+- ~~**PCA**~~ (MATLAB) — `+utilities/pcaAnalysis.m`, 10 tests
+- ~~**ODR**~~ (MATLAB) — `+fitting/odrFit.m`, 10 tests (13x more accurate than OLS)

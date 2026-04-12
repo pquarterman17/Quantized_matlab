@@ -1,5 +1,5 @@
 %TEST_GUI_BUTTONS  Comprehensive button/control coverage for BosonPlotter.
-%   54 tests across 10 categories (A–J).
+%   55 tests across 11 categories (A–K).
 %   Run via: runAllTests(Group="gui")
 %
 %   Categories:
@@ -13,6 +13,7 @@
 %     H. Batch Operations    (tests 47–48)
 %     I. Macro Recording     (tests 49–51)
 %     J. Miscellaneous       (tests 52–54)
+%     K. Recent Files        (test  55)
 
 clear; clc;
 
@@ -1754,6 +1755,38 @@ try
         sprintf('refreshState changed dataset count: %d → %d', nBefore, nAfter));
     fprintf('  refreshState called, dataset count stable (%d)\n', nAfter);
     fprintf('  PASS\n'); passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+
+% ── K55. Recent files dropdown populates after load ────────────────────
+fprintf('\n══ TEST K55: Recent files dropdown populates after load ══\n');
+try
+    api.reset(); drawnow;
+    api.addFiles({XRDML}); drawnow;
+
+    recent = api.getRecentFiles();
+    assert(~isempty(recent), 'recentFiles is empty after loading a file');
+    assert(strcmp(recent{1}, XRDML), ...
+        sprintf('Most recent file should be XRDML, got: %s', recent{1}));
+    fprintf('  PASS  recentFiles{1} matches loaded file\n');
+
+    % Load a second file — it should be first now
+    api.addFiles({VSM}); drawnow;
+    recent2 = api.getRecentFiles();
+    assert(strcmp(recent2{1}, VSM), 'VSM should be most recent after second load');
+    assert(strcmp(recent2{2}, XRDML), 'XRDML should be second after VSM load');
+    fprintf('  PASS  order is correct after second load (MRU first)\n');
+
+    % Duplicate load should not create duplicate entries
+    api.addFiles({XRDML}); drawnow;
+    recent3 = api.getRecentFiles();
+    nXRDML = sum(strcmp(recent3, XRDML));
+    assert(nXRDML == 1, sprintf('XRDML appears %d times, expected 1', nXRDML));
+    assert(strcmp(recent3{1}, XRDML), 'XRDML should be most recent after re-load');
+    fprintf('  PASS  deduplication works (no duplicate entries)\n');
+
+    passed = passed + 1;
 catch ME
     fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
 end

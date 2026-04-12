@@ -42,12 +42,25 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         allYLabels = unique(allYLabels, 'stable');
 
         % ── Builder uifigure ────────────────────────────────────────────
+        % Dynamic height: fit within the current screen so controls stay
+        % reachable on laptops (1366×768).  Reserve ~120 px for title bar
+        % + taskbar.  Root grid is Scrollable so short screens get a
+        % scrollbar instead of clipped buttons.
+        dlgW = 700;
+        try
+            screenSize = get(0, 'ScreenSize');
+            maxDlgH    = max(400, screenSize(4) - 120);
+        catch
+            maxDlgH = 600;
+        end
+        dlgH = min(600, maxDlgH);
         bFig = uifigure('Name','Advanced Figure Builder', ...
-            'Position',[250 120 700 600], 'Resize','off');
+            'Position',[250 120 dlgW dlgH], 'Resize','on');
 
         bRootGL = uigridlayout(bFig, [4 1], ...
             'RowHeight', {28, '1x', 70, 36}, ...
-            'Padding', [10 10 10 10], 'RowSpacing', 6);
+            'Padding', [10 10 10 10], 'RowSpacing', 6, ...
+            'Scrollable', 'on');
 
         % ════════════════════════════════════════════════════════════════
         %  Row 1: Figure type selector

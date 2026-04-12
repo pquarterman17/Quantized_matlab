@@ -189,6 +189,9 @@ classdef AppState < handle
         % ── Smoothing live preview ─────────────────────────────────
         smoothPreviewLine            = []   % line handle for dashed smooth overlay; [] when inactive
 
+        % ── Recent files ───────────────────────────────────────────
+        recentFiles     cell   = {}    % {1×N} full paths, most recent first; persisted to prefdir
+
         % ── Visual style (Phase A) ─────────────────────────────────
         % activeTemplate names a built-in template from styles.template()
         % or a user template (prefixed 'user:'); styleOverrides is a

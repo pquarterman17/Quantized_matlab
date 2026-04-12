@@ -257,6 +257,19 @@ function varargout = BosonPlotter()
     % ── Toolbar configuration: load from prefdir or use factory default ────
     appData.toolbarConfig = loadToolbarConfig();
 
+    % ── Recent files: load from prefdir ──────────────────────────────────
+    recentFilePath = fullfile(prefdir, 'boson_recent.mat');
+    try
+        if isfile(recentFilePath)
+            tmp = load(recentFilePath, 'recentFiles');
+            if isfield(tmp, 'recentFiles')
+                appData.recentFiles = tmp.recentFiles;
+            end
+        end
+    catch
+        % Ignore errors loading recent files
+    end
+
     % ── Figure ───────────────────────────────────────────────────────────
     % Detect available screen size and fit the window to it
     screenSz = get(0, 'ScreenSize');  % [1 1 width height]
@@ -354,7 +367,15 @@ function varargout = BosonPlotter()
         'BackgroundColor',BTN_PRIMARY, ...
         'FontColor',BTN_FG,'FontWeight','bold', ...
         'Tooltip','Browse for one or more data files — each is added as a new dataset');
-    btnBrowse.Layout.Row = 1; btnBrowse.Layout.Column = [1 2];
+    btnBrowse.Layout.Row = 1; btnBrowse.Layout.Column = 1;
+
+    ddRecent = uidropdown(tbGL, ...
+        'Items', {'(recent)'}, ...
+        'Value', '(recent)', ...
+        'FontSize', 10, ...
+        'ValueChangedFcn', @onRecentFileSelected, ...
+        'Tooltip', 'Open a recently loaded file');
+    ddRecent.Layout.Row = 1; ddRecent.Layout.Column = 2;
 
     % Row 2: Batch Import | Batch XRD Convert
     btnBatchImport = uibutton(tbGL,'Text','Batch Import...', ...
@@ -2330,6 +2351,12 @@ function varargout = BosonPlotter()
     api.setShowLegend           = @setShowLegendDirect;
     api.setTheme                = @(name) setThemeDirect(name);
 
+    % ── Recent files API (for testing) ───────────────────────────────
+    api.getRecentFiles          = @() appData.recentFiles;
+
+    % Populate recent dropdown from persisted state
+    updateRecentDropdown();
+
     % ════════════════════════════════════════════════════════════════════
     %  NESTED CALLBACKS  (share appData + all control handles via closure)
     % ════════════════════════════════════════════════════════════════════
@@ -2530,6 +2557,7 @@ function varargout = BosonPlotter()
                         ds.displayName = sprintf('%s%s [%s]', fnBase, fExt, shName);
                         appData.datasets{end+1} = ds;
                         nLoaded = nLoaded + 1;
+                        addToRecentFiles(fp);
                     catch ME
                         fprintf(2, '\n[BosonPlotter] Import error (%s [%s]): %s\n', ...
                             fnBase, shName, ME.message);
@@ -2547,6 +2575,7 @@ function varargout = BosonPlotter()
                 ds = buildDs(fp, data, parserName);
                 appData.datasets{end+1} = ds;
                 nLoaded = nLoaded + 1;
+                addToRecentFiles(fp);
             catch ME
                 fprintf(2, '\n[BosonPlotter] Import error (%s): %s\n', fnBase, ME.message);
                 for si = 1:numel(ME.stack)
@@ -5799,6 +5828,63 @@ function varargout = BosonPlotter()
             % Update record button text with entry count
             btnMacroRecord.Text = sprintf('%s %d', char(9632), appData.macroLog.nEntries());
         end
+    end
+
+    % ── Recent files helpers ─────────────────────────────────────────────
+
+    function saveRecentFiles()
+    %SAVERECENTFILES  Persist the recent file list to prefdir.
+        try
+            recentFiles = appData.recentFiles; %#ok<NASGU>
+            save(recentFilePath, 'recentFiles');
+        catch
+            % Ignore save errors (read-only prefdir, etc.)
+        end
+    end
+
+    function addToRecentFiles(fp)
+    %ADDTORECENTFILES  Add a file path to recent files (deduplicated, capped at 10).
+        fp = char(fp);
+        appData.recentFiles(strcmp(appData.recentFiles, fp)) = [];
+        appData.recentFiles = [{fp}, appData.recentFiles];
+        if numel(appData.recentFiles) > 10
+            appData.recentFiles = appData.recentFiles(1:10);
+        end
+        saveRecentFiles();
+        updateRecentDropdown();
+    end
+
+    function updateRecentDropdown()
+    %UPDATERECENTDROPDOWN  Refresh the Recent dropdown from appData.recentFiles.
+        if isempty(appData.recentFiles)
+            ddRecent.Items = {'(recent)'};
+            ddRecent.Value = '(recent)';
+        else
+            shortNames = cell(size(appData.recentFiles));
+            for ri = 1:numel(appData.recentFiles)
+                [~, fn, fe] = fileparts(appData.recentFiles{ri});
+                shortNames{ri} = [fn fe];
+            end
+            ddRecent.Items     = shortNames;
+            ddRecent.ItemsData = appData.recentFiles;
+            ddRecent.Value     = appData.recentFiles{1};
+        end
+    end
+
+    function onRecentFileSelected(~, evt)
+    %ONRECENTFILESELECTED  Load a file chosen from the Recent dropdown.
+        fp = evt.Value;
+        if ischar(fp) && strcmp(fp, '(recent)'), return; end
+        if ~isfile(fp)
+            uialert(fig, sprintf('File not found:\n%s', fp), ...
+                'File Missing', 'Icon', 'warning');
+            % Remove stale entry
+            appData.recentFiles(strcmp(appData.recentFiles, fp)) = [];
+            saveRecentFiles();
+            updateRecentDropdown();
+            return;
+        end
+        loadFilePaths({fp});
     end
 
     function onToggleMacroRecord(~, ~)

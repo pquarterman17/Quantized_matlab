@@ -1,48 +1,73 @@
 # Codebase Organization Roadmap
 
-Structural improvements for maintainability.
+Structural improvements for maintainability — monolith decomposition, documentation coverage, test organization.
+
+**Status:** Active
+**Created:** 2026-03
+**Updated:** 2026-04-11
 
 ---
 
-## 1. Break up monolithic GUIs
+## Context
 
-**BosonPlotter.m:** reduced from ~14,836 to ~14,514 lines by extracting:
-- `+bosonPlotter/colorMaps.m` — colormap generation (viridis, plasma, inferno + builtins)
-- `+bosonPlotter/safeEvalMathExpr.m` — safe recursive-descent expression parser
+### How the pieces fit together
+`BosonPlotter.m` is a ~13,659-line single-function file containing ~317 nested functions.
+The `+bosonPlotter/` package holds extracted subsystems that are called from the parent via
+function handles or direct package calls. Extraction reduces the parent's line count and
+makes subsystems independently testable.
 
-Previously extracted subsystems in `+bosonPlotter/`:
-- `curveFitting.m`, `figureBuilder.m`, `graphDigitizer.m`
-- `roiAnalysis.m`, `multiPanel.m`, `actionLog.m`, `datasetGroups.m`
-- `applyCorrections.m`, `correctionParams.m`, `reflFitting.m`
+`FermiViewer.m` (~12k lines) follows the same nested-function pattern but is better
+organized internally with clear section dividers — lower priority for extraction.
 
-### Extracted (2026-03-26)
-- `+bosonPlotter/drawOverlays.m` — peak markers, fit curves, annotations, ref lines (~200 lines from drawToAxes)
-- `+bosonPlotter/peakTools.m` — analysis dialogs (lattice refinement, phase matching, FFT thickness, reflectivity FFT, Williamson-Hall)
-- `+bosonPlotter/buildPeakWindow.m` — peak window widget construction
-- `+bosonPlotter/buildMap2DPanel.m` — 2D map panel widget construction
-- Session save/load dialog wrappers merged into `+bosonPlotter/sessionManager.m`
+### Data / control flow
+```
+BosonPlotter.m (parent)
+  ├── closure state (appData, widget handles)
+  ├── calls → +bosonPlotter/renderPlot.m (via context struct)
+  ├── calls → +bosonPlotter/peakCallbacks.m (via context struct)
+  ├── calls → +bosonPlotter/curveFitting.m, figureBuilder.m, ...
+  └── ~1,500 lines of layout construction (creates 200+ widgets)
+```
 
-### Extracted (2026-04-10)
-- `+bosonPlotter/peakCallbacks.m` — peak detection, fitting, export (~978 lines; 14 callbacks via context struct pattern)
-- `+bosonPlotter/renderPlot.m` — main 1D/2D rendering loop (~902 lines; widget state passed via context struct)
-- BosonPlotter.m reduced from ~15,515 to ~13,659 lines
-
-### Remaining candidates (lower priority)
-- Main GUI layout construction (~1,500 lines) — creates ~200 widget handles captured by closure; requires callback refactor to extract
-
-### Fermion.m (~12k lines)
-Less urgent — well-organized internally with clear section dividers.
+### Dependency map
+- Items 1-2 are independent
+- Item 1 (further extraction) is the long pole — each extraction makes other work easier
 
 ---
 
-## 2. Documentation
+## Tier 1 — High Impact
 
-- `+calc/README.md` ✅ already exists (11 sub-packages documented)
-- CLAUDE.md is ~100 lines (healthy)
-- Per-package READMEs exist for: `+parser/`, `+imaging/`, `+calc/`, `+utilities/`, `+scripts/`
+1. **Continue `+bosonPlotter/` extraction — drive parent below 8k lines**
+   - [ ] Extract table model (edit + units sync, ~360 lines at ~11140-11500)
+   - [ ] Extract neutron sibling propagation (~45 lines at 5602-5647)
+   - [ ] Extract undo state helpers (~60 call sites, deduplicate into `captureUndoState.m`)
+   - [ ] Extract hysteresis dialog (~200 lines at 12430+)
+   - [ ] Extract batch fit / global fit / track peak (~50 lines at 12581-12628)
+
+## Tier 2 — Medium Impact
+
+2. **Documentation coverage — package READMEs**
+   - [ ] Rewrite `+bosonPlotter/README.md` (5/37 functions documented)
+   - [ ] Expand `+plotting/README.md` (3/15 documented)
+   - [ ] Expand `+utilities/README.md` (16/38 documented)
+   - [ ] Expand `+parser/README.md` (15/27 documented)
+   - [ ] Add `template` + `palette` to `+styles/README.md` (2/4 documented)
+   - [ ] Expand `+imaging/README.md` (~46/52 documented)
+   - [ ] Add 3 missing entries to `+scripts/README.md` (4/7 documented)
 
 ---
 
-## 3. Test organization
+## Completed
 
-Already in clean subdirectories: `parser/`, `gui/`, `imaging/`, `calc/`, `batch/`, `fitting/`. No changes needed.
+- ~~**Extract renderPlot.m**~~ (2026-04-10) — ~902 lines, main 1D/2D rendering loop
+- ~~**Extract peakCallbacks.m**~~ (2026-04-10) — ~978 lines, 14 callbacks via context struct
+- ~~**Extract drawOverlays.m**~~ (2026-03-26) — peak markers, fit curves, annotations
+- ~~**Extract peakTools.m**~~ (2026-03-26) — lattice refinement, phase matching, FFT thickness dialogs
+- ~~**Extract buildPeakWindow.m + buildMap2DPanel.m**~~ (2026-03-26) — widget construction
+- ~~**Merge session dialogs into sessionManager.m**~~ (2026-03-26)
+- ~~**Extract colorMaps.m + safeEvalMathExpr.m**~~ (2026-03) — colormap generation + expression parser
+- ~~**Previously extracted subsystems**~~ — curveFitting, figureBuilder, graphDigitizer, roiAnalysis, multiPanel, actionLog, datasetGroups, applyCorrections, correctionParams, reflFitting
+- ~~**Create `+fitting/README.md`**~~ (2026-04-11) — 19 functions + 23-model catalog
+- ~~**Test organization**~~ — clean subdirectories: parser/, gui/, imaging/, calc/, batch/, fitting/
+- ~~**`+calc/README.md`**~~ — 11 sub-packages documented
+- ~~**Per-package READMEs created**~~ — +parser/, +imaging/, +calc/, +utilities/, +scripts/
