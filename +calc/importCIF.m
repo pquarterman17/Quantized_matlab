@@ -13,7 +13,7 @@ function result = importCIF(filePath)
 %   -------
 %   result — struct with fields:
 %     .blockName   — string; data block identifier (after 'data_')
-%     .tags        — containers.Map of tag→value string (all simple key-values)
+%     .tags        — dictionary of tag→value string (all simple key-values)
 %     .loops       — cell array of loop structs, each with:
 %                      .tags  — cell array of tag name strings
 %                      .data  — cell matrix {nRows × nCols}
@@ -57,7 +57,7 @@ end
 
 % ── Initialise output ────────────────────────────────────────────────
 result.blockName  = '';
-result.tags       = containers.Map('KeyType','char','ValueType','char');
+result.tags       = dictionary(string.empty, string.empty);
 result.loops      = {};
 result.cellParams = struct('a',NaN,'b',NaN,'c',NaN, ...
                            'alpha',NaN,'beta',NaN,'gamma',NaN);
@@ -124,7 +124,7 @@ cellTagMap = { ...
 for ti = 1:size(cellTagMap,1)
     tag   = cellTagMap{ti,1};
     field = cellTagMap{ti,2};
-    if result.tags.isKey(tag)
+    if isKey(result.tags, tag)
         result.cellParams.(field) = stripUncertainty(result.tags(tag));
     end
 end
@@ -132,14 +132,14 @@ end
 % ── Post-process: space group ─────────────────────────────────────────
 sgTags = {'_symmetry_space_group_name_h-m', '_space_group_name_h-m_alt'};
 for ti = 1:numel(sgTags)
-    if result.tags.isKey(sgTags{ti})
+    if isKey(result.tags, sgTags{ti})
         result.spaceGroup = strtrim(result.tags(sgTags{ti}));
         break
     end
 end
 
 % ── Post-process: chemical formula ───────────────────────────────────
-if result.tags.isKey('_chemical_formula_sum')
+if isKey(result.tags, '_chemical_formula_sum')
     result.formula = strtrim(result.tags('_chemical_formula_sum'));
 end
 

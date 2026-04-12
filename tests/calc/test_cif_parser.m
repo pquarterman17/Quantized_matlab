@@ -130,9 +130,9 @@ end
 fprintf('== TEST 5: Tags map ==\n');
 try
     r = calc.importCIF(cifPath);
-    assert(isa(r.tags, 'containers.Map'), 'tags should be a containers.Map');
-    assert(r.tags.isKey('_cell_length_a'), 'Should have _cell_length_a tag');
-    fprintf('  Tags map has %d entries\n', r.tags.Count);
+    assert(isa(r.tags, 'dictionary'), 'tags should be a dictionary');
+    assert(isKey(r.tags, '_cell_length_a'), 'Should have _cell_length_a tag');
+    fprintf('  Tags map has %d entries\n', numEntries(r.tags));
     fprintf('  PASS\n');
     passed = passed + 1;
 catch ME

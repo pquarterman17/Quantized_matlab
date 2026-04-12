@@ -61,10 +61,10 @@ end
 function labels = deduplicateLabels(labels)
 %DEDUPLICATELABELS  Append numeric suffixes to repeated label strings.
 %   {'A','B','A','A'} → {'A','B','A (2)','A (3)'}
-    seen = containers.Map('KeyType','char','ValueType','double');
+    seen = dictionary(string.empty, double.empty);
     for k = 1:numel(labels)
         lbl = labels{k};
-        if seen.isKey(lbl)
+        if isKey(seen, lbl)
             seen(lbl) = seen(lbl) + 1;
             labels{k} = sprintf('%s (%d)', lbl, seen(lbl));
         else

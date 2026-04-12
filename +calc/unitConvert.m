@@ -188,8 +188,8 @@ function [dims, scale] = decomposeToken(tokStr)
     end
 
     % Strategy 2: try splitting off SI prefixes (longest first)
-    prefixKeys = pre.keys;
-    prefixKeys = prefixKeys(cellfun(@(x) ~isempty(x), prefixKeys));
+    prefixKeys = cellstr(keys(pre));
+    prefixKeys = prefixKeys(~cellfun(@isempty, prefixKeys));
     % Sort by length descending so we try longest prefix first
     [~, sortIdx] = sort(cellfun(@numel, prefixKeys), 'descend');
     prefixKeys = prefixKeys(sortIdx);
@@ -337,27 +337,11 @@ function pre = getSIPrefixTable()
         return
     end
 
-    pre = containers.Map();
-    pre('Y')     = 1e24;   % yotta
-    pre('Z')     = 1e21;   % zetta
-    pre('E')     = 1e18;   % exa
-    pre('P')     = 1e15;   % peta
-    pre('T')     = 1e12;   % tera
-    pre('G')     = 1e9;    % giga
-    pre('M')     = 1e6;    % mega
-    pre('k')     = 1e3;    % kilo
-    pre('h')     = 1e2;    % hecto
-    pre('da')    = 1e1;    % deca
-    pre('d')     = 1e-1;   % deci
-    pre('c')     = 1e-2;   % centi
-    pre('m')     = 1e-3;   % milli
-    pre('u')     = 1e-6;   % micro (ASCII shorthand)
-    pre('mu')    = 1e-6;   % micro
-    pre('micro') = 1e-6;   % micro (verbose)
-    pre('n')     = 1e-9;   % nano
-    pre('p')     = 1e-12;  % pico
-    pre('f')     = 1e-15;  % femto
-    pre('a')     = 1e-18;  % atto
+    pre = dictionary( ...
+        ["Y","Z","E","P","T","G","M","k","h","da", ...
+         "d","c","m","u","mu","micro","n","p","f","a"], ...
+        [1e24,1e21,1e18,1e15,1e12,1e9,1e6,1e3,1e2,1e1, ...
+         1e-1,1e-2,1e-3,1e-6,1e-6,1e-6,1e-9,1e-12,1e-15,1e-18]);
 
     cachedPre = pre;
 end

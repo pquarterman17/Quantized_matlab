@@ -57,7 +57,7 @@ end
 targetParsed = calc.xrayNeutron.parseFormula(formula);
 
 % Build a lookup: element symbol → required count in target
-targetMap = containers.Map(targetParsed.elements, num2cell(targetParsed.counts));
+targetMap = dictionary(string(targetParsed.elements), targetParsed.counts);
 
 nSrc   = numel(sources);
 needed  = zeros(1, nSrc);

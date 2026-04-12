@@ -1984,7 +1984,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         % Load element data once — shared by all callbacks
         allEls = calc.elementData();
         % Build symbol → index map for fast lookup
-        elIdxMap = containers.Map('KeyType','char','ValueType','double');
+        elIdxMap = dictionary(string.empty, double.empty);
         for ii = 1:numel(allEls)
             elIdxMap(allEls(ii).symbol) = ii;
         end
@@ -1995,7 +1995,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         for ei = 1:numel(ptLayout)
             entry = ptLayout(ei);
             sym   = entry.symbol;
-            if ~elIdxMap.isKey(sym), continue; end
+            if ~isKey(elIdxMap, sym), continue; end
             el = allEls(elIdxMap(sym));
 
             btnText = sprintf('%d\n%s', el.Z, el.symbol);

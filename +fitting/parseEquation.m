@@ -53,7 +53,7 @@ funcHandles = containers.Map(funcNames, ...
      @sign, @floor, @ceil, @round});
 
 constNames = {'pi', 'e'};
-constValues = containers.Map(constNames, {pi, exp(1)});
+constValues = dictionary(string(constNames), [pi, exp(1)]);
 
 % ════════════════════════════════════════════════════════════════════════
 % Tokenize
@@ -89,7 +89,7 @@ while pos <= len
         if funcHandles.isKey(name)
             tokens{end+1} = struct('type', 'function', 'value', name); %#ok<AGROW>
             prevType = 'function';
-        elseif constValues.isKey(name)
+        elseif isKey(constValues, name)
             tokens{end+1} = struct('type', 'number', 'value', constValues(name)); %#ok<AGROW>
             prevType = 'value';
         elseif strcmp(name, 'x')
@@ -299,8 +299,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 
 function tf = shouldPop(stackOp, newOp)
-    prec = containers.Map({'+','-','*','/','^'}, {1,1,2,2,3});
-    if ~prec.isKey(stackOp)
+    prec = dictionary(string({'+','-','*','/','^'}), [1,1,2,2,3]);
+    if ~isKey(prec, stackOp)
         tf = false;
         return;
     end
