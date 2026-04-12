@@ -28,41 +28,86 @@ INPUT_BG    = [0.18 0.18 0.18];   % dark input background
 INPUT_FG    = [0.90 0.90 0.90];   % light input text
 
 % ════════════════════════════════════════════════════════════════════════
+% DARK THEME COLORS
+% ════════════════════════════════════════════════════════════════════════
+FIG_BG      = [0.13 0.13 0.13];   % figure / panel background
+SIDEBAR_BG  = [0.10 0.10 0.10];   % slightly darker sidebar
+LABEL_FG    = [0.85 0.85 0.85];   % label text on dark backgrounds
+STATUSBAR_BG = [0.10 0.10 0.10];  % status bar background
+
+% ════════════════════════════════════════════════════════════════════════
 % MAIN FIGURE
 % ════════════════════════════════════════════════════════════════════════
 fig = uifigure('Name', 'Materials Calculator — Thin Film Toolkit', ...
-    'Position', [80 60 740 640], ...
-    'Resize', 'on');
+    'Position', [80 60 780 640], ...
+    'Resize', 'on', ...
+    'Color', FIG_BG);
 fig.CloseRequestFcn = @onFigureClose;
 
 % Root grid: nav sidebar | content area, plus status bar
 rootGL = uigridlayout(fig);
 rootGL.RowHeight    = {'1x', 22};
-rootGL.ColumnWidth  = {140, '1x'};
+rootGL.ColumnWidth  = {160, '1x'};
 rootGL.Padding      = [0 0 0 0];
 rootGL.RowSpacing   = 0;
 rootGL.ColumnSpacing = 0;
+rootGL.BackgroundColor = FIG_BG;
 
-% Navigation list (vertical sidebar)
-navNames = {'Unit Converter', 'Crystal', 'Electrical', 'Semiconductor', ...
-            'Thin Film', 'X-ray/Neutron', 'Superconductor', 'Magnetic', ...
-            'Optics', 'Vacuum', 'Electrochem', 'Thermal', 'Diffusion', ...
-            'Reflectivity', 'Substrates', 'Periodic Table', ...
-            [char(9733) ' Favorites']};
+% Navigation tree (categorised sidebar)
+% Each category holds leaf nodes whose NodeData is the navKey string.
+navTree = uitree(rootGL, ...
+    'SelectionChangedFcn', @onNavChanged, ...
+    'FontSize', 11, ...
+    'BackgroundColor', SIDEBAR_BG);
+navTree.Layout.Row    = 1;
+navTree.Layout.Column = 1;
+% FontColor was added after R2021b — set defensively
+try; navTree.FontColor = LABEL_FG; catch; end
+
+% ── tree category definitions ──────────────────────────────────────────
+navCategories = { ...
+    'Reference',         {'Unit Converter',  'unitConverter'; ...
+                          [char(9733) ' Favorites'], 'favorites'}; ...
+    'Materials',         {'Crystal',          'crystal'; ...
+                          'Thin Film',         'thinFilm'; ...
+                          'Substrates',        'substrates'; ...
+                          'Periodic Table',    'periodicTable'}; ...
+    'Electronic',        {'Electrical',        'electrical'; ...
+                          'Semiconductor',     'semiconductor'; ...
+                          'Electrochem',       'electrochemistry'}; ...
+    'Optics & Scattering', {'Optics',          'optics'; ...
+                          'X-ray/Neutron',     'xrayNeutron'; ...
+                          'Reflectivity',      'reflectivity'}; ...
+    'Thermal-Magnetic',  {'Superconductor',    'superconductor'; ...
+                          'Magnetic',          'magnetic'; ...
+                          'Thermal',           'thermal'; ...
+                          'Diffusion',         'diffusion'; ...
+                          'Vacuum',            'vacuum'}; ...
+};
+
+% Build the tree and collect a navKey → node map for selectPanel
+navNodeMap = containers.Map('KeyType','char','ValueType','any');
+for ci = 1:size(navCategories, 1)
+    catName   = navCategories{ci, 1};
+    leaves    = navCategories{ci, 2};   % Nx2 cell: {displayName, key}
+    catNode   = uitreenode(navTree, 'Text', catName);
+    for li = 1:size(leaves, 1)
+        leafNode = uitreenode(catNode, ...
+            'Text',     leaves{li, 1}, ...
+            'NodeData', leaves{li, 2});
+        navNodeMap(leaves{li, 2}) = leafNode;
+    end
+    expand(catNode);
+end
+
+% Also build flat navKeys list for panels loop (order must match navNames order)
 navKeys  = {'unitConverter', 'crystal', 'electrical', 'semiconductor', ...
             'thinFilm', 'xrayNeutron', 'superconductor', 'magnetic', ...
             'optics', 'vacuum', 'electrochemistry', 'thermal', 'diffusion', ...
-            'reflectivity', 'substrates', 'periodicTable', ...
-            'favorites'};
+            'reflectivity', 'substrates', 'periodicTable', 'favorites'};
 
-navList = uilistbox(rootGL, ...
-    'Items', navNames, ...
-    'ItemsData', navKeys, ...
-    'Value', 'unitConverter', ...
-    'FontSize', 12, ...
-    'ValueChangedFcn', @onNavChanged);
-navList.Layout.Row    = 1;
-navList.Layout.Column = 1;
+% Select the first node (activeNavKey is set in APP STATE block below)
+navTree.SelectedNodes = navNodeMap('unitConverter');
 
 % Content area — grid layout so each panel gets proper sizing
 contentGL = uigridlayout(rootGL);
@@ -71,16 +116,19 @@ contentGL.Layout.Column = 2;
 contentGL.RowHeight     = {'1x'};
 contentGL.ColumnWidth   = {'1x'};
 contentGL.Padding       = [0 0 0 0];
+contentGL.BackgroundColor = FIG_BG;
 
 % Status bar with copy + favorites buttons
 statusGL = uigridlayout(rootGL);
 statusGL.Layout.Row = 2; statusGL.Layout.Column = [1 2];
 statusGL.RowHeight = {'1x'}; statusGL.ColumnWidth = {'1x', 90, 90, 90};
 statusGL.Padding = [4 0 4 0]; statusGL.ColumnSpacing = 4;
+statusGL.BackgroundColor = STATUSBAR_BG;
 
 lblStatus = uilabel(statusGL, ...
     'Text', 'Ready', ...
     'FontSize', 11, ...
+    'FontColor', LABEL_FG, ...
     'HorizontalAlignment', 'left');
 lblStatus.Layout.Row = 1; lblStatus.Layout.Column = 1;
 
@@ -102,10 +150,11 @@ btnSaveFav.Layout.Row = 1; btnSaveFav.Layout.Column = 4;
 % ════════════════════════════════════════════════════════════════════════
 % APP STATE
 % ════════════════════════════════════════════════════════════════════════
-appData.history    = {};
-appData.historyMax = 100;
-appData.api        = struct();  % tab builders store callable hooks here
-appData.favorites  = {};        % cell array of favorite structs: .name, .tab, .lastResult, .lastLatex
+appData.history      = {};
+appData.historyMax   = 100;
+appData.api          = struct();  % tab builders store callable hooks here
+appData.favorites    = {};        % cell array of favorite structs: .name, .tab, .lastResult, .lastLatex
+appData.activeNavKey = 'unitConverter';  % mirrors current tree selection
 
 % ════════════════════════════════════════════════════════════════════════
 % BUILD PANELS (one per nav entry, all in same grid cell [1,1])
@@ -138,8 +187,9 @@ buildPeriodicTableTab(tabs.periodicTable);
 buildFavoritesTab(tabs.favorites);
 appData.api.exportReport = @(fp) exportReportToFile(fp);
 
-% Apply consistent dark theme to all input widgets
+% Apply consistent dark theme to all widgets
 applyDarkInputTheme(fig, INPUT_BG, INPUT_FG);
+applyDarkPanelTheme(fig, FIG_BG, LABEL_FG);
 
 % ════════════════════════════════════════════════════════════════════════
 % API (headless testing)
@@ -195,7 +245,7 @@ end
         end
         appData.lastResult = description;
         appData.lastLatex  = latexStr;
-        appData.lastTab    = navList.Value;
+        appData.lastTab    = appData.activeNavKey;
         setStatus(description);
         % Enable copy/save buttons
         btnCopyResult.Enable = 'on';
@@ -258,17 +308,26 @@ end
 % NAVIGATION: Switch visible panel
 % ════════════════════════════════════════════════════════════════════════
 
-    function onNavChanged(~, ~)
-        selectPanel(navList.Value);
+    function onNavChanged(~, evt)
+        % Only respond to leaf nodes (those with a NodeData key string)
+        if isempty(evt.SelectedNodes), return; end
+        node = evt.SelectedNodes(1);
+        if isempty(node.NodeData), return; end   % category header clicked
+        selectPanel(node.NodeData);
     end
 
     function selectPanel(key)
+        if ~isfield(tabs, key), return; end
         fnames = fieldnames(tabs);
         for ni = 1:numel(fnames)
             tabs.(fnames{ni}).Visible = 'off';
         end
         tabs.(key).Visible = 'on';
-        navList.Value = key;
+        appData.activeNavKey = key;
+        % Sync tree selection
+        if navNodeMap.isKey(key)
+            navTree.SelectedNodes = navNodeMap(key);
+        end
     end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -283,7 +342,7 @@ primaryBtnMap = containers.Map('KeyType','char','ValueType','any');
 fig.WindowKeyPressFcn = @onGlobalKeyPress;
     function onGlobalKeyPress(~, evt)
         if strcmp(evt.Key, 'return')
-            activeKey = navList.Value;
+            activeKey = appData.activeNavKey;
             if primaryBtnMap.isKey(activeKey)
                 btn = primaryBtnMap(activeKey);
                 if isvalid(btn) && strcmp(btn.Enable, 'on')
@@ -4309,5 +4368,45 @@ function applyDarkInputTheme(parent, bg, fg)
     for i = 1:numel(children)
         children(i).BackgroundColor = bg;
         children(i).FontColor = fg;
+    end
+end
+
+% ════════════════════════════════════════════════════════════════════════
+% UTILITY: Apply dark background and text colour to panels and labels
+% ════════════════════════════════════════════════════════════════════════
+
+function applyDarkPanelTheme(parent, bg, fg)
+%APPLYDARKPANELTHEME  Set dark background on uipanels and font colour on labels.
+    % uipanel backgrounds
+    children = findall(parent, 'Type', 'uipanel');
+    for i = 1:numel(children)
+        try
+            children(i).BackgroundColor = bg;
+        catch
+        end
+    end
+    % Label foreground colours
+    children = findall(parent, 'Type', 'uilabel');
+    for i = 1:numel(children)
+        try
+            children(i).FontColor = fg;
+        catch
+        end
+    end
+    % Checkbox text colour
+    children = findall(parent, 'Type', 'uicheckbox');
+    for i = 1:numel(children)
+        try
+            children(i).FontColor = fg;
+        catch
+        end
+    end
+    % Radio button text colour
+    children = findall(parent, 'Type', 'uiradiobutton');
+    for i = 1:numel(children)
+        try
+            children(i).FontColor = fg;
+        catch
+        end
     end
 end
