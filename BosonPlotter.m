@@ -247,6 +247,9 @@ function varargout = BosonPlotter(options)
     % appData.X references work unchanged (same dot-syntax as struct).
     appData = bosonPlotter.AppState();
 
+    % ── Shared WorkspaceModel (observed by DataWorkspace if open) ────────
+    appData.model = dataWorkspace.WorkspaceModel();
+
     % Fields with non-default values (overriding AppState property defaults)
     appData.style      = 'Line';
     appData.fringeQ    = [NaN NaN];
@@ -776,6 +779,9 @@ function varargout = BosonPlotter(options)
     tbActions(end+1) = struct('id','spreadsheet', 'label',[char(9783) ' Sheet'], ...
         'tooltip','Open dataset in spreadsheet view', ...
         'callback',@(~,~) onSpreadsheetPopup([],[]));
+    tbActions(end+1) = struct('id','dataworkspace', 'label',[char(9638) ' Workspace'], ...
+        'tooltip','Open DataWorkspace (full spreadsheet with shared model)', ...
+        'callback',@(~,~) DataWorkspace(Model=appData.model));
     tbActions(end+1) = struct('id','undo',        'label',[char(8617) ' Undo'], ...
         'tooltip','Undo last operation  [Ctrl+Z]', ...
         'callback',@(~,~) onUndo([],[]));
@@ -2872,6 +2878,7 @@ function varargout = BosonPlotter(options)
 
                 ds = buildDs(fp, data, parserName);
                 appData.datasets{end+1} = ds;
+                appData.model.addDataset(data, fp, parserName);
                 nLoaded = nLoaded + 1;
                 addToRecentFiles(fp);
             catch ME
@@ -3565,7 +3572,12 @@ function varargout = BosonPlotter(options)
         % Sort indices in descending order so removal doesn't affect remaining indices
         indicesToRemove = sort(indicesToRemove, 'descend');
 
-        % Remove selected datasets
+        % Remove selected datasets (also from shared model)
+        for ri = 1:numel(indicesToRemove)
+            if indicesToRemove(ri) <= appData.model.count()
+                appData.model.removeDataset(indicesToRemove(ri));
+            end
+        end
         appData.datasets(indicesToRemove) = [];
 
         if isempty(appData.datasets)

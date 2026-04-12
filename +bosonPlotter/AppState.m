@@ -22,6 +22,7 @@ classdef AppState < handle
         activeIdx       double = 0
         lastDir         char   = ''
         searchFilter    char   = ''
+        model                  = []   % dataWorkspace.WorkspaceModel (shared with DataWorkspace)
 
         % ── Correction state ───────────────────────────────────────
         style           char   = 'auto'

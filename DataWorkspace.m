@@ -30,12 +30,17 @@ function varargout = DataWorkspace(options)
 
 arguments
     options.Visible (1,:) char {mustBeMember(options.Visible, {'on','off'})} = 'on'
+    options.Model         = []   % existing WorkspaceModel (shared with BosonPlotter)
 end
 
 % ════════════════════════════════════════════════════════════════════════
 %  Shared model
 % ════════════════════════════════════════════════════════════════════════
-model = dataWorkspace.WorkspaceModel();
+if ~isempty(options.Model) && isa(options.Model, 'dataWorkspace.WorkspaceModel')
+    model = options.Model;
+else
+    model = dataWorkspace.WorkspaceModel();
+end
 
 % ════════════════════════════════════════════════════════════════════════
 %  Figure
