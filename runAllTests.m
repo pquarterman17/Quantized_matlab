@@ -32,6 +32,7 @@ function runAllTests(options)
 %       baseline  — baseline estimation: ALS, rolling ball, modified polynomial
 %       errorprop — error propagation utilities (errorProp and wrappers)
 %       templates — dataset template engine (fingerprint, match, apply, save/load)
+%       workspace — DataWorkspace model (WorkspaceModel add/remove/mask/undo/events)
 %       all      — all of the above, in order
 %
 %   Examples:
@@ -57,7 +58,7 @@ options.Group = validatestring(options.Group, ...
     ["all", "parser", "batch", "xrd2d", "gui", "calcgui", "sims", "em", "emgui", "eds", ...
      "xrayneutron", "superconductor", "cif", "optics", "vacuum", "electrochemistry", ...
      "eels", "eels_adv", "diffindex", "diff_sim", "edsquant", "contour", "fitting", "plotting", ...
-     "spectral", "interp2d", "baseline", "errorprop", "utilities", "templates"]);
+     "spectral", "interp2d", "baseline", "errorprop", "utilities", "templates", "workspace"]);
 
 % Build absolute paths to test scripts so `run` works regardless of CWD.
 % Tests are organized into subdirectories: parser/, gui/, imaging/, calc/, batch/
@@ -171,6 +172,8 @@ SUITES = {
     T('utilities','test_convertMagUnits'), 'utilities','Magnetometry unit conversion: Oe/T/mT/A/m, emu/A·m²/emu·g⁻¹/kA·m⁻¹, raw-preserve'
     % ── Template tests ───────────────────────────────────────────────────
     T('templates','test_templateEngine'),  'templates','Template engine: fingerprint, match cascade, apply, save/load/delete round-trip'
+    % ── Workspace tests ──────────────────────────────────────────────────
+    T('workspace','test_workspaceModel'),  'workspace','WorkspaceModel: add/remove/mask/undo/event firing'
 };
 
 % Filter by group
