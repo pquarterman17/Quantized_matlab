@@ -69,8 +69,7 @@ Features that reduce friction on common BosonPlotter tasks.
 
 ### Tier 2 — Medium Impact
 
-5. **Bulk-apply corrections to selected/all datasets** — button in corrections panel
-   iterating `lbDatasets.Value`, copies correction state, calls `applyCorrections`
+5. ~~**Bulk-apply corrections to selected/all datasets**~~ — already implemented (`btnApplyAll` + `onApplyCorrectionsAll`)
 
 6. **Correction presets (named, saved)** — "Save/Load Preset..." dropdown under
    corrections; persist to `prefdir/boson_corr_presets.mat`
@@ -81,7 +80,7 @@ Features that reduce friction on common BosonPlotter tasks.
 8. **Reload-from-disk button** — context menu "Reload from disk" re-calls
    `guiImport(ds.filepath)` replacing `ds.data`, preserving corrections
 
-9. **xrdConvertGUI: remember last folders** — persist via `getpref('BosonXRDConvert',...)`
+9. ~~**xrdConvertGUI: remember last folders**~~ — done (Lane B agent)
 
 ### Tier 3 — Nice-to-Have
 
@@ -160,21 +159,17 @@ Layout, interaction, theming, tooltips, and accessibility across all GUIs.
 
 28. ~~**Figure Builder scroll/resize**~~ — done, see Completed section
 
-29. **Dialog theme propagation** — popup dialogs leak light mode when parent is dark.
+29. **Dialog theme propagation** — popup dialogs leak light mode when parent is dark. — popup dialogs leak light mode when parent is dark.
     `templateDialog.m:46-78`, Dataset Math, Plot Templates, Batch Figure Export, Integrate
     — none read `appData.theme`. Add shared `applyDialogTheme(dlg)` helper
 
-30. **xrdConvertGUI resize + contrast** — fixed 600x720, `Resize='off'`. Convert button
-    green BG with black text = poor contrast. Add resize + white `FontColor`
+30. ~~**xrdConvertGUI resize + contrast**~~ — done (Lane B agent): Resize='on', min 480x600
 
-31. **materialsCalcGUI nav overhaul** — single-column listbox with 17 uncategorized
-    entries. Switch to `uitree` with categories
+31. ~~**materialsCalcGUI nav overhaul**~~ — done (Lane B agent): uitree with 5 categories
 
-32. **materialsCalcGUI keyboard shortcuts** — no `KeyPressFcn` on figure. Bind Enter →
-    primary Compute button
+32. ~~**materialsCalcGUI keyboard shortcuts**~~ — already implemented (WindowKeyPressFcn + primaryBtnMap)
 
-33. **materialsCalcGUI theme consistency** — dark `INPUT_BG` edit fields in light figure.
-    Pick one theme
+33. ~~**materialsCalcGUI theme consistency**~~ — done (Lane B agent): full dark theme with applyDarkPanelTheme()
 
 ### Tier 2 — Medium Impact
 
@@ -227,26 +222,21 @@ Stale docs, missing feature docs, thin package READMEs, and function docstrings.
 49. **Data table split docs** — `docs/gui_bosonplotter.md:58-66` describes old single-table
     layout. Update for `tblUnits` + `tblData` architecture with ~10x scroll speedup rationale
 
-50. **Expand `+bosonPlotter/README.md`** — 5/37 functions documented. Rewrite grouped by
-    subsystem (rendering, peaks, corrections, UI builders, state management)
+50. ~~**Expand `+bosonPlotter/README.md`**~~ — done (Lane C agent): 37 functions in 8 subsections
 
-51. **Expand `+utilities/README.md`** — 16/38 documented. Add sections: Baselines,
-    Statistics, Error Propagation, Signal Processing, Magnetometry
+51. ~~**Expand `+utilities/README.md`**~~ — done (Lane C agent): 7 new subsections
 
-52. **Expand `+plotting/README.md`** — 3/15 documented. Add 12 missing functions +
-    examples for `polarContour`, `ternaryPlot`
+52. ~~**Expand `+plotting/README.md`**~~ — done (Lane C agent): 12 functions added
 
 ### Tier 2 — Medium Impact
 
-53. **Expand `+parser/README.md`** — 15/27 documented. Add Microscopy/EM subsection +
-    internal helpers (`computeQSpace`, `resolveParser`)
+53. ~~**Expand `+parser/README.md`**~~ — done (Lane C agent): EM parsers + internal helpers
 
-54. **Add `template` + `palette` to `+styles/README.md`** — 2/4 documented
+54. ~~**Add `template` + `palette` to `+styles/README.md`**~~ — done (Lane C agent)
 
-55. **Expand `+imaging/README.md`** — ~46/52 documented. Add Morphology/Segmentation
-    section + `eelsSVD`
+55. ~~**Expand `+imaging/README.md`**~~ — done (Lane C agent): morphology/segmentation + eelsSVD
 
-56. **Add 3 entries to `+scripts/README.md`** — `batchPlot`, `dataConnector`, `generateReport`
+56. ~~**Add 3 entries to `+scripts/README.md`**~~ — done (Lane C agent)
 
 57. **`resolveStyle` usage example** — add 3-line example to docstring showing
     `resolveStyle → applyDsOverride → applyPostRenderStyle`
@@ -295,3 +285,10 @@ Stale docs, missing feature docs, thin package READMEs, and function docstrings.
 - ~~**Per-dataset notes**~~ (2026-04-11) — `ds.notes` field, "Notes..." context menu, pencil indicator in list, note shown in tooltip, persists in session. Test K56
 - ~~**Rename dataset**~~ (2026-04-11) — "Rename..." context menu, updates displayName + legendName, refreshes legend. Test K57
 - ~~**Autosave / crash-recovery**~~ (2026-04-11) — `+bosonPlotter/autosave.m` static class: 2-min timer saves datasets to `prefdir/boson_autosave.mat`, recovery prompt on startup, cleanup on clean exit. Zero new nested functions in BosonPlotter.m
+- ~~**Bulk-apply corrections**~~ — already existed: `btnApplyAll` + `onApplyCorrectionsAll`
+- ~~**xrdConvertGUI folder memory**~~ (2026-04-11) — getpref/setpref for last input/output dirs, min size enforcement
+- ~~**xrdConvertGUI resize + contrast**~~ (2026-04-11) — Resize='on', min 480x600, white FontColor on Convert
+- ~~**materialsCalcGUI uitree nav**~~ (2026-04-11) — replaced listbox with uitree, 5 categories, all expanded by default
+- ~~**materialsCalcGUI keyboard shortcuts**~~ — already existed: WindowKeyPressFcn + primaryBtnMap
+- ~~**materialsCalcGUI dark theme**~~ (2026-04-11) — full dark theme with applyDarkPanelTheme() utility
+- ~~**Package READMEs**~~ (2026-04-11) — all 7 expanded: +bosonPlotter (37 funcs), +utilities (38), +plotting (15), +parser (27), +styles (4), +imaging (52), +scripts (7)
