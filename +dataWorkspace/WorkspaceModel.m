@@ -291,6 +291,140 @@ classdef WorkspaceModel < handle
         end
 
         % ════════════════════════════════════════════════════════════════════════
+        %  Computed column management
+        % ════════════════════════════════════════════════════════════════════════
+
+        function addComputedColumn(obj, dsIdx, name, expression, unit)
+        %ADDCOMPUTEDCOLUMN  Evaluate a formula and append a computed column.
+        %
+        %   model.addComputedColumn(dsIdx, name, expression, unit)
+        %
+        %   Inputs:
+        %     dsIdx      — 1-based dataset index
+        %     name       — display name for the new column (string)
+        %     expression — formula string, e.g. 'col("Field") / 79.5775'
+        %     unit       — unit string (optional, default '')
+        %
+        %   The formula is evaluated immediately; the result is stored in
+        %   computedColumns{dsIdx}.  Fires DataChanged.
+            arguments
+                obj        (1,1) dataWorkspace.WorkspaceModel
+                dsIdx      (1,1) double {mustBePositive, mustBeInteger}
+                name       (1,:) char
+                expression (1,:) char
+                unit       (1,:) char = ''
+            end
+
+            obj.validateDatasetIndex(dsIdx);
+
+            % Check for duplicate computed column name
+            existing = obj.computedColumns{dsIdx};
+            for k = 1:numel(existing)
+                if strcmpi(existing{k}.name, name)
+                    error('dataWorkspace:WorkspaceModel:duplicateComputedColumn', ...
+                        'A computed column named "%s" already exists for dataset %d.', ...
+                        name, dsIdx);
+                end
+            end
+
+            % Guard: new column must not reference itself (it can't exist yet,
+            % but names of existing computed columns in the chain could cycle)
+            existingNames = cellfun(@(c) c.name, existing, 'UniformOutput', false);
+            if dataWorkspace.FormulaEngine.hasCircularRef(string(expression), [{name}, existingNames])
+                error('dataWorkspace:WorkspaceModel:circularRef', ...
+                    'Formula for "%s" would create a circular reference.', name);
+            end
+
+            % Evaluate the formula now
+            data   = obj.getData(dsIdx);
+            values = dataWorkspace.FormulaEngine.evaluate(string(expression), data);
+
+            entry.name       = name;
+            entry.expression = expression;
+            entry.values     = values(:);
+            entry.unit       = unit;
+
+            obj.computedColumns{dsIdx}{end+1} = entry;
+            notify(obj, 'DataChanged');
+        end
+
+        function removeComputedColumn(obj, dsIdx, colName)
+        %REMOVECOMPUTEDCOLUMN  Remove a computed column by name and fire DataChanged.
+        %
+        %   model.removeComputedColumn(dsIdx, colName)
+        %
+        %   Inputs:
+        %     dsIdx   — 1-based dataset index
+        %     colName — name of the computed column to remove
+            arguments
+                obj     (1,1) dataWorkspace.WorkspaceModel
+                dsIdx   (1,1) double {mustBePositive, mustBeInteger}
+                colName (1,:) char
+            end
+
+            obj.validateDatasetIndex(dsIdx);
+            cols = obj.computedColumns{dsIdx};
+            idx  = [];
+            for k = 1:numel(cols)
+                if strcmpi(cols{k}.name, colName)
+                    idx = k;
+                    break;
+                end
+            end
+            if isempty(idx)
+                error('dataWorkspace:WorkspaceModel:unknownComputedColumn', ...
+                    'No computed column named "%s" in dataset %d.', colName, dsIdx);
+            end
+            obj.computedColumns{dsIdx}(idx) = [];
+            notify(obj, 'DataChanged');
+        end
+
+        function recomputeColumns(obj, dsIdx)
+        %RECOMPUTECOLUMNS  Re-evaluate all computed columns for a dataset.
+        %
+        %   model.recomputeColumns(dsIdx)
+        %
+        %   Call this after the underlying data changes.  Fires DataChanged
+        %   once at the end.  Columns that fail re-evaluation are left with
+        %   their previous values and a warning is issued.
+            arguments
+                obj   (1,1) dataWorkspace.WorkspaceModel
+                dsIdx (1,1) double {mustBePositive, mustBeInteger}
+            end
+
+            obj.validateDatasetIndex(dsIdx);
+            data = obj.getData(dsIdx);
+            cols = obj.computedColumns{dsIdx};
+            for k = 1:numel(cols)
+                try
+                    newVals = dataWorkspace.FormulaEngine.evaluate( ...
+                        string(cols{k}.expression), data);
+                    obj.computedColumns{dsIdx}{k}.values = newVals(:);
+                catch ME
+                    warning('dataWorkspace:WorkspaceModel:recomputeFailed', ...
+                        'Failed to recompute column "%s": %s', cols{k}.name, ME.message);
+                end
+            end
+            notify(obj, 'DataChanged');
+        end
+
+        function cols = getComputedColumns(obj, dsIdx)
+        %GETCOMPUTEDCOLUMNS  Return the computed column cell array for a dataset.
+        %
+        %   cols = model.getComputedColumns(dsIdx)
+        %
+        %   Outputs:
+        %     cols — cell array of structs with fields:
+        %            .name, .expression, .values ([Nx1]), .unit
+            arguments
+                obj   (1,1) dataWorkspace.WorkspaceModel
+                dsIdx (1,1) double {mustBePositive, mustBeInteger}
+            end
+            obj.validateDatasetIndex(dsIdx);
+            cols = obj.computedColumns{dsIdx};
+        end
+
+        % ════════════════════════════════════════════════════════════════════════
         %  Mask operations
         % ════════════════════════════════════════════════════════════════════════
 
@@ -467,6 +601,157 @@ classdef WorkspaceModel < handle
             notify(obj, 'SelectionChanged');
         end
 
+        % ════════════════════════════════════════════════════════════════════════
+        %  Multi-dataset operations
+        % ════════════════════════════════════════════════════════════════════════
+
+        function result = datasetMath(obj, idxA, op, idxB)
+        %DATASETMATH  Apply element-wise arithmetic between two datasets.
+        %
+        %   result = model.datasetMath(idxA, op, idxB)
+        %
+        %   Inputs:
+        %     idxA — 1-based index of the first (reference) dataset
+        %     op   — operation string: '+', '-', '*', '/', 'ratio'
+        %     idxB — 1-based index of the second dataset
+        %
+        %   Outputs:
+        %     result — new unified data struct; NOT added to the model.
+        %              Call model.addDataset(result, ...) to register it.
+        %
+        %   If row counts differ, dataset B is interpolated onto dataset A's
+        %   time grid using interp1 (linear, extrap='extrap').
+        %   Operation applies element-wise to all value columns.
+        %   If the datasets have different numbers of value columns the
+        %   operation is applied only to the minimum of the two column counts.
+            arguments
+                obj  (1,1) dataWorkspace.WorkspaceModel
+                idxA (1,1) double {mustBePositive, mustBeInteger}
+                op   (1,:) char
+                idxB (1,1) double {mustBePositive, mustBeInteger}
+            end
+
+            obj.validateDatasetIndex(idxA);
+            obj.validateDatasetIndex(idxB);
+
+            validOps = {'+', '-', '*', '/', 'ratio'};
+            if ~ismember(op, validOps)
+                error('dataWorkspace:WorkspaceModel:badOp', ...
+                    'op must be one of: %s', strjoin(validOps, ', '));
+            end
+
+            dsA = obj.getData(idxA);
+            dsB = obj.getData(idxB);
+
+            xA = dsA.time(:);
+            xB = dsB.time(:);
+            vA = dsA.values;
+            vB = dsB.values;
+
+            % Interpolate B onto A's X grid when row counts differ
+            if numel(xA) ~= numel(xB) || ~isequal(xA, xB)
+                nCols = size(vB, 2);
+                vBi = zeros(numel(xA), nCols);
+                for c = 1:nCols
+                    vBi(:, c) = interp1(xB, vB(:, c), xA, 'linear', 'extrap');
+                end
+                vB = vBi;
+            end
+
+            % Operate on the common number of columns
+            nCols = min(size(vA, 2), size(vB, 2));
+            vA = vA(:, 1:nCols);
+            vB = vB(:, 1:nCols);
+
+            switch op
+                case '+'
+                    vResult = vA + vB;
+                    opStr = 'plus';
+                case '-'
+                    vResult = vA - vB;
+                    opStr = 'minus';
+                case '*'
+                    vResult = vA .* vB;
+                    opStr = 'times';
+                case '/'
+                    vResult = vA ./ vB;
+                    opStr = 'div';
+                case 'ratio'
+                    vResult = vA ./ vB;
+                    opStr = 'ratio';
+            end
+
+            % Build labels: "LabelA op LabelB"
+            labA = dsA.labels(1:nCols);
+            labB = dsB.labels(1:nCols);
+            newLabels = cell(1, nCols);
+            for c = 1:nCols
+                newLabels{c} = sprintf('%s %s %s', labA{c}, opStr, labB{c});
+            end
+            newUnits = dsA.units(1:nCols);
+
+            % Name the result datasets
+            nameA = obj.getDatasetName(idxA);
+            nameB = obj.getDatasetName(idxB);
+            srcStr = sprintf('%s %s %s', nameA, op, nameB);
+
+            result = parser.createDataStruct(xA, vResult, ...
+                'labels',   newLabels, ...
+                'units',    newUnits, ...
+                'metadata', struct('source', srcStr, 'parserName', 'datasetMath'));
+        end
+
+        function result = mergeDatasets(obj, idxA, idxB)
+        %MERGEDATASETS  Horizontally concatenate Y columns from two datasets.
+        %
+        %   result = model.mergeDatasets(idxA, idxB)
+        %
+        %   Inputs:
+        %     idxA — 1-based index of the first (reference) dataset
+        %     idxB — 1-based index of the second dataset
+        %
+        %   Outputs:
+        %     result — new unified data struct; NOT added to the model.
+        %
+        %   Dataset B's Y columns are interpolated onto dataset A's time grid.
+        %   Result has all Y columns from A followed by all from B.
+            arguments
+                obj  (1,1) dataWorkspace.WorkspaceModel
+                idxA (1,1) double {mustBePositive, mustBeInteger}
+                idxB (1,1) double {mustBePositive, mustBeInteger}
+            end
+
+            obj.validateDatasetIndex(idxA);
+            obj.validateDatasetIndex(idxB);
+
+            dsA = obj.getData(idxA);
+            dsB = obj.getData(idxB);
+
+            xA = dsA.time(:);
+            xB = dsB.time(:);
+            vB = dsB.values;
+
+            % Interpolate B onto A's X grid
+            nColsB = size(vB, 2);
+            vBi = zeros(numel(xA), nColsB);
+            for c = 1:nColsB
+                vBi(:, c) = interp1(xB, vB(:, c), xA, 'linear', 'extrap');
+            end
+
+            vMerged    = [dsA.values, vBi];
+            labMerged  = [dsA.labels(:)', dsB.labels(:)'];
+            unitMerged = [dsA.units(:)',  dsB.units(:)'];
+
+            nameA = obj.getDatasetName(idxA);
+            nameB = obj.getDatasetName(idxB);
+            srcStr = sprintf('merge(%s, %s)', nameA, nameB);
+
+            result = parser.createDataStruct(xA, vMerged, ...
+                'labels',   labMerged, ...
+                'units',    unitMerged, ...
+                'metadata', struct('source', srcStr, 'parserName', 'mergeDatasets'));
+        end
+
     end  % public methods
 
     % ════════════════════════════════════════════════════════════════════════
@@ -488,6 +773,18 @@ classdef WorkspaceModel < handle
             if idx < 1 || idx > numel(obj.datasets)
                 error('dataWorkspace:WorkspaceModel:badIndex', ...
                     'Index %d out of range (1..%d).', idx, numel(obj.datasets));
+            end
+        end
+
+        function name = getDatasetName(obj, idx)
+        %GETDATASETNAME  Return a short display name for dataset idx.
+            ds = obj.datasets{idx};
+            if isfield(ds, 'metadata') && isfield(ds.metadata, 'source') ...
+                    && ~isempty(ds.metadata.source)
+                [~, nm, ext] = fileparts(ds.metadata.source);
+                name = [nm ext];
+            else
+                name = sprintf('Dataset%d', idx);
             end
         end
 

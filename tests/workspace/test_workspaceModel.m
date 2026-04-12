@@ -563,6 +563,102 @@ catch ex
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  R. datasetMath — same row counts
+% ════════════════════════════════════════════════════════════════════════
+
+fprintf('\n══ TEST R: datasetMath (same rows) ══\n');
+try
+    model = dataWorkspace.WorkspaceModel();
+    d1 = parser.createDataStruct((1:5)', [2*ones(5,1), 3*ones(5,1)], ...
+        'labels', {'A','B'}, 'units', {'u','u'}, ...
+        'metadata', struct('source', 'r1.dat', 'parserName', 'test'));
+    d2 = parser.createDataStruct((1:5)', [ones(5,1), ones(5,1)], ...
+        'labels', {'A','B'}, 'units', {'u','u'}, ...
+        'metadata', struct('source', 'r2.dat', 'parserName', 'test'));
+    model.addDataset(d1, 'r1.dat', 'test');
+    model.addDataset(d2, 'r2.dat', 'test');
+
+    res = model.datasetMath(1, '+', 2);
+    assert(numel(res.time) == 5, 'result should have 5 rows');
+    assert(all(res.values(:,1) == 3), 'col1: 2+1 = 3');
+    assert(all(res.values(:,2) == 4), 'col2: 3+1 = 4');
+    assert(contains(res.metadata.source, '+'), 'source should contain op');
+
+    res2 = model.datasetMath(1, '-', 2);
+    assert(all(res2.values(:,1) == 1), 'col1: 2-1 = 1');
+
+    res3 = model.datasetMath(1, 'ratio', 2);
+    assert(all(res3.values(:,1) == 2), 'col1: 2/1 = 2 (ratio)');
+
+    % Bad op should error
+    ok = false;
+    try, model.datasetMath(1, 'boop', 2); catch, ok = true; end
+    assert(ok, 'bad op should error');
+
+    fprintf('PASS\n'); passed = passed + 1;
+catch ex
+    fprintf('FAIL: %s\n', ex.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  S. datasetMath — different row counts (interpolation)
+% ════════════════════════════════════════════════════════════════════════
+
+fprintf('\n══ TEST S: datasetMath interpolation ══\n');
+try
+    model = dataWorkspace.WorkspaceModel();
+    % Dataset A: x=1:10, Y = x
+    xA = (1:10)';
+    d1 = parser.createDataStruct(xA, xA, 'labels', {'Y'}, 'units', {'u'}, ...
+        'metadata', struct('source', 's1.dat', 'parserName', 'test'));
+    % Dataset B: x=1:5 (half the rows), Y = 2*x
+    xB = (1:5)';
+    d2 = parser.createDataStruct(xB, 2*xB, 'labels', {'Y'}, 'units', {'u'}, ...
+        'metadata', struct('source', 's2.dat', 'parserName', 'test'));
+    model.addDataset(d1, 's1.dat', 'test');
+    model.addDataset(d2, 's2.dat', 'test');
+
+    res = model.datasetMath(1, '+', 2);
+    % B interpolated onto A's grid: B(x=1)=2, B(x=2)=4, ..., B(x=5)=10
+    % A+B at x=1: 1+2=3; at x=5: 5+10=15
+    assert(numel(res.time) == 10, 'result should use A row count');
+    assert(abs(res.values(1,1) - 3) < 1e-9,  'x=1: 1+2=3');
+    assert(abs(res.values(5,1) - 15) < 1e-9, 'x=5: 5+10=15');
+
+    fprintf('PASS\n'); passed = passed + 1;
+catch ex
+    fprintf('FAIL: %s\n', ex.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  T. mergeDatasets
+% ════════════════════════════════════════════════════════════════════════
+
+fprintf('\n══ TEST T: mergeDatasets ══\n');
+try
+    model = dataWorkspace.WorkspaceModel();
+    d1 = parser.createDataStruct((1:4)', [ones(4,1)*10], 'labels', {'A'}, ...
+        'units', {'u'}, 'metadata', struct('source', 't1.dat', 'parserName', 'test'));
+    d2 = parser.createDataStruct((1:4)', [ones(4,1)*20], 'labels', {'B'}, ...
+        'units', {'v'}, 'metadata', struct('source', 't2.dat', 'parserName', 'test'));
+    model.addDataset(d1, 't1.dat', 'test');
+    model.addDataset(d2, 't2.dat', 'test');
+
+    res = model.mergeDatasets(1, 2);
+    assert(size(res.values, 2) == 2, 'merged should have 2 value columns');
+    assert(all(res.values(:,1) == 10), 'col1 from A');
+    assert(all(res.values(:,2) == 20), 'col2 from B');
+    assert(numel(res.labels) == 2, 'should have 2 labels');
+    assert(strcmp(res.labels{1}, 'A'), 'first label = A');
+    assert(strcmp(res.labels{2}, 'B'), 'second label = B');
+    assert(contains(res.metadata.source, 'merge'), 'source should say merge');
+
+    fprintf('PASS\n'); passed = passed + 1;
+catch ex
+    fprintf('FAIL: %s\n', ex.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  Summary
 % ════════════════════════════════════════════════════════════════════════
 

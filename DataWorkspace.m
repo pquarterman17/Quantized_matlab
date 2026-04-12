@@ -54,9 +54,10 @@ ACC = [0.24 0.52 0.90];   % accent (selected / active)
 
 fig = uifigure( ...
     'Name',            'Data Workspace', ...
-    'Position',        [80 80 1100 660], ...
+    'Position',        [80 80 1200 660], ...
     'Color',           BG, ...
     'Visible',         options.Visible, ...
+    'KeyPressFcn',     @onKeyPress, ...
     'CloseRequestFcn', @onClose);
 
 % ════════════════════════════════════════════════════════════════════════
@@ -72,8 +73,8 @@ rootGL = uigridlayout(fig, [2 1], ...
 % ════════════════════════════════════════════════════════════════════════
 %  Toolbar row
 % ════════════════════════════════════════════════════════════════════════
-tbGL = uigridlayout(rootGL, [1 5], ...
-    'ColumnWidth',   {90, 90, 90, '1x', 90}, ...
+tbGL = uigridlayout(rootGL, [1 9], ...
+    'ColumnWidth',   {90, 90, 90, 110, 110, 80, 110, '1x', 90}, ...
     'Padding',       [0 0 0 0], ...
     'ColumnSpacing', 4, ...
     'BackgroundColor', BG);
@@ -81,7 +82,7 @@ tbGL.Layout.Row = 1;
 
 btnAddFiles = uibutton(tbGL, ...
     'Text',            [char(43) ' Add Files'], ...
-    'Tooltip',         'Import files via parser.importAuto', ...
+    'Tooltip',         'Import files via parser.importAuto (Ctrl+V pastes clipboard)', ...
     'BackgroundColor', BTN, ...
     'FontColor',       FG, ...
     'FontSize',        10, ...
@@ -106,14 +107,50 @@ btnExport = uibutton(tbGL, ...
     'ButtonPushedFcn', @onExportCSV);
 btnExport.Layout.Column = 3;
 
-% Spacer at column 4
+btnDsMath = uibutton(tbGL, ...
+    'Text',            [char(8710) ' Dataset Math...'], ...
+    'Tooltip',         'Apply arithmetic between two datasets', ...
+    'BackgroundColor', BTN, ...
+    'FontColor',       FG, ...
+    'FontSize',        10, ...
+    'ButtonPushedFcn', @onDatasetMath);
+btnDsMath.Layout.Column = 4;
+
+btnMerge = uibutton(tbGL, ...
+    'Text',            [char(8614) ' Merge Columns...'], ...
+    'Tooltip',         'Horizontally concatenate two datasets', ...
+    'BackgroundColor', BTN, ...
+    'FontColor',       FG, ...
+    'FontSize',        10, ...
+    'ButtonPushedFcn', @onMergeDatasets);
+btnMerge.Layout.Column = 5;
+
+btnPlot = uibutton(tbGL, ...
+    'Text',            [char(9654) ' Plot...'], ...
+    'Tooltip',         'Open active dataset in BosonPlotter', ...
+    'BackgroundColor', BTN, ...
+    'FontColor',       FG, ...
+    'FontSize',        10, ...
+    'ButtonPushedFcn', @onPlotSelected);
+btnPlot.Layout.Column = 6;
+
+btnAddColumn = uibutton(tbGL, ...
+    'Text',            [char(402) ' Add Column...'], ...
+    'Tooltip',         'Add a computed column with a formula', ...
+    'BackgroundColor', BTN, ...
+    'FontColor',       FG, ...
+    'FontSize',        10, ...
+    'ButtonPushedFcn', @onAddColumn);
+btnAddColumn.Layout.Column = 7;
+
+% Spacer at column 8
 
 lblStatus = uilabel(tbGL, ...
     'Text',                'No datasets loaded', ...
     'FontColor',           [0.6 0.6 0.6], ...
     'FontSize',            10, ...
     'HorizontalAlignment', 'right');
-lblStatus.Layout.Column = 5;
+lblStatus.Layout.Column = 9;
 
 % ════════════════════════════════════════════════════════════════════════
 %  Content area: [left panel | table area]
@@ -312,7 +349,7 @@ end
     %ONEXPORTCSV  Export the active dataset to CSV.
         if model.activeIdx == 0, return; end
         data = model.getData(model.activeIdx);
-        T    = buildTableFromData(data);
+        T    = buildTableFromData(data, model.getComputedColumns(model.activeIdx));
         [fname, fdir] = uiputfile('*.csv', 'Export CSV');
         if isequal(fname, 0), return; end
         try
@@ -322,6 +359,179 @@ end
             uialert(fig, ME.message, 'Export failed');
         end
     end
+
+    function onAddColumn(~, ~)
+    %ONADDCOLUMN  Open the Add Computed Column dialog.
+        if model.activeIdx == 0
+            uialert(fig, 'No active dataset. Load a file first.', 'Add Column');
+            return;
+        end
+        showAddColumnDialog();
+    end
+
+    function showAddColumnDialog(existingName, existingExpr, existingUnit)
+    %SHOWADDCOLUMNDIALOG  Open a modal dialog for defining a computed column.
+    %   existingName/Expr/Unit — if supplied, pre-fill the fields (Edit mode).
+        if nargin < 1, existingName = ''; end
+        if nargin < 2, existingExpr = ''; end
+        if nargin < 3, existingUnit = ''; end
+
+        isEditMode = ~isempty(existingName);
+
+        dlgFig = uifigure( ...
+            'Name',       'Add Computed Column', ...
+            'Position',   [0 0 460 300], ...
+            'Color',      BG, ...
+            'Resize',     'off', ...
+            'WindowStyle','modal');
+        movegui(dlgFig, 'center');
+
+        dlgGL = uigridlayout(dlgFig, [6 2], ...
+            'RowHeight',    {22, 22, 22, 60, 22, 34}, ...
+            'ColumnWidth',  {100, '1x'}, ...
+            'Padding',      [12 12 12 12], ...
+            'RowSpacing',   6, ...
+            'ColumnSpacing',8, ...
+            'BackgroundColor', BG);
+
+        % Column name
+        uilabel(dlgGL, 'Text', 'Column name:', 'FontColor', FG, ...
+            'FontSize', 10).Layout.Row = 1;
+        txtName = uieditfield(dlgGL, 'Value', existingName, ...
+            'BackgroundColor', TBL, 'FontColor', FG, 'FontSize', 10, ...
+            'Placeholder', 'e.g. FieldSI');
+        txtName.Layout.Row    = 1;
+        txtName.Layout.Column = 2;
+
+        % Unit
+        uilabel(dlgGL, 'Text', 'Unit:', 'FontColor', FG, ...
+            'FontSize', 10).Layout.Row = 2;
+        txtUnit = uieditfield(dlgGL, 'Value', existingUnit, ...
+            'BackgroundColor', TBL, 'FontColor', FG, 'FontSize', 10, ...
+            'Placeholder', 'e.g. kA/m');
+        txtUnit.Layout.Row    = 2;
+        txtUnit.Layout.Column = 2;
+
+        % Formula
+        uilabel(dlgGL, 'Text', 'Formula:', 'FontColor', FG, ...
+            'FontSize', 10).Layout.Row = 3;
+        txtFormula = uieditfield(dlgGL, 'Value', existingExpr, ...
+            'BackgroundColor', TBL, 'FontColor', FG, 'FontSize', 10, ...
+            'Placeholder', 'e.g. col("Field") / 79.5775  or  $Field * pi');
+        txtFormula.Layout.Row    = 3;
+        txtFormula.Layout.Column = 2;
+        txtFormula.ValueChangedFcn = @onFormulaEdited;
+
+        % Preview area (row 4)
+        lblPreviewHdr = uilabel(dlgGL, 'Text', 'Preview:', ...
+            'FontColor', FG, 'FontSize', 10, 'VerticalAlignment', 'top');
+        lblPreviewHdr.Layout.Row = 4;
+        txtPreview = uitextarea(dlgGL, ...
+            'Value',           {''}, ...
+            'Editable',        'off', ...
+            'BackgroundColor', TBL, ...
+            'FontColor',       [0.6 0.85 0.6], ...
+            'FontSize',        9, ...
+            'FontName',        'Courier New');
+        txtPreview.Layout.Row    = 4;
+        txtPreview.Layout.Column = 2;
+
+        % Error label (row 5)
+        lblErr = uilabel(dlgGL, ...
+            'Text',      '', ...
+            'FontColor', [0.9 0.4 0.4], ...
+            'FontSize',  9, ...
+            'WordWrap',  'on');
+        lblErr.Layout.Row        = 5;
+        lblErr.Layout.Column     = [1 2];
+
+        % Buttons (row 6)
+        btnGL = uigridlayout(dlgGL, [1 3], ...
+            'ColumnWidth',   {'1x', 80, 80}, ...
+            'Padding',       [0 0 0 0], ...
+            'ColumnSpacing', 6, ...
+            'BackgroundColor', BG);
+        btnGL.Layout.Row    = 6;
+        btnGL.Layout.Column = [1 2];
+
+        uibutton(btnGL, 'Text', '', 'BackgroundColor', BG, ...
+            'Enable', 'off').Layout.Column = 1;  % spacer
+
+        if isEditMode
+            addLabel = 'Save';
+        else
+            addLabel = 'Add';
+        end
+        btnAdd = uibutton(btnGL, 'Text', addLabel, ...
+            'BackgroundColor', ACC, 'FontColor', [1 1 1], 'FontSize', 10, ...
+            'ButtonPushedFcn', @onCommit);
+        btnAdd.Layout.Column = 2;
+
+        uibutton(btnGL, 'Text', 'Cancel', ...
+            'BackgroundColor', BTN, 'FontColor', FG, 'FontSize', 10, ...
+            'ButtonPushedFcn', @(~,~) delete(dlgFig)).Layout.Column = 3;
+
+        % Pre-fill preview if editing
+        if isEditMode
+            updatePreview(existingExpr);
+        end
+
+        function onFormulaEdited(~, ~)
+            updatePreview(txtFormula.Value);
+        end
+
+        function updatePreview(expr)
+            if isempty(strtrim(expr))
+                txtPreview.Value = {''};
+                lblErr.Text      = '';
+                return;
+            end
+            try
+                data   = model.getData(model.activeIdx);
+                result = dataWorkspace.FormulaEngine.evaluate(string(expr), data);
+                N      = numel(result);
+                nShow  = min(10, N);
+                lines  = cell(1, nShow + 1);
+                lines{1} = sprintf('First %d of %d values:', nShow, N);
+                for ki = 1:nShow
+                    lines{ki+1} = sprintf('  [%d]  %g', ki, result(ki));
+                end
+                txtPreview.Value = lines;
+                lblErr.Text      = '';
+            catch ME
+                txtPreview.Value = {''};
+                lblErr.Text      = ME.message;
+            end
+        end
+
+        function onCommit(~, ~)
+            colName = strtrim(txtName.Value);
+            expr    = strtrim(txtFormula.Value);
+            unit    = strtrim(txtUnit.Value);
+
+            if isempty(colName)
+                lblErr.Text = 'Column name is required.';
+                return;
+            end
+            if isempty(expr)
+                lblErr.Text = 'Formula is required.';
+                return;
+            end
+
+            dsIdx = model.activeIdx;
+            try
+                if isEditMode
+                    % Remove the old column and re-add with (possibly new) name/expr
+                    model.removeComputedColumn(dsIdx, existingName);
+                end
+                model.addComputedColumn(dsIdx, colName, expr, unit);
+                delete(dlgFig);
+                setStatusBar(sprintf('Computed column "%s" added.', colName));
+            catch ME
+                lblErr.Text = ME.message;
+            end
+        end
+    end  % showAddColumnDialog
 
 % ════════════════════════════════════════════════════════════════════════
 %  Dataset list callbacks
@@ -370,13 +580,20 @@ end
             uimenu(cm, 'Text', 'Clear Sort',      'MenuSelectedFcn', @onClearSort, ...
                 'Separator', 'on');
         end
+        % Column reorder items
+        uimenu(cm, 'Text', 'Move Column Left',    'MenuSelectedFcn', @onMoveColLeft,  'Separator', 'on');
+        uimenu(cm, 'Text', 'Move Column Right',   'MenuSelectedFcn', @onMoveColRight);
+        uimenu(cm, 'Text', 'Move Column to Start','MenuSelectedFcn', @onMoveColStart);
         if ~isSpreadsheet
             uimenu(cm, 'Text', 'Mask selected rows',   'MenuSelectedFcn', @onMaskRows, 'Separator', 'on');
         else
-            uimenu(cm, 'Text', 'Mask selected rows',   'MenuSelectedFcn', @onMaskRows);
+            uimenu(cm, 'Text', 'Mask selected rows',   'MenuSelectedFcn', @onMaskRows, 'Separator', 'on');
         end
         uimenu(cm, 'Text', 'Unmask selected rows', 'MenuSelectedFcn', @onUnmaskRows);
         uimenu(cm, 'Text', 'Unmask all rows',      'MenuSelectedFcn', @onUnmaskAll, 'Separator', 'on');
+        % Computed column operations (shown when a computed column is selected)
+        uimenu(cm, 'Text', 'Edit Formula...',    'MenuSelectedFcn', @onEditFormula,   'Separator', 'on');
+        uimenu(cm, 'Text', 'Remove Column',      'MenuSelectedFcn', @onRemoveColumn);
     end
 
     function onMaskRows(~, ~)
@@ -403,6 +620,310 @@ end
         idx = model.activeIdx;
         n   = numel(model.datasets{idx}.time);
         model.setMask(idx, true(n, 1));
+    end
+
+    function onEditFormula(~, ~)
+    %ONEDITFORMULA  Open the Add Column dialog pre-filled for the selected column.
+        if model.activeIdx == 0 || isempty(state.selCols), return; end
+        dsIdx = model.activeIdx;
+        data  = model.getData(dsIdx);
+        cols  = model.getComputedColumns(dsIdx);
+        if isempty(cols), return; end
+
+        % Find the column name from the table column index
+        T       = buildTableFromData(data, cols);
+        nRegular = 1 + size(data.values, 2);  % X + value columns
+        tblCol   = state.selCols(1);
+        if tblCol <= nRegular, return; end  % not a computed column
+
+        compIdx = tblCol - nRegular;
+        if compIdx < 1 || compIdx > numel(cols), return; end
+        entry = cols{compIdx};
+        showAddColumnDialog(entry.name, entry.expression, entry.unit);
+    end
+
+    function onRemoveColumn(~, ~)
+    %ONREMOVECOLUMN  Remove the computed column for the selected table column.
+        if model.activeIdx == 0 || isempty(state.selCols), return; end
+        dsIdx = model.activeIdx;
+        data  = model.getData(dsIdx);
+        cols  = model.getComputedColumns(dsIdx);
+        if isempty(cols), return; end
+
+        T        = buildTableFromData(data, cols);
+        nRegular = 1 + size(data.values, 2);
+        tblCol   = state.selCols(1);
+        if tblCol <= nRegular, return; end
+
+        compIdx = tblCol - nRegular;
+        if compIdx < 1 || compIdx > numel(cols), return; end
+        colName  = cols{compIdx}.name;
+
+        answer = uiconfirm(fig, ...
+            sprintf('Remove computed column "%s"?', colName), ...
+            'Remove Column', ...
+            'Options', {'Remove', 'Cancel'}, ...
+            'DefaultOption', 'Cancel', ...
+            'CancelOption',  'Cancel');
+        if strcmp(answer, 'Remove')
+            model.removeComputedColumn(dsIdx, colName);
+            setStatusBar(sprintf('Computed column "%s" removed.', colName));
+        end
+    end
+
+% ════════════════════════════════════════════════════════════════════════
+%  Column reorder callbacks
+% ════════════════════════════════════════════════════════════════════════
+
+    function onMoveColLeft(~, ~)
+    %ONMOVECOLLEFT  Move the right-clicked (selected) value column one step left.
+        reorderColumn('left');
+    end
+
+    function onMoveColRight(~, ~)
+    %ONMOVECOLRIGHT  Move the right-clicked value column one step right.
+        reorderColumn('right');
+    end
+
+    function onMoveColStart(~, ~)
+    %ONMOVECOLSTART  Move the right-clicked value column to the first position.
+        reorderColumn('start');
+    end
+
+    function reorderColumn(direction)
+    %REORDERCOLUMN  Compute new display order and call model.setColumnRoles.
+    %
+    %   direction — 'left' | 'right' | 'start'
+    %
+    %   Table col 1 = X axis (.time); value columns start at table col 2.
+        if model.activeIdx == 0 || isempty(state.selCols), return; end
+
+        dsIdx = model.activeIdx;
+        roles = model.getColumnRoles(dsIdx);
+        nCols = roles.numColumns();
+        if nCols < 2, return; end
+
+        % Map table column → value column index (col 1 is X, skipped)
+        tblCol = state.selCols(1);
+        valCol = tblCol - 1;
+        if valCol < 1 || valCol > nCols, return; end
+
+        % Find position of valCol in the current displayOrder
+        order = roles.displayOrder;
+        pos   = find(order == valCol, 1);
+        if isempty(pos), return; end
+
+        switch direction
+            case 'left'
+                if pos <= 1, return; end
+                newPos = pos - 1;
+            case 'right'
+                if pos >= nCols, return; end
+                newPos = pos + 1;
+            case 'start'
+                if pos == 1, return; end
+                newPos = 1;
+            otherwise
+                return;
+        end
+
+        % Build new order: remove element at pos, insert at newPos
+        newOrder      = order;
+        newOrder(pos) = [];
+        newOrder = [newOrder(1:newPos-1), order(pos), newOrder(newPos:end)];
+
+        model.pushUndo(sprintf('reorder column %s', direction));
+        model.setColumnRoles(dsIdx, roles.reorder(newOrder));
+        setStatusBar(sprintf('Column moved %s', direction));
+    end
+
+% ════════════════════════════════════════════════════════════════════════
+%  Dataset math callbacks
+% ════════════════════════════════════════════════════════════════════════
+
+    function onDatasetMath(~, ~)
+    %ONDATASETMATH  Open the dataset arithmetic dialog.
+        if model.count() < 2
+            uialert(fig, 'At least two datasets are required.', 'Dataset Math');
+            return;
+        end
+        showDatasetMathDialog('+');
+    end
+
+    function showDatasetMathDialog(defaultOp)
+    %SHOWDATASETMATHDIALOG  Modal dialog: choose A, op, B then compute.
+        n     = model.count();
+        names = cell(1, n);
+        for k = 1:n
+            names{k} = getDatasetNameLocal(k);
+        end
+
+        dlg = uifigure('Name', 'Dataset Math', ...
+            'Position', [200 300 360 200], ...
+            'WindowStyle', 'modal');
+        dlgGL = uigridlayout(dlg, [4 3], ...
+            'RowHeight',   {30, 30, 30, 36}, ...
+            'ColumnWidth', {100, 80, 100}, ...
+            'Padding',     [12 12 12 12], ...
+            'RowSpacing',  8);
+
+        uilabel(dlgGL, 'Text', 'Dataset A:', 'HorizontalAlignment', 'right');
+        ddA = uidropdown(dlgGL, 'Items', names, 'Value', names{1});
+        ddA.Layout.Column = [2 3];
+
+        uilabel(dlgGL, 'Text', 'Operation:', 'HorizontalAlignment', 'right');
+        ddOp = uidropdown(dlgGL, 'Items', {'+', '-', '*', '/', 'Ratio (A/B)'}, ...
+            'Value', defaultOp);
+        ddOp.Layout.Column = [2 3];
+
+        uilabel(dlgGL, 'Text', 'Dataset B:', 'HorizontalAlignment', 'right');
+        idxBDefault = min(2, n);
+        ddB = uidropdown(dlgGL, 'Items', names, 'Value', names{idxBDefault});
+        ddB.Layout.Column = [2 3];
+
+        uibutton(dlgGL, 'Text', 'Cancel', ...
+            'ButtonPushedFcn', @(~,~) delete(dlg));
+        btnCompute = uibutton(dlgGL, 'Text', 'Compute', ...
+            'ButtonPushedFcn', @doCompute);
+        btnCompute.Layout.Column = [2 3];
+
+        function doCompute(~, ~)
+            idxA  = find(strcmp(names, ddA.Value), 1);
+            idxB  = find(strcmp(names, ddB.Value), 1);
+            opStr = ddOp.Value;
+            if strcmp(opStr, 'Ratio (A/B)'), opStr = 'ratio'; end
+            try
+                result = model.datasetMath(idxA, opStr, idxB);
+                model.addDataset(result, result.metadata.source, 'datasetMath');
+                setStatusBar(sprintf('Created: %s', result.metadata.source));
+                delete(dlg);
+            catch ME
+                uialert(dlg, ME.message, 'Dataset Math Error');
+            end
+        end
+    end
+
+    function onMergeDatasets(~, ~)
+    %ONMERGEDATASETS  Open the merge-columns dialog.
+        if model.count() < 2
+            uialert(fig, 'At least two datasets are required.', 'Merge Columns');
+            return;
+        end
+        showMergeDialog();
+    end
+
+    function showMergeDialog()
+    %SHOWMERGEDIALOG  Modal dialog: choose A and B then merge columns.
+        n     = model.count();
+        names = cell(1, n);
+        for k = 1:n
+            names{k} = getDatasetNameLocal(k);
+        end
+
+        dlg = uifigure('Name', 'Merge Columns', ...
+            'Position', [200 320 320 160], ...
+            'WindowStyle', 'modal');
+        dlgGL = uigridlayout(dlg, [3 3], ...
+            'RowHeight',   {30, 30, 36}, ...
+            'ColumnWidth', {100, 80, 80}, ...
+            'Padding',     [12 12 12 12], ...
+            'RowSpacing',  8);
+
+        uilabel(dlgGL, 'Text', 'Base (A):', 'HorizontalAlignment', 'right');
+        ddA = uidropdown(dlgGL, 'Items', names, 'Value', names{1});
+        ddA.Layout.Column = [2 3];
+
+        uilabel(dlgGL, 'Text', 'Append (B):', 'HorizontalAlignment', 'right');
+        idxBDefault = min(2, n);
+        ddB = uidropdown(dlgGL, 'Items', names, 'Value', names{idxBDefault});
+        ddB.Layout.Column = [2 3];
+
+        uibutton(dlgGL, 'Text', 'Cancel', ...
+            'ButtonPushedFcn', @(~,~) delete(dlg));
+        btnMerge = uibutton(dlgGL, 'Text', 'Merge', ...
+            'ButtonPushedFcn', @doMerge);
+        btnMerge.Layout.Column = [2 3];
+
+        function doMerge(~, ~)
+            idxA = find(strcmp(names, ddA.Value), 1);
+            idxB = find(strcmp(names, ddB.Value), 1);
+            try
+                result = model.mergeDatasets(idxA, idxB);
+                model.addDataset(result, result.metadata.source, 'mergeDatasets');
+                setStatusBar(sprintf('Created: %s', result.metadata.source));
+                delete(dlg);
+            catch ME
+                uialert(dlg, ME.message, 'Merge Error');
+            end
+        end
+    end
+
+    function name = getDatasetNameLocal(idx)
+    %GETDATASETNAMELOCAL  Return a short display name for dataset idx.
+        ds = model.datasets{idx};
+        if isfield(ds, 'metadata') && isfield(ds.metadata, 'source') ...
+                && ~isempty(ds.metadata.source)
+            [~, nm, ext] = fileparts(ds.metadata.source);
+            name = [nm ext];
+        else
+            name = sprintf('Dataset%d', idx);
+        end
+    end
+
+% ════════════════════════════════════════════════════════════════════════
+%  Clipboard paste-to-import  (Ctrl+V)
+% ════════════════════════════════════════════════════════════════════════
+
+    function onKeyPress(~, evt)
+    %ONKEYPRESS  Handle figure-level keyboard shortcuts.
+        if strcmp(evt.Key, 'v') && any(strcmp(evt.Modifier, 'control'))
+            onPasteFromClipboard();
+        end
+    end
+
+    function onPasteFromClipboard()
+    %ONPASTEFROMCLIPBOARD  Read clipboard text and create a new dataset.
+        txt = clipboard('paste');
+        if isempty(strtrim(txt))
+            setStatusBar('Clipboard is empty.');
+            return;
+        end
+        try
+            data = parseClipboardText(txt);
+            model.addDataset(data, 'clipboard', 'paste');
+            setStatusBar(sprintf('Pasted %d rows from clipboard.', numel(data.time)));
+        catch ME
+            uialert(fig, ME.message, 'Clipboard Import Failed');
+        end
+    end
+
+% ════════════════════════════════════════════════════════════════════════
+%  Plot in BosonPlotter
+% ════════════════════════════════════════════════════════════════════════
+
+    function onPlotSelected(~, ~)
+    %ONPLOTSELECTED  Export active dataset to a temp CSV then open BosonPlotter.
+        if model.activeIdx == 0
+            uialert(fig, 'No active dataset to plot.', 'Plot');
+            return;
+        end
+
+        data    = model.getData(model.activeIdx);
+        T       = buildTableFromData(data);
+        tmpFile = [tempname, '.csv'];
+        try
+            writetable(T, tmpFile);
+        catch ME
+            uialert(fig, ME.message, 'Plot: temp file write failed');
+            return;
+        end
+
+        try
+            BosonPlotter();
+            setStatusBar(['Exported temp CSV — open it in BosonPlotter: ' tmpFile]);
+        catch ME
+            uialert(fig, ME.message, 'BosonPlotter failed to open');
+        end
     end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -433,7 +954,7 @@ end
     %APPLYSORT  Sort visible rows by column col in direction dir.
         if model.activeIdx == 0, return; end
         data  = model.getData(model.activeIdx);
-        T     = buildTableFromData(data);
+        T     = buildTableFromData(data, model.getComputedColumns(model.activeIdx));
 
         % Determine the base rows (visible after filter)
         baseRows = computeVisibleRows(data);   % [k×1] indices into data
@@ -571,7 +1092,8 @@ end
         end
 
         data = model.getData(model.activeIdx);
-        T    = buildTableFromData(data);
+        compCols = model.getComputedColumns(model.activeIdx);
+        T    = buildTableFromData(data, compCols);
 
         % Highlight masked rows with a distinct background color
         m = model.mask{model.activeIdx};
@@ -723,7 +1245,7 @@ end
         end
 
         data = model.getData(model.activeIdx);
-        T    = buildTableFromData(data);
+        T    = buildTableFromData(data, model.getComputedColumns(model.activeIdx));
 
         % Gather the numeric values to compute stats over
         vals = [];
@@ -834,8 +1356,14 @@ end  % DataWorkspace
 %  Module-level helpers (outside the main function scope)
 % ════════════════════════════════════════════════════════════════════════
 
-function T = buildTableFromData(data)
+function T = buildTableFromData(data, computedCols)
 %BUILDTABLEFROMDATA  Convert a unified data struct to a MATLAB table.
+%   Optional computedCols is a cell array of computed column structs
+%   (each with .name, .values, .unit fields) appended as extra columns.
+
+if nargin < 2
+    computedCols = {};
+end
 
 xVec = double(data.time(:));
 
@@ -862,12 +1390,26 @@ while numel(labels) < nVal
 end
 labels = labels(1:nVal);
 
-% Sanitise variable names for the table
-allRaw   = [{xLabel}, labels];
+% Computed column data / labels / units
+compMat   = zeros(numel(xVec), numel(computedCols));
+compLabels = cell(1, numel(computedCols));
+compUnits  = cell(1, numel(computedCols));
+for kc = 1:numel(computedCols)
+    v = computedCols{kc}.values;
+    if numel(v) == numel(xVec)
+        compMat(:, kc) = v(:);
+    end
+    compLabels{kc} = computedCols{kc}.name;
+    compUnits{kc}  = computedCols{kc}.unit;
+end
+
+% Sanitise variable names for the table (mark computed with italic prefix f_)
+allRaw   = [{xLabel}, labels, compLabels];
 allValid = matlab.lang.makeValidName(allRaw);
 allValid = matlab.lang.makeUniqueStrings(allValid);
 
-T = array2table([xVec, valMat]);
+allData = [xVec, valMat, compMat];
+T = array2table(allData);
 T.Properties.VariableNames = allValid;
 
 % Units metadata
@@ -879,7 +1421,7 @@ while numel(units) < nVal
     units{end+1} = '';  %#ok<AGROW>
 end
 units = units(1:nVal);
-T.Properties.VariableUnits = [{''},  units];
+T.Properties.VariableUnits = [{''},  units, compUnits];
 
 end  % buildTableFromData
 
@@ -905,3 +1447,100 @@ else
     s = strjoin(parts, ',  ');
 end
 end  % buildUnitsString
+
+
+function data = parseClipboardText(txt)
+%PARSECLIPBOARDTEXT  Parse raw clipboard text into a unified data struct.
+%
+%   data = parseClipboardText(txt)
+%
+%   Inputs:
+%     txt — raw text string from clipboard('paste')
+%
+%   Outputs:
+%     data — unified struct (.time, .values, .labels, .units, .metadata)
+%
+%   Auto-detects delimiter (tab > comma > space).  Treats the first row as
+%   a header when it contains any non-numeric token.  First column becomes
+%   .time; remaining columns become .values.
+
+% Split into lines, remove trailing whitespace / empty lines
+lines = strsplit(txt, {'\n', '\r\n', '\r'});
+lines = strtrim(lines);
+lines = lines(~cellfun('isempty', lines));
+
+if isempty(lines)
+    error('parseClipboardText:empty', 'No data found in clipboard text.');
+end
+
+% ── Detect delimiter ──────────────────────────────────────────────────
+if contains(lines{1}, char(9))           % tab
+    delim = char(9);
+elseif contains(lines{1}, ',')           % comma
+    delim = ',';
+else                                     % space / whitespace
+    delim = ' ';
+end
+
+% ── Split all rows ────────────────────────────────────────────────────
+rows = cellfun(@(ln) strsplit(ln, delim), lines, 'UniformOutput', false);
+
+% Normalise row lengths (pad short rows with NaN placeholder)
+rowLens  = cellfun('length', rows);
+maxCols  = max(rowLens);
+for k = 1:numel(rows)
+    while numel(rows{k}) < maxCols
+        rows{k}{end+1} = '';
+    end
+end
+
+% ── Detect header row (first row with any non-numeric token) ──────────
+firstRow = rows{1};
+isHeader = any(cellfun(@(t) isnan(str2double(strtrim(t))), firstRow));
+
+if isHeader
+    headerTokens = strtrim(firstRow);
+    dataRows     = rows(2:end);
+else
+    headerTokens = arrayfun(@(k) sprintf('Col%d', k), 1:maxCols, ...
+                            'UniformOutput', false);
+    dataRows = rows;
+end
+
+if isempty(dataRows)
+    error('parseClipboardText:noData', 'Clipboard contains a header but no data rows.');
+end
+
+% ── Convert to numeric matrix ─────────────────────────────────────────
+nRows = numel(dataRows);
+mat   = nan(nRows, maxCols);
+for r = 1:nRows
+    for c = 1:maxCols
+        v = str2double(strtrim(dataRows{r}{c}));
+        if ~isnan(v)
+            mat(r, c) = v;
+        end
+    end
+end
+
+% ── Build unified struct ──────────────────────────────────────────────
+xVec = mat(:, 1);
+if maxCols > 1
+    yMat = mat(:, 2:end);
+else
+    yMat = zeros(nRows, 0);
+end
+
+labels = headerTokens(2:end);
+if isempty(labels)
+    labels = {};
+end
+units = repmat({''}, 1, numel(labels));
+
+data = parser.createDataStruct(xVec, yMat, ...
+    'labels',   labels, ...
+    'units',    units, ...
+    'metadata', struct('source', 'clipboard', 'parserName', 'paste', ...
+                       'xLabel', headerTokens{1}));
+
+end  % parseClipboardText
