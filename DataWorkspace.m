@@ -152,10 +152,11 @@ listDatasets = uilistbox(leftGL, ...
 listDatasets.Layout.Row = 2;
 
 % ────────────────────────────────────────────────────────────────────────
-%  Right area: units label + table + status bar
+%  Right area: units label | filter bar | table | stats bar | status bar
+%  Row layout: {18, 28, '1x', 22, 20}
 % ────────────────────────────────────────────────────────────────────────
-rightGL = uigridlayout(contentGL, [3 1], ...
-    'RowHeight',   {18, '1x', 20}, ...
+rightGL = uigridlayout(contentGL, [5 1], ...
+    'RowHeight',   {18, 28, '1x', 22, 20}, ...
     'Padding',     [0 0 0 0], ...
     'RowSpacing',  2, ...
     'BackgroundColor', BG);
@@ -168,8 +169,33 @@ lblUnits = uilabel(rightGL, ...
     'HorizontalAlignment', 'left');
 lblUnits.Layout.Row = 1;
 
+% ── Filter bar (row 2) — only shown for uitable fallback ────────────────
+filterGL = uigridlayout(rightGL, [1 2], ...
+    'ColumnWidth',   {'1x', 60}, ...
+    'Padding',       [0 2 0 2], ...
+    'ColumnSpacing', 4, ...
+    'BackgroundColor', BG);
+filterGL.Layout.Row = 2;
+
+txtFilter = uieditfield(filterGL, ...
+    'Value',           '', ...
+    'Placeholder',     'Filter: e.g. Temperature > 300', ...
+    'BackgroundColor', TBL, ...
+    'FontColor',       FG, ...
+    'FontSize',        10, ...
+    'ValueChangedFcn', @onFilterChanged);
+txtFilter.Layout.Column = 1;
+
+btnClearFilter = uibutton(filterGL, ...
+    'Text',            'Clear', ...
+    'BackgroundColor', BTN, ...
+    'FontColor',       FG, ...
+    'FontSize',        9, ...
+    'ButtonPushedFcn', @onClearFilter);
+btnClearFilter.Layout.Column = 2;
+
 % Data table — uispreadsheet on R2025a+, uitable on older releases
-[tblData, ~] = dataWorkspace.createTableWidget(rightGL);
+[tblData, isSpreadsheet] = dataWorkspace.createTableWidget(rightGL);
 tblData.Data = table();
 try
     tblData.FontSize        = 11;
@@ -180,20 +206,43 @@ catch
 end
 tblData.CellSelectionCallback = @onCellSelected;
 tblData.ContextMenu           = buildContextMenu();
-tblData.Layout.Row            = 2;
+tblData.Layout.Row            = 3;
+
+% Hide filter bar when uispreadsheet is active (has built-in filter)
+if isSpreadsheet
+    filterGL.Visible = 'off';
+    rightGL.RowHeight{2} = 0;
+end
+
+% ── Stats bar (row 4) ────────────────────────────────────────────────────
+lblStats = uilabel(rightGL, ...
+    'Text',                '', ...
+    'FontSize',            9, ...
+    'FontName',            'Courier New', ...
+    'FontColor',           [0.65 0.65 0.65], ...
+    'HorizontalAlignment', 'left');
+lblStats.Layout.Row = 4;
 
 lblStatusBar = uilabel(rightGL, ...
     'Text',                '', ...
     'FontSize',            9, ...
     'FontColor',           [0.5 0.5 0.5], ...
     'HorizontalAlignment', 'left');
-lblStatusBar.Layout.Row = 3;
+lblStatusBar.Layout.Row = 5;
 
 % ════════════════════════════════════════════════════════════════════════
 %  GUI state
 % ════════════════════════════════════════════════════════════════════════
-state.selRows    = [];   % selected row indices in the table
-state.selCols    = [];   % selected column indices in the table
+state.selRows       = [];        % selected row indices in the table
+state.selCols       = [];        % selected column indices in the table
+
+% Sort state (uitable fallback only — uispreadsheet has built-in sort)
+state.sortCol       = 0;         % 0 = unsorted; column index when active
+state.sortDir       = 'ascend';  % 'ascend' | 'descend'
+state.sortOrder     = [];        % [N×1] permutation index: display → data row
+
+% Filter state (uitable fallback only — uispreadsheet has built-in filter)
+state.filterMask    = [];        % [N×1] logical, true = row passes filter
 
 % ════════════════════════════════════════════════════════════════════════
 %  Model event listeners
@@ -299,11 +348,12 @@ end
 % ════════════════════════════════════════════════════════════════════════
 
     function onCellSelected(~, evt)
-    %ONCELLSELECTED  Track selected rows/columns for context menu.
+    %ONCELLSELECTED  Track selected rows/columns; update stats bar.
         if ~isempty(evt.Indices)
             state.selRows = unique(evt.Indices(:,1));
             state.selCols = unique(evt.Indices(:,2));
         end
+        refreshStatsBar();
     end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -313,7 +363,18 @@ end
     function cm = buildContextMenu()
     %BUILDCONTEXTMENU  Build the right-click context menu for the data table.
         cm = uicontextmenu(fig);
-        uimenu(cm, 'Text', 'Mask selected rows',   'MenuSelectedFcn', @onMaskRows);
+        % Sort items — only wired when uitable fallback is active
+        if ~isSpreadsheet
+            uimenu(cm, 'Text', 'Sort Ascending',  'MenuSelectedFcn', @onSortAscending);
+            uimenu(cm, 'Text', 'Sort Descending', 'MenuSelectedFcn', @onSortDescending);
+            uimenu(cm, 'Text', 'Clear Sort',      'MenuSelectedFcn', @onClearSort, ...
+                'Separator', 'on');
+        end
+        if ~isSpreadsheet
+            uimenu(cm, 'Text', 'Mask selected rows',   'MenuSelectedFcn', @onMaskRows, 'Separator', 'on');
+        else
+            uimenu(cm, 'Text', 'Mask selected rows',   'MenuSelectedFcn', @onMaskRows);
+        end
         uimenu(cm, 'Text', 'Unmask selected rows', 'MenuSelectedFcn', @onUnmaskRows);
         uimenu(cm, 'Text', 'Unmask all rows',      'MenuSelectedFcn', @onUnmaskAll, 'Separator', 'on');
     end
@@ -345,6 +406,95 @@ end
     end
 
 % ════════════════════════════════════════════════════════════════════════
+%  Sort callbacks (uitable fallback only)
+% ════════════════════════════════════════════════════════════════════════
+
+    function onSortAscending(~, ~)
+    %ONSORTASCENDING  Sort by the right-clicked column, ascending.
+        if isempty(state.selCols), return; end
+        applySort(state.selCols(1), 'ascend');
+    end
+
+    function onSortDescending(~, ~)
+    %ONSORTDESCENDING  Sort by the right-clicked column, descending.
+        if isempty(state.selCols), return; end
+        applySort(state.selCols(1), 'descend');
+    end
+
+    function onClearSort(~, ~)
+    %ONCLEARSORT  Remove sort and restore original row order.
+        state.sortCol   = 0;
+        state.sortDir   = 'ascend';
+        state.sortOrder = [];
+        refreshTable();
+    end
+
+    function applySort(col, dir)
+    %APPLYSORT  Sort visible rows by column col in direction dir.
+        if model.activeIdx == 0, return; end
+        data  = model.getData(model.activeIdx);
+        T     = buildTableFromData(data);
+
+        % Determine the base rows (visible after filter)
+        baseRows = computeVisibleRows(data);   % [k×1] indices into data
+
+        % Extract the sort column from the table (numeric columns only)
+        nCols = width(T);
+        if col < 1 || col > nCols, return; end
+        colVec = table2array(T(baseRows, col));
+        if ~isnumeric(colVec)
+            % Cannot sort non-numeric; silently ignore
+            return;
+        end
+
+        [~, ord]        = sort(colVec, dir);
+        state.sortOrder = baseRows(ord);       % display-order index into data rows
+        state.sortCol   = col;
+        state.sortDir   = dir;
+        renderSortedTable(data, T);
+    end
+
+% ════════════════════════════════════════════════════════════════════════
+%  Filter callbacks (uitable fallback only)
+% ════════════════════════════════════════════════════════════════════════
+
+    function onFilterChanged(~, ~)
+    %ONFILTERCHANGED  Re-evaluate the filter expression and re-render table.
+        applyFilter();
+    end
+
+    function onClearFilter(~, ~)
+    %ONCLEARFILTER  Clear the filter field and remove the filter.
+        txtFilter.Value = '';
+        applyFilter();
+    end
+
+    function applyFilter()
+    %APPLYFILTER  Evaluate filter expression; update filterMask and re-render.
+        if model.activeIdx == 0
+            state.filterMask = [];
+            return;
+        end
+        expr = strtrim(txtFilter.Value);
+        data = model.getData(model.activeIdx);
+        nRows = numel(data.time);
+        if isempty(expr)
+            state.filterMask = true(nRows, 1);
+        else
+            try
+                state.filterMask = bosonPlotter.filterRows(data, expr);
+            catch
+                % On parse error keep the previous mask; show hint in stats
+                state.filterMask = true(nRows, 1);
+            end
+        end
+        % Reset sort order so it is recomputed against new visible rows
+        state.sortOrder = [];
+        state.sortCol   = 0;
+        refreshTable();
+    end
+
+% ════════════════════════════════════════════════════════════════════════
 %  Model event handlers (view updates)
 % ════════════════════════════════════════════════════════════════════════
 
@@ -352,6 +502,7 @@ end
     %ONMODELDATACHANGED  Rebuild the dataset list when the model changes.
         if ~isvalid(fig), return; end
         refreshDatasetList();
+        resetSortFilterState();
         refreshTable();
         refreshStatusLabel();
     end
@@ -359,6 +510,7 @@ end
     function onModelSelectionChanged(~, ~)
     %ONMODELSELECTIONCHANGED  Refresh the table when the active dataset changes.
         if ~isvalid(fig), return; end
+        resetSortFilterState();
         refreshTable();
         refreshSelectionInList();
     end
@@ -410,10 +562,11 @@ end
     end
 
     function refreshTable()
-    %REFRESHTABLE  Populate tblData from the active dataset.
+    %REFRESHTABLE  Populate tblData from the active dataset (with sort/filter).
         if model.activeIdx == 0 || model.count() == 0
-            tblData.Data = table();
+            tblData.Data  = table();
             lblUnits.Text = 'Units: —';
+            lblStats.Text = '';
             return;
         end
 
@@ -430,17 +583,88 @@ end
             T.Masked = maskedCol;
         end
 
-        tblData.Data = T;
+        % Units label
+        lblUnits.Text = ['Units: ' buildUnitsString(data)];
+
+        if isSpreadsheet
+            % uispreadsheet: set data directly (sort/filter built-in)
+            tblData.Data = T;
+            try
+                nC = width(T);
+                tblData.ColumnSortable = true(1, nC);
+            catch
+            end
+            refreshStatusBar();
+            refreshStatsBar();
+            return;
+        end
+
+        % ── uitable fallback: apply filter then sort ──────────────────────
+        renderSortedTable(data, T);
+    end
+
+    function renderSortedTable(data, T)
+    %RENDERSORTEDTABLE  Apply filterMask + sortOrder then display table.
+        nRows = height(T);
+
+        % Determine which rows pass the filter
+        visibleRows = computeVisibleRows(data);   % indices into T
+
+        % Apply sort if active
+        if state.sortCol > 0 && ~isempty(state.sortOrder)
+            % sortOrder was built from baseRows; intersect with current visibleRows
+            % to handle mask/filter interaction (keep only rows still visible)
+            [~, ia] = ismember(state.sortOrder, visibleRows);
+            sortedRows = state.sortOrder(ia > 0);
+            % Rows in visibleRows not yet in sortedRows (new rows after filter change)
+            missing = visibleRows(~ismember(visibleRows, sortedRows));
+            visibleRows = [sortedRows; missing(:)];
+        end
+
+        Tdisp = T(visibleRows, :);
+
+        % Append sort indicator to column header
+        colNames = T.Properties.VariableNames;
+        if state.sortCol > 0 && state.sortCol <= numel(colNames)
+            if strcmp(state.sortDir, 'ascend')
+                colNames{state.sortCol} = [colNames{state.sortCol} ' ' char(9650)];
+            else
+                colNames{state.sortCol} = [colNames{state.sortCol} ' ' char(9660)];
+            end
+        end
+        Tdisp.Properties.VariableNames = colNames;
+
+        tblData.Data = Tdisp;
         try
-            nC = width(T);
+            nC = width(Tdisp);
             tblData.ColumnSortable = true(1, nC);
         catch
         end
 
-        % Units label
-        lblUnits.Text = ['Units: ' buildUnitsString(data)];
+        refreshStatusBar(nRows, numel(visibleRows));
+        refreshStatsBar();
+    end
 
-        refreshStatusBar();
+    function visRows = computeVisibleRows(data)
+    %COMPUTEVISIBLEROWS  Return row indices (into data) visible after filter.
+        nRows = numel(data.time);
+        % Start with all rows
+        fMask = true(nRows, 1);
+        if ~isempty(state.filterMask) && numel(state.filterMask) == nRows
+            fMask = state.filterMask;
+        end
+        visRows = find(fMask);
+    end
+
+    function resetSortFilterState()
+    %RESETSORTFILTERSTATE  Clear sort + filter when switching datasets.
+        state.sortCol    = 0;
+        state.sortDir    = 'ascend';
+        state.sortOrder  = [];
+        state.filterMask = [];
+        if ~isSpreadsheet
+            txtFilter.Value = '';
+        end
     end
 
     function refreshStatusLabel()
@@ -455,26 +679,107 @@ end
         end
     end
 
-    function refreshStatusBar()
+    function refreshStatusBar(nTotal, nVisible)
     %REFRESHSTATUSBAR  Update the bottom status bar.
+    %   Optional args nTotal and nVisible allow the caller to pass pre-computed
+    %   counts (avoids redundant model access from renderSortedTable).
         if model.activeIdx == 0 || model.count() == 0
             lblStatusBar.Text = '';
             return;
         end
-        data  = model.getData(model.activeIdx);
-        nRows = numel(data.time);
+        if nargin < 1
+            data   = model.getData(model.activeIdx);
+            nTotal = numel(data.time);
+        end
+        if nargin < 2
+            nVisible = nTotal;
+        end
         m     = model.mask{model.activeIdx};
         nMask = sum(~m);
-        if nMask == 0
-            lblStatusBar.Text = sprintf('%d rows', nRows);
-        else
-            lblStatusBar.Text = sprintf('%d rows  |  %d masked', nRows, nMask);
+
+        parts = {};
+        parts{end+1} = sprintf('%d rows', nTotal);
+        if nMask > 0
+            parts{end+1} = sprintf('%d masked', nMask);
         end
+        % Show filter count only when filter is active and reduces rows
+        if ~isSpreadsheet && nVisible < nTotal
+            parts{end+1} = sprintf('Filtered: %d of %d shown', nVisible, nTotal);
+        end
+        lblStatusBar.Text = strjoin(parts, '  |  ');
     end
 
     function setStatusBar(msg)
     %SETSTATUSBAR  Display a transient message in the status bar.
         lblStatusBar.Text = msg;
+    end
+
+    function refreshStatsBar()
+    %REFRESHSTATSBAR  Show Count/Mean/Std/Min/Max for the selected cells.
+    %   Falls back to the entire active column when no numeric selection exists.
+        if model.activeIdx == 0 || model.count() == 0
+            lblStats.Text = '';
+            return;
+        end
+
+        data = model.getData(model.activeIdx);
+        T    = buildTableFromData(data);
+
+        % Gather the numeric values to compute stats over
+        vals = [];
+        if ~isempty(state.selRows) && ~isempty(state.selCols)
+            % Collect all selected numeric cells from the displayed table
+            % (state.selRows are display-row indices)
+            for ci = state.selCols(:)'
+                if ci < 1 || ci > width(T), continue; end
+                col = T{:, ci};
+                if ~isnumeric(col), continue; end
+                vals = [vals; col(state.selRows(state.selRows <= height(T)))]; %#ok<AGROW>
+            end
+        end
+
+        % Fallback: use the first selected column across all visible rows
+        if isempty(vals) && ~isempty(state.selCols)
+            ci = state.selCols(1);
+            if ci >= 1 && ci <= width(T)
+                col = T{:, ci};
+                if isnumeric(col)
+                    vals = col;
+                end
+            end
+        end
+
+        % Final fallback: first numeric column
+        if isempty(vals)
+            for ci = 1:width(T)
+                col = T{:, ci};
+                if isnumeric(col)
+                    vals = col;
+                    break;
+                end
+            end
+        end
+
+        if isempty(vals)
+            lblStats.Text = '';
+            return;
+        end
+
+        % Exclude NaN before stats
+        vals  = vals(~isnan(vals));
+        n     = numel(vals);
+        if n == 0
+            lblStats.Text = 'Count: 0  (all NaN)';
+            return;
+        end
+        mu    = mean(vals);
+        sigma = std(vals);
+        mn    = min(vals);
+        mx    = max(vals);
+
+        lblStats.Text = sprintf( ...
+            'Count: %d  |  Mean: %g  |  Std: %g  |  Min: %g  |  Max: %g', ...
+            n, mu, sigma, mn, mx);
     end
 
 % ════════════════════════════════════════════════════════════════════════
