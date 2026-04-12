@@ -53,6 +53,7 @@ classdef WorkspaceModel < handle
         activeIdx        double  % index of currently active dataset (0 = none)
         mask             cell    % {1 x N} cell of logical vectors (true = included)
         computedColumns  cell    % {1 x N} cell of computed column definition arrays
+        columnRoles      cell    % {1 x N} cell of ColumnRoles value objects
         undoStack        cell    % cell of saved model snapshots for undo
         listeners        cell    % cell of addlistener handles (managed externally)
     end
@@ -68,6 +69,7 @@ classdef WorkspaceModel < handle
             obj.activeIdx       = 0;
             obj.mask            = {};
             obj.computedColumns = {};
+            obj.columnRoles     = {};
             obj.undoStack       = {};
             obj.listeners       = {};
         end
@@ -111,6 +113,7 @@ classdef WorkspaceModel < handle
             obj.datasets{n}        = data;
             obj.mask{n}            = true(numel(data.time), 1);
             obj.computedColumns{n} = {};
+            obj.columnRoles{n}     = dataWorkspace.ColumnRoles(size(data.values, 2));
 
             % Auto-activate the first dataset
             if obj.activeIdx == 0
@@ -138,6 +141,7 @@ classdef WorkspaceModel < handle
             obj.datasets(idx)        = [];
             obj.mask(idx)            = [];
             obj.computedColumns(idx) = [];
+            obj.columnRoles(idx)     = [];
 
             % Clamp activeIdx
             remaining = numel(obj.datasets);
@@ -223,6 +227,168 @@ classdef WorkspaceModel < handle
             notify(obj, 'MaskChanged');
         end
 
+        function setColumnRoles(obj, dsIdx, roles)
+        %SETCOLUMNROLES  Replace the ColumnRoles for a dataset and fire DataChanged.
+        %
+        %   model.setColumnRoles(dsIdx, roles)
+        %
+        %   Inputs:
+        %     dsIdx — 1-based dataset index
+        %     roles — dataWorkspace.ColumnRoles value object
+            arguments
+                obj    (1,1) dataWorkspace.WorkspaceModel
+                dsIdx  (1,1) double {mustBePositive, mustBeInteger}
+                roles  (1,1) dataWorkspace.ColumnRoles
+            end
+
+            if dsIdx > numel(obj.datasets)
+                error('dataWorkspace:WorkspaceModel:badIndex', ...
+                    'Index %d out of range (1..%d).', dsIdx, numel(obj.datasets));
+            end
+
+            obj.columnRoles{dsIdx} = roles;
+            notify(obj, 'DataChanged');
+        end
+
+        function roles = getColumnRoles(obj, dsIdx)
+        %GETCOLUMNROLES  Return the ColumnRoles for a dataset.
+        %
+        %   roles = model.getColumnRoles(dsIdx)
+        %
+        %   Inputs:
+        %     dsIdx — 1-based dataset index
+        %
+        %   Outputs:
+        %     roles — dataWorkspace.ColumnRoles value object
+            arguments
+                obj   (1,1) dataWorkspace.WorkspaceModel
+                dsIdx (1,1) double {mustBePositive, mustBeInteger}
+            end
+
+            if dsIdx > numel(obj.datasets)
+                error('dataWorkspace:WorkspaceModel:badIndex', ...
+                    'Index %d out of range (1..%d).', dsIdx, numel(obj.datasets));
+            end
+
+            roles = obj.columnRoles{dsIdx};
+        end
+
+        % ════════════════════════════════════════════════════════════════════════
+        %  Mask operations
+        % ════════════════════════════════════════════════════════════════════════
+
+        function maskPoints(obj, dsIdx, rowIndices)
+        %MASKPOINTS  Exclude specific rows from a dataset and fire MaskChanged.
+        %
+        %   model.maskPoints(dsIdx, rowIndices)
+        %
+        %   Inputs:
+        %     dsIdx      — 1-based dataset index
+        %     rowIndices — [1×K] row indices to mask (set to false)
+            arguments
+                obj        (1,1) dataWorkspace.WorkspaceModel
+                dsIdx      (1,1) double {mustBePositive, mustBeInteger}
+                rowIndices (1,:) double {mustBePositive, mustBeInteger}
+            end
+
+            obj.validateDatasetIndex(dsIdx);
+            obj.mask{dsIdx}(rowIndices) = false;
+            notify(obj, 'MaskChanged');
+        end
+
+        function unmaskPoints(obj, dsIdx, rowIndices)
+        %UNMASKPOINTS  Re-include specific rows of a dataset and fire MaskChanged.
+        %
+        %   model.unmaskPoints(dsIdx, rowIndices)
+        %
+        %   Inputs:
+        %     dsIdx      — 1-based dataset index
+        %     rowIndices — [1×K] row indices to unmask (set to true)
+            arguments
+                obj        (1,1) dataWorkspace.WorkspaceModel
+                dsIdx      (1,1) double {mustBePositive, mustBeInteger}
+                rowIndices (1,:) double {mustBePositive, mustBeInteger}
+            end
+
+            obj.validateDatasetIndex(dsIdx);
+            obj.mask{dsIdx}(rowIndices) = true;
+            notify(obj, 'MaskChanged');
+        end
+
+        function maskRegion(obj, dsIdx, xMin, xMax, yMin, yMax, colIdx)
+        %MASKREGION  Mask rows where X∈[xMin,xMax] AND Y colIdx∈[yMin,yMax].
+        %
+        %   model.maskRegion(dsIdx, xMin, xMax, yMin, yMax, colIdx)
+        %
+        %   Inputs:
+        %     dsIdx  — 1-based dataset index
+        %     xMin   — lower bound for X (inclusive)
+        %     xMax   — upper bound for X (inclusive)
+        %     yMin   — lower bound for Y column colIdx (inclusive)
+        %     yMax   — upper bound for Y column colIdx (inclusive)
+        %     colIdx — which .values column to test for Y bounds
+        %
+        %   Fires MaskChanged.
+            arguments
+                obj    (1,1) dataWorkspace.WorkspaceModel
+                dsIdx  (1,1) double {mustBePositive, mustBeInteger}
+                xMin   (1,1) double
+                xMax   (1,1) double
+                yMin   (1,1) double
+                yMax   (1,1) double
+                colIdx (1,1) double {mustBePositive, mustBeInteger}
+            end
+
+            obj.validateDatasetIndex(dsIdx);
+            ds = obj.datasets{dsIdx};
+
+            xVec = ds.time(:);
+            yVec = ds.values(:, colIdx);
+
+            inRegion = xVec >= xMin & xVec <= xMax & yVec >= yMin & yVec <= yMax;
+            obj.mask{dsIdx}(inRegion) = false;
+            notify(obj, 'MaskChanged');
+        end
+
+        function unmaskAll(obj, dsIdx)
+        %UNMASKALL  Set the full row mask to true (all rows included).
+        %
+        %   model.unmaskAll(dsIdx)
+        %
+        %   Inputs:
+        %     dsIdx — 1-based dataset index
+        %
+        %   Fires MaskChanged.
+            arguments
+                obj   (1,1) dataWorkspace.WorkspaceModel
+                dsIdx (1,1) double {mustBePositive, mustBeInteger}
+            end
+
+            obj.validateDatasetIndex(dsIdx);
+            nRows = numel(obj.datasets{dsIdx}.time);
+            obj.mask{dsIdx} = true(nRows, 1);
+            notify(obj, 'MaskChanged');
+        end
+
+        function m = getMask(obj, dsIdx)
+        %GETMASK  Return the row mask for a dataset.
+        %
+        %   m = model.getMask(dsIdx)
+        %
+        %   Inputs:
+        %     dsIdx — 1-based dataset index
+        %
+        %   Outputs:
+        %     m — [N×1] logical vector (true = included, false = masked)
+            arguments
+                obj   (1,1) dataWorkspace.WorkspaceModel
+                dsIdx (1,1) double {mustBePositive, mustBeInteger}
+            end
+
+            obj.validateDatasetIndex(dsIdx);
+            m = obj.mask{dsIdx};
+        end
+
         function n = count(obj)
         %COUNT  Return the number of datasets in the workspace.
         %
@@ -249,6 +415,7 @@ classdef WorkspaceModel < handle
             snap.activeIdx       = obj.activeIdx;
             snap.mask            = obj.mask;
             snap.computedColumns = obj.computedColumns;
+            snap.columnRoles     = obj.columnRoles;
             snap.label           = label;
             snap.timestamp       = now();  %#ok<TNOW1>
 
@@ -275,6 +442,9 @@ classdef WorkspaceModel < handle
             obj.activeIdx       = snap.activeIdx;
             obj.mask            = snap.mask;
             obj.computedColumns = snap.computedColumns;
+            if isfield(snap, 'columnRoles')
+                obj.columnRoles = snap.columnRoles;
+            end
 
             notify(obj, 'DataChanged');
             notify(obj, 'SelectionChanged');
@@ -294,6 +464,14 @@ classdef WorkspaceModel < handle
             if ~isfield(data, 'labels'),   data.labels   = {};  end
             if ~isfield(data, 'units'),    data.units    = {};  end
             if ~isfield(data, 'metadata'), data.metadata = struct(); end
+        end
+
+        function validateDatasetIndex(obj, idx)
+        %VALIDATEDATASETINDEX  Error if idx is out of range.
+            if idx < 1 || idx > numel(obj.datasets)
+                error('dataWorkspace:WorkspaceModel:badIndex', ...
+                    'Index %d out of range (1..%d).', idx, numel(obj.datasets));
+            end
         end
 
     end  % private methods
