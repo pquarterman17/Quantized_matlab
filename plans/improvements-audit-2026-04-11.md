@@ -259,18 +259,9 @@ on the fallback path per CLAUDE.md convention).
 
 ### Tier 1 — High Impact
 
-60. **Remove dead version guards** — `copygraphics`, `exportgraphics`, `uistyle`/`addStyle`/`removeStyle` all predate R2022b; the try/catch fallbacks are dead code
-    - [ ] `BosonPlotter.m:9173-9177` — remove try/catch around `copygraphics`, it's R2020a+
-    - [ ] `BosonPlotter.m:9833-9844` — remove try/catch around `copygraphics` vector copy, it's R2020a+
-    - [ ] `BosonPlotter.m:11579-11584` — remove try/catch around `removeStyle`, it's R2019b+
-    - [ ] `BosonPlotter.m:11595-11600` — remove try/catch around `uistyle`/`addStyle`, it's R2019b+
-    - [ ] `+bosonPlotter/multiPanel.m:277` — remove `exist('exportgraphics')` guard, it's R2020a+
+60. ~~**Remove dead version guards**~~ — `copygraphics`, `exportgraphics`, `uistyle`/`addStyle`/`removeStyle` all predate R2022b; guards already removed in prior sessions. FermiViewer clipboard copy also cleaned up (inverted print/copygraphics replaced with copygraphics-primary)
 
-61. **Native line alpha on R2024b+** — replace undocumented `Edge.ColorData` hack with documented 4-element `Color`
-    - [ ] `+bosonPlotter/applyAlphaToLine.m` — use `isMATLABReleaseOlderThan('R2024b')` to branch: on R2024b+ use `set(h,'Color',[r g b a])`, on older use current `Edge`/`Bar` primitive approach
-    - [ ] Keep white-blend fallback only for the R2022b path (last resort)
-    - [ ] Print one-time `fprintf('Note: Line transparency using fallback mode. Upgrade to R2024b+ for native alpha support.\n')` on the old path
-    - [ ] Update `tests/gui/test_renderPlot_styling.m` to cover both branches
+61. ~~**Native line alpha on R2024b+**~~ — `applyAlphaToLine.m` already had `isMATLABReleaseOlderThan('R2024b')` branch; added one-time `fprintf` notice on fallback path per CLAUDE.md convention; test updated to cover both branches
 
 ### Tier 2 — Medium Impact
 
