@@ -163,20 +163,19 @@ lblUnits = uilabel(rightGL, ...
     'HorizontalAlignment', 'left');
 lblUnits.Layout.Row = 1;
 
-% Data table (uitable)
-tblData = uitable(rightGL, ...
-    'Data',             table(), ...
-    'ColumnEditable',   false, ...
-    'FontSize',         11, ...
-    'BackgroundColor',  [TBL; [0.16 0.16 0.16]], ...
-    'FontColor',        FG, ...
-    'CellSelectionCallback', @onCellSelected, ...
-    'ContextMenu',      buildContextMenu());
-tblData.Layout.Row = 2;
+% Data table — uispreadsheet on R2025a+, uitable on older releases
+[tblData, ~] = dataWorkspace.createTableWidget(rightGL);
+tblData.Data = table();
 try
-    tblData.ColumnSortable = [];  % set dynamically when table loads
+    tblData.FontSize        = 11;
+    tblData.BackgroundColor = [TBL; [0.16 0.16 0.16]];
+    tblData.FontColor       = FG;
 catch
+    % uispreadsheet does not support all uitable appearance properties
 end
+tblData.CellSelectionCallback = @onCellSelected;
+tblData.ContextMenu           = buildContextMenu();
+tblData.Layout.Row            = 2;
 
 lblStatusBar = uilabel(rightGL, ...
     'Text',                '', ...
@@ -198,8 +197,9 @@ lsnData = addlistener(model, 'DataChanged',      @onModelDataChanged);
 lsnSel  = addlistener(model, 'SelectionChanged', @onModelSelectionChanged);
 lsnMask = addlistener(model, 'MaskChanged',      @onModelMaskChanged);
 
-% Store listeners in model so they survive until figure closes
-model.listeners = {lsnData, lsnSel, lsnMask};
+% Keep listeners alive in the GUI scope (handle objects — MATLAB will
+% auto-delete them when they go out of scope, so we anchor them here).
+guiListeners = {lsnData, lsnSel, lsnMask};  %#ok<NASGU>
 
 % ════════════════════════════════════════════════════════════════════════
 %  API struct (for headless / automated testing)
@@ -507,13 +507,13 @@ end
 
     function onClose(~, ~)
     %ONCLOSE  Clean up listeners and delete the figure.
-        % Delete model listeners to prevent callbacks on a dead figure
-        for k = 1:numel(model.listeners)
-            if isvalid(model.listeners{k})
-                delete(model.listeners{k});
+        % Delete listeners to prevent callbacks on a dead figure
+        for k = 1:numel(guiListeners)
+            if isvalid(guiListeners{k})
+                delete(guiListeners{k});
             end
         end
-        model.listeners = {};
+        guiListeners = {};  %#ok<NASGU>
         delete(fig);
     end
 
