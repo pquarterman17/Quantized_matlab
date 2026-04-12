@@ -5,7 +5,7 @@
     "type": "tabular",
     "match": {
         "parserName": "importQDVSM",
-        "columnNames": ["Temperature (K)", "Moment (emu)", "M. Std. Err. (emu)"],
+        "columnNames": ["Temperature", "Moment", "M. Std. Err."],
         "instrument": "VSM"
     },
     "overrides": {

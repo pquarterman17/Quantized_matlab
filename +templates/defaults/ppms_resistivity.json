@@ -1,12 +1,11 @@
 {
-    "_comment": "PPMS standard resistivity — 4-probe R vs T",
+    "_comment": "PPMS standard resistivity — 4-probe R vs T (legacy CSV format)",
     "name": "PPMS — Resistivity",
     "version": 1,
     "type": "tabular",
     "match": {
         "parserName": "importPPMS",
-        "columnNames": ["Temperature (K)", "Resistance Ch1 (Ohms)", "Resistance Ch2 (Ohms)"],
-        "instrument": "PPMS"
+        "columnNames": ["Temperature", "Resistance Ch1", "Resistance Ch2"]
     },
     "overrides": {
         "labels": {},

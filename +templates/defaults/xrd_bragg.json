@@ -1,5 +1,5 @@
 {
-    "_comment": "Generic XRD Bragg scan — 2theta vs intensity",
+    "_comment": "Generic XRD Bragg scan — 2theta vs intensity. Matches on file extension and parser name; column names are not used since Intensity is shared with other parsers.",
     "name": "XRD — Bragg Scan",
     "version": 1,
     "type": "tabular",

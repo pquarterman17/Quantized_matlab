@@ -5,7 +5,7 @@
     "type": "tabular",
     "match": {
         "parserName": "importQDVSM",
-        "columnNames": ["Magnetic Field (Oe)", "Moment (emu)", "M. Std. Err. (emu)"],
+        "columnNames": ["Magnetic Field", "Moment", "M. Std. Err."],
         "instrument": "VSM"
     },
     "overrides": {

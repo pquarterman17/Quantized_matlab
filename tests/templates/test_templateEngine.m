@@ -225,6 +225,137 @@ function results = test_templateEngine()
         recordError('TEST 10', ME);
     end
 
+    % ────────────────────────────────────────────────────────────────
+    %  Test 11: Default template column names match parser output
+    %  Verifies that shipped templates use post-parsing label format
+    %  (units stripped) so Jaccard matching is effective.
+    % ────────────────────────────────────────────────────────────────
+    fprintf('\n== TEST 11: Shipped template column names match parser output ==\n');
+    try
+        % QD VSM M vs H — parsers strip "(Oe)" from "Magnetic Field (Oe)"
+        data = makeTabularData({'Magnetic Field', 'Moment', 'M. Std. Err.'}, ...
+            {'Oe', 'emu', 'emu'}, 'importQDVSM');
+        data.metadata.parserSpecific.instrument = 'VSM';
+        [tmpl, conf] = templates.TemplateEngine.match(data, Type='tabular');
+        check('QD VSM M vs H: confidence >= 0.5', conf >= 0.5);
+        check('QD VSM M vs H: matched correct template', ...
+            ~isempty(tmpl) && contains(tmpl.name, 'M vs H'));
+        fprintf('  QD VSM M vs H matched: "%s" at %.2f\n', tmpl.name, conf);
+
+        % QD VSM M vs T
+        data = makeTabularData({'Temperature', 'Moment', 'M. Std. Err.'}, ...
+            {'K', 'emu', 'emu'}, 'importQDVSM');
+        data.metadata.parserSpecific.instrument = 'VSM';
+        [tmpl, conf] = templates.TemplateEngine.match(data, Type='tabular');
+        check('QD VSM M vs T: confidence >= 0.5', conf >= 0.5);
+        check('QD VSM M vs T: matched correct template', ...
+            ~isempty(tmpl) && contains(tmpl.name, 'M vs T'));
+        fprintf('  QD VSM M vs T matched: "%s" at %.2f\n', tmpl.name, conf);
+
+        % PPMS Resistivity
+        data = makeTabularData({'Temperature', 'Resistance Ch1', 'Resistance Ch2'}, ...
+            {'K', 'Ohms', 'Ohms'}, 'importPPMS');
+        [tmpl, conf] = templates.TemplateEngine.match(data, Type='tabular');
+        check('PPMS Resistivity: confidence >= 0.5', conf >= 0.5);
+        check('PPMS Resistivity: matched correct template', ...
+            ~isempty(tmpl) && contains(tmpl.name, 'Resistivity'));
+        fprintf('  PPMS Resistivity matched: "%s" at %.2f\n', tmpl.name, conf);
+
+        % PPMS ACMS — uses importQDVSM parser
+        data = makeTabularData({'Temperature', 'AC Moment', 'AC Susceptibility'}, ...
+            {'K', 'emu', 'emu/Oe'}, 'importQDVSM');
+        data.metadata.parserSpecific.instrument = 'PPMS';
+        [tmpl, conf] = templates.TemplateEngine.match(data, Type='tabular');
+        check('PPMS ACMS: confidence >= 0.5', conf >= 0.5);
+        check('PPMS ACMS: matched correct template', ...
+            ~isempty(tmpl) && contains(tmpl.name, 'AC Susceptibility'));
+        fprintf('  PPMS ACMS matched: "%s" at %.2f\n', tmpl.name, conf);
+
+        % XRD Bragg — matches on filePattern + parserName (no columnNames to
+        % avoid ambiguity with other Intensity-producing parsers)
+        data = makeTabularData({'Intensity'}, {'cps'}, 'importXRDML');
+        data.metadata.source = 'scan.xrdml';
+        [tmpl, conf] = templates.TemplateEngine.match(data, Type='tabular');
+        check('XRD Bragg: confidence >= 0.4', conf >= 0.4);
+        check('XRD Bragg: matched correct template', ...
+            ~isempty(tmpl) && contains(tmpl.name, 'Bragg'));
+        fprintf('  XRD Bragg matched: "%s" at %.2f\n', tmpl.name, conf);
+
+        % Lake Shore M vs T
+        data = makeTabularData({'Temperature', 'Moment'}, {'K', 'emu'}, 'importLakeShore');
+        data.metadata.parserSpecific.instrumentType = 'Lake Shore VSM/Magnetometer';
+        [tmpl, conf] = templates.TemplateEngine.match(data, Type='tabular');
+        check('LakeShore M vs T: confidence >= 0.5', conf >= 0.5);
+        check('LakeShore M vs T: matched correct template', ...
+            ~isempty(tmpl) && contains(tmpl.name, 'Lake Shore'));
+        fprintf('  Lake Shore matched: "%s" at %.2f\n', tmpl.name, conf);
+
+        % NCNR Reflectometry — matches on filePattern + parserName
+        data = makeTabularData({'Intensity'}, {'counts'}, 'importNCNRRefl');
+        data.metadata.source = 'sample_CANDOR.refl';
+        [tmpl, conf] = templates.TemplateEngine.match(data, Type='tabular');
+        check('NCNR Reflectometry: confidence >= 0.4', conf >= 0.4);
+        check('NCNR Reflectometry: matched correct template', ...
+            ~isempty(tmpl) && contains(tmpl.name, 'NCNR'));
+        fprintf('  NCNR matched: "%s" at %.2f\n', tmpl.name, conf);
+    catch ME
+        recordError('TEST 11', ME);
+    end
+
+    % ────────────────────────────────────────────────────────────────
+    %  Test 12: Apply does not mutate input data
+    % ────────────────────────────────────────────────────────────────
+    fprintf('\n== TEST 12: Apply does not mutate input ==\n');
+    try
+        data = makeTabularData({'Magnetic Field', 'Moment'}, {'Oe', 'emu'}, 'importQDVSM');
+        data.metadata.parserSpecific.instrument = 'VSM';
+        [tmpl, ~] = templates.TemplateEngine.match(data, Type='tabular');
+        if isempty(tmpl)
+            check('skipped (no template to apply)', true);
+        else
+            origLabel1 = data.labels{1};
+            result = templates.TemplateEngine.apply(data, tmpl);
+            check('apply returns struct', isstruct(result));
+            check('original data.labels{1} unchanged after apply', ...
+                strcmp(data.labels{1}, origLabel1));
+        end
+    catch ME
+        recordError('TEST 12', ME);
+    end
+
+    % ────────────────────────────────────────────────────────────────
+    %  Test 13: All shipped JSON files are valid and have required fields
+    % ────────────────────────────────────────────────────────────────
+    fprintf('\n== TEST 13: All shipped JSON files valid ==\n');
+    try
+        defaultDir = fullfile(fileparts(fileparts(mfilename('fullpath'))), ...
+            '..', '+templates', 'defaults');
+        listing = dir(fullfile(defaultDir, '*.json'));
+        check('at least 6 shipped templates', numel(listing) >= 6);
+        for k = 1:numel(listing)
+            fp = fullfile(listing(k).folder, listing(k).name);
+            txt = fileread(fp);
+            t = jsondecode(txt);
+            fname = listing(k).name;
+            check(sprintf('%s: has .name', fname), isfield(t, 'name') && ~isempty(t.name));
+            check(sprintf('%s: has .type', fname), isfield(t, 'type') && ~isempty(t.type));
+            check(sprintf('%s: has .match', fname), isfield(t, 'match'));
+            check(sprintf('%s: has .overrides', fname), isfield(t, 'overrides'));
+            check(sprintf('%s: has .source=shipped', fname), ...
+                isfield(t, 'source') && strcmp(t.source, 'shipped'));
+            if isfield(t, 'match') && isfield(t.match, 'parserName')
+                pname = t.match.parserName;
+                parserDir = fullfile(fileparts(fileparts(mfilename('fullpath'))), ...
+                    '..', '+parser');
+                parserFile = fullfile(parserDir, [pname '.m']);
+                check(sprintf('%s: parserName %s exists in +parser/', fname, pname), ...
+                    isfile(parserFile));
+            end
+        end
+    catch ME
+        recordError('TEST 13', ME);
+    end
+
     % ════════════════════════════════════════════════════════════════
     %  Summary
     % ════════════════════════════════════════════════════════════════

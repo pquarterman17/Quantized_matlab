@@ -1,11 +1,11 @@
 {
-    "_comment": "PPMS AC susceptibility — chi' and chi'' vs temperature",
+    "_comment": "QD PPMS/DynaCool AC susceptibility — chi' and chi'' vs temperature. Uses importQDVSM since ACMS files use the [Header]/[Data] format.",
     "name": "PPMS — AC Susceptibility",
     "version": 1,
     "type": "tabular",
     "match": {
-        "parserName": "importPPMS",
-        "columnNames": ["Temperature (K)", "AC Chi' (emu/Oe)", "AC Chi'' (emu/Oe)", "AC Frequency (Hz)"],
+        "parserName": "importQDVSM",
+        "columnNames": ["Temperature", "AC Moment", "AC Susceptibility"],
         "instrument": "PPMS"
     },
     "overrides": {

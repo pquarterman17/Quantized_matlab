@@ -1,0 +1,15 @@
+{
+    "_comment": "NCNR neutron reflectometry — Qz vs intensity from reductus .refl files",
+    "name": "NCNR — Reflectometry",
+    "version": 1,
+    "type": "tabular",
+    "match": {
+        "parserName": "importNCNRRefl",
+        "filePattern": "*.refl"
+    },
+    "overrides": {
+        "labels": {},
+        "units": {}
+    },
+    "source": "shipped"
+}

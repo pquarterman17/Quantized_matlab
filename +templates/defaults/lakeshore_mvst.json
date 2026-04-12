@@ -1,0 +1,16 @@
+{
+    "_comment": "Lake Shore VSM M vs T — magnetization vs temperature",
+    "name": "Lake Shore — M vs T",
+    "version": 1,
+    "type": "tabular",
+    "match": {
+        "parserName": "importLakeShore",
+        "columnNames": ["Temperature", "Moment"],
+        "instrument": "Lake Shore VSM/Magnetometer"
+    },
+    "overrides": {
+        "labels": {},
+        "units": {}
+    },
+    "source": "shipped"
+}

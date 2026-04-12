@@ -1,11 +1,10 @@
 {
-    "_comment": "FEI/Thermo SEM TIFF — common metadata fields to override",
+    "_comment": "FEI/Thermo SEM TIFF — common metadata fields to override. Matches any importTIFF file; instrument-specific match is not available since importTIFF does not propagate the instrument model to parserSpecific.",
     "name": "SEM — FEI/Thermo",
     "version": 1,
     "type": "image_metadata",
     "match": {
-        "parserName": "importTIFF",
-        "instrument": "Helios"
+        "parserName": "importTIFF"
     },
     "overrides": {
         "sampleName": "",
