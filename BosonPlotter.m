@@ -623,9 +623,10 @@ function varargout = BosonPlotter()
         'ValueChangedFcn', @(~,~) onWaterfallToggled());
     cbWaterfall.Layout.Column = 1;
 
-    efWaterfallSpacing = uieditfield(wfGL, 'text', 'Value', '', ...
-        'Placeholder',     'auto', ...
-        'Tooltip',         'Spacing between stacked traces in data units — blank = auto (1.1× max data range)', ...
+    efWaterfallSpacing = uieditfield(wfGL, 'numeric', 'Value', 0, ...
+        'Limits', [0 Inf], 'AllowEmpty', 'on', ...
+        'Tooltip', 'Spacing between stacked traces in data units — 0 or empty = auto (1.1× max data range)', ...
+        'ValueDisplayFormat', '%.4g', ...
         'ValueChangedFcn', @(~,~) onPlot([],[]));
     efWaterfallSpacing.Layout.Column = 2;
 
@@ -851,7 +852,7 @@ function varargout = BosonPlotter()
     statusGL.Layout.Row = 3; statusGL.Layout.Column = 1;
 
     lblStatusBar = uilabel(statusGL, 'Text', 'Ready', ...
-        'FontSize', 9, 'FontColor', [0.5 0.5 0.5], ...
+        'FontSize', 9, 'FontColor', [0.85 0.85 0.85], ...
         'HorizontalAlignment', 'left');
     lblStatusBar.Layout.Column = 1;
 
@@ -3622,6 +3623,12 @@ function varargout = BosonPlotter()
         % Show Y2 rows/columns only when a right-axis channel is active
         y2Active = ~all(strcmp(ensureCell(lbY2.Value), '(none)'));
         axLimGL.RowHeight{3}  = 22 * y2Active;
+        % Collapse the Y2 listbox row when no Y2 channel is selected (Fix B1)
+        if y2Active
+            ctrlGL.RowHeight{3} = '1x';
+        else
+            ctrlGL.RowHeight{3} = 0;
+        end
         toggleY2Appearance(y2Active);
 
         [fp2, fn2, ~] = fileparts(ds.filepath);
@@ -4116,113 +4123,34 @@ function varargout = BosonPlotter()
     end
 
     function onAutoMagCorrections(~,~)
-    %ONATOMAGCORRECTIONS  Estimate linear BG and Y offset from high-field data.
-    %   Uses data points at |x| >= 95% of the maximum |x| (field) range to
-    %   find the saturation region.  Fits a line through those points to get
-    %   BG slope + intercept, and computes Y offset as the mean of the
-    %   positive-field and negative-field saturation averages.
-    %
-    %   Works on the first selected Y channel.  Operates on the raw data
-    %   (pre-correction) so the resulting polynomial is compatible with
-    %   onApplyCorrections.
+    %ONATOMAGCORRECTIONS  Delegate — see +bosonPlotter/computeAutoMagCorrections.m.
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig, 'Load a file first.', 'No data'); return;
         end
-
-        doAll = strcmp(ddAutoMagScope.Value, 'All Datasets');
-        if doAll
-            indices = 1:numel(appData.datasets);
-        else
-            indices = appData.activeIdx;
-        end
-
-        magParsers = {'importQDVSM','importPPMS','importMPMS','importLakeShore'};
-
-        % First pass: compute corrections per dataset
-        corrections = struct('di', {}, 'slope', {}, 'intercept', {}, 'yOff', {});
-        for di = indices
-            ds = appData.datasets{di};
-            if ~isfield(ds, 'parserName') || ...
-               ~ismember(ds.parserName, magParsers)
-                continue;
-            end
-
-            d = ds.data;
-            if isdatetime(d.time), continue; end
-
-            xVec = double(d.time);
-            % Use first selected Y channel, or fall back to first column
-            ySel = ensureCell(lbY.Value);
-            yIdx = 1;
-            if ~isempty(ySel)
-                found = find(strcmp(d.labels, ySel{1}), 1);
-                if ~isempty(found), yIdx = found; end
-            end
-            yVec = d.values(:, yIdx);
-
-            % Remove NaNs
-            valid = ~isnan(xVec) & ~isnan(yVec);
-            xV = xVec(valid);
-            yV = yVec(valid);
-            if numel(xV) < 4, continue; end
-
-            % Identify high-field region: |x| >= 95% of max |x|
-            maxAbsX = max(abs(xV));
-            if maxAbsX < eps, continue; end
-            threshold = 0.95 * maxAbsX;
-            hiPos = xV >=  threshold;
-            hiNeg = xV <= -threshold;
-            hiField = hiPos | hiNeg;
-
-            if sum(hiField) < 2, continue; end
-
-            % Fit linear BG through high-field points
-            p = polyfit(xV(hiField), yV(hiField), 1);
-
-            % Y offset: average of positive and negative saturation means
-            % after removing the linear BG
-            yDetrended = yV - polyval(p, xV);
-            if any(hiPos) && any(hiNeg)
-                meanPos = mean(yDetrended(hiPos));
-                meanNeg = mean(yDetrended(hiNeg));
-                yOff = (meanPos + meanNeg) / 2;
-            else
-                yOff = mean(yDetrended(hiField));
-            end
-
-            corrections(end+1) = struct('di', di, ...
-                'slope', p(1), 'intercept', p(2), 'yOff', yOff); %#ok<AGROW>
-        end
-
+        doAll   = strcmp(ddAutoMagScope.Value, 'All Datasets');
+        indices = guiTernary(doAll, 1:numel(appData.datasets), appData.activeIdx);
+        corrections = bosonPlotter.computeAutoMagCorrections( ...
+            appData.datasets, indices, lbY.Value);
         if isempty(corrections)
             uialert(fig, 'No magnetometry datasets found to correct.', 'Auto BG');
             return;
         end
-
-        % Second pass: apply corrections per dataset
         origIdx = appData.activeIdx;
         for ci = 1:numel(corrections)
             c = corrections(ci);
-            % Switch to this dataset so onApplyCorrections reads the widgets
             appData.activeIdx = c.di;
             updateControlsForActiveDataset();
-
             efBGSlope.Value     = c.slope;
             efBGIntercept.Value = c.intercept;
             efYOffset.Value     = c.yOff;
-            % Clear any stored higher-order polynomial
             ds = appData.datasets{c.di};
             ds.bgPoly = [];
             appData.datasets{c.di} = ds;
-
             onApplyCorrections([], []);
         end
-
-        % Restore original active dataset
         appData.activeIdx = origIdx;
         updateControlsForActiveDataset();
         onPlot([], []);
-
         if numel(corrections) > 1
             setStatus(sprintf('Auto BG+Offset applied to %d dataset(s).', numel(corrections)));
         else
@@ -6524,122 +6452,26 @@ function varargout = BosonPlotter()
     end
 
     function onBGMouseUp(~,~)
+    %ONBGMOUSEUP  Delegate — see +bosonPlotter/onBGMouseUp.m for implementation.
         fig.WindowButtonDownFcn   = @onAxesButtonDown;
         fig.WindowButtonMotionFcn = @onMouseHover;
         fig.WindowButtonUpFcn     = '';
-
         btnFitBG.Text            = 'Fit Linear BG from Box';
         btnFitBG.BackgroundColor = BTN_INTERACT;
         btnPickY.Enable          = 'on';
         btnFitBG.Enable          = 'on';
-
-        if isempty(appData.bgStartPt)
-            return;
-        end
-
-        cp    = ax.CurrentPoint;
-        endPt = [cp(1,1), cp(1,2)];
-
-        if ~isempty(appData.bgRectPatch) && isvalid(appData.bgRectPatch)
-            delete(appData.bgRectPatch);
-            appData.bgRectPatch = [];
-        end
-
-        xMin = min(appData.bgStartPt(1), endPt(1));
-        xMax = max(appData.bgStartPt(1), endPt(1));
-        yMin = min(appData.bgStartPt(2), endPt(2));
-        yMax = max(appData.bgStartPt(2), endPt(2));
-        appData.bgStartPt = [];
-
-        if (xMax - xMin) < eps(xMax)
-            uialert(fig,'Box too narrow — drag across a wider x range.','BG fit');
-            return;
-        end
-
-        % Use displayed (corrected) data for hit-testing the box region,
-        % then map selected indices back to raw data for the polynomial fit.
-        % This ensures the box drawn on the preview matches the visible data,
-        % while the BG polynomial operates in raw coordinates (as expected
-        % by onApplyCorrections).
-        ds      = appData.datasets{appData.activeIdx};
-        d       = ds.data;
-        dDisp   = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
-        xVecRaw = appData.bgXVecRaw;
-        % Displayed x may be shorter (trimmed) or unit-converted;
-        % build the displayed x vector to match dDisp.values row count.
-        % Also apply SI prefix scaling so coordinates match the axes.
-        if ~isdatetime(dDisp.time)
-            xDisp = double(dDisp.time);
-        else
-            xDisp = (1:numel(dDisp.time))';
-        end
-        pfX = appData.axisPrefixX;
-        pfY = appData.axisPrefixY;
-        if pfX.factor ~= 1, xDisp = xDisp * pfX.factor; end
-
-        ySel = ensureCell(lbY.Value);
-
-        xPool = [];
-        yPool = [];
-        for k = 1:numel(ySel)
-            idx = find(strcmp(dDisp.labels, ySel{k}), 1);
-            if isempty(idx), continue; end
-            yDisp = dDisp.values(:, idx);
-            if pfY.factor ~= 1, yDisp = yDisp * pfY.factor; end
-            nDisp = min(numel(xDisp), numel(yDisp));
-            inBox = xDisp(1:nDisp) >= xMin & xDisp(1:nDisp) <= xMax & ...
-                    yDisp(1:nDisp) >= yMin & yDisp(1:nDisp) <= yMax & ...
-                    ~isnan(xDisp(1:nDisp)) & ~isnan(yDisp(1:nDisp));
-            % Map back to raw data for polyfit (use same row indices)
-            idxRaw = find(strcmp(d.labels, ySel{k}), 1);
-            if isempty(idxRaw), idxRaw = idx; end
-            % When trimming is active, dDisp may have fewer rows than d;
-            % find the corresponding raw rows via the trim mask.
-            rawRows = bgDisplayToRawRows(ds, inBox);
-            xPool = [xPool; xVecRaw(rawRows)];        %#ok<AGROW>
-            yPool = [yPool; d.values(rawRows, idxRaw)]; %#ok<AGROW>
-        end
-
-        % Display region statistics
-        if numel(yPool) >= 1
-            lblRegionStats.Text = sprintf( ...
-                'Region: n=%d  mean=%.4g  std=%.4g  min=%.4g  max=%.4g', ...
-                numel(yPool), mean(yPool), std(yPool), min(yPool), max(yPool));
-        else
-            lblRegionStats.Text = '';
-        end
-
-        if numel(xPool) < 2
-            uialert(fig, ...
-                sprintf('Only %d data point(s) inside the box — need at least 2 to fit.', ...
-                        numel(xPool)), ...
-                'Too few points');
-            return;
-        end
-
-        % Determine polynomial order from ddBGOrder
-        bgOrderStr = ddBGOrder.Value;
-        if strcmp(bgOrderStr, 'Linear')
-            bgOrder = 1;
-        else
-            bgOrder = str2double(bgOrderStr(6:end));  % 'Poly N' → N
-        end
-
-        p = polyfit(xPool, yPool, bgOrder);
-
-        % Store per-dataset and update widgets
-        ds = appData.datasets{appData.activeIdx};
+        bgWgts.lbY            = lbY;
+        bgWgts.ddBGOrder      = ddBGOrder;
+        bgWgts.lblRegionStats = lblRegionStats;
+        [ds, bgOrder, p] = bosonPlotter.onBGMouseUp(ax, appData, fig, bgWgts);
+        appData.bgRectPatch = [];
+        appData.bgStartPt   = [];
+        if isempty(ds), return; end
         if bgOrder == 1
-            % Linear: also populate slope/intercept widgets for manual editing
             efBGSlope.Value     = p(1);
             efBGIntercept.Value = p(2);
-            ds.bgPoly = [];   % clear polynomial storage (use widget values)
-        else
-            % Higher order: store in ds.bgPoly; slope/intercept widgets stay as-is
-            ds.bgPoly = p;
         end
         appData.datasets{appData.activeIdx} = ds;
-
         onApplyCorrections([],[]);
     end
 
@@ -7860,6 +7692,9 @@ function varargout = BosonPlotter()
 
     function onPlot(~,~)
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        % Fix B1: collapse Y2 listbox row when no right-axis channel is selected
+        y2IsActive = ~all(strcmp(ensureCell(lbY2.Value), '(none)'));
+        ctrlGL.RowHeight{3} = guiTernary(y2IsActive, '1x', 0);
         drawToAxes(ax);
     end
 
@@ -7969,8 +7804,8 @@ function varargout = BosonPlotter()
         % ── Resolve waterfall spacing ────────────────────────────────────
         waterfallOn = cbWaterfall.Value;
         if waterfallOn
-            rawSp = str2double(efWaterfallSpacing.Value);
-            if isnan(rawSp) || rawSp <= 0
+            rawSp = efWaterfallSpacing.Value;  % numeric field: [] or double
+            if isempty(rawSp) || rawSp <= 0
                 effectiveSpacing = computeAutoWaterfallSpacing();
             else
                 effectiveSpacing = rawSp;
@@ -8185,174 +8020,16 @@ function varargout = BosonPlotter()
     end
 
     function draw2DMap(targetAx, ds)
-    %DRAW2DMAP  Render a 2D area-detector intensity map into targetAx.
-    %   Uses imagesc (Heatmap) or contour/contourf (Contour / Filled Contour).
-    %   ddScaleY is reinterpreted as log-intensity toggle for 2D maps.
-    %   Axis limits from ds.axLims are applied when present.
-    %   Large maps are stride-decimated for faster rendering.
-        ps  = ds.data.metadata.parserSpecific;
-        map = ps.map2D;
-        I   = double(map.intensity);   % ensure double for rendering (supports single storage)
-
-        x2 = map.axis2(:)';  % 2Theta [1×M]
-        x1 = map.axis1(:);   % Omega / Chi / Phi [N×1]
-
-        % ── Stride-based decimation for very large maps ──
-        % Skip every Nth pixel when the display resolution exceeds the screen.
-        % This avoids rendering millions of pixels that would be subsampled anyway.
-        MAX_DISPLAY_PIX = 2000;  % max pixels per axis before decimation
-        [nRows, nCols] = size(I);
-        strideR = max(1, ceil(nRows / MAX_DISPLAY_PIX));
-        strideC = max(1, ceil(nCols / MAX_DISPLAY_PIX));
-        if strideR > 1 || strideC > 1
-            rIdx = 1:strideR:nRows;
-            cIdx = 1:strideC:nCols;
-            I  = I(rIdx, cIdx);
-            x1 = x1(rIdx);
-            x2 = x2(cIdx);
-        end
-
-        % Determine whether to render in Q-space (non-uniform Qx/Qz grid)
-        useQSpace = cbMap2DQSpace.Value && isfield(map, 'Qx');
-        if useQSpace
-            Xmat = map.Qx;   % [N×M]  Qx grid
-            Ymat = map.Qz;   % [N×M]  Qz grid
-            if strideR > 1 || strideC > 1
-                Xmat = Xmat(rIdx, cIdx);
-                Ymat = Ymat(rIdx, cIdx);
-            end
-            xLbl = 'Q_x (Å^{-1})';
-            yLbl = 'Q_z (Å^{-1})';
-        else
-            xLbl = [map.axis2Name ' (' map.axis2Unit ')'];
-            yLbl = [map.axis1Name ' (' map.axis1Unit ')'];
-            % Defer meshgrid — only needed for Contour modes, not Heatmap.
-            % imagesc uses the axis vectors directly, avoiding two [N×M]
-            % temporary matrices on every replot.
-            Xmat = [];  Ymat = [];
-        end
-
-        % Log intensity — use dedicated 2D scale dropdown (ddMap2DScale)
-        useLogI = strcmp(ddMap2DScale.Value, 'Log₁₀');
-        if useLogI
-            I = log10(max(I, 1e-9));
-        end
-
-        % Per-axes colormap — use the dedicated 2D color scale dropdown
-        cmapName = ddMap2DCmap.Value;
-        try
-            switch lower(cmapName)
-                case 'viridis'
-                    colormap(targetAx, generateViridis(256));
-                case 'plasma'
-                    colormap(targetAx, generatePlasma(256));
-                case 'inferno'
-                    colormap(targetAx, generateInferno(256));
-                otherwise
-                    colormap(targetAx, feval(cmapName, 256));
-            end
-        catch
-            colormap(targetAx, parula(256));
-        end
-
-        nLvl = round(efMap2DContourN.Value);
-        % Try to reuse a cached graphics handle for Heatmap replots (faster)
-        h2D = appData.map2DHandle;
-        canReuse = ~isempty(h2D) && isvalid(h2D) && strcmp(ddMap2DType.Value, 'Heatmap');
-        switch ddMap2DType.Value
-            case 'Heatmap'
-                if useQSpace
-                    if canReuse && isa(h2D, 'matlab.graphics.chart.primitive.Surface')
-                        h2D.XData = Xmat;  h2D.YData = Ymat;  h2D.CData = I;
-                    else
-                        pcolor(targetAx, Xmat, Ymat, I);
-                        shading(targetAx, 'flat');
-                        appData.map2DHandle = targetAx.Children(1);
-                    end
-                else
-                    if canReuse && isa(h2D, 'matlab.graphics.primitive.Image')
-                        h2D.XData = [x2(1) x2(end)];
-                        h2D.YData = [x1(1) x1(end)];
-                        h2D.CData = I;
-                    else
-                        imagesc(targetAx, x2, x1, I);
-                        targetAx.YDir = 'normal';
-                        appData.map2DHandle = targetAx.Children(1);
-                    end
-                end
-            case 'Contour'
-                if isempty(Xmat), [Xmat, Ymat] = meshgrid(x2, x1); end
-                contour(targetAx, Xmat, Ymat, I, nLvl);
-                appData.map2DHandle = [];
-            otherwise  % 'Filled Contour'
-                if isempty(Xmat), [Xmat, Ymat] = meshgrid(x2, x1); end
-                contourf(targetAx, Xmat, Ymat, I, nLvl);
-                appData.map2DHandle = [];
-        end
-
-        % Apply colorbar range limits from the editor controls
-        cMin = str2double(efMap2DCMin.Value);
-        cMax = str2double(efMap2DCMax.Value);
-        if ~isnan(cMin) && ~isnan(cMax) && cMax > cMin
-            clim(targetAx, [cMin cMax]);          elseif ~isnan(cMin)
-            cl = clim(targetAx);              clim(targetAx, [cMin cl(2)]);          elseif ~isnan(cMax)
-            cl = clim(targetAx);              clim(targetAx, [cl(1) cMax]);          end
-
-        % Colorbar with intensity unit label
-        if useLogI
-            cbStr = ['log_{10}(I / ' map.intensityUnit ')'];
-        else
-            cbStr = ['I (' map.intensityUnit ')'];
-        end
-        cbh = colorbar(targetAx);
-        cbh.Label.String      = cbStr;
-        cbh.Label.Interpreter = 'tex';
-
-        xlabel(targetAx, xLbl, 'Interpreter', 'tex');
-        ylabel(targetAx, yLbl, 'Interpreter', 'tex');
-
-        % Title: sample name or filename
-        sName = '';
-        if isfield(ps, 'sampleName') && ~isempty(ps.sampleName)
-            sName = ps.sampleName;
-        end
-        if isempty(sName)
-            [~, fn, fext] = fileparts(ds.filepath);
-            sName = [fn fext];
-        end
-        title(targetAx, sName, 'Interpreter', 'none');
-
-        % ── Apply active template's axes-level properties (Phase F) ────
-        % 2D maps are rendered with imagesc / contourf which don't have
-        % the "line width / marker size" concept — but they do have axes
-        % typography, tick direction, box, and grid that should match
-        % the main preview so switching the Template dropdown propagates
-        % to the 2D heatmap as well.  Phase G extends this to the
-        % colorbar, which is a second axes with its own FontName,
-        % TickDirection, TickLength, and Label font — all previously
-        % stuck at MATLAB defaults regardless of the active template.
-        try
-            appr2D = resolveActiveAppearance();
-            bosonPlotter.applyAppearanceToAxes(targetAx, appr2D);
-            if exist('cbh', 'var') && ~isempty(cbh) && isvalid(cbh)
-                bosonPlotter.applyAppearanceToColorbar(cbh, appr2D);
-            end
-        catch
-            % Never let a styling failure break the map render
-        end
-
-        % Restore saved axis limits if present
-        if isfield(ds, 'axLims')
-            aL  = ds.axLims;
-            xlo = str2num_trim(aL.xMin);  xhi = str2num_trim(aL.xMax);
-            ylo = str2num_trim(aL.yMin);  yhi = str2num_trim(aL.yMax);
-            if ~isnan(xlo) && ~isnan(xhi) && xhi > xlo
-                targetAx.XLim = [xlo, xhi];
-            end
-            if ~isnan(ylo) && ~isnan(yhi) && yhi > ylo
-                targetAx.YLim = [ylo, yhi];
-            end
-        end
+    %DRAW2DMAP  Delegate — see +bosonPlotter/draw2DMap.m for implementation.
+        wgts.cbMap2DQSpace   = cbMap2DQSpace;
+        wgts.ddMap2DScale    = ddMap2DScale;
+        wgts.ddMap2DCmap     = ddMap2DCmap;
+        wgts.ddMap2DType     = ddMap2DType;
+        wgts.efMap2DContourN = efMap2DContourN;
+        wgts.efMap2DCMin     = efMap2DCMin;
+        wgts.efMap2DCMax     = efMap2DCMax;
+        wgts.appearance      = resolveActiveAppearance();
+        appData.map2DHandle  = bosonPlotter.draw2DMap(targetAx, ds, appData.map2DHandle, wgts);
     end
 
     function extract2DLineCut(clickX, clickY, isHorizontal)
@@ -8427,130 +8104,27 @@ function varargout = BosonPlotter()
     end
 
     function extract2DBoxIntegral(bx0, by0, bx1, by1, profileAxis)
-    %EXTRACT2DBOXINTEGRAL  Integrate a rectangular region of a 2D map into a 1D profile.
-    %   bx0, by0, bx1, by1 — box corners in data coordinates (X=axis2, Y=axis1)
-    %   profileAxis (optional) — 'axis1' or 'axis2'; if omitted a dialog is shown.
+    %EXTRACT2DBOXINTEGRAL  Delegate — see +bosonPlotter/extract2DBoxIntegral.m.
         if appData.activeIdx < 1 || isempty(appData.datasets), return; end
         ds = appData.datasets{appData.activeIdx};
         if ~is2DDataset(ds), return; end
-
-        map = ds.data.metadata.parserSpecific.map2D;
-        [~, fn, fext] = fileparts(ds.filepath);
-
-        xLo = min(bx0, bx1);  xHi = max(bx0, bx1);
-        yLo = min(by0, by1);  yHi = max(by0, by1);
-
-        % Auto-fill the fixed-size input fields with the drawn box dimensions
-        efBoxIntW.Value = sprintf('%.6g', xHi - xLo);
-        efBoxIntH.Value = sprintf('%.6g', yHi - yLo);
-
-        useQSpace = cbMap2DQSpace.Value && isfield(map, 'Qx');
-
-        % Find row and column masks within the box
-        if useQSpace
-            meanQz = mean(map.Qz, 2);  % [N×1]
-            meanQx = mean(map.Qx, 1);  % [1×M]
-            rowMask = meanQz >= yLo & meanQz <= yHi;
-            colMask = meanQx >= xLo & meanQx <= xHi;
-        else
-            rowMask = map.axis1 >= yLo & map.axis1 <= yHi;
-            colMask = map.axis2 >= xLo & map.axis2 <= xHi;
-        end
-
-        if ~any(rowMask) || ~any(colMask)
-            msg = 'No data points fall within the selected box.';
-            if strcmp(fig.Visible, 'on')
-                uialert(fig, msg, 'Empty Selection');
-            else
-                warning('BosonPlotter:emptyBox', '%s', msg);
-            end
-            return;
-        end
-
-        % Determine axis names for dialog
-        if useQSpace
-            name1 = 'Q_z';
-            name2 = 'Q_x';
-        else
-            name1 = map.axis1Name;
-            name2 = map.axis2Name;
-        end
-
-        % Ask user for integration direction (or use supplied profileAxis)
-        if nargin < 5 || isempty(profileAxis)
-            opt1 = sprintf('Profile vs %s (sum along %s)', name1, name2);
-            opt2 = sprintf('Profile vs %s (sum along %s)', name2, name1);
-            sel = uiconfirm(fig, ...
-                'Choose integration direction:', 'Box Integration', ...
-                'Options', {opt1, opt2, 'Cancel'}, ...
-                'DefaultOption', 1, 'CancelOption', 3);
-            if strcmp(sel, 'Cancel'), return; end
-            if strcmp(sel, opt1)
-                profileAxis = 'axis1';
-            else
-                profileAxis = 'axis2';
-            end
-        end
-
-        Isub = map.intensity(rowMask, colMask);
-
-        if strcmp(profileAxis, 'axis1')
-            % Sum across columns (axis2 direction) → profile vs axis1
-            yVec = sum(Isub, 2);
-            if useQSpace
-                xVec = mean(map.Qz(rowMask, colMask), 2);
-                xColName = 'Q_z (Ang^-1)';
-            else
-                xVec = map.axis1(rowMask);
-                xColName = [map.axis1Name ' (' map.axis1Unit ')'];
-            end
-            dirLabel = name2;
-        else
-            % Sum across rows (axis1 direction) → profile vs axis2
-            yVec = sum(Isub, 1)';
-            if useQSpace
-                xVec = mean(map.Qx(rowMask, colMask), 1)';
-                xColName = 'Q_x (Ang^-1)';
-            else
-                xVec = map.axis2(colMask);
-                xColName = [map.axis2Name ' (' map.axis2Unit ')'];
-            end
-            dirLabel = name1;
-        end
-
-        cutLabel = sprintf('Box %s [%.4g–%.4g]%s[%.4g–%.4g] %s %s', ...
-            char(8747), xLo, xHi, char(215), yLo, yHi, char(8594), ...
-            sprintf('vs %s', strrep(dirLabel, '_', '')));
-
-        meta.source      = ds.filepath;
-        meta.importDate  = datetime('now');
-        meta.parserName  = 'boxIntegral';
-        meta.xColumnName = xColName;
-        meta.xColumnUnit = '';
-        meta.parserSpecific = struct('is2D', false, ...
-            'originFile', ds.filepath, 'cutLabel', cutLabel, ...
-            'boxRegion', [xLo xHi yLo yHi], 'profileAxis', profileAxis);
-        intData = parser.createDataStruct(xVec, yVec, ...
-            'labels',   {['I (' map.intensityUnit ')']}, ...
-            'units',    {map.intensityUnit}, ...
-            'metadata', meta);
-
-        newDs             = buildDs('[boxIntegral]', intData, 'boxIntegral');
-        newDs.displayName = cutLabel;
-        newDs.legendName  = cutLabel;
+        if nargin < 5, profileAxis = []; end
+        wgts2.cbMap2DQSpace = cbMap2DQSpace;
+        wgts2.efBoxIntW     = efBoxIntW;
+        wgts2.efBoxIntH     = efBoxIntH;
+        wgts2.buildDs       = @buildDs;
+        [newDs, cutLabel] = bosonPlotter.extract2DBoxIntegral( ...
+            ds, bx0, by0, bx1, by1, profileAxis, fig, wgts2);
+        if isempty(newDs), return; end
         appData.datasets{end+1} = newDs;
         rebuildDatasetList(numel(appData.datasets));
         updateControlsForActiveDataset();
-
-        % Reset button appearance
-        % Restore button label — show action hint if dimensions are still set
         if hasFixedBoxSize()
             btnBoxIntegrate.Text = [char(9654) ' Integrate Box'];
         else
             btnBoxIntegrate.Text = 'Box Integrate...';
         end
         btnBoxIntegrate.BackgroundColor = [0.20 0.50 0.35];
-
         setStatus(sprintf('Box integral: %s', cutLabel));
     end
 
@@ -8627,110 +8201,15 @@ function varargout = BosonPlotter()
     end
 
     function extract2DArcIntegral(params)
-    %EXTRACT2DARCINTEGRAL  Integrate a 2D RSM along arcs of constant |Q|.
-    %   params struct fields:
-    %     .qMin, .qMax — Q-radius range (Ang^-1)
-    %     .nBins       — number of radial bins
-    %     .sectorMin, .sectorMax — azimuthal sector in degrees (0 = +Qx, CCW)
-    %     .mode        — 'Sum' or 'Mean'
+    %EXTRACT2DARCINTEGRAL  Delegate — see +bosonPlotter/extract2DArcIntegral.m.
         if appData.activeIdx < 1 || isempty(appData.datasets), return; end
         ds = appData.datasets{appData.activeIdx};
         if ~is2DDataset(ds), return; end
-        map = ds.data.metadata.parserSpecific.map2D;
-        if ~isfield(map, 'Qx'), return; end
-
-        [~, fn, fext] = fileparts(ds.filepath);
-
-        % Flatten Q-space grids and intensity
-        Qx_v  = map.Qx(:);
-        Qz_v  = map.Qz(:);
-        I_v   = double(map.intensity(:));
-        Qrad  = hypot(Qx_v, Qz_v);
-        phi   = atan2d(Qz_v, Qx_v);  % [-180, 180]
-
-        % Apply azimuthal sector mask
-        sMin = params.sectorMin;
-        sMax = params.sectorMax;
-        fullCircle = (sMin == 0 && sMax == 360) || (sMin == -180 && sMax == 180);
-        if ~fullCircle
-            if sMin < sMax
-                sectorMask = (phi >= sMin) & (phi < sMax);
-            else
-                % Wrapping sector (e.g. 170 → -170)
-                sectorMask = (phi >= sMin) | (phi < sMax);
-            end
-        else
-            sectorMask = true(size(Qrad));
-        end
-
-        % Apply Q-range and sector masks, exclude NaN
-        mask = sectorMask & ~isnan(I_v) & (Qrad >= params.qMin) & (Qrad <= params.qMax);
-        if ~any(mask)
-            uialert(fig, 'No data points fall within the specified Q-range and sector.', ...
-                'Empty Selection');
-            return;
-        end
-
-        Qrad_m = Qrad(mask);
-        I_m    = I_v(mask);
-
-        % Radial binning
-        nBins    = params.nBins;
-        edges    = linspace(params.qMin, params.qMax, nBins + 1);
-        binWidth = edges(2) - edges(1);
-        binCentres = (edges(1:nBins) + edges(2:nBins+1))' / 2;
-
-        binIdx = floor((Qrad_m - params.qMin) / binWidth) + 1;
-        binIdx = max(1, min(binIdx, nBins));
-
-        binSum   = accumarray(binIdx, I_m,   [nBins 1], @sum, 0);
-        binCount = accumarray(binIdx, ones(size(I_m)), [nBins 1], @sum, 0);
-
-        if strcmp(params.mode, 'Mean')
-            yVec = binSum ./ binCount;
-            yVec(binCount == 0) = NaN;
-            modeStr = 'mean';
-        else
-            yVec = binSum;
-            modeStr = 'sum';
-        end
-
-        % Build label
-        if fullCircle
-            sectorStr = '';
-        else
-            sectorStr = sprintf(' sector [%.0f%s%.0f%s]', ...
-                sMin, char(176), sMax, char(176));
-        end
-        cutLabel = sprintf('Arc %s |Q|=[%.4g–%.4g] %s%s%s (%s)', ...
-            char(8747), params.qMin, params.qMax, char(197), ...
-            char(8315), char(185), modeStr);
-        if ~isempty(sectorStr)
-            cutLabel = [cutLabel sectorStr];
-        end
-
-        meta.source      = ds.filepath;
-        meta.importDate  = datetime('now');
-        meta.parserName  = 'arcIntegral';
-        meta.xColumnName = '|Q| (Ang^-1)';
-        meta.xColumnUnit = '';
-        meta.parserSpecific = struct('is2D', false, ...
-            'originFile', ds.filepath, 'cutLabel', cutLabel, ...
-            'qRange', [params.qMin params.qMax], ...
-            'sector', [sMin sMax], 'mode', params.mode);
-        arcData = parser.createDataStruct(binCentres, yVec, ...
-            'labels',   {['I (' map.intensityUnit ')']}, ...
-            'units',    {map.intensityUnit}, ...
-            'metadata', meta);
-
-        newDs             = buildDs('[arcIntegral]', arcData, 'arcIntegral');
-        newDs.displayName = cutLabel;
-        newDs.legendName  = cutLabel;
+        [newDs, ~] = bosonPlotter.extract2DArcIntegral(ds, params, fig, @buildDs);
+        if isempty(newDs), return; end
         appData.datasets{end+1} = newDs;
         rebuildDatasetList(numel(appData.datasets));
         updateControlsForActiveDataset();
-
-        fprintf('[BosonPlotter] Arc integral added: %s — %s\n', [fn fext], cutLabel);
     end
 
     function onSmartScale(~,~)
@@ -10094,9 +9573,9 @@ function varargout = BosonPlotter()
     function onWaterfallToggled()
     %ONWATERFALLTOGGLED  When waterfall is checked, seed the spacing field
     %  with the auto-computed value so users have a sensible starting point.
-        if cbWaterfall.Value && isempty(strtrim(efWaterfallSpacing.Value))
+        if cbWaterfall.Value && (isempty(efWaterfallSpacing.Value) || efWaterfallSpacing.Value <= 0)
             autoSp = computeAutoWaterfallSpacing();
-            efWaterfallSpacing.Value = sprintf('%.4g', autoSp);
+            efWaterfallSpacing.Value = autoSp;
         end
         onPlot([],[]);
     end
@@ -12019,17 +11498,30 @@ function varargout = BosonPlotter()
             'CloseRequestFcn', @(~,~) closeAdvMenu(), ...
             'KeyPressFcn', @(~,evt) onAdvMenuKey(evt));
 
+        % ── Fix B2: Search/filter bar above the scrollable panel ────────
+        FILTER_H = 30;
+        figW = advMenuFig.Position(3);
+        figH = advMenuFig.Position(4);
+        filterBar = uipanel(advMenuFig, 'BorderType', 'none', ...
+            'Position', [0, figH - FILTER_H, figW, FILTER_H]);
+        efAdvFilter = uieditfield(filterBar, 'text', ...
+            'Value', '', ...
+            'Placeholder', 'Filter tools...', ...
+            'Position', [6, 4, figW - 12, 22], ...
+            'ValueChangedFcn', @(~,~) onAdvFilterChanged());
+
         % Scrollable panel so all content is accessible even at small sizes
         advScrollPanel = uipanel(advMenuFig, 'BorderType', 'none', 'Scrollable', 'on');
-        advScrollPanel.Position = [0 0 advMenuFig.Position(3) advMenuFig.Position(4)];
-        advMenuFig.SizeChangedFcn = @(~,~) set(advScrollPanel, ...
-            'Position', [0 0 advMenuFig.Position(3) advMenuFig.Position(4)]);
+        advScrollPanel.Position = [0 0 figW figH - FILTER_H];
+        advMenuFig.SizeChangedFcn = @(~,~) onAdvMenuResize();
 
         % 26 rows x 2 cols: 7 headers, 6 separators, 13 button rows
         advMenuGL = uigridlayout(advScrollPanel, [26 2], ...
             'RowHeight', {16, 26,26,26,  5,  16, 26,26,26,  5,  16, 26,  5,  16, 26,  5,  16, 26,  5,  16, 26,26,26,  5,  16, 26}, ...
             'ColumnWidth', {'1x', '1x'}, ...
             'Padding', [8 6 8 6], 'RowSpacing', 2, 'ColumnSpacing', 4);
+
+        allAdvBtns = {};  % collect all button handles for filtering (Fix B2)
 
         % ── Section: ANALYSIS ────────────────────────────────────────
         hdr = uilabel(advMenuGL, 'Text', 'ANALYSIS', 'FontSize', 9, 'FontWeight', 'bold', 'FontColor', HDR_FC);
@@ -12129,6 +11621,7 @@ function varargout = BosonPlotter()
                 'HorizontalAlignment', 'left', ...
                 'Tooltip', tip);
             b.Layout.Row = row; b.Layout.Column = col;
+            allAdvBtns{end+1} = b;  % register for filter (Fix B2)
         end
 
         function advMenuAction(callbackFcn)
@@ -12139,6 +11632,32 @@ function varargout = BosonPlotter()
 
         function onAdvMenuKey(evt)
             if strcmp(evt.Key, 'escape'), closeAdvMenu(); end
+        end
+
+        function onAdvMenuResize()
+        %ONADVMENURESIZE  Keep filter bar pinned to top; scroll panel fills rest.
+            if ~isvalid(advMenuFig), return; end
+            fw = advMenuFig.Position(3);
+            fh = advMenuFig.Position(4);
+            filterBar.Position      = [0, fh - FILTER_H, fw, FILTER_H];
+            efAdvFilter.Position    = [6, 4, fw - 12, 22];
+            advScrollPanel.Position = [0, 0, fw, fh - FILTER_H];
+        end
+
+        function onAdvFilterChanged()
+        %ONADVFILTERCHANGED  Show/hide buttons based on filter text (Fix B2).
+            term = lower(strtrim(efAdvFilter.Value));
+            for bi = 1:numel(allAdvBtns)
+                b = allAdvBtns{bi};
+                if ~isvalid(b), continue; end
+                if isempty(term)
+                    b.Visible = 'on';
+                else
+                    matches = contains(lower(b.Text), term) || ...
+                              contains(lower(b.Tooltip), term);
+                    b.Visible = guiTernary(matches, 'on', 'off');
+                end
+            end
         end
     end
 
