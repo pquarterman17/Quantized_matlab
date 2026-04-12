@@ -504,6 +504,10 @@ function varargout = BosonPlotter()
             'MenuSelectedFcn', @(~,~) onMoveDatasetUp([], []));
         uimenu(cmDatasets, 'Text', 'Move Down', ...
             'MenuSelectedFcn', @(~,~) onMoveDatasetDown([], []));
+        uimenu(cmDatasets, 'Text', 'Notes...', 'Separator', 'on', ...
+            'MenuSelectedFcn', @(~,~) onDatasetMetaEdit('notes'));
+        uimenu(cmDatasets, 'Text', 'Rename...', ...
+            'MenuSelectedFcn', @(~,~) onDatasetMetaEdit('rename'));
         lbDatasets.ContextMenu = cmDatasets;
     catch
         % R2022a/R2022b: uicontextmenu not supported on uifigure — skip silently.
@@ -2354,6 +2358,11 @@ function varargout = BosonPlotter()
     % ── Recent files API (for testing) ───────────────────────────────
     api.getRecentFiles          = @() appData.recentFiles;
 
+    % ── Notes / rename API (for testing) ──────────────────────────────
+    api.setDatasetNotes = @(idx, txt) dsFieldOp('set', idx, 'notes', char(txt));
+    api.getDatasetNotes = @(idx) dsFieldOp('get', idx, 'notes', '');
+    api.renameDataset   = @(idx, name) dsFieldOp('rename', idx, '', char(name));
+
     % Populate recent dropdown from persisted state
     updateRecentDropdown();
 
@@ -3011,8 +3020,12 @@ function varargout = BosonPlotter()
         nPts = numel(ds.data.time);
         pName = guiTernary(isfield(ds,'parserName'), ds.parserName, 'unknown');
         hasCorrStr = guiTernary(~isempty(ds.corrData), 'corrected', 'raw');
-        lbDatasets.Tooltip = sprintf('%s\nParser: %s  |  %d points  |  %s', ...
+        tipStr = sprintf('%s\nParser: %s  |  %d points  |  %s', ...
             ds.filepath, pName, nPts, hasCorrStr);
+        if isfield(ds, 'notes') && ~isempty(ds.notes)
+            tipStr = sprintf('%s\nNote: %s', tipStr, ds.notes);
+        end
+        lbDatasets.Tooltip = tipStr;
 
         % Always replot — selection may have changed even if active didn't
         onPlot([],[]);
@@ -3407,7 +3420,11 @@ function varargout = BosonPlotter()
                 [~, fn, fext] = fileparts(dsI.filepath);
                 displayStr = [fn, fext];
             end
-            allItems{i} = sprintf('[%d]  %s  %s', i, badgeStr, displayStr);
+            noteTag = '';
+            if isfield(dsI, 'notes') && ~isempty(dsI.notes)
+                noteTag = [' ' char(9998)];  % ✎ pencil
+            end
+            allItems{i} = sprintf('[%d]  %s  %s%s', i, badgeStr, displayStr, noteTag);
         end
 
         % Apply search filter (always keep active dataset visible)
@@ -4973,6 +4990,28 @@ function varargout = BosonPlotter()
         appData.activeTemplate = name;
         if appData.activeIdx > 0 && ~isempty(appData.datasets)
             onPlot([],[]);
+        end
+    end
+
+    function result = dsFieldOp(op, idx, fld, val)
+    %DSFIELDOP  Multipurpose dataset field accessor for test API.
+    %   dsFieldOp('set',    idx, 'notes', txt)  — set field, refresh list
+    %   dsFieldOp('get',    idx, 'notes', '')    — get field value
+    %   dsFieldOp('rename', idx, '',      name)  — set displayName+legendName, replot
+        result = '';
+        if idx < 1 || idx > numel(appData.datasets), return; end
+        switch op
+            case 'set'
+                appData.datasets{idx}.(fld) = val;
+                rebuildDatasetList(true);
+            case 'get'
+                ds = appData.datasets{idx};
+                if isfield(ds, fld), result = ds.(fld); end
+            case 'rename'
+                appData.datasets{idx}.displayName = val;
+                appData.datasets{idx}.legendName  = val;
+                rebuildDatasetList(true);
+                if appData.activeIdx > 0, onPlot([],[]); end
         end
     end
 
@@ -10640,6 +10679,41 @@ function varargout = BosonPlotter()
         onPlot([],[]);
     end
 
+    function onDatasetMetaEdit(mode)
+    %ONDATASETMETAEDIT  Edit notes or rename the active dataset via input dialog.
+    %   mode: 'notes' or 'rename'
+        if isempty(appData.datasets) || appData.activeIdx < 1
+            uialert(fig, 'Load a file first.', 'No data'); return;
+        end
+        ds = appData.datasets{appData.activeIdx};
+        switch mode
+            case 'notes'
+                currentNotes = '';
+                if isfield(ds, 'notes'), currentNotes = ds.notes; end
+                answer = inputdlg('Dataset notes:', 'Notes', [5 60], {currentNotes});
+                if isempty(answer), return; end
+                appData.datasets{appData.activeIdx}.notes = strtrim(answer{1});
+                rebuildDatasetList(true);
+                onSelectDataset([], []);
+                setStatus(guiTernary(isempty(strtrim(answer{1})), 'Note cleared.', 'Note saved.'));
+            case 'rename'
+                current = ds.displayName;
+                if isempty(current)
+                    [~, fn, fext] = fileparts(ds.filepath);
+                    current = [fn fext];
+                end
+                answer = inputdlg('Display name:', 'Rename Dataset', [1 60], {current});
+                if isempty(answer), return; end
+                newName = strtrim(answer{1});
+                if isempty(newName), return; end
+                appData.datasets{appData.activeIdx}.displayName = newName;
+                appData.datasets{appData.activeIdx}.legendName  = newName;
+                rebuildDatasetList(true);
+                onPlot([], []);
+                setStatus(sprintf('Renamed to: %s', newName));
+        end
+    end
+
     function onAddHRefLine(~,~)
     %ONADDHREFLINE  Add a horizontal reference line at a user-specified Y value (#11).
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
@@ -13280,6 +13354,7 @@ function ds = buildDs(fp, data, parserName)
     ds.unitSystem    = 'CGS';        % 'CGS' or 'SI' — quick-set toggle
     ds.refLines       = {};       % Cell array of structs: {orientation, value, color, style}
     ds.mask            = true(size(data.time));  % logical; true = included, false = masked
+    ds.notes           = '';       % Free-text annotation; persists in session save/load
 end
 
 

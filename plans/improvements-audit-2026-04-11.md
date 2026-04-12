@@ -61,11 +61,9 @@ Features that reduce friction on common BosonPlotter tasks.
 
 1. ~~**Recent Files / Recent Folders menu**~~ — done, see Completed section
 
-2. **Per-dataset notes / metadata annotations** — `ds.notes` string, "Notes..." context
-   menu on `lbDatasets`, persist in session `.mat`, tooltip on hover
+2. ~~**Per-dataset notes / metadata annotations**~~ — done, see Completed section
 
-3. **Rename / relabel dataset from list** — "Rename..." context-menu entry →
-   `ds.displayName`; refresh `rebuildDatasetList`
+3. ~~**Rename / relabel dataset from list**~~ — done, see Completed section
 
 4. **Autosave / crash-recovery session** — `timer` serializing `appData.datasets` to
    `prefdir/boson_autosave.mat` every 2 min; offer restore on startup
@@ -295,3 +293,5 @@ Stale docs, missing feature docs, thin package READMEs, and function docstrings.
 - ~~**Model-count reconciliation**~~ (2026-04-11) — 5 docs switched to indirect references; canonical count is 23 via `numel(fitting.models())`
 - ~~**Figure Builder scroll/resize**~~ (2026-04-11) — dynamic height `min(600, screenH-120)`, `Resize='on'`, root grid `Scrollable='on'`
 - ~~**Recent Files menu**~~ (2026-04-11) — dropdown next to Add Files, persisted to `prefdir/boson_recent.mat`, MRU-first, deduplicated, capped at 10, stale-entry cleanup, test K55
+- ~~**Per-dataset notes**~~ (2026-04-11) — `ds.notes` field, "Notes..." context menu, pencil indicator in list, note shown in tooltip, persists in session. Test K56
+- ~~**Rename dataset**~~ (2026-04-11) — "Rename..." context menu, updates displayName + legendName, refreshes legend. Test K57

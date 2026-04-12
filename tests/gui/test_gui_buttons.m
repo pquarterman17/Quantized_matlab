@@ -1,5 +1,5 @@
 %TEST_GUI_BUTTONS  Comprehensive button/control coverage for BosonPlotter.
-%   55 tests across 11 categories (A–K).
+%   57 tests across 11 categories (A–K).
 %   Run via: runAllTests(Group="gui")
 %
 %   Categories:
@@ -13,7 +13,7 @@
 %     H. Batch Operations    (tests 47–48)
 %     I. Macro Recording     (tests 49–51)
 %     J. Miscellaneous       (tests 52–54)
-%     K. Recent Files        (test  55)
+%     K. Recent / Notes / Rename (tests 55–57)
 
 clear; clc;
 
@@ -1785,6 +1785,65 @@ try
     assert(nXRDML == 1, sprintf('XRDML appears %d times, expected 1', nXRDML));
     assert(strcmp(recent3{1}, XRDML), 'XRDML should be most recent after re-load');
     fprintf('  PASS  deduplication works (no duplicate entries)\n');
+
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+
+% ── K56. Per-dataset notes (set, get, display indicator) ───────────────
+fprintf('\n══ TEST K56: Per-dataset notes ══\n');
+try
+    api.reset(); drawnow;
+    api.addFiles({XRDML}); drawnow;
+
+    % Initially no notes
+    n0 = api.getDatasetNotes(1);
+    assert(isempty(n0), 'Notes should be empty initially');
+    fprintf('  PASS  notes empty on fresh dataset\n');
+
+    % Set a note
+    api.setDatasetNotes(1, 'Sample annealed at 800C for 2h');
+    n1 = api.getDatasetNotes(1);
+    assert(strcmp(n1, 'Sample annealed at 800C for 2h'), 'Note not stored');
+    fprintf('  PASS  note stored and retrieved\n');
+
+    % Check pencil indicator in list items
+    items = api.fig.Children; % get listbox
+    lbItems = findobj(api.fig, 'Type', 'uilistbox');
+    found = false;
+    for li = 1:numel(lbItems)
+        if contains(lbItems(li).Items{1}, char(9998))
+            found = true; break;
+        end
+    end
+    assert(found, 'Pencil indicator not found in listbox items');
+    fprintf('  PASS  pencil indicator shown in dataset list\n');
+
+    % Clear note
+    api.setDatasetNotes(1, '');
+    n2 = api.getDatasetNotes(1);
+    assert(isempty(n2), 'Notes should be empty after clearing');
+    fprintf('  PASS  note cleared successfully\n');
+
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+
+% ── K57. Rename dataset via API ────────────────────────────────────────
+fprintf('\n══ TEST K57: Rename dataset via API ══\n');
+try
+    api.reset(); drawnow;
+    api.addFiles({XRDML}); drawnow;
+
+    api.renameDataset(1, 'My Custom Name');
+    ds = api.getDatasets();
+    assert(strcmp(ds{1}.displayName, 'My Custom Name'), ...
+        sprintf('displayName should be "My Custom Name", got "%s"', ds{1}.displayName));
+    assert(strcmp(ds{1}.legendName, 'My Custom Name'), ...
+        'legendName should match displayName');
+    fprintf('  PASS  dataset renamed, displayName and legendName updated\n');
 
     passed = passed + 1;
 catch ME
