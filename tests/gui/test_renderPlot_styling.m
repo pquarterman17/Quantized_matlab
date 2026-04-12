@@ -192,26 +192,34 @@ function test_renderPlot_styling
         bosonPlotter.applyAlphaToLine(h1, 0.4);
         drawnow;
 
-        % Verify via the Edge primitive (where MATLAB actually stores
-        % line transparency — the documented Color property silently
-        % drops the 4th element)
-        haveEdge = false;
-        try
-            e = h1.Edge;
-            haveEdge = ~isempty(e) && isvalid(e);
-        catch
-        end
-        check('line.Edge primitive is accessible', haveEdge);
-        if haveEdge
-            check('Edge.ColorType is truecoloralpha', ...
-                  strcmp(h1.Edge.ColorType, 'truecoloralpha'));
-            cd = h1.Edge.ColorData;
-            check('Edge.ColorData has 4 bytes', numel(cd) == 4);
-            if numel(cd) == 4
-                % Alpha 0.4 → round(0.4 * 255) = 102
-                check('Edge.ColorData(4) ≈ 102 (0.4*255)', abs(double(cd(4)) - 102) <= 1);
-                % RGB preserved within rounding
-                check('Edge.ColorData(1) preserved', abs(double(cd(1)) - 51) <= 1);
+        % R2024b+ uses documented 4-element Color; older uses Edge primitive
+        if ~isMATLABReleaseOlderThan('R2024b')
+            % Native alpha path — Color should be [R G B A]
+            c = get(h1, 'Color');
+            check('Color has 4 elements (native alpha)', numel(c) == 4);
+            if numel(c) == 4
+                check('Color(4) ≈ 0.4', abs(c(4) - 0.4) < 0.02);
+                check('Color(1) preserved', abs(c(1) - 0.2) < 0.02);
+            end
+        else
+            % Undocumented Edge primitive path
+            haveEdge = false;
+            try
+                e = h1.Edge;
+                haveEdge = ~isempty(e) && isvalid(e);
+            catch
+            end
+            check('line.Edge primitive is accessible', haveEdge);
+            if haveEdge
+                check('Edge.ColorType is truecoloralpha', ...
+                      strcmp(h1.Edge.ColorType, 'truecoloralpha'));
+                cd = h1.Edge.ColorData;
+                check('Edge.ColorData has 4 bytes', numel(cd) == 4);
+                if numel(cd) == 4
+                    % Alpha 0.4 → round(0.4 * 255) = 102
+                    check('Edge.ColorData(4) ≈ 102 (0.4*255)', abs(double(cd(4)) - 102) <= 1);
+                    check('Edge.ColorData(1) preserved', abs(double(cd(1)) - 51) <= 1);
+                end
             end
         end
 
