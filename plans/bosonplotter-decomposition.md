@@ -8,7 +8,7 @@ something first.
 
 **Status:** Active
 **Created:** 2026-04-12
-**Updated:** 2026-04-12
+**Updated:** 2026-04-12 (Tier 1 complete)
 
 ---
 
@@ -178,4 +178,11 @@ insurance for the long term.
 
 ## Completed
 
-(none yet)
+- ~~**Delete 13 redundant peak callback delegates**~~ (2026-04-12) — all 13 one-liner delegates removed, 8 `refreshPeakTable()` callsites rewritten to `peakCb.refreshPeakTable()`, 3 initial button wirings changed to `@(~,~)[]`
+- ~~**Extract `saveConsolidatedNeutronCSV`**~~ (2026-04-12) — 172 lines → 4-line delegate, 0 widget deps
+- ~~**Extract `computeAutoWaterfallSpacing`**~~ (2026-04-12) — 82 lines → 4-line delegate, lbY/ddScaleY passed as args
+- ~~**Extract `refreshDataTable`**~~ (2026-04-12) — 177 lines → delegate, tblData/tblUnits/lblTableUnits/lblTableStats passed
+- ~~**Extract `onEstimateBaseline`**~~ (2026-04-12) — 95 lines → delegate, opens own uifigure dialog
+- ~~**Extract `onDatasetAlgebra`**~~ (2026-04-12) — 106 lines → delegate, opens own uifigure dialog
+
+**Result:** 346 → 331 nested functions (−15), 14,349 → 13,737 lines (−612), 40 → 45 extracted modules. 16/16 GUI tests pass.
