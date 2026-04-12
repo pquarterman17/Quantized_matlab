@@ -22,6 +22,12 @@ All parsers return the same **unified data struct** via `parser.createDataStruct
 | TIFF image | `importTIFF` | `.tif`, `.tiff` | 8/16/32-bit; multi-page; FEI metadata |
 | RAW image | `importRawImage` | `.raw` | Headerless binary (not auto-dispatchable) |
 | Gatan DM3/DM4 | `importDM3` | `.dm3`, `.dm4` | Recursive tagged binary; pixel calibration |
+| Gatan DM4 | `importDM4` | `.dm4` | DM4 variant; 2D image, 1D spectrum, or 3D SI cube |
+| Bruker NanoScope AFM | `importAFM` | `.spm`, `.000`, `.001`, … | ASCII header + binary image; Z-scale calibration |
+| Bruker BCF (EDS) | `importBCF` | `.bcf` | SFS container; SEM image + sum EDS spectrum + XML metadata |
+| Common image | `importImage` | `.jpg`, `.jpeg`, `.png`, `.bmp`, `.gif` | MATLAB `imread` wrapper; returns mean intensity per row |
+| MRC2014 | `importMRC` | `.mrc`, `.mrcs` | EM image stack; first section returned as 1D mean profile |
+| FEI/ThermoFisher SER | `importSER` | `.ser` | TIA binary image; mean intensity per row |
 
 ---
 
@@ -300,6 +306,163 @@ data.metadata.xColumnUnit  % '1/Ang'
 | `polarization` | char | `'++'`, `'+-'`, `'-+'`, or `'--'` (from extension) |
 | `intensity` | double | Intensity column (if present) |
 | `background` | double | Background column (if present) |
+
+---
+
+## Microscopy / EM Parsers
+
+These parsers return the unified struct with image data in `data.metadata.parserSpecific`. The `.time` and `.values` fields carry a 1D projection (mean intensity per row) as a lightweight fallback for the GUI; the full image matrix is in `data.metadata.parserSpecific.image` or `.cube`.
+
+### `importAFM` — Bruker NanoScope AFM/SPM
+
+```matlab
+data = parser.importAFM('surface.spm');
+data = parser.importAFM('surface.spm', Channel='Phase');
+```
+
+| `parserSpecific` field | Type | Description |
+|------------------------|------|-------------|
+| `isImage` | logical | Always `true` |
+| `image` | double | [H×W] image matrix in physical units |
+| `xScale_nm` | double | Pixel size in X (nm) |
+| `yScale_nm` | double | Pixel size in Y (nm) |
+| `zScale_nm` | double | Z calibration factor |
+| `channel` | char | Channel name extracted (e.g. `'Height'`) |
+| `allChannels` | cell | All channel names present in file |
+
+---
+
+### `importBCF` — Bruker BCF EDS Spectral-Imaging
+
+```matlab
+data = parser.importBCF('eds_map.bcf');
+```
+
+| `parserSpecific` field | Type | Description |
+|------------------------|------|-------------|
+| `isImage` | logical | `true` when a SEM reference image is present |
+| `image` | double | [H×W] SEM reference image |
+| `sumSpectrum` | double | [Nx1] spatially-summed EDS spectrum |
+| `energyAxis_keV` | double | [Nx1] energy axis in keV |
+| `acceleratingVoltage_kV` | double | Beam voltage |
+| `pixelSize_nm` | double | Pixel size (nm) |
+| `elements` | cell | Element symbols identified in file |
+
+---
+
+### `importImage` — Common Image Files (JPEG/PNG/BMP/GIF)
+
+```matlab
+data = parser.importImage('micrograph.png');
+```
+
+| `parserSpecific` field | Type | Description |
+|------------------------|------|-------------|
+| `isImage` | logical | Always `true` |
+| `image` | double | [H×W] or [H×W×3] image matrix |
+| `width` | double | Image width (px) |
+| `height` | double | Image height (px) |
+| `nChannels` | double | 1 (grayscale) or 3 (RGB) |
+| `colorType` | char | `'grayscale'` or `'truecolor'` |
+| `bitDepth` | double | Bit depth |
+
+---
+
+### `importMRC` — MRC2014 Electron Microscopy Image
+
+```matlab
+data = parser.importMRC('tomo.mrc');
+```
+
+| `parserSpecific` field | Type | Description |
+|------------------------|------|-------------|
+| `isImage` | logical | Always `true` |
+| `image` | double | [H×W] first section |
+| `nSections` | double | Total number of sections in stack |
+| `pixelSize_A` | double | Pixel size in Å (from cell dimensions) |
+| `mode` | double | MRC mode integer (0=int8, 1=int16, 2=float32, …) |
+| `mapType` | char | `'image'`, `'volume'`, or `'transform'` |
+
+---
+
+### `importSER` — FEI/ThermoFisher TIA SER
+
+```matlab
+data = parser.importSER('image.ser');
+```
+
+| `parserSpecific` field | Type | Description |
+|------------------------|------|-------------|
+| `isImage` | logical | Always `true` |
+| `image` | double | [H×W] image matrix |
+| `pixelSize` | double | Pixel calibration value |
+| `pixelUnit` | char | Pixel calibration unit |
+| `dataType` | double | SER data type code |
+
+---
+
+### `importDM4` — Gatan DM4
+
+```matlab
+data = parser.importDM4('spectrum.dm4');
+data = parser.importDM4('image.dm4', Verbose=true);
+```
+
+Returns image, 1D spectrum, or 3D SI cube depending on file content. `parserSpecific` inherits from `importDM3`; see the DM3/DM4 row in the table above and `+parser/importDM3.m` for full metadata fields.
+
+#### Example — load and display a DM4 spectrum image
+```matlab
+data = parser.importDM4('eels_map.dm4');
+if isfield(data.metadata.parserSpecific, 'cube')
+    cube = data.metadata.parserSpecific.cube;  % [Y × X × E]
+    sumSpec = squeeze(sum(sum(cube, 1), 2));
+    plot(data.time, sumSpec);
+    xlabel('Energy (eV)'); ylabel('Counts');
+end
+```
+
+---
+
+## Internal Helpers
+
+These functions implement the dispatch and calibration logic used by `importAuto` and the individual parsers. They are not typically called directly by users but are useful for extending the toolbox or writing custom parsers.
+
+| Function | Description |
+|----------|-------------|
+| `resolveParser(filepath)` | Extension → parser name + metadata; single dispatch table for `importAuto` and the GUI |
+| `resolveColumnShorthand(spec, colNames)` | Resolve a column spec (index, shorthand string, or full name) to a 1-based index |
+| `computeQSpace(map)` | Lazily compute Qx/Qz grids for a 2D map struct when wavelength is available |
+| `createDataStruct(...)` | Construct and validate the canonical unified data struct (call from all parsers) |
+
+### `resolveParser`
+
+```matlab
+result = parser.resolveParser('scan.raw');
+% result.parserName  — 'importRigaku_raw' or 'importBruker'
+% result.extension   — '.raw'
+% result.magicBytes  — true  (magic-byte dispatch was used)
+
+result = parser.resolveParser('sample.dat');
+% result.parserName  — 'importQDVSM' (heuristic based on [Header] marker)
+```
+
+### `resolveColumnShorthand`
+
+```matlab
+% Resolve 'moment' → column index in a QD VSM file
+idx = parser.resolveColumnShorthand('moment', colNames);
+idx = parser.resolveColumnShorthand(3,        colNames);  % pass-through
+idx = parser.resolveColumnShorthand('Magnetic Field (Oe)', colNames);
+```
+
+### `computeQSpace`
+
+```matlab
+% Called automatically by importXRDML for 2D area-detector data
+map = parser.computeQSpace(map);
+% map.Qx  — [N×M] grid
+% map.Qz  — [N×M] grid
+```
 
 ---
 
