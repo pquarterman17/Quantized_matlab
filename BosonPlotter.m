@@ -5137,6 +5137,8 @@ function varargout = BosonPlotter()
             'FontSize',12, ...
             'ButtonPushedFcn',@(~,~) delete(settingsFig));
         btnClose.Layout.Row = 5; btnClose.Layout.Column = [1 2];
+
+        bosonPlotter.applyDialogTheme(settingsFig, appData.theme);
     end
 
     function applyThemeFromDialog(themeName, settingsFig)
@@ -5144,12 +5146,7 @@ function varargout = BosonPlotter()
         appData.theme = themeName;
         onThemeChanged([], []);
         % Update dialog colours to match new theme
-        if strcmp(themeName, 'Dark')
-            th = styles.dark();
-            settingsFig.Color = th.bgColor;
-        else
-            settingsFig.Color = [0.94 0.94 0.94];
-        end
+        bosonPlotter.applyDialogTheme(settingsFig, themeName);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -11023,6 +11020,8 @@ function varargout = BosonPlotter()
         uibutton(btnGL, 'Text', 'Cancel', ...
             'ButtonPushedFcn', @(~,~) delete(mathFig));
 
+        bosonPlotter.applyDialogTheme(mathFig, appData.theme);
+
         function doMathCompute()
             try
                 idxA = ddMathA.Value;  idxB = ddMathB.Value;
@@ -12286,6 +12285,8 @@ function varargout = BosonPlotter()
         intResult = struct('area', NaN, 'x1', NaN, 'x2', NaN, 'channel', '');
         hShadePatch = [];  % handle to shaded region on main axes
 
+        bosonPlotter.applyDialogTheme(intFig, appData.theme);
+
         function pickEdgePoint(which)
         %PICKEDGEPOINT  Click on the main axes to set an edge point.
             intFig.Visible = 'off';  % hide dialog so user can click plot
@@ -12747,6 +12748,8 @@ function varargout = BosonPlotter()
              'Use "Batch Apply" to process a folder of files with the same pipeline.'], ...
             'WordWrap', 'on', 'FontSize', 9, 'FontColor', [0.4 0.4 0.4]);
         lblInfo.Layout.Row = 4; lblInfo.Layout.Column = [1 2];
+
+        bosonPlotter.applyDialogTheme(tplFig, appData.theme);
 
         function doSaveTemplate()
             [fname, fpath] = uiputfile('*.mat', 'Save Plot Template');
