@@ -2222,6 +2222,9 @@ function varargout = BosonPlotter(options)
     btnRefineLattice.ButtonPushedFcn         = @onRefineLattice;
     btnMatchPhases.ButtonPushedFcn           = @onMatchPhases;
     efWavelength.ValueChangedFcn             = @onWavelengthChanged;
+
+    % ── Peak window keyboard shortcuts ─────────────────────────────────
+    peakFig.KeyPressFcn = peakCb.onKeyPress;
     efKFactor.ValueChangedFcn                = @onKFactorChanged;
     efInstBroadening.ValueChangedFcn         = @onInstBroadeningChanged;
     ddXraySource.ValueChangedFcn             = @onXraySourceChanged;
@@ -3529,6 +3532,8 @@ function varargout = BosonPlotter(options)
         % Build full display strings for all datasets
         allItems    = cell(1, N);
         allIdxData  = num2cell(1:N);
+        dsColors    = zeros(N, 3);  % resolved plot colors for swatch styling
+        defaultCols = plotting.lineColors(N);
         for i = 1:N
             dsI = appData.datasets{i};
             badgeStr = getParserBadge(dsI.parserName);
@@ -3544,7 +3549,12 @@ function varargout = BosonPlotter(options)
             if isfield(dsI, 'notes') && ~isempty(dsI.notes)
                 noteTag = [' ' char(9998)];  % ✎ pencil
             end
-            allItems{i} = sprintf('[%d]  %s  %s%s', i, badgeStr, displayStr, noteTag);
+            if isfield(dsI,'color') && ~isempty(dsI.color)
+                dsColors(i,:) = dsI.color;
+            else
+                dsColors(i,:) = defaultCols(i,:);
+            end
+            allItems{i} = sprintf('%s [%d]  %s  %s%s', char(9679), i, badgeStr, displayStr, noteTag);
         end
 
         % Apply search filter (always keep active dataset visible)
@@ -3578,6 +3588,13 @@ function varargout = BosonPlotter(options)
         else
             appData.activeIdx = visIdx(1);
             lbDatasets.Value  = {visIdx(1)};
+        end
+
+        % Apply color swatches via uistyle per visible item
+        removeStyle(lbDatasets);
+        for si = 1:numel(visIdx)
+            s = uistyle('FontColor', dsColors(visIdx(si),:));
+            addStyle(lbDatasets, s, 'item', si);
         end
     end
 
@@ -9771,10 +9788,12 @@ function varargout = BosonPlotter(options)
     %  Space           — toggle dataset visibility
     %  Ctrl+Up         — move dataset up
     %  Ctrl+Down       — move dataset down
+    %  Alt+Up/Down     — cycle SI prefix on Y (Alt+Shift = X)
     %  F5              — refresh state (flush caches, re-sync widgets, redraw)
         hasMod   = ~isempty(e.Modifier);
         hasCtrl  = hasMod && any(strcmp(e.Modifier, 'control'));
         hasShift = hasMod && any(strcmp(e.Modifier, 'shift'));
+        hasAlt   = hasMod && any(strcmp(e.Modifier, 'alt'));
 
         switch e.Key
             case 'f5'
@@ -9829,10 +9848,38 @@ function varargout = BosonPlotter(options)
                 end
 
             case 'uparrow'
-                if hasCtrl, onMoveDatasetUp([], []); end
+                if hasAlt
+                    % Alt+Up = cycle Y prefix toward larger units; +Shift = X
+                    isX = hasShift;
+                    if isX, curSym = appData.axisPrefixX.symbol;
+                    else,   curSym = appData.axisPrefixY.symbol;
+                    end
+                    ci = find(strcmp(appData.prefixSymbols, curSym), 1);
+                    if isempty(ci), ci = 1; end
+                    ni = max(1, ci - 1);
+                    pf = struct('symbol', appData.prefixSymbols{ni}, 'factor', appData.prefixFactors(ni));
+                    if isX, appData.axisPrefixX = pf; else, appData.axisPrefixY = pf; end
+                    onPlot([],[]); setStatus(sprintf('%s prefix: %s', guiTernary(isX,'X','Y'), appData.prefixNames{ni}));
+                elseif hasCtrl
+                    onMoveDatasetUp([], []);
+                end
 
             case 'downarrow'
-                if hasCtrl, onMoveDatasetDown([], []); end
+                if hasAlt
+                    % Alt+Down = cycle Y prefix toward smaller units; +Shift = X
+                    isX = hasShift;
+                    if isX, curSym = appData.axisPrefixX.symbol;
+                    else,   curSym = appData.axisPrefixY.symbol;
+                    end
+                    ci = find(strcmp(appData.prefixSymbols, curSym), 1);
+                    if isempty(ci), ci = 1; end
+                    ni = min(numel(appData.prefixSymbols), ci + 1);
+                    pf = struct('symbol', appData.prefixSymbols{ni}, 'factor', appData.prefixFactors(ni));
+                    if isX, appData.axisPrefixX = pf; else, appData.axisPrefixY = pf; end
+                    onPlot([],[]); setStatus(sprintf('%s prefix: %s', guiTernary(isX,'X','Y'), appData.prefixNames{ni}));
+                elseif hasCtrl
+                    onMoveDatasetDown([], []);
+                end
         end
     end
 
@@ -11227,8 +11274,8 @@ function varargout = BosonPlotter(options)
     function onToggleDataCursor(~,~)
     %ONTOGGLEDATACURSOR  Toggle interactive data cursor mode.
     %  Click on plot to snap to nearest data point and show (x,y).
-    %  Click a second point to show delta.  Click button again to exit.
-        if ~isprop(appData, 'cursorActive'), appData.cursorActive = false; end
+    %  Click a second point to show delta.  Ctrl+click pins a marker.
+    %  Click button again to exit and clear all markers.
         if appData.cursorActive
             % Deactivate cursor
             appData.cursorActive = false;
@@ -11240,6 +11287,13 @@ function varargout = BosonPlotter(options)
             if isgraphics(appData.cursorMarker2), delete(appData.cursorMarker2); end
             if isgraphics(appData.cursorDeltaLabel), delete(appData.cursorDeltaLabel); end
             if isgraphics(appData.cursorLine), delete(appData.cursorLine); end
+            % Remove pinned markers
+            for pi = 1:numel(appData.cursorPinned)
+                p = appData.cursorPinned{pi};
+                if isgraphics(p.marker), delete(p.marker); end
+                if isgraphics(p.label),  delete(p.label);  end
+            end
+            appData.cursorPinned = {};
             appData.cursorClickCount = 0;
             setStatus('Cursor off.');
         else
@@ -11250,12 +11304,14 @@ function varargout = BosonPlotter(options)
             appData.cursorClickCount = 0;
             btnDataCursor.BackgroundColor = BTN_PRIMARY;
             fig.WindowButtonDownFcn = @onCursorClick;
-            setStatus('Cursor ON — click on plot to read values. Click again for delta.');
+            setStatus('Cursor ON — click to read, click again for delta. Ctrl+click to pin.');
         end
     end
 
     function onCursorClick(~,~)
     %ONCURSORCLICK  Handle click in data cursor mode.
+    %  Normal click: point 1 / point 2 (delta) cycle.
+    %  Ctrl+click: pin a persistent marker at the snapped point.
         if ~appData.cursorActive, return; end
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
 
@@ -11280,7 +11336,6 @@ function varargout = BosonPlotter(options)
 
         % Find nearest point (use first visible Y channel)
         yCol = yData(:, 1);
-        % Normalize distances to axes range for fair comparison
         xRange = diff(xl); yRange = diff(yl);
         if xRange == 0, xRange = 1; end
         if yRange == 0, yRange = 1; end
@@ -11288,6 +11343,27 @@ function varargout = BosonPlotter(options)
         [~, idx] = min(dist);
         xSnap = xData(idx);
         ySnap = yCol(idx);
+
+        % Ctrl+click → pin a persistent marker
+        ctrlHeld = ~isempty(fig.CurrentModifier) && ...
+                   any(strcmp(fig.CurrentModifier, 'control'));
+        if ctrlHeld
+            hold(ax, 'on');
+            pinColors = [0.00 0.60 0.30; 0.80 0.40 0.00; 0.50 0.00 0.50; ...
+                         0.00 0.40 0.70; 0.70 0.00 0.00; 0.40 0.40 0.40];
+            ci = mod(numel(appData.cursorPinned), size(pinColors,1)) + 1;
+            pc = pinColors(ci,:);
+            mk = plot(ax, xSnap, ySnap, 'd', 'MarkerSize', 9, 'LineWidth', 2, ...
+                'Color', pc, 'MarkerFaceColor', pc, 'HandleVisibility', 'off');
+            lbl = sprintf('  (%.6g, %.6g)', xSnap, ySnap);
+            lb = text(ax, xSnap, ySnap, lbl, ...
+                'FontSize', 8, 'Color', pc, 'FontWeight', 'bold', ...
+                'BackgroundColor', [1 1 1 0.85], 'EdgeColor', pc, ...
+                'VerticalAlignment', 'bottom', 'HandleVisibility', 'off');
+            appData.cursorPinned{end+1} = struct('marker', mk, 'label', lb);
+            setStatus(sprintf('Pinned #%d: (%.6g, %.6g)', numel(appData.cursorPinned), xSnap, ySnap));
+            return;
+        end
 
         appData.cursorClickCount = appData.cursorClickCount + 1;
 
@@ -13253,112 +13329,10 @@ function varargout = BosonPlotter(options)
     % ── Batch Figure Export ────────────────────────────────────────────
 
     function onBatchFigureExport(~,~)
-    %ONBATCHFIGUREEXPORT  Export each loaded dataset as an individual figure.
-        if isempty(appData.datasets)
-            uialert(fig, 'Load files first.', 'No data'); return;
-        end
-
-        beFig = uifigure('Name', 'Batch Figure Export', 'Position', [350 300 400 250], 'Resize', 'off');
-        beGL = uigridlayout(beFig, [6 2], ...
-            'RowHeight', {22, 22, 22, 22, 22, 30}, ...
-            'ColumnWidth', {110, '1x'}, ...
-            'Padding', [10 10 10 10], 'RowSpacing', 6);
-
-        uilabel(beGL, 'Text', 'Format:', 'HorizontalAlignment', 'right');
-        ddBEFormat = uidropdown(beGL, 'Items', {'PNG','PDF','SVG','EPS'}, 'Value', 'PNG');
-
-        uilabel(beGL, 'Text', 'DPI (raster):', 'HorizontalAlignment', 'right');
-        spBEDpi = uispinner(beGL, 'Value', 300, 'Limits', [72 1200], 'Step', 50);
-
-        uilabel(beGL, 'Text', 'Width (in):', 'HorizontalAlignment', 'right');
-        spBEW = uispinner(beGL, 'Value', 7, 'Limits', [2 20], 'Step', 0.5);
-
-        uilabel(beGL, 'Text', 'Height (in):', 'HorizontalAlignment', 'right');
-        spBEH = uispinner(beGL, 'Value', 5, 'Limits', [2 20], 'Step', 0.5);
-
-        uilabel(beGL, 'Text', 'Template:', 'HorizontalAlignment', 'right');
-        ddBETpl = uidropdown(beGL, ...
-            'Items', {'None','APS (Phys Rev)','Nature','ACS'}, ...
-            'Value', 'None');
-
-        btnBEGL = uigridlayout(beGL, [1 2], 'ColumnWidth', {'1x','1x'}, ...
-            'Padding', [0 0 0 0], 'ColumnSpacing', 8);
-        btnBEGL.Layout.Row = 6; btnBEGL.Layout.Column = [1 2];
-
-        uibutton(btnBEGL, 'Text', 'Export All', ...
-            'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
-            'FontWeight', 'bold', ...
-            'ButtonPushedFcn', @(~,~) doBatchExport());
-        uibutton(btnBEGL, 'Text', 'Cancel', ...
-            'ButtonPushedFcn', @(~,~) delete(beFig));
-
-        function doBatchExport()
-            outDir = uigetdir('', 'Select output folder');
-            if isequal(outDir, 0), return; end
-
-            fmt = lower(ddBEFormat.Value);
-            nDS = numel(appData.datasets);
-            pb = uiprogressdlg(beFig, 'Title', 'Exporting...', 'Indeterminate', 'off');
-
-            for ii = 1:nDS
-                pb.Value = (ii-1)/nDS;
-                pb.Message = sprintf('Dataset %d of %d', ii, nDS);
-
-                ds = appData.datasets{ii};
-                d  = getPlotData(ii);
-                [~, fn, ~] = fileparts(ds.filepath);
-
-                % Create temporary figure
-                tmpFig = figure('Visible', 'off', 'Units', 'inches', ...
-                    'Position', [0 0 spBEW.Value spBEH.Value]);
-                tmpAx = axes(tmpFig);
-                hold(tmpAx, 'on'); box(tmpAx, 'on'); grid(tmpAx, 'on');
-
-                % Plot all Y channels
-                nCh = size(d.values, 2);
-                cols = plotting.lineColors(nCh);
-                for ch = 1:nCh
-                    plot(tmpAx, d.time, d.values(:, ch), '-', ...
-                        'Color', cols(ch,:), 'LineWidth', 1.5, ...
-                        'DisplayName', d.labels{ch});
-                end
-
-                % Apply template formatting
-                fontSize = 10;
-                fontName = 'Helvetica';
-                switch ddBETpl.Value
-                    case 'APS (Phys Rev)', fontSize = 8; fontName = 'Times New Roman';
-                    case 'Nature',         fontSize = 7; fontName = 'Helvetica';
-                    case 'ACS',            fontSize = 8; fontName = 'Helvetica';
-                end
-
-                tmpAx.FontSize = fontSize;
-                tmpAx.FontName = fontName;
-                tmpAx.TickDir = 'in';
-
-                xlabel(tmpAx, guiLabel(guiXName(d.metadata), guiXUnit(d.metadata)), 'FontSize', fontSize);
-                if nCh == 1
-                    ylabel(tmpAx, guiLabel(d.labels{1}, d.units{min(1,numel(d.units))}), 'FontSize', fontSize);
-                else
-                    ylabel(tmpAx, 'Intensity', 'FontSize', fontSize);
-                    legend(tmpAx, 'Location', 'best', 'FontSize', max(6, fontSize-2));
-                end
-                title(tmpAx, fn, 'FontSize', fontSize+1, 'Interpreter', 'none');
-
-                % Save
-                outPath = fullfile(outDir, [fn '.' fmt]);
-                switch fmt
-                    case 'png'
-                        exportgraphics(tmpFig, outPath, 'Resolution', spBEDpi.Value);
-                    case {'pdf','eps','svg'}
-                        exportgraphics(tmpFig, outPath, 'ContentType', 'vector');
-                end
-                close(tmpFig);
-            end
-            close(pb);
-            setStatus(sprintf('Exported %d figures to %s', nDS, outDir));
-            delete(beFig);
-        end
+    %ONBATCHFIGUREEXPORT  Delegates to bosonPlotter.batchFigureExport.
+        bosonPlotter.batchFigureExport(appData.datasets, fig, ...
+            @getPlotData, @setStatus, ...
+            struct('primary', BTN_PRIMARY, 'fg', BTN_FG));
     end
 
     % ── Shared Data Helper ─────────────────────────────────────────────

@@ -31,6 +31,7 @@ function runAllTests(options)
 %       interp2d  — 2-D interpolation utilities (interpolate2D, regrid2D)
 %       baseline  — baseline estimation: ALS, rolling ball, modified polynomial
 %       errorprop — error propagation utilities (errorProp and wrappers)
+%       templates — dataset template engine (fingerprint, match, apply, save/load)
 %       all      — all of the above, in order
 %
 %   Examples:
@@ -56,7 +57,7 @@ options.Group = validatestring(options.Group, ...
     ["all", "parser", "batch", "xrd2d", "gui", "calcgui", "sims", "em", "emgui", "eds", ...
      "xrayneutron", "superconductor", "cif", "optics", "vacuum", "electrochemistry", ...
      "eels", "eels_adv", "diffindex", "diff_sim", "edsquant", "contour", "fitting", "plotting", ...
-     "spectral", "interp2d", "baseline", "errorprop", "utilities"]);
+     "spectral", "interp2d", "baseline", "errorprop", "utilities", "templates"]);
 
 % Build absolute paths to test scripts so `run` works regardless of CWD.
 % Tests are organized into subdirectories: parser/, gui/, imaging/, calc/, batch/

@@ -58,6 +58,7 @@ cb.onPeakTableSelect     = @onPeakTableSelect;
 cb.refreshPeakTable      = @refreshPeakTable;
 cb.onSavePeakSummary     = @onSavePeakSummary;
 cb.onExportPeakXLSX      = @onExportPeakXLSX;
+cb.onKeyPress            = @onKeyPress;
 
 % ════════════════════════════════════════════════════════════════════════
 % Peak detection
@@ -1055,6 +1056,38 @@ cb.onExportPeakXLSX      = @onExportPeakXLSX;
             uialert(ctx.fig, sprintf('Exported %d dataset(s); %d error(s):\n%s', ...
                 nWritten, numel(errMsgs), strjoin(errMsgs,'\n')), ...
                 'Peak Export Partial');
+        end
+    end
+
+    function onKeyPress(~, evt)
+    %ONKEYPRESS  Keyboard shortcuts in the Peak Analysis window.
+    %  Up/Down   — navigate peak table rows
+    %  Return    — fit selected peak
+    %  Delete    — remove selected peak
+        nRows = size(ctx.peakTable.Data, 1);
+        if nRows == 0, return; end
+        curRow = ctx.appData.selectedPeakIdx;
+
+        switch evt.Key
+            case 'uparrow'
+                newRow = max(1, curRow - 1);
+                ctx.appData.selectedPeakIdx = newRow;
+                ctx.peakTable.Selection = newRow;
+                ctx.onPlot();
+            case 'downarrow'
+                newRow = min(nRows, curRow + 1);
+                if curRow == 0, newRow = 1; end
+                ctx.appData.selectedPeakIdx = newRow;
+                ctx.peakTable.Selection = newRow;
+                ctx.onPlot();
+            case 'return'
+                if curRow > 0
+                    onFitPeaks([], []);
+                end
+            case 'delete'
+                if curRow > 0
+                    onRemoveSelectedPeak([], []);
+                end
         end
     end
 

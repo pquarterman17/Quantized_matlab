@@ -105,6 +105,7 @@ classdef AppState < handle
         cursorLine                = []
         cursorText                = []
         cursorPt1       double  = []
+        cursorPinned    cell    = {}   % pinned marker graphics (Ctrl+click)
 
         % ── Fringe thickness ───────────────────────────────────────
         fringeMarkers             = []

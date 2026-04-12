@@ -76,7 +76,7 @@ runAllTests(Group="batch")           % batch import + XRD converter
 runAllTests(Group="fitting")         % curve fitting engine + models + parser
 ```
 
-Groups: `parser`, `batch`, `xrd2d`, `gui`, `sims`, `em`, `emgui`, `eds`, `xrayneutron`, `superconductor`, `cif`, `optics`, `vacuum`, `electrochemistry`, `eels`, `eels_adv`, `diffindex`, `diff_sim`, `edsquant`, `contour`, `fitting`
+Groups: `parser`, `batch`, `xrd2d`, `gui`, `calcgui`, `sims`, `em`, `emgui`, `eds`, `xrayneutron`, `superconductor`, `cif`, `optics`, `vacuum`, `electrochemistry`, `eels`, `eels_adv`, `diffindex`, `diff_sim`, `edsquant`, `contour`, `fitting`, `plotting`, `spectral`, `interp2d`, `baseline`, `errorprop`, `utilities`, `templates`
 
 ## Key Design Decisions
 

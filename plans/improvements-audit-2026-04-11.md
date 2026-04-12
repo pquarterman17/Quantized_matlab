@@ -6,7 +6,7 @@ BosonPlotter, FermiViewer, materialsCalcGUI, xrdConvertGUI, and all `+` packages
 
 **Status:** Active
 **Created:** 2026-04-11
-**Updated:** 2026-04-12
+**Updated:** 2026-04-12 (W1 complete)
 
 ---
 
@@ -82,17 +82,17 @@ Features that reduce friction on common BosonPlotter tasks.
 
 ### Tier 3 — Nice-to-Have
 
-10. **Data-cursor pin/lock** — Ctrl+click pins cursor with marker + text label
+10. ~~**Data-cursor pin/lock**~~ — done, Ctrl+click pins persistent marker with cycling colors
 
-11. **Quick unit-prefix cycling** — Alt+Up/Down cycles prefix index on X/Y
+11. ~~**Quick unit-prefix cycling**~~ — done, Alt+Up/Down cycles Y prefix; Alt+Shift+Up/Down for X
 
 12. ~~**Extension-specific file filter presets**~~ — done, grouped into XRD/VSM/CSV/Excel/Microscopy/Images/Neutron
 
 13. ~~**"Copy Row as MATLAB code" for materialsCalcGUI**~~ — done (Lane F agent): history panel + context menu + 4 tabs wired
 
-14. **Keyboard shortcut for "next peak"** — Down/Up/Enter on `peakFig`
+14. ~~**Keyboard shortcut for "next peak"**~~ — done, Up/Down/Enter/Delete in Peak Analysis window via peakCallbacks.onKeyPress
 
-15. **Dataset color swatch in list** — HTML markup colored square + "Set Color..." picker
+15. ~~**Dataset color swatch in list**~~ — done, colored ● prefix + uistyle FontColor matching plot line color
 
 ---
 
@@ -324,3 +324,7 @@ on the fallback path per CLAUDE.md convention).
 - ~~**Plot Style Dialog docs**~~ (2026-04-11) — 4-layer cascade, palette picker, apply-to scopes
 - ~~**Data table split docs**~~ (2026-04-11) — tblUnits + tblData architecture documented
 - ~~**Function docstrings**~~ (2026-04-11) — multiPanel, peakCallbacks, renderPlot, filterRows, colorMaps, computeQSpace, resolveParser, resolveStyle, convertMagUnits
+- ~~**Data-cursor pin/lock**~~ (2026-04-12) — Ctrl+click in cursor mode pins persistent diamond markers with cycling colors; cleared on toggle-off
+- ~~**Quick unit-prefix cycling**~~ (2026-04-12) — Alt+Up/Down cycles Y-axis SI prefix (pico→…→Giga); Alt+Shift for X-axis
+- ~~**Keyboard shortcut for "next peak"**~~ (2026-04-12) — peakCallbacks.onKeyPress: Up/Down navigate table, Enter fits, Delete removes
+- ~~**Dataset color swatch in list**~~ (2026-04-12) — ● prefix + uistyle FontColor per item matching resolved plot color (override or default palette)

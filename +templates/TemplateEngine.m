@@ -362,11 +362,11 @@ function result = applyTabular(data, ov)
         end
     end
 
-    % Label overrides (keyed by column index as string)
+    % Label overrides (keyed by column index: '0','1',... or 'x0','x1',...)
     if isfield(ov, 'labels') && isstruct(ov.labels)
         flds = fieldnames(ov.labels);
         for k = 1:numel(flds)
-            idx = str2double(flds{k}) + 1;  % 0-based → 1-based
+            idx = parseFieldIndex(flds{k}) + 1;  % 0-based → 1-based
             if idx >= 1 && idx <= numel(result.labels)
                 result.labels{idx} = ov.labels.(flds{k});
             end
@@ -377,12 +377,21 @@ function result = applyTabular(data, ov)
     if isfield(ov, 'units') && isstruct(ov.units)
         flds = fieldnames(ov.units);
         for k = 1:numel(flds)
-            idx = str2double(flds{k}) + 1;
+            idx = parseFieldIndex(flds{k}) + 1;
             if idx >= 1 && idx <= numel(result.units)
                 result.units{idx} = ov.units.(flds{k});
             end
         end
     end
+end
+
+
+function idx = parseFieldIndex(key)
+%PARSEFIELDINDEX  Extract numeric index from '0', '1', 'x0', 'x1', etc.
+%   MATLAB struct fields can't start with a digit, so JSON keys like "0"
+%   become "x0" after jsondecode.  Handles both formats.
+    stripped = regexprep(key, '^x', '');
+    idx = str2double(stripped);
 end
 
 
