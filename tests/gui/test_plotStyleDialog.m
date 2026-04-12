@@ -27,8 +27,7 @@ function test_plotStyleDialog
     failed = 0;
     failures = {};
 
-    api = BosonPlotter();
-    api.fig.Visible = 'off';
+    api = BosonPlotter('Visible','off');
     drawnow;
     cleanupApi = onCleanup(@() api.close()); %#ok<NASGU>
     api.addFiles({VSM_F});

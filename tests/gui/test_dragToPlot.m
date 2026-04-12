@@ -30,8 +30,7 @@ passed = 0;
 failed = 0;
 
 % ── Launch GUI (headless) ────────────────────────────────────────────────
-api = BosonPlotter();
-api.fig.Visible = 'off';
+api = BosonPlotter('Visible','off');
 drawnow;
 cleanup = onCleanup(@() api.close());
 

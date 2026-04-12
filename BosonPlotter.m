@@ -1,4 +1,4 @@
-function varargout = BosonPlotter()
+function varargout = BosonPlotter(options)
 %BOSON  Browse, import and preview data files using the +parser toolkit.
 %
 % ── Syntax ────────────────────────────────────────────────────────────────
@@ -237,6 +237,10 @@ function varargout = BosonPlotter()
 %   parser.importAuto, parser.resolveParser, +parser/README.md,
 %   xrdConvertGUI, test_gui_harness
 
+    arguments
+        options.Visible (1,1) string {mustBeMember(options.Visible,["on","off"])} = "on"
+    end
+
     % ── Shared application state (handle class — pass-by-reference) ──────
     % Using a handle class enables extracted +bosonPlotter/ functions to
     % mutate state without return-value gymnastics.  All existing
@@ -281,7 +285,8 @@ function varargout = BosonPlotter()
     initY = max(40, round((availH - initH) / 2));
     fig = uifigure('Name','Data Import & Preview', ...
                    'Position',[initX initY initW initH], ...
-                   'AutoResizeChildren','off');
+                   'AutoResizeChildren','off', ...
+                   'Visible', options.Visible);
     MIN_FIG_H = 500;   % reduced minimum so GUI works on small screens
     LAYOUT_DEFAULTS = struct('figW',initW,'figH',initH,'ctrlPanelW',190, ...
         'corrPanelW',320,'axLimPanelW',200,'fileListW',180);

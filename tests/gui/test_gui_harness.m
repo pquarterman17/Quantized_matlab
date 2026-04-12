@@ -40,8 +40,7 @@ failed = 0;
 % ════════════════════════════════════════════════════════════════════════
 %  Launch single shared GUI instance
 % ════════════════════════════════════════════════════════════════════════
-api = BosonPlotter();
-api.fig.Visible = 'off';
+api = BosonPlotter('Visible','off');
 drawnow;
 cleanupApi = onCleanup(@() api.close());
 
@@ -981,8 +980,7 @@ function api = launchHeadless()
 %   Used only for the session reload phase of tests 11 and 12, where a
 %   fresh GUI instance is required to verify that saved state loads
 %   correctly into a clean environment.
-    api = BosonPlotter();
-    hideTestFig(api.fig);
+    api = BosonPlotter('Visible','off');
     drawnow;
 end
 

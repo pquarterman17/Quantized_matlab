@@ -46,8 +46,7 @@ passed = 0;
 failed = 0;
 
 % ── Launch single headless GUI instance ──────────────────────────────────
-api = BosonPlotter();
-api.fig.Visible = 'off';
+api = BosonPlotter('Visible','off');
 drawnow;
 C = onCleanup(@() api.close());
 

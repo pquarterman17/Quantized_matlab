@@ -439,7 +439,6 @@ end
 % ════════════════════════════════════════════════════════════════════════
 function api = launchHeadless()
 %LAUNCHHEADLESS  Start BosonPlotter with the figure hidden.
-    api = BosonPlotter();
-    api.fig.Visible = 'off';
+    api = BosonPlotter('Visible','off');
     drawnow;
 end

@@ -33,8 +33,7 @@ function test_layoutIntegrity
     % ════════════════════════════════════════════════════════════════════
     fprintf('\n== TEST 1: BosonPlotter layout integrity ==\n');
     try
-        api = BosonPlotter();
-        api.fig.Visible = 'off';
+        api = BosonPlotter('Visible','off');
         drawnow;
         cleanupApi = onCleanup(@() api.close()); %#ok<NASGU>
 

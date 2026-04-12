@@ -27,8 +27,7 @@ function test_renderPlot_styling
     failed = 0;
     failures = {};
 
-    api = BosonPlotter();
-    api.fig.Visible = 'off';
+    api = BosonPlotter('Visible','off');
     drawnow;
     cleanupApi = onCleanup(@() api.close()); %#ok<NASGU>
 

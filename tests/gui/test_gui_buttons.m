@@ -1868,8 +1868,7 @@ end
 
 function api = launchHeadless()
 %LAUNCHHEADLESS  Create a BosonPlotter instance with figure hidden.
-    api = BosonPlotter();
-    hideTestFig(api.fig);
+    api = BosonPlotter('Visible','off');
     drawnow;
 end
 

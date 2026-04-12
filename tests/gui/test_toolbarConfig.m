@@ -28,8 +28,7 @@ mkdir(tmpDir);
 cleanupTmp = onCleanup(@() rmdir(tmpDir, 's'));
 
 % ── Shared headless GUI instance ─────────────────────────────────────────
-api = BosonPlotter();
-api.fig.Visible = 'off';
+api = BosonPlotter('Visible','off');
 drawnow;
 cleanupApi = onCleanup(@() safeClose(api));
 
