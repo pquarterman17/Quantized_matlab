@@ -20,9 +20,17 @@ function xrdConvertGUI()
 INPUT_BG = [0.18 0.18 0.18];
 INPUT_FG = [0.90 0.90 0.90];
 
+% Restore last window position from prefs (default: 100,100)
+lastPos = getpref('BosonXRDConvert', 'windowPos', [100 100 600 720]);
+% Clamp to minimum size in case stored size is smaller
+lastPos(3) = max(lastPos(3), 480);
+lastPos(4) = max(lastPos(4), 600);
+
 % Create main figure
-fig = uifigure('Name', 'XRD Batch Converter', 'Position', [100 100 600 720]);
-fig.CloseRequestFcn = @onFigureClose;
+fig = uifigure('Name', 'XRD Batch Converter', 'Position', lastPos, ...
+    'Resize', 'on');
+fig.CloseRequestFcn    = @onFigureClose;
+fig.SizeChangedFcn     = @onFigureResized;
 
 % Main grid layout  (12 rows: added row 2 for Add Folder / Remove Selected)
 mainGL = uigridlayout(fig);
@@ -227,6 +235,12 @@ handles.lblStatus        = lblStatus;
 
 fig.UserData = struct('appData', appData, 'handles', handles);
 
+% Restore last output directory from prefs
+lastOutDir = getpref('BosonXRDConvert', 'lastOutputDir', '');
+if ~isempty(lastOutDir) && isfolder(lastOutDir)
+    efOutputDir.Value = lastOutDir;
+end
+
 % Apply dark theme to all input widgets
 applyDarkInputTheme(fig, INPUT_BG, INPUT_FG);
 
@@ -238,8 +252,11 @@ btnConvert.FontColor = [1 1 1];
 % ════════════════════════════════════════════════════════════════════════
 
     function onBrowseFolder(~, ~)
-        folderPath = uigetdir(pwd, 'Select a folder containing XRD files');
+        startDir = getpref('BosonXRDConvert', 'lastInputDir', pwd);
+        if ~isfolder(startDir), startDir = pwd; end
+        folderPath = uigetdir(startDir, 'Select a folder containing XRD files');
         if isequal(folderPath, 0), return; end
+        setpref('BosonXRDConvert', 'lastInputDir', folderPath);
 
         % Replace list with XRD files from this folder
         scanFolderAndReplace(folderPath);
@@ -251,13 +268,16 @@ btnConvert.FontColor = [1 1 1];
 
     function onAddFolder(~, ~)
         state = fig.UserData;
-        startDir = pwd;
+        % Prefer last-used folder from prefs, then fall back to most recent in list
+        startDir = getpref('BosonXRDConvert', 'lastInputDir', pwd);
+        if ~isfolder(startDir), startDir = pwd; end
         if ~isempty(state.appData.folderPaths)
             startDir = state.appData.folderPaths{end};
         end
 
         folderPath = uigetdir(startDir, 'Add a folder of XRD files');
         if isequal(folderPath, 0), return; end
+        setpref('BosonXRDConvert', 'lastInputDir', folderPath);
 
         % Append XRD files from this folder, skipping duplicates
         appendFolderToList(folderPath);
@@ -513,8 +533,11 @@ btnConvert.FontColor = [1 1 1];
 % ════════════════════════════════════════════════════════════════════════
 
     function onBrowseOutputDir(~, ~)
-        folderPath = uigetdir(pwd, 'Select output folder');
+        startDir = getpref('BosonXRDConvert', 'lastOutputDir', pwd);
+        if ~isfolder(startDir), startDir = pwd; end
+        folderPath = uigetdir(startDir, 'Select output folder');
         if isequal(folderPath, 0), return; end
+        setpref('BosonXRDConvert', 'lastOutputDir', folderPath);
         handles.efOutputDir.Value = folderPath;
     end
 
@@ -681,6 +704,27 @@ btnConvert.FontColor = [1 1 1];
     end
 
 % ════════════════════════════════════════════════════════════════════════
+% CALLBACK: Figure resized — enforce minimum size
+% ════════════════════════════════════════════════════════════════════════
+
+    function onFigureResized(~, ~)
+        if ~isvalid(fig), return; end
+        pos = fig.Position;
+        changed = false;
+        if pos(3) < 480
+            pos(3) = 480;
+            changed = true;
+        end
+        if pos(4) < 600
+            pos(4) = 600;
+            changed = true;
+        end
+        if changed
+            fig.Position = pos;
+        end
+    end
+
+% ════════════════════════════════════════════════════════════════════════
 % CALLBACK: Figure close
 % ════════════════════════════════════════════════════════════════════════
 
@@ -691,6 +735,8 @@ btnConvert.FontColor = [1 1 1];
                 'Close Confirmation', 'Yes', 'No', 'No');
             if strcmp(response, 'No'), return; end
         end
+        % Persist window position for next session
+        setpref('BosonXRDConvert', 'windowPos', fig.Position);
         delete(fig);
     end
 
