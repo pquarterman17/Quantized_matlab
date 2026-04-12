@@ -284,10 +284,9 @@ function varargout = BosonPlotter(options)
     initX = max(20, round((availW - initW) / 2));
     initY = max(40, round((availH - initH) / 2));
     % Headless mode: figure starts hidden and popup dialogs stay hidden.
-    % Triggered by Visible='off' or by DefaultFigureVisible='off' (set
-    % by runAllTests for GUI groups).
-    headless = options.Visible == "off" || ...
-               strcmp(get(0,'DefaultFigureVisible'), 'off');
+    % Triggered by Visible='off' (used by tests).  For full focus-steal
+    % suppression on Windows, run via tests/run_gui_hidden.ps1.
+    headless = options.Visible == "off";
     figArgs = {'Name','Data Import & Preview', ...
                'Position',[initX initY initW initH], ...
                'AutoResizeChildren','off'};
