@@ -65,8 +65,7 @@ Features that reduce friction on common BosonPlotter tasks.
 
 3. ~~**Rename / relabel dataset from list**~~ — done, see Completed section
 
-4. **Autosave / crash-recovery session** — `timer` serializing `appData.datasets` to
-   `prefdir/boson_autosave.mat` every 2 min; offer restore on startup
+4. ~~**Autosave / crash-recovery session**~~ — done, see Completed section
 
 ### Tier 2 — Medium Impact
 
@@ -295,3 +294,4 @@ Stale docs, missing feature docs, thin package READMEs, and function docstrings.
 - ~~**Recent Files menu**~~ (2026-04-11) — dropdown next to Add Files, persisted to `prefdir/boson_recent.mat`, MRU-first, deduplicated, capped at 10, stale-entry cleanup, test K55
 - ~~**Per-dataset notes**~~ (2026-04-11) — `ds.notes` field, "Notes..." context menu, pencil indicator in list, note shown in tooltip, persists in session. Test K56
 - ~~**Rename dataset**~~ (2026-04-11) — "Rename..." context menu, updates displayName + legendName, refreshes legend. Test K57
+- ~~**Autosave / crash-recovery**~~ (2026-04-11) — `+bosonPlotter/autosave.m` static class: 2-min timer saves datasets to `prefdir/boson_autosave.mat`, recovery prompt on startup, cleanup on clean exit. Zero new nested functions in BosonPlotter.m

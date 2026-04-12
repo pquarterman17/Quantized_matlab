@@ -2383,6 +2383,34 @@ function varargout = BosonPlotter(options)
     % Populate recent dropdown from persisted state
     updateRecentDropdown();
 
+    % ── Autosave: check for crash recovery ───────────────────────────
+    % Deferred to here so all GUI callbacks exist before restoring data.
+    if ~headless && bosonPlotter.autosave.check()
+        try
+            answer = uiconfirm(fig, ...
+                'An unsaved session was found (possible crash recovery). Restore it?', ...
+                'Recover Session', ...
+                'Options', {'Restore', 'Discard'}, ...
+                'DefaultOption', 'Restore', 'CancelOption', 'Discard');
+            if strcmp(answer, 'Restore')
+                [recoveredDS, recovered] = bosonPlotter.autosave.restore();
+                appData.datasets  = recoveredDS;
+                appData.activeIdx = recovered.activeIdx;
+                appData.lastDir   = recovered.lastDir;
+                rebuildDatasetList(true);
+                updateControlsForActiveDataset();
+                onPlot([], []);
+                setStatus(sprintf('Restored %d dataset(s) from autosave (%s).', ...
+                    numel(recoveredDS), char(recovered.timestamp, 'HH:mm')));
+            else
+                bosonPlotter.autosave.cleanup();
+            end
+        catch ME
+            fprintf(2, '[BosonPlotter] Autosave recovery failed: %s\n', ME.message);
+            bosonPlotter.autosave.cleanup();
+        end
+    end
+
     % ════════════════════════════════════════════════════════════════════
     %  NESTED CALLBACKS  (share appData + all control handles via closure)
     % ════════════════════════════════════════════════════════════════════
@@ -2631,6 +2659,10 @@ function varargout = BosonPlotter(options)
             recordAction(sprintf("data = parser.importAuto('%s');", fpaths{fj}));
         end
         onPlot([],[]);
+        % (Re)start autosave timer now that datasets exist
+        if ~headless
+            bosonPlotter.autosave.start(appData);
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -9639,6 +9671,8 @@ function varargout = BosonPlotter(options)
             end
         end
         appData.dataConnectors = {};
+        % Stop autosave and delete recovery file (clean exit = no recovery needed)
+        bosonPlotter.autosave.cleanup();
         % Close the peak analysis window if it exists
         if isvalid(peakFig), delete(peakFig); end
         delete(fig);
