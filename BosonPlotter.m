@@ -2322,6 +2322,166 @@ function varargout = BosonPlotter(options)
     rCtxStatic_.setStatus                   = @setStatus;
     rCtxStatic_.logGUIError                 = @logGUIError;
 
+    % ── Widget handle struct for extracted functions ──────────────────────
+    % All fields point to the same handle objects as the closure variables.
+    % Built once during initialisation; passed to +bosonPlotter/ helpers so
+    % they can be ordinary functions instead of nested functions.
+    ui = struct();
+    % X/Y channel selectors
+    ui.ddX              = ddX;
+    ui.lbY              = lbY;
+    ui.lbY2             = lbY2;
+    % Scale / display
+    ui.ddScaleX         = ddScaleX;
+    ui.ddScaleY         = ddScaleY;
+    ui.cbCountsPerSec   = cbCountsPerSec;
+    % Dataset appearance
+    ui.ddDatasetColor   = ddDatasetColor;
+    ui.ddDatasetColorR  = ddDatasetColorR;
+    ui.efLegendName     = efLegendName;
+    ui.efLegendNameR    = efLegendNameR;
+    % Correction offsets / BG
+    ui.efXOffset        = efXOffset;
+    ui.efYOffset        = efYOffset;
+    ui.efBGSlope        = efBGSlope;
+    ui.efBGIntercept    = efBGIntercept;
+    ui.ddBGOrder        = ddBGOrder;
+    ui.ddBGInterp       = ddBGInterp;
+    ui.cbSubtractBG     = cbSubtractBG;
+    % Smoothing
+    ui.cbSmooth         = cbSmooth;
+    ui.efSmoothWin      = efSmoothWin;
+    ui.ddSmoothMethod   = ddSmoothMethod;
+    ui.cbSmoothPreview  = cbSmoothPreview;
+    % Trim / normalize / derivative
+    ui.efXTrimMin       = efXTrimMin;
+    ui.efXTrimMax       = efXTrimMax;
+    ui.ddNormalize      = ddNormalize;
+    ui.ddDerivative     = ddDerivative;
+    % Magnetometry parameters
+    ui.efSampleMass     = efSampleMass;
+    ui.efSampleWidth    = efSampleWidth;
+    ui.efSampleHeight   = efSampleHeight;
+    ui.ddDimUnit        = ddDimUnit;
+    ui.efSampleThick    = efSampleThick;
+    ui.ddThickUnit      = ddThickUnit;
+    ui.ddMomentUnit     = ddMomentUnit;
+    ui.ddFieldUnit      = ddFieldUnit;
+    ui.ddUnitSystem     = ddUnitSystem;
+    % Wavelength (from peak window)
+    ui.efWavelength     = efWavelength;
+    % Axis limits
+    ui.efXMin           = efXMin;
+    ui.efXMax           = efXMax;
+    ui.efXStep          = efXStep;
+    ui.efYMin           = efYMin;
+    ui.efYMax           = efYMax;
+    ui.efYStep          = efYStep;
+    ui.efY2Min          = efY2Min;
+    ui.efY2Max          = efY2Max;
+    ui.efY2Step         = efY2Step;
+    ui.axLimGL          = axLimGL;
+    % Correction labels (relabelled by applyParserAnalysisConfig)
+    ui.lblXOff          = lblXOff;
+    ui.lblYOff          = lblYOff;
+    ui.lblBGSlope       = lblBGSlope;
+    ui.lblBGInt         = lblBGInt;
+    % Correction action buttons
+    ui.btnApply         = btnApply;
+    ui.btnReset         = btnReset;
+    ui.btnApplyAll      = btnApplyAll;
+    ui.btnUndo          = btnUndo;
+    % Tool buttons (visibility toggled by parser type)
+    ui.btnFitBG             = btnFitBG;
+    ui.btnPickY             = btnPickY;
+    ui.btnYTranslate        = btnYTranslate;
+    ui.btnAutoPeak          = btnAutoPeak;
+    ui.btnManualPeak        = btnManualPeak;
+    ui.btnRemovePeakClick   = btnRemovePeakClick;
+    ui.btnPeakWindow        = btnPeakWindow;
+    % Panels / layouts (for visibility / row-height changes)
+    ui.ctrlPanel        = ctrlPanel;
+    ui.analysisPanel    = analysisPanel;
+    ui.analysisGL       = analysisGL;
+    ui.corrGL           = corrGL;
+    ui.map2DPanel       = map2DPanel;
+    ui.dataTablePanel   = dataTablePanel;
+    ui.axLimPanel       = axLimPanel;
+    % 2D map controls
+    ui.cbMap2DQSpace    = cbMap2DQSpace;
+    ui.btnArcIntegrate  = btnArcIntegrate;
+    ui.lblMap2DInfo     = lblMap2DInfo;
+    % Save path (hidden field)
+    ui.efSavePath       = efSavePath;
+    % Data table filter
+    ui.efFilter         = efFilter;
+    % Axis appearance / label overrides (used by onPlotTemplates)
+    ui.efCustomTitle    = efCustomTitle;
+    ui.efCustomXLabel   = efCustomXLabel;
+    ui.efCustomYLabel   = efCustomYLabel;
+    ui.ddXFmt           = ddXFmt;
+    ui.ddYFmt           = ddYFmt;
+    % CorrStyle / LivePreview selectors
+    ui.ddCorrStyle      = ddCorrStyle;
+    ui.cbLivePreview    = cbLivePreview;
+
+    % ── Callback struct for applyParserAnalysisConfig ─────────────────────
+    apacCb_ = struct();
+    apacCb_.configurePeakWindowForMode = @configurePeakWindowForMode;
+    apacCb_.showMagSection             = @showMagSection;
+    apacCb_.is2DDataset                = @is2DDataset;
+    apacCb_.updateUndoButtons          = @updateUndoButtons;
+
+    % ── Callback struct for onApplyCorrections ────────────────────────────
+    corrCb_ = struct();
+    corrCb_.onPlot                  = @(varargin) onPlot([],[]);
+    corrCb_.setStatus               = @setStatus;
+    corrCb_.logGUIError             = @logGUIError;
+    corrCb_.markCorrectionsDirty    = @markCorrectionsDirty;
+    corrCb_.updateApplyButtonStyle  = @updateApplyButtonStyle;
+    corrCb_.recordAction            = @recordAction;
+    corrCb_.pushUndoCorrectionEntry = @pushUndoCorrectionEntry;
+    corrCb_.updateUndoButtons       = @updateUndoButtons;
+    corrCb_.magSampleVolume_cm3     = @magSampleVolume_cm3;
+    corrCb_.str2num_trim            = @str2num_trim;
+    corrCb_.isNeutronParser         = @isNeutronParser;
+    corrCb_.neutronBaseName         = @neutronBaseName;
+    corrCb_.BTN_FG                  = BTN_FG;
+    corrCb_.BTN_PRIMARY             = BTN_PRIMARY;
+    corrCb_.fig                     = fig;
+
+    % ── Callback struct for updateControlsForActiveDataset ───────────────
+    ucdsCb_ = struct();
+    ucdsCb_.applyParserAnalysisConfig = @applyParserAnalysisConfig;
+    ucdsCb_.resolvedCorrStyle         = @resolvedCorrStyle;
+    ucdsCb_.onPlot                    = @() onPlot([],[]);
+    ucdsCb_.guiXName                  = @guiXName;
+    ucdsCb_.guiCountingTime           = @guiCountingTime;
+    ucdsCb_.guiParserLabel            = @guiParserLabel;
+    ucdsCb_.guiTernary                = @guiTernary;
+    ucdsCb_.ensureCell                = @ensureCell;
+    ucdsCb_.nan2str                   = @nan2str;
+    ucdsCb_.is2DDataset               = @is2DDataset;
+    ucdsCb_.isNeutronParser           = @isNeutronParser;
+    ucdsCb_.neutronBaseName           = @neutronBaseName;
+    ucdsCb_.extractWavelength_A       = @extractWavelength_A;
+    ucdsCb_.refreshPeakTable          = @refreshPeakTable;
+    ucdsCb_.refreshDataTable          = @refreshDataTable;
+    ucdsCb_.toggleY2Appearance        = @toggleY2Appearance;
+    ucdsCb_.onAxisChanged             = @onAxisChanged;
+    ucdsCb_.computeQSpace             = @(map) parser.computeQSpace(map);
+
+    % ── Callback struct for plotTemplates ────────────────────────────────
+    ptCb_ = struct();
+    ptCb_.onApplyCorrections = @(varargin) onApplyCorrections([],[]);
+    ptCb_.setStatus          = @setStatus;
+    ptCb_.logGUIError        = @logGUIError;
+    ptCb_.getLastDir         = @() appData.lastDir;
+    ptCb_.BTN_PRIMARY        = BTN_PRIMARY;
+    ptCb_.BTN_TOOL           = BTN_TOOL;
+    ptCb_.BTN_FG             = BTN_FG;
+    ptCb_.fig                = fig;
+
     % ════════════════════════════════════════════════════════════════════
     %  PROGRAMMATIC API (for automated testing / scripting)
     % ════════════════════════════════════════════════════════════════════
@@ -3703,195 +3863,8 @@ function varargout = BosonPlotter(options)
     end
 
     function updateControlsForActiveDataset()
-    %UPDATECONTROLSFORACTIVEDATASET  Sync all controls to the active dataset.
-        if appData.activeIdx < 1 || isempty(appData.datasets), return; end
-        ds = appData.datasets{appData.activeIdx};
-        d  = ds.data;
-
-        % Suppress value-change callbacks during bulk update
-        ddX.ValueChangedFcn  = [];
-        lbY.ValueChangedFcn  = [];
-        lbY2.ValueChangedFcn = [];
-
-        ctrlPanel.Title = sprintf('Controls  —  %s', guiParserLabel(ds.parserName));
-
-        % X dropdown: rebuild items; try to preserve the current selection
-        xName     = guiXName(d.metadata);
-        allLabels = [{xName}, d.labels];
-        ddX.Items = allLabels;
-        if ~ismember(ddX.Value, allLabels)
-            ddX.Value = allLabels{1};
-        end
-
-        % Y listbox: rebuild; keep any channels that exist in this dataset
-        lbY.Items = d.labels;
-        if ~isempty(d.labels)
-            curSel = ensureCell(lbY.Value);
-            validSel = curSel(ismember(curSel, d.labels));
-            if isempty(validSel)
-                lbY.Value = d.labels(1);
-            else
-                lbY.Value = validSel;
-            end
-        end
-
-        % Y2 listbox: rebuild; keep valid selections (or reset to "(none)")
-        lbY2.Items = [{'(none)'}, d.labels];
-        curSel2   = ensureCell(lbY2.Value);
-        validSel2 = curSel2(ismember(curSel2, [{'(none)'}, d.labels]));
-        if isempty(validSel2)
-            lbY2.Value = {'(none)'};
-        else
-            lbY2.Value = validSel2;
-        end
-
-        % Enable Counts/s only for Rigaku files with a valid counting time
-        ct = guiCountingTime(ds);
-        cbCountsPerSec.Enable = guiTernary(ct > 0, 'on', 'off');
-        if ct == 0
-            cbCountsPerSec.Value = false;
-        end
-
-        % Restore this dataset's per-dataset appearance overrides
-        ddDatasetColor.Enable  = 'on';
-        ddDatasetColor.Value   = ds.color;
-        ddDatasetColorR.Enable = 'on';
-        ddDatasetColorR.Value  = guiTernary(isfield(ds,'colorR'),     ds.colorR,     []);
-        efLegendName.Enable    = 'on';
-        efLegendName.Value     = guiTernary(isfield(ds,'legendName'),  ds.legendName,  '');
-        efLegendNameR.Enable   = 'on';
-        efLegendNameR.Value    = guiTernary(isfield(ds,'legendNameR'), ds.legendNameR, '');
-
-        % Restore this dataset's correction parameter values
-        efXOffset.Value      = ds.xOff;
-        efYOffset.Value      = ds.yOff;
-        efBGSlope.Value      = ds.bgSlope;
-        efBGIntercept.Value  = ds.bgInt;
-        % Restore BG polynomial order dropdown
-        if isfield(ds,'bgPoly') && numel(ds.bgPoly) > 2
-            bgPolyOrd = numel(ds.bgPoly) - 1;   % poly order = nCoeffs - 1
-            if bgPolyOrd >= 2 && bgPolyOrd <= 6
-                ddBGOrder.Value = sprintf('Poly %d', bgPolyOrd);
-            end
-        else
-            ddBGOrder.Value = 'Linear';
-        end
-        cbSmooth.Value       = guiTernary(isfield(ds,'smoothEnabled'), ds.smoothEnabled, false);
-        efSmoothWin.Value    = guiTernary(isfield(ds,'smoothWindow'),  ds.smoothWindow,  5);
-        ddSmoothMethod.Value = guiTernary(isfield(ds,'smoothMethod'),  ds.smoothMethod,  'Moving');
-        efXTrimMin.Value     = nan2str(guiTernary(isfield(ds,'xTrimMin'),      ds.xTrimMin,      NaN));
-        efXTrimMax.Value     = nan2str(guiTernary(isfield(ds,'xTrimMax'),      ds.xTrimMax,      NaN));
-        ddNormalize.Value    = guiTernary(isfield(ds,'normMethod'),    ds.normMethod,    'None');
-        ddDerivative.Value   = guiTernary(isfield(ds,'derivativeMode'), ds.derivativeMode, 'None');
-
-        % Restore magnetometry sample parameters
-        efSampleMass.Value   = guiTernary(isfield(ds,'sampleMass'),   ds.sampleMass,   0);
-        efSampleWidth.Value  = guiTernary(isfield(ds,'sampleWidth'),  ds.sampleWidth,  0);
-        efSampleHeight.Value = guiTernary(isfield(ds,'sampleHeight'), ds.sampleHeight, 0);
-        ddDimUnit.Value      = guiTernary(isfield(ds,'dimUnit'),      ds.dimUnit,      'mm');
-        efSampleThick.Value  = guiTernary(isfield(ds,'sampleThick'),  ds.sampleThick,  0);
-        ddThickUnit.Value    = guiTernary(isfield(ds,'thickUnit'),    ds.thickUnit,    'nm');
-        ddMomentUnit.Value   = guiTernary(isfield(ds,'momentUnit'),   ds.momentUnit,   'emu');
-        ddFieldUnit.Value    = guiTernary(isfield(ds,'fieldUnit'),    ds.fieldUnit,    'Oe');
-        ddUnitSystem.Value   = guiTernary(isfield(ds,'unitSystem'),   ds.unitSystem,   'CGS');
-
-        % Restore wavelength override field; auto-fill from metadata if no override set
-        wl_meta = extractWavelength_A(ds);
-        if isfield(ds,'wavelengthOverride_A') && ~isnan(ds.wavelengthOverride_A) && ds.wavelengthOverride_A > 0
-            efWavelength.Value = ds.wavelengthOverride_A;
-        elseif ~isnan(wl_meta) && wl_meta > 0
-            efWavelength.Value = wl_meta;
-        else
-            efWavelength.Value = 0;
-        end
-
-        % Restore per-dataset axis limits (auto-scale if not yet saved)
-        if isfield(ds, 'axLims')
-            efXMin.Value  = ds.axLims.xMin;
-            efXMax.Value  = ds.axLims.xMax;
-            efXStep.Value = ds.axLims.xStep;
-            efYMin.Value  = ds.axLims.yMin;
-            efYMax.Value  = ds.axLims.yMax;
-            efYStep.Value = ds.axLims.yStep;
-            efY2Min.Value  = guiTernary(isfield(ds.axLims,'y2Min'), ds.axLims.y2Min, '');
-            efY2Max.Value  = guiTernary(isfield(ds.axLims,'y2Max'), ds.axLims.y2Max, '');
-            efY2Step.Value = guiTernary(isfield(ds.axLims,'y2Step'), ds.axLims.y2Step, '');
-        else
-            efXMin.Value = '';  efXMax.Value = '';  efXStep.Value = '';
-            efYMin.Value = '';  efYMax.Value = '';  efYStep.Value = '';
-            efY2Min.Value = '';  efY2Max.Value = '';  efY2Step.Value = '';
-        end
-
-        % Show Y2 rows/columns only when a right-axis channel is active
-        y2Active = ~all(strcmp(ensureCell(lbY2.Value), '(none)'));
-        axLimGL.RowHeight{3}  = 22 * y2Active;
-        % Collapse the Y2 listbox row when no Y2 channel is selected (Fix B1)
-        if y2Active
-            ctrlGL.RowHeight{3} = '1x';
-        else
-            ctrlGL.RowHeight{3} = 0;
-        end
-        toggleY2Appearance(y2Active);
-
-        [fp2, fn2, ~] = fileparts(ds.filepath);
-        if ~isempty(ds.corrData)
-            efSavePath.Value = fullfile(fp2, [fn2, '_corrected.csv']);
-        elseif isfield(ds, 'parserName') && isNeutronParser(ds.parserName)
-            efSavePath.Value = fullfile(fp2, [neutronBaseName(ds.filepath), '_neutron.csv']);
-        else
-            efSavePath.Value = fullfile(fp2, [fn2, '_export.csv']);
-        end
-
-        applyParserAnalysisConfig(resolvedCorrStyle());
-
-        % Auto-configure for neutron data; reset log scale for non-neutron
-        if isNeutronParser(ds.parserName)
-            rIdx = find(strcmp(d.labels, 'R'), 1);
-            if ~isempty(rIdx)
-                lbY.Value = d.labels(rIdx);
-            end
-            ddScaleY.Value = 'Log';
-        elseif isfield(ds, 'parserName') && strcmp(ds.parserName, 'importSIMS')
-            ddScaleY.Value = 'Log';  % SIMS concentrations span many decades
-            % Auto-select all elements so each gets its own legend entry
-            if numel(d.labels) > 1
-                lbY.Value = d.labels;
-            end
-        elseif is2DDataset(ds)
-            ddScaleY.Value = 'Log';  % log intensity is standard for XRD reciprocal-space maps
-            % Lazy Q-space: compute Qx/Qz on first activation if wavelength available
-            map = ds.data.metadata.parserSpecific.map2D;
-            map = parser.computeQSpace(map);
-            ds.data.metadata.parserSpecific.map2D = map;
-            appData.datasets{appData.activeIdx} = ds;
-            % Update map dimension info label
-            lblMap2DInfo.Text = sprintf('%d %s positions  \xD7  %d 2\xB0 pixels', ...
-                numel(map.axis1), map.axis1Name, numel(map.axis2));
-            % Enable Q-space toggle and arc integration only when wavelength was available
-            if isfield(map, 'Qx')
-                cbMap2DQSpace.Enable  = 'on';
-                btnArcIntegrate.Enable = 'on';
-            else
-                cbMap2DQSpace.Enable  = 'off';
-                cbMap2DQSpace.Value   = false;
-                btnArcIntegrate.Enable = 'off';
-            end
-        else
-            ddScaleY.Value = 'Linear';
-        end
-
-        ddX.ValueChangedFcn  = @onAxisChanged;
-        lbY.ValueChangedFcn  = @onAxisChanged;
-        lbY2.ValueChangedFcn = @(~,~) onPlot([],[]);
-
-        appData.selectedPeakIdx = 0;   % clear peak selection on dataset switch
-        peakCb.refreshPeakTable();
-
-        % Refresh data table if visible
-        appData.tableMask   = [];  % reset mask on dataset switch
-        appData.filterMask  = [];  % reset row filter on dataset switch
-        efFilter.Value      = '';  % clear filter text field
-        refreshDataTable();
+    %UPDATECONTROLSFORACTIVEDATASET  Delegate to extracted +bosonPlotter module.
+        bosonPlotter.updateControlsForActiveDataset(appData, ui, ucdsCb_);
     end
 
     % ── Axis / style callbacks ────────────────────────────────────────────
@@ -3903,246 +3876,8 @@ function varargout = BosonPlotter(options)
     end
 
     function applyParserAnalysisConfig(pName)
-    %APPLYPARSERANALYSISCONFIG  Relabel Analysis panel controls for data type.
-    %  Uses CROW row-index constants defined at corrGL creation.
-
-        % ── Common row-height setup for non-neutron modes ──
-        % Show BG file rows only if section not collapsed; hide asymmetry
-        showBGFileRows = ~appData.sectionCollapsed.bgFile;
-        bgFileH = 22 * showBGFileRows;
-
-        switch pName
-            case {'importRigaku_raw', 'importXRDML', 'importBruker'}
-                % Re-enable controls for non-neutron case
-                for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
-                          btnApply, btnReset, btnApplyAll, btnUndo, ...
-                          cbSmooth, efSmoothWin, ddSmoothMethod, cbSmoothPreview, ...
-                          efXTrimMin, efXTrimMax, ddNormalize}
-                    hh{1}.Enable = 'on'; %#ok<FXSET>
-                end
-                analysisPanel.Title   = 'Analysis & Corrections  —  XRD';
-                lblXOff.Text          = '2θ Offset (°):';
-                efXOffset.Tooltip     = '2θ-offset: 2θ_corrected = 2θ − this value  (0 = no shift)';
-                lblYOff.Text          = 'Intens. Floor:';
-                efYOffset.Tooltip     = ['Intensity floor subtracted from all counts ' ...
-                                         'after BG removal  (0 = no shift)'];
-                lblBGSlope.Text       = 'BG Slope:';
-                efBGSlope.Tooltip     = 'Linear BG slope m: I_BG = m·2θ + b  (0 = no BG subtraction)';
-                lblBGInt.Text         = 'BG Intercept:';
-                efBGIntercept.Tooltip = 'Linear BG intercept b: I_BG = m·2θ + b  (0 = no BG subtraction)';
-                % Show XRD interactive tools, hide generic ones
-                btnFitBG.Visible           = 'off';
-                btnPickY.Visible           = 'off';
-                btnYTranslate.Visible      = 'on';
-                btnAutoPeak.Visible        = 'on';
-                btnManualPeak.Visible      = 'on';
-                btnRemovePeakClick.Visible = 'on';
-                btnPeakWindow.Visible      = 'on';
-                % Peak window mode — XRD
-                appData.peakMode = 'xrd';
-                configurePeakWindowForMode('xrd');
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 210};
-                % Hide asymmetry; respect BG file collapse state
-                corrGL.RowHeight{CROW.BGFILE}  = bgFileH;
-                corrGL.RowHeight{CROW.BGSUBTR} = bgFileH;
-                corrGL.RowHeight{CROW.ASYM1}   = 0;
-                corrGL.RowHeight{CROW.ASYM2}   = 0;
-                % Hide magnetometry section (not applicable to XRD)
-                showMagSection(false);
-
-            case {'importQDVSM', 'importMPMS', 'importLakeShore', 'importPPMS'}
-                % Re-enable controls for magnetometry data
-                for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
-                          btnApply, btnReset, btnApplyAll, btnUndo, ...
-                          cbSmooth, efSmoothWin, ddSmoothMethod, cbSmoothPreview, ...
-                          efXTrimMin, efXTrimMax, ddNormalize}
-                    hh{1}.Enable = 'on'; %#ok<FXSET>
-                end
-                switch pName
-                    case 'importPPMS',     magTitle = 'PPMS';
-                    case 'importMPMS',     magTitle = 'MPMS';
-                    case 'importLakeShore',magTitle = 'Lake Shore';
-                    otherwise,             magTitle = 'VSM';
-                end
-                analysisPanel.Title   = ['Analysis & Corrections  —  ' magTitle];
-                % Magnetometry-specific labels and tooltips
-                lblXOff.Text          = 'Field Offset:';
-                efXOffset.Tooltip     = 'Field offset: H_corrected = H − this value  (0 = no shift)';
-                lblYOff.Text          = 'Moment Offset:';
-                efYOffset.Tooltip     = ['Moment baseline shift applied after diamagnetic BG ' ...
-                                         'subtraction  (0 = no shift)'];
-                lblBGSlope.Text       = 'Diamag. Slope:';
-                efBGSlope.Tooltip     = ['Diamagnetic susceptibility slope ' char(967) ': ' ...
-                                         'M_BG = ' char(967) char(183) 'H + b  (0 = no subtraction).  ' ...
-                                         'Use "Fit BG from Box" or "Auto BG" to estimate automatically.'];
-                lblBGInt.Text         = 'Diamag. Intcpt:';
-                efBGIntercept.Tooltip = ['Diamagnetic intercept b: M_BG = ' char(967) char(183) 'H + b  ' ...
-                                         '(0 = no subtraction)'];
-                % Magnetometry interactive tools: Fit BG + Est. Y Offset
-                btnFitBG.Visible           = 'on';
-                btnPickY.Visible           = 'on';
-                btnYTranslate.Visible      = 'off';
-                btnAutoPeak.Visible        = 'off';
-                btnManualPeak.Visible      = 'off';
-                btnRemovePeakClick.Visible = 'off';
-                btnPeakWindow.Visible      = 'off';
-                appData.peakMode = 'none';
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 210};
-                % Hide asymmetry; respect BG file collapse state; show mag section
-                corrGL.RowHeight{CROW.BGFILE}  = bgFileH;
-                corrGL.RowHeight{CROW.BGSUBTR} = bgFileH;
-                corrGL.RowHeight{CROW.ASYM1}   = 0;
-                corrGL.RowHeight{CROW.ASYM2}   = 0;
-                showMagSection(true);
-
-            case {'importNCNRDat', 'importNCNRRefl', 'importNCNRPNR'}
-                analysisPanel.Title = 'Analysis & Corrections  —  Neutron Reflectometry';
-                lblXOff.Text  = 'Q Offset:';
-                efXOffset.Tooltip = 'Q-offset: Q_corrected = Q − this value  (0 = no shift)';
-                lblYOff.Text  = 'R Scale:';
-                efYOffset.Tooltip = 'R scale factor: R_corrected = R × this value  (1.0 = no change)';
-                for hh = {efXOffset, efYOffset, btnApply, btnReset, btnApplyAll, btnUndo, ...
-                          efXTrimMin, efXTrimMax, ddNormalize}
-                    hh{1}.Enable = 'on'; %#ok<FXSET>
-                end
-                for hh = {efBGSlope, efBGIntercept, cbSmooth, efSmoothWin, ddSmoothMethod, cbSmoothPreview}
-                    hh{1}.Enable = 'off'; %#ok<FXSET>
-                end
-                lblBGSlope.Text = 'BG Slope:';
-                lblBGInt.Text   = 'BG Intercept:';
-                btnFitBG.Visible           = 'off';
-                btnPickY.Visible           = 'off';
-                btnYTranslate.Visible      = 'off';
-                btnAutoPeak.Visible        = 'off';
-                btnManualPeak.Visible      = 'off';
-                btnRemovePeakClick.Visible = 'off';
-                btnPeakWindow.Visible      = 'off';
-                btnApply.Tooltip = 'Apply Q offset / R scale, trim, and normalization to all polarizations from the same measurement';
-                % Peak window mode — reflectometry
-                appData.peakMode = 'reflectometry';
-                configurePeakWindowForMode('reflectometry');
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 210};
-                % Hide BG file rows; asymmetry is now in Advanced Analysis popup
-                corrGL.RowHeight{CROW.BGFILE}  = 0;
-                corrGL.RowHeight{CROW.BGSUBTR} = 0;
-                corrGL.RowHeight{CROW.ASYM1}   = 0;
-                corrGL.RowHeight{CROW.ASYM2}   = 0;
-                % Hide magnetometry section (not applicable to neutron)
-                showMagSection(false);
-
-            case 'importSIMS'
-                analysisPanel.Title   = 'Analysis & Corrections  —  SIMS Depth Profile';
-                lblXOff.Text          = 'Depth Offset (nm):';
-                efXOffset.Tooltip     = 'Depth offset: depth_corrected = depth − this value  (0 = no shift)';
-                lblYOff.Text          = 'Conc. Floor:';
-                efYOffset.Tooltip     = 'Concentration floor subtracted from all values  (0 = no shift)';
-                lblBGSlope.Text       = 'BG Slope:';
-                lblBGInt.Text         = 'BG Intercept:';
-                for hh = {efXOffset, efYOffset, btnApply, btnReset, btnApplyAll, btnUndo, ...
-                          cbSmooth, efSmoothWin, ddSmoothMethod, cbSmoothPreview, ...
-                          efXTrimMin, efXTrimMax, ddNormalize}
-                    hh{1}.Enable = 'on'; %#ok<FXSET>
-                end
-                for hh = {efBGSlope, efBGIntercept}
-                    hh{1}.Enable = 'off'; %#ok<FXSET>
-                end
-                btnFitBG.Visible           = 'off';
-                btnPickY.Visible           = 'off';
-                btnYTranslate.Visible      = 'off';
-                btnAutoPeak.Visible        = 'off';
-                btnManualPeak.Visible      = 'off';
-                btnRemovePeakClick.Visible = 'off';
-                btnPeakWindow.Visible      = 'off';
-                appData.peakMode = 'none';
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 210};
-                % Hide asymmetry; respect BG file collapse state
-                corrGL.RowHeight{CROW.BGFILE}  = bgFileH;
-                corrGL.RowHeight{CROW.BGSUBTR} = bgFileH;
-                corrGL.RowHeight{CROW.ASYM1}   = 0;
-                corrGL.RowHeight{CROW.ASYM2}   = 0;
-                % Hide magnetometry section (not applicable to SIMS)
-                showMagSection(false);
-
-            otherwise  % importCSV, importExcel, unknown — generic labels
-                % Re-enable controls for non-neutron case
-                for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
-                          btnApply, btnReset, btnApplyAll, btnUndo, ...
-                          cbSmooth, efSmoothWin, ddSmoothMethod, cbSmoothPreview, ...
-                          efXTrimMin, efXTrimMax, ddNormalize}
-                    hh{1}.Enable = 'on'; %#ok<FXSET>
-                end
-                analysisPanel.Title   = 'Analysis & Corrections';
-                lblXOff.Text          = 'X Offset:';
-                efXOffset.Tooltip     = 'X-offset: x_corrected = x − this value  (0 = no shift)';
-                lblYOff.Text          = 'Y Offset:';
-                efYOffset.Tooltip     = 'Y-offset: applied after BG subtraction  (0 = no shift)';
-                lblBGSlope.Text       = 'BG Slope:';
-                efBGSlope.Tooltip     = 'Linear BG slope m: y_BG = m·x + b  (0 = no BG subtraction)';
-                lblBGInt.Text         = 'BG Intercept:';
-                efBGIntercept.Tooltip = 'Linear BG intercept b: y_BG = m·x + b  (0 = no BG subtraction)';
-                btnFitBG.Visible           = 'on';
-                btnPickY.Visible           = 'on';
-                btnYTranslate.Visible      = 'off';
-                btnAutoPeak.Visible        = 'off';
-                btnManualPeak.Visible      = 'off';
-                btnRemovePeakClick.Visible = 'off';
-                btnPeakWindow.Visible      = 'off';
-                appData.peakMode = 'none';
-                analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 210};
-                % Hide asymmetry; respect BG file collapse state
-                corrGL.RowHeight{CROW.BGFILE}  = bgFileH;
-                corrGL.RowHeight{CROW.BGSUBTR} = bgFileH;
-                corrGL.RowHeight{CROW.ASYM1}   = 0;
-                corrGL.RowHeight{CROW.ASYM2}   = 0;
-                % Hide magnetometry section for generic data
-                showMagSection(false);
-        end
-
-        % ── Hide peak window when switching to a non-peak mode ───────────
-        if strcmp(appData.peakMode, 'none') && isvalid(peakFig)
-            peakFig.Visible = 'off';
-        end
-
-        % ── 2D area-detector override (applied after the switch) ─────────
-        % When the active dataset contains a 2D map, hide the peak/map and
-        % corrections (not meaningful for raw intensity maps) and show the
-        % map2D controls instead.
-        is2D_active = appData.activeIdx >= 1 && ~isempty(appData.datasets) && ...
-                      is2DDataset(appData.datasets{appData.activeIdx});
-        if is2D_active
-            map2DPanel.Visible = 'on';
-            analysisGL.ColumnWidth = {appData.corrPanelWidth, '1x', '2x', 180};
-            % Hide the data table — 1D projection rows are not useful in 2D
-            % map mode and the panel wastes space that the axes or map panel
-            % could use.  Let the Axes panel expand to fill both rows.
-            dataTablePanel.Visible   = 'off';
-            axLimPanel.Layout.Row    = [1 2];
-            % Disable all corrections — not meaningful for raw 2D maps
-            for hh = {efXOffset, efYOffset, efBGSlope, efBGIntercept, ...
-                      btnApply, btnReset, btnApplyAll, btnUndo, ...
-                      cbSmooth, efSmoothWin, ddSmoothMethod, cbSmoothPreview, ...
-                      efXTrimMin, efXTrimMax, ddNormalize}
-                hh{1}.Enable = 'off'; %#ok<FXSET>
-            end
-            btnFitBG.Visible           = 'off';
-            btnPickY.Visible           = 'off';
-            btnYTranslate.Visible      = 'off';
-            btnAutoPeak.Visible        = 'off';
-            btnManualPeak.Visible      = 'off';
-            btnRemovePeakClick.Visible = 'off';
-            btnPeakWindow.Visible      = 'off';
-            if isvalid(peakFig), peakFig.Visible = 'off'; end
-            analysisPanel.Title = 'Analysis  —  XRD 2D Map';
-        else
-            map2DPanel.Visible = 'off';
-            % Restore the data table and axes panel to normal 1D layout
-            dataTablePanel.Visible   = 'on';
-            axLimPanel.Layout.Row    = 1;
-        end
-
-        % Sync undo/redo button state after layout changes (enable flags above
-        % may have overridden the UndoManager-managed state for btnUndo).
-        updateUndoButtons();
+    %APPLYPARSERANALYSISCONFIG  Delegate to extracted +bosonPlotter module.
+        bosonPlotter.applyParserAnalysisConfig(pName, appData, ui, CROW, peakFig, apacCb_);
     end
 
     function pName = resolvedCorrStyle()
@@ -5616,212 +5351,8 @@ function varargout = BosonPlotter(options)
     end
 
     function onApplyCorrections(~,~)
-        if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data');
-            return;
-        end
-        ds       = appData.datasets{appData.activeIdx};
-        % 2D datasets have corrections disabled in the UI — skip the full
-        % struct copy (corrData = d) that would otherwise double memory.
-        if is2DDataset(ds), return; end
-        d        = ds.data;
-        xOff     = efXOffset.Value;
-        yOff     = efYOffset.Value;
-        bgSlope  = efBGSlope.Value;
-        bgIntcpt = efBGIntercept.Value;
-
-        % ════════════════════════════════════════════════════════════════
-        %  Save undo state before applying new corrections
-        % ════════════════════════════════════════════════════════════════
-        undoState.corrData       = ds.corrData;
-        undoState.mask           = guiTernary(isfield(ds,'mask'), ds.mask, true(size(ds.data.time)));
-        undoState.xOff           = ds.xOff;
-        undoState.yOff           = ds.yOff;
-        undoState.bgSlope        = ds.bgSlope;
-        undoState.bgInt          = ds.bgInt;
-        undoState.bgPoly         = guiTernary(isfield(ds,'bgPoly'), ds.bgPoly, []);
-        undoState.smoothEnabled  = ds.smoothEnabled;
-        undoState.smoothWindow   = ds.smoothWindow;
-        undoState.smoothMethod   = ds.smoothMethod;
-        undoState.xTrimMin       = ds.xTrimMin;
-        undoState.xTrimMax       = ds.xTrimMax;
-        undoState.normMethod     = ds.normMethod;
-        if isfield(ds, 'derivativeMode')
-            undoState.derivativeMode = ds.derivativeMode;
-        else
-            undoState.derivativeMode = 'None';
-        end
-        % Magnetometry undo fields
-        undoState.sampleMass  = guiTernary(isfield(ds,'sampleMass'),  ds.sampleMass,  0);
-        undoState.sampleWidth = guiTernary(isfield(ds,'sampleWidth'), ds.sampleWidth, 0);
-        undoState.sampleHeight= guiTernary(isfield(ds,'sampleHeight'),ds.sampleHeight,0);
-        undoState.dimUnit     = guiTernary(isfield(ds,'dimUnit'),     ds.dimUnit,     'mm');
-        undoState.sampleThick = guiTernary(isfield(ds,'sampleThick'), ds.sampleThick, 0);
-        undoState.thickUnit   = guiTernary(isfield(ds,'thickUnit'),   ds.thickUnit,   'nm');
-        undoState.momentUnit  = guiTernary(isfield(ds,'momentUnit'),  ds.momentUnit,  'emu');
-        undoState.fieldUnit   = guiTernary(isfield(ds,'fieldUnit'),   ds.fieldUnit,   'Oe');
-        undoState.unitSystem  = guiTernary(isfield(ds,'unitSystem'),  ds.unitSystem,  'CGS');
-        % Multi-level undo stack (#13): push onto stack, cap at 5
-        if ~isfield(ds, 'undoStack') || ~iscell(ds.undoStack)
-            ds.undoStack = {};
-        end
-        ds.undoStack{end+1} = undoState;
-        if numel(ds.undoStack) > 5
-            ds.undoStack = ds.undoStack(end-4:end);
-        end
-        ds.undoState = undoState;  % keep single-state for backward compat
-
-        % ════════════════════════════════════════════════════════════════
-        %  Apply corrections via extracted pipeline
-        % ════════════════════════════════════════════════════════════════
-        xTrimMin = str2num_trim(efXTrimMin.Value);
-        xTrimMax = str2num_trim(efXTrimMax.Value);
-        sampleVol = 0;
-        isMag = ismember(guiTernary(isfield(ds,'parserName'), ds.parserName, ''), ...
-                {'importQDVSM','importPPMS','importMPMS','importLakeShore'});
-        if isMag
-            sampleVol = magSampleVolume_cm3();
-        end
-        uiVals = struct('xOff', xOff, 'yOff', yOff, ...
-            'bgSlope', bgSlope, 'bgInt', bgIntcpt, ...
-            'xTrimMin', xTrimMin, 'xTrimMax', xTrimMax, ...
-            'smoothEnabled', cbSmooth.Value, ...
-            'smoothWindow', efSmoothWin.Value, ...
-            'smoothMethod', ddSmoothMethod.Value, ...
-            'normMethod', ddNormalize.Value, ...
-            'derivativeMode', ddDerivative.Value, ...
-            'fieldUnit', ddFieldUnit.Value, ...
-            'momentUnit', ddMomentUnit.Value, ...
-            'sampleMass', efSampleMass.Value, ...
-            'sampleVolume', sampleVol);
-        corrParams = bosonPlotter.correctionParams(ds, uiVals);
-        bgArgs = {};
-        if cbSubtractBG.Value && ~isempty(appData.bgDataset)
-            bgArgs = {'BgDataset', appData.bgDataset, ...
-                      'BgInterp', ddBGInterp.Value};
-        end
-        corrData = bosonPlotter.applyCorrections(d, corrParams, bgArgs{:});
-
-        ds.corrData      = corrData;
-        ds.xOff          = xOff;
-        ds.yOff          = yOff;
-        ds.bgSlope       = bgSlope;
-        ds.bgInt         = bgIntcpt;
-        % bgPoly already set on ds by onBGMouseUp; preserve it here (don't overwrite)
-        ds.smoothEnabled = cbSmooth.Value;
-        ds.smoothWindow  = efSmoothWin.Value;
-        ds.smoothMethod  = ddSmoothMethod.Value;
-        ds.xTrimMin      = xTrimMin;
-        ds.xTrimMax      = xTrimMax;
-        ds.normMethod      = ddNormalize.Value;
-        ds.derivativeMode  = ddDerivative.Value;
-        % Magnetometry sample parameters
-        ds.sampleMass    = efSampleMass.Value;
-        ds.sampleWidth   = efSampleWidth.Value;
-        ds.sampleHeight  = efSampleHeight.Value;
-        ds.dimUnit       = ddDimUnit.Value;
-        ds.sampleThick   = efSampleThick.Value;
-        ds.thickUnit     = ddThickUnit.Value;
-        ds.momentUnit    = ddMomentUnit.Value;
-        ds.fieldUnit     = ddFieldUnit.Value;
-        ds.unitSystem    = ddUnitSystem.Value;
-        appData.datasets{appData.activeIdx} = ds;
-
-        % ════════════════════════════════════════════════════════════════
-        %  Cross-polarization propagation (neutron data only)
-        %  Apply same corrections to all datasets sharing the same source
-        %  file (matched by stripping polarization suffixes).
-        % ════════════════════════════════════════════════════════════════
-        if isfield(ds, 'parserName') && isNeutronParser(ds.parserName)
-            activeBase = neutronBaseName(ds.filepath);
-            normVal    = ddNormalize.Value;
-            for pki = 1:numel(appData.datasets)
-                if pki == appData.activeIdx, continue; end
-                pds = appData.datasets{pki};
-                if ~isfield(pds, 'parserName') || ~isNeutronParser(pds.parserName)
-                    continue;
-                end
-                if ~strcmp(neutronBaseName(pds.filepath), activeBase)
-                    continue;
-                end
-                % Save undo state for this sibling
-                pUndo.corrData      = pds.corrData;
-                pUndo.xOff          = pds.xOff;
-                pUndo.yOff          = pds.yOff;
-                pUndo.bgSlope       = pds.bgSlope;
-                pUndo.bgInt         = pds.bgInt;
-                pUndo.smoothEnabled = pds.smoothEnabled;
-                pUndo.smoothWindow  = pds.smoothWindow;
-                pUndo.smoothMethod  = pds.smoothMethod;
-                pUndo.xTrimMin      = pds.xTrimMin;
-                pUndo.xTrimMax      = pds.xTrimMax;
-                pUndo.normMethod    = pds.normMethod;
-                pds.undoState       = pUndo;
-                % Apply same correction pipeline via extracted function
-                pUiVals = struct('xOff', xOff, 'yOff', yOff, ...
-                    'bgSlope', 0, 'bgInt', 0, ...
-                    'xTrimMin', xTrimMin, 'xTrimMax', xTrimMax, ...
-                    'smoothEnabled', false, 'smoothWindow', 5, ...
-                    'smoothMethod', 'Moving', ...
-                    'normMethod', normVal, 'derivativeMode', 'None', ...
-                    'fieldUnit', 'Oe', 'momentUnit', 'emu');
-                pParams = bosonPlotter.correctionParams(pds, pUiVals);
-                pCorr = bosonPlotter.applyCorrections(pds.data, pParams);
-                pds.corrData   = pCorr;
-                pds.xOff       = xOff;
-                pds.yOff       = yOff;
-                pds.bgSlope    = 0;
-                pds.bgInt      = 0;
-                pds.xTrimMin   = xTrimMin;
-                pds.xTrimMax   = xTrimMax;
-                pds.normMethod = normVal;
-                appData.datasets{pki} = pds;
-            end
-        end
-
-        % Auto-set the save path for the active dataset
-        [fpath, fname, ~] = fileparts(ds.filepath);
-        efSavePath.Value = fullfile(fpath, [fname, '_corrected.csv']);
-
-        % Reset dirty-state indicator on Apply button
-        btnApply.Text      = 'Apply Corrections';
-        btnApply.FontColor = BTN_FG;
-
-        % Record correction parameters in macro
-        recordAction(sprintf("%% Apply corrections: XOff=%.6g YOff=%.6g BGSlope=%.6g BGInt=%.6g Smooth=%s Norm=%s Deriv=%s", ...
-            xOff, yOff, bgSlope, bgIntcpt, ...
-            string(cbSmooth.Value), ddNormalize.Value, ddDerivative.Value));
-
-        % ── Push UndoManager entry for unlimited undo/redo ───────────────
-        % undoState (prevState) captured above; build newState from the
-        % just-applied values so Redo can re-apply the same correction.
-        newState.corrData       = ds.corrData;
-        newState.mask           = guiTernary(isfield(ds,'mask'), ds.mask, true(size(ds.data.time)));
-        newState.xOff           = ds.xOff;
-        newState.yOff           = ds.yOff;
-        newState.bgSlope        = ds.bgSlope;
-        newState.bgInt          = ds.bgInt;
-        newState.bgPoly         = guiTernary(isfield(ds,'bgPoly'), ds.bgPoly, []);
-        newState.smoothEnabled  = ds.smoothEnabled;
-        newState.smoothWindow   = ds.smoothWindow;
-        newState.smoothMethod   = ds.smoothMethod;
-        newState.xTrimMin       = ds.xTrimMin;
-        newState.xTrimMax       = ds.xTrimMax;
-        newState.normMethod     = ds.normMethod;
-        newState.derivativeMode = ds.derivativeMode;
-        newState.sampleMass     = guiTernary(isfield(ds,'sampleMass'),  ds.sampleMass,  0);
-        newState.sampleWidth    = guiTernary(isfield(ds,'sampleWidth'), ds.sampleWidth, 0);
-        newState.sampleHeight   = guiTernary(isfield(ds,'sampleHeight'),ds.sampleHeight,0);
-        newState.dimUnit        = guiTernary(isfield(ds,'dimUnit'),     ds.dimUnit,     'mm');
-        newState.sampleThick    = guiTernary(isfield(ds,'sampleThick'), ds.sampleThick, 0);
-        newState.thickUnit      = guiTernary(isfield(ds,'thickUnit'),   ds.thickUnit,   'nm');
-        newState.momentUnit     = guiTernary(isfield(ds,'momentUnit'),  ds.momentUnit,  'emu');
-        newState.fieldUnit      = guiTernary(isfield(ds,'fieldUnit'),   ds.fieldUnit,   'Oe');
-        newState.unitSystem     = guiTernary(isfield(ds,'unitSystem'),  ds.unitSystem,  'CGS');
-        activeIdxAtPush = appData.activeIdx;
-        pushUndoCorrectionEntry(activeIdxAtPush, undoState, newState, 'Apply Corrections');
-
-        onPlot([],[]);
+    %ONAPPLYCORRECTIONS  Delegate to extracted +bosonPlotter module.
+        bosonPlotter.onApplyCorrections(appData, ui, corrCb_);
     end
 
     function markCorrectionsDirty()
@@ -12083,166 +11614,8 @@ function varargout = BosonPlotter(options)
     % ── Plot Templates ─────────────────────────────────────────────────
 
     function onPlotTemplates(~,~)
-    %ONPLOTTEMPLATES  Save or load plot formatting presets.
-        if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a file first.', 'No data'); return;
-        end
-
-        tplFig = uifigure('Name', 'Plot Templates', 'Position', [350 300 360 260], 'Resize', 'off');
-        tplGL = uigridlayout(tplFig, [4 2], ...
-            'RowHeight', {30, 30, 30, '1x'}, 'ColumnWidth', {'1x', '1x'}, ...
-            'Padding', [15 15 15 15], 'RowSpacing', 10);
-
-        uibutton(tplGL, 'Text', 'Save Template...', ...
-            'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
-            'FontWeight', 'bold', ...
-            'ButtonPushedFcn', @(~,~) doSaveTemplate());
-        uibutton(tplGL, 'Text', 'Load Template...', ...
-            'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
-            'FontWeight', 'bold', ...
-            'ButtonPushedFcn', @(~,~) doLoadTemplate());
-
-        uibutton(tplGL, 'Text', 'Delete Template...', ...
-            'ButtonPushedFcn', @(~,~) doDeleteTemplate());
-        uibutton(tplGL, 'Text', 'Cancel', ...
-            'ButtonPushedFcn', @(~,~) delete(tplFig));
-
-        btnBatchApply = uibutton(tplGL, 'Text', 'Batch Apply...', ...
-            'BackgroundColor', [0.18 0.55 0.34], 'FontColor', BTN_FG, ...
-            'FontWeight', 'bold', ...
-            'Tooltip', 'Apply a saved template to a folder of files (import + correct + export CSV)', ...
-            'ButtonPushedFcn', @(~,~) doBatchApplyTemplate());
-        btnBatchApply.Layout.Row = 3; btnBatchApply.Layout.Column = [1 2];
-
-        lblInfo = uilabel(tplGL, 'Text', ...
-            ['Templates save corrections, normalization, labels, and scale settings. ' ...
-             'Use "Batch Apply" to process a folder of files with the same pipeline.'], ...
-            'WordWrap', 'on', 'FontSize', 9, 'FontColor', [0.4 0.4 0.4]);
-        lblInfo.Layout.Row = 4; lblInfo.Layout.Column = [1 2];
-
-        bosonPlotter.applyDialogTheme(tplFig, appData.theme);
-
-        function doSaveTemplate()
-            [fname, fpath] = uiputfile('*.mat', 'Save Plot Template');
-            if isequal(fname, 0), return; end
-
-            ds = appData.datasets{appData.activeIdx};
-            tpl = struct();
-            % Axis limits
-            tpl.xMin = efXMin.Value; tpl.xMax = efXMax.Value; tpl.xStep = efXStep.Value;
-            tpl.yMin = efYMin.Value; tpl.yMax = efYMax.Value; tpl.yStep = efYStep.Value;
-            % Corrections
-            tpl.xOff = ds.xOff; tpl.yOff = ds.yOff;
-            tpl.bgSlope = ds.bgSlope; tpl.bgInt = ds.bgInt;
-            tpl.smoothEnabled = ds.smoothEnabled;
-            tpl.smoothWindow = ds.smoothWindow;
-            tpl.smoothMethod = ds.smoothMethod;
-            tpl.normMethod = ds.normMethod;
-            tpl.derivativeMode = ds.derivativeMode;
-            tpl.xTrimMin = ds.xTrimMin; tpl.xTrimMax = ds.xTrimMax;
-            % Labels
-            tpl.plotTitle = efPlotTitle.Value;
-            tpl.xLabel = efXLabel.Value;
-            tpl.yLabel = efYLabel.Value;
-            % Scale
-            tpl.xScale = ax.XScale;
-            tpl.yScale = ax.YScale;
-            % Tick format
-            tpl.xTickFormat = ddXTickFmt.Value;
-            tpl.yTickFormat = ddYTickFmt.Value;
-
-            save(fullfile(fpath, fname), '-struct', 'tpl');
-            setStatus(sprintf('Template saved: %s', fname));
-        end
-
-        function doLoadTemplate()
-            [fname, fpath] = uigetfile('*.mat', 'Load Plot Template');
-            if isequal(fname, 0), return; end
-
-            tpl = load(fullfile(fpath, fname));
-            ds = appData.datasets{appData.activeIdx};
-
-            % Apply corrections
-            if isfield(tpl, 'xOff'), efXOffset.Value = tpl.xOff; ds.xOff = tpl.xOff; end
-            if isfield(tpl, 'yOff'), efYOffset.Value = tpl.yOff; ds.yOff = tpl.yOff; end
-            if isfield(tpl, 'bgSlope'), efBGSlope.Value = tpl.bgSlope; ds.bgSlope = tpl.bgSlope; end
-            if isfield(tpl, 'bgInt'), efBGIntercept.Value = tpl.bgInt; ds.bgInt = tpl.bgInt; end
-            if isfield(tpl, 'smoothEnabled'), cbSmooth.Value = tpl.smoothEnabled; ds.smoothEnabled = tpl.smoothEnabled; end
-            if isfield(tpl, 'smoothWindow'), efSmoothWin.Value = tpl.smoothWindow; ds.smoothWindow = tpl.smoothWindow; end
-            if isfield(tpl, 'smoothMethod'), ddSmoothMethod.Value = tpl.smoothMethod; ds.smoothMethod = tpl.smoothMethod; end
-            if isfield(tpl, 'normMethod'), ddNormalize.Value = tpl.normMethod; ds.normMethod = tpl.normMethod; end
-            if isfield(tpl, 'derivativeMode'), ddDerivative.Value = tpl.derivativeMode; ds.derivativeMode = tpl.derivativeMode; end
-            if isfield(tpl, 'xTrimMin') && ~isnan(tpl.xTrimMin), efXTrimMin.Value = num2str(tpl.xTrimMin); end
-            if isfield(tpl, 'xTrimMax') && ~isnan(tpl.xTrimMax), efXTrimMax.Value = num2str(tpl.xTrimMax); end
-
-            % Apply axis limits
-            if isfield(tpl, 'xMin'), efXMin.Value = tpl.xMin; end
-            if isfield(tpl, 'xMax'), efXMax.Value = tpl.xMax; end
-            if isfield(tpl, 'xStep'), efXStep.Value = tpl.xStep; end
-            if isfield(tpl, 'yMin'), efYMin.Value = tpl.yMin; end
-            if isfield(tpl, 'yMax'), efYMax.Value = tpl.yMax; end
-            if isfield(tpl, 'yStep'), efYStep.Value = tpl.yStep; end
-
-            % Apply labels
-            if isfield(tpl, 'plotTitle'), efPlotTitle.Value = tpl.plotTitle; end
-            if isfield(tpl, 'xLabel'), efXLabel.Value = tpl.xLabel; end
-            if isfield(tpl, 'yLabel'), efYLabel.Value = tpl.yLabel; end
-
-            % Apply tick formats
-            if isfield(tpl, 'xTickFormat'), ddXTickFmt.Value = tpl.xTickFormat; end
-            if isfield(tpl, 'yTickFormat'), ddYTickFmt.Value = tpl.yTickFormat; end
-
-            appData.datasets{appData.activeIdx} = ds;
-
-            % Re-apply corrections and replot
-            onApplyCorrections([],[]);
-            setStatus(sprintf('Template loaded: %s', fname));
-            delete(tplFig);
-        end
-
-        function doDeleteTemplate()
-            [fname, fpath] = uigetfile('*.mat', 'Delete Plot Template');
-            if isequal(fname, 0), return; end
-            delete(fullfile(fpath, fname));
-            setStatus(sprintf('Template deleted: %s', fname));
-        end
-
-        function doBatchApplyTemplate()
-        %DOBATCHAPPLYTEMPLATE  Pick a template + folder, run analysis pipeline.
-            % Select template
-            [tplName, tplPath] = uigetfile('*.mat', 'Select Template to Apply');
-            if isequal(tplName, 0), return; end
-            tplFile = fullfile(tplPath, tplName);
-
-            % Select input folder
-            inputDir = uigetdir(startDir, 'Select folder of data files');
-            if isequal(inputDir, 0), return; end
-
-            % Select output folder
-            outputDir = uigetdir(inputDir, 'Select output folder for corrected CSVs');
-            if isequal(outputDir, 0), return; end
-
-            setStatus('Batch applying template...');
-            delete(tplFig);
-            drawnow;
-
-            try
-                res = scripts.applyAnalysisTemplate(tplFile, inputDir, ...
-                    'OutputDir', outputDir, 'Recursive', true, ...
-                    'ExportCSV', true, 'ExportPeaks', false);
-                nOk  = sum(cellfun(@isempty, {res.error}));
-                nErr = numel(res) - nOk;
-                msg = sprintf('Batch complete: %d processed, %d failed.\nOutput: %s', ...
-                    nOk, nErr, outputDir);
-                setStatus(sprintf('Batch template: %d ok, %d failed', nOk, nErr));
-                uialert(fig, msg, 'Batch Apply Complete');
-            catch ME
-                setStatus('Batch apply failed.');
-                logGUIError('Batch Apply Error', ME.message, ME);
-                uialert(fig, sprintf('Batch apply failed:\n%s', ME.message), ...
-                    'Batch Apply Error');
-            end
-        end
+    %ONPLOTTEMPLATES  Delegate to extracted +bosonPlotter module.
+        bosonPlotter.plotTemplates(appData, fig, ui, ptCb_);
     end
 
     % ── Batch Figure Export ────────────────────────────────────────────
