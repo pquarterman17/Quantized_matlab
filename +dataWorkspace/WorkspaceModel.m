@@ -198,6 +198,23 @@ classdef WorkspaceModel < handle
             end
         end
 
+        function updateDataset(obj, idx, ds)
+        %UPDATEDATASET  Replace a dataset struct in-place and fire DataChanged.
+        %
+        %   model.updateDataset(idx, ds)
+        %
+        %   Use this instead of `model.datasets{idx} = ds` (which would fail
+        %   because datasets has SetAccess=private).
+            arguments
+                obj (1,1) dataWorkspace.WorkspaceModel
+                idx (1,1) double {mustBePositive, mustBeInteger}
+                ds  (1,1) struct
+            end
+            obj.validateDatasetIndex(idx);
+            obj.datasets{idx} = ds;
+            notify(obj, 'DataChanged');
+        end
+
         function setMask(obj, idx, maskVec)
         %SETMASK  Set the row mask for dataset idx and fire MaskChanged.
         %
