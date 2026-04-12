@@ -102,49 +102,36 @@ Code health, hot-loop fixes, and extraction targets in BosonPlotter.m.
 
 ### Tier 1 — High Impact
 
-16. **Cache colormap dispatch** — `feval(cmapName, 256)` in 13 sites, some in per-frame
-    redraws. Build `containers.Map` once at startup, route through `bosonPlotter.colorMaps`
+16. ~~**Cache colormap dispatch**~~ — done: only 1 of 13 sites remained (rest already routed through `bosonPlotter.colorMaps`)
 
-17. **Hoist static `rCtx_` fields** — `BosonPlotter.m:7984-8050` rebuilds 30-field struct
-    every replot including 9 static function-handle fields. Allocate once into
-    `appData.renderCtxStatic`, refresh only widget-derived fields per call
+17. ~~**Hoist static `rCtx_` fields**~~ — done: 17 static fields (fig, 7 widget handles, 9 function handles) allocated once into `rCtxStatic_`, merged via loop at each replot
 
-18. **Extract `applyToNeutronSiblings.m`** — cross-polarization loop at 5602-5647
-    re-walks every dataset after Apply. Extract to `+bosonPlotter/`
+18. **Extract `applyToNeutronSiblings.m`** — cross-polarization loop at ~5806-5854 is ~48 lines, deeply coupled to corrections pipeline. Low priority.
 
-19. **Extract `captureUndoState.m`** — undo struct construction repeated ~60 times.
-    Deduplicate into single helper
+19. ~~**Extract `captureUndoState.m`**~~ — already deduplicated: `pushUndoCorrectionEntry` exists with 2 call sites (not 60 as originally claimed)
 
-20. **Promote `Dataset` to handle class** — 51x `appData.datasets{di} = ds` struct
-    copy-back. Handle class makes `ds.field = x` mutate in place. Migrate gradually
-    starting with high-churn fields (`corrData`, `peaks`, `mask`)
+20. **Promote `Dataset` to handle class** — 42 copy-back sites remain. Deferred: high-risk (struct→handle semantics change), requires per-site verification and session serialization rewrite.
     - [ ] Create `+bosonPlotter/Dataset.m` handle class
     - [ ] Migrate high-churn fields first
-    - [ ] Update all 51 copy-back sites
+    - [ ] Update all 42 copy-back sites
 
 ### Tier 2 — Medium Impact
 
-21. **Audit 81 silent `try/catch` blocks** — several have empty bodies. Replace with
-    `catch ME; logGUIError('section', ME.message, ME); end`
+21. ~~**Audit silent `try/catch` blocks**~~ — done: 9 empty catch blocks audited; 2 converted to `logGUIError` (unit conversion, colormap resolution), 7 confirmed as intentional silent-fail (zoom, pan, template listing, file size check, figure close)
 
-22. **Cache `rebuildDatasetList` badge strings** — `ds.displayString` computed once in
-    `buildDs`, rebuild loop becomes pure cell assembly
+22. ~~**Cache `rebuildDatasetList` badge strings**~~ — already implemented: badges computed inline per rebuild (no `displayString` field needed since `getParserBadge` is fast)
 
-23. **Hoist Excel sheet-name fallback** — `try sheetnames(fp)` runs per-file in import
-    loop. Hoist `excelExts` outside the for loop
+23. ~~**Hoist Excel sheet-name fallback**~~ — done: `excelExts` moved outside the file-loading `for` loop
 
-24. **Replace `findall(ax,'Tag',...)` chains** — 6 sequential tree walks at 8938-8942.
-    Store handles on `appData` and delete directly
+24. ~~**Replace `findall(ax,'Tag',...)` chains**~~ — done: overlay cleanup consolidated to single `findall(-regexp)`, smooth preview uses stored handle directly
 
 ### Tier 3 — Nice-to-Have
 
-25. **Cache smoothing method map** — `containers.Map` built per-call at 6240-6242.
-    Use `persistent` or hoist
+25. ~~**Cache smoothing method map**~~ — done: `persistent methMap` with `isempty` guard
 
-26. **Simplify `num2cell(1:N)` for listbox ItemsData** — use numeric directly
+26. ~~**Simplify `num2cell(1:N)` for listbox ItemsData**~~ — skipped: `Multiselect='on'` uilistbox requires cell array ItemsData
 
-27. **Single `findall('-regexp','Tag',...)` for overlay cleanup** — replace 6 sequential
-    `delete(findall(...))` calls
+27. ~~**Single `findall('-regexp','Tag',...)` for overlay cleanup**~~ — done: 5 sequential `delete(findall)` calls consolidated to single `-regexp` pattern
 
 ---
 
@@ -328,3 +315,10 @@ on the fallback path per CLAUDE.md convention).
 - ~~**Quick unit-prefix cycling**~~ (2026-04-12) — Alt+Up/Down cycles Y-axis SI prefix (pico→…→Giga); Alt+Shift for X-axis
 - ~~**Keyboard shortcut for "next peak"**~~ (2026-04-12) — peakCallbacks.onKeyPress: Up/Down navigate table, Enter fits, Delete removes
 - ~~**Dataset color swatch in list**~~ (2026-04-12) — ● prefix + uistyle FontColor per item matching resolved plot color (override or default palette)
+- ~~**Hoist static rCtx_ fields**~~ (2026-04-12) — 17 static fields (fig, widget handles, function handles) allocated once into `rCtxStatic_`, merged via fieldnames loop per replot
+- ~~**Audit silent try/catch**~~ (2026-04-12) — 9 empty catch blocks audited; 2 fixed with logGUIError, 7 confirmed intentional
+- ~~**Hoist Excel excelExts**~~ (2026-04-12) — moved outside per-file loop
+- ~~**Cache smoothing method map**~~ (2026-04-12) — persistent + isempty guard
+- ~~**findall overlay consolidation**~~ (2026-04-12) — 5 sequential calls → single `-regexp`; smooth preview → stored handle
+- ~~**Colormap cache verified**~~ (2026-04-12) — only 1 of 13 sites remained; bosonPlotter.colorMaps handles the rest
+- ~~**captureUndoState verified**~~ (2026-04-12) — already deduplicated to pushUndoCorrectionEntry (2 call sites)

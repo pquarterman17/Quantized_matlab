@@ -2302,6 +2302,25 @@ function varargout = BosonPlotter(options)
     % ── Apply initial button styles ─────────────────────────────────────
     updateApplyButtonStyle();
 
+    % ── Static render context (allocated once, merged into rCtx_ each replot) ──
+    rCtxStatic_.fig                         = fig;
+    rCtxStatic_.efXMin                      = efXMin;
+    rCtxStatic_.efXMax                      = efXMax;
+    rCtxStatic_.efYMin                      = efYMin;
+    rCtxStatic_.efYMax                      = efYMax;
+    rCtxStatic_.efY2Min                     = efY2Min;
+    rCtxStatic_.efY2Max                     = efY2Max;
+    rCtxStatic_.axLimGL                     = axLimGL;
+    rCtxStatic_.draw2DMap                   = @draw2DMap;
+    rCtxStatic_.toggleY2Appearance          = @toggleY2Appearance;
+    rCtxStatic_.applyAxisPrefix             = @applyAxisPrefix;
+    rCtxStatic_.recreateFringeMarkers       = @recreateFringeMarkers;
+    rCtxStatic_.resolvedCorrStyle           = @resolvedCorrStyle;
+    rCtxStatic_.getColorsFromMap            = @getColorsFromMap;
+    rCtxStatic_.findPolarizationPairs       = @findPolarizationPairs;
+    rCtxStatic_.setStatus                   = @setStatus;
+    rCtxStatic_.logGUIError                 = @logGUIError;
+
     % ════════════════════════════════════════════════════════════════════
     %  PROGRAMMATIC API (for automated testing / scripting)
     % ════════════════════════════════════════════════════════════════════
@@ -2565,6 +2584,7 @@ function varargout = BosonPlotter(options)
         excelApplyAll    = false;   % true once user opts to reuse selection
         excelSavedSheets = {};      % remembered sheet indices (by name)
 
+        excelExts = {'.xlsx','.xls','.xlsm','.xlsb','.ods'};
         nLoaded = 0;
         for fi = 1:numel(fpaths)
             fp = fpaths{fi};
@@ -2577,7 +2597,6 @@ function varargout = BosonPlotter(options)
             drawnow limitrate;
 
             % ── Excel: offer sheet selection when file has multiple sheets ──
-            excelExts = {'.xlsx','.xls','.xlsm','.xlsb','.ods'};
             if any(strcmpi(fExt, excelExts))
                 try
                     allSheetNames = sheetnames(fp);
@@ -6483,9 +6502,12 @@ function varargout = BosonPlotter(options)
 
         win  = max(1, round(efSmoothWin.Value));
         % Map GUI dropdown labels to smoothData 'Method' values (lowercase)
-        methMap = containers.Map( ...
-            {'Moving','Gaussian','Savitzky-Golay'}, ...
-            {'moving','gaussian','savitzky-golay'});
+        persistent methMap
+        if isempty(methMap)
+            methMap = containers.Map( ...
+                {'Moving','Gaussian','Savitzky-Golay'}, ...
+                {'moving','gaussian','savitzky-golay'});
+        end
         methKey = ddSmoothMethod.Value;
         if isKey(methMap, methKey)
             methVal = methMap(methKey);
@@ -6507,7 +6529,9 @@ function varargout = BosonPlotter(options)
 
     function clearSmoothPreview()
     %CLEARSMOOTHPREVIEW  Delete the smooth preview overlay line if it exists.
-        delete(findall(ax, 'Tag', 'GUISmoothPreview'));
+        if isgraphics(appData.smoothPreviewLine)
+            delete(appData.smoothPreviewLine);
+        end
         appData.smoothPreviewLine = [];
     end
 
@@ -8105,25 +8129,11 @@ function varargout = BosonPlotter(options)
         rCtx_.customY2Label      = efCustomY2Label.Value;
         rCtx_.customTitle        = efCustomTitle.Value;
         rCtx_.isMainAx           = (targetAx == ax);
-        rCtx_.fig                = fig;
-        % Widget handles for bg-color validation feedback
-        rCtx_.efXMin             = efXMin;
-        rCtx_.efXMax             = efXMax;
-        rCtx_.efYMin             = efYMin;
-        rCtx_.efYMax             = efYMax;
-        rCtx_.efY2Min            = efY2Min;
-        rCtx_.efY2Max            = efY2Max;
-        rCtx_.axLimGL            = axLimGL;
-        % Function handles for callbacks that remain in BosonPlotter
-        rCtx_.draw2DMap                    = @draw2DMap;
-        rCtx_.toggleY2Appearance           = @toggleY2Appearance;
-        rCtx_.applyAxisPrefix              = @applyAxisPrefix;
-        rCtx_.recreateFringeMarkers        = @recreateFringeMarkers;
-        rCtx_.resolvedCorrStyle            = @resolvedCorrStyle;
-        rCtx_.getColorsFromMap             = @getColorsFromMap;
-        rCtx_.findPolarizationPairs        = @findPolarizationPairs;
-        rCtx_.setStatus                    = @setStatus;
-        rCtx_.logGUIError                  = @logGUIError;
+        % Merge static fields (widget handles + function handles, allocated once)
+        sf = fieldnames(rCtxStatic_);
+        for sfi = 1:numel(sf)
+            rCtx_.(sf{sfi}) = rCtxStatic_.(sf{sfi});
+        end
 
         bosonPlotter.renderPlot(targetAx, rCtx_);
     end
@@ -8156,7 +8166,8 @@ function varargout = BosonPlotter(options)
                 n = max(6, size(tpl.colors, 1));
                 tpl.colors = getColorsFromMap(cmapName, n);
             end
-        catch
+        catch ME
+            logGUIError('Colormap resolution', ME.message, ME);
         end
 
         appearance = bosonPlotter.resolveStyle(tpl, appData.styleOverrides);
@@ -9023,11 +9034,8 @@ function varargout = BosonPlotter(options)
 
     function onClearFitOverlays(~, ~)
     %ONCLEARFITOVERLAYS  Remove curve fit and peak decomposition overlays.
-        delete(findall(ax, 'Tag', 'curveFitOverlay'));
-        delete(findall(ax, 'Tag', 'curveFitLabel'));
-        delete(findall(ax, 'Tag', 'GUIPeakDecomp'));
-        delete(findall(ax, 'Tag', 'integrationShade'));
-        delete(findall(ax, 'Tag', 'integrationEdge'));
+        delete(findall(ax, '-regexp', 'Tag', ...
+            '^(curveFitOverlay|curveFitLabel|GUIPeakDecomp|integrationShade|integrationEdge)$'));
         setStatus('Fit overlays cleared');
     end
 
@@ -11663,7 +11671,8 @@ function varargout = BosonPlotter(options)
                 [d.time, newUnit] = utilities.convertUnits(d.time, fromUnit, toUnit);
                 d.metadata.xUnit = newUnit;
                 converted = true;
-            catch
+            catch ME
+                logGUIError('X-axis unit conversion', ME.message, ME);
             end
         end
         if converted
