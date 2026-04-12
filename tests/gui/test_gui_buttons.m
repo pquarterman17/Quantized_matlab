@@ -461,7 +461,7 @@ try
     api.reset(); drawnow;
     api.addFiles({XRDML, XRDML}); drawnow;
 
-    cbWf = findCheckboxByText(api.fig, 'WF');
+    cbWf = findCheckboxByText(api.fig, 'Waterfall');
     assert(~isempty(cbWf), 'Waterfall checkbox not found');
     assert(~cbWf.Value, 'Waterfall should start off');
 
@@ -487,7 +487,7 @@ try
     api.addFiles({XRDML, XRDML}); drawnow;
 
     % Enable waterfall first (auto-sets spacing)
-    cbWf = findCheckboxByText(api.fig, 'WF');
+    cbWf = findCheckboxByText(api.fig, 'Waterfall');
     assert(~isempty(cbWf), 'Waterfall checkbox not found');
     cbWf.Value = true;
     if ~isempty(cbWf.ValueChangedFcn), cbWf.ValueChangedFcn(cbWf, []); end
