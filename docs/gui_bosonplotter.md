@@ -60,11 +60,22 @@ The Figure Builder auto-detects separate upper/lower error columns (e.g., `dR+`/
 Collapsible panel below the plot axes. Toggle via the "▾ Data Table" bar.
 
 - **Full cell editing** — click any cell to modify values; edits stored in a working copy (original data untouched)
-- **Units row** — displays column units from the parser
+- **Units row** — displays column units from the parser; editable (does not affect data)
 - **Column stats** — row count, column count, masked point count in the toolbar
 - **Data masking** — select rows → "Mask Sel." to exclude from plot/analysis; "Unmask All" to restore
 - **Save As** — export working copy (with edits) to new CSV or Excel file; optionally exclude masked rows
 - **Auto-refresh** — table updates when switching datasets or applying corrections
+
+### tblUnits + tblData Split Architecture
+
+The data table panel is implemented as **two separate `uitable` widgets** stacked inside `dataTableInnerGL`:
+
+- `tblUnits` (row 4 of the inner grid) — a **1-row** editable table rendered with green text on a pale green background. Holds the unit strings for each column. Its `ColumnName` is always kept in sync with `tblData.ColumnName` and `ColumnWidth` is synchronised explicitly via `syncUnitsColumnWidths()` after every refresh.
+- `tblData` (row 5 of the inner grid) — the main **scrollable** data table. Its `Data` property is always a **pure numeric matrix** (never a cell array).
+
+**Why the split?** MATLAB's `uitable` renders approximately 10x slower on scroll events when `Data` is a cell array compared to a pure numeric matrix. Previously, the units row lived in row 1 of the single table's `Data` as a cell, which forced the entire `Data` property to be a cell array and caused visible scroll lag on datasets with hundreds of rows. Separating the units into their own fixed 1-row `tblUnits` keeps `tblData.Data` as a numeric matrix, eliminating the re-render cost on every scroll event.
+
+**Implementation note:** `tblUnits` is not scrollable and has a fixed height. It does not scroll horizontally on its own — horizontal scroll is handled by `tblData`. The column widths of both tables are kept in sync so the header and units row appear visually aligned.
 
 ## General Curve Fitting (Advanced > Curve Fit...)
 
@@ -120,6 +131,62 @@ For 2D XRDML area-detector data, the map panel includes: intensity scale (Linear
 - `configurePeakWindowForMode(mode)` shows/hides mode-specific buttons in the peak window.
 - `showPeakWindow()` refreshes the table and brings the window to front.
 - The main GUI's `analysisGL` column 3 is now width 0 by default (only used for `map2DPanel` in 2D mode).
+
+## Plot Style Dialog
+
+A modal editor for fine-grained visual control over the active plot. Open it from the main toolbar ("Style..." button) or programmatically via `api.openPlotStyle()`.
+
+### Style Precedence Cascade
+
+Every render resolves visual properties through a 4-layer cascade (lowest to highest priority):
+
+| Layer | Source | Written by |
+|-------|--------|------------|
+| 1 (lowest) | `template` — from `styles.template(name)` | Template dropdown in main GUI |
+| 2 | `globalOverrides` — sparse struct in `appData.styleOverrides` | Plot Style dialog → "Whole plot" scope |
+| 3 | `ds.styleOverride` — sparse struct per dataset | Plot Style dialog → "Active dataset" scope |
+| 4 (highest) | `ds.channelStyles{k}` — sparse struct per Y channel | Plot Style dialog → "Active channel" scope |
+
+"Sparse" means only explicitly changed fields are stored; all other fields pass through from the layer below unchanged. This lets you tweak a single property (e.g. line width) for one dataset without pinning every other visual property.
+
+The merge is performed by `bosonPlotter.resolveStyle` (template + global) followed by `bosonPlotter.applyDsOverride` (per-dataset + per-channel) in `renderPlot`. Post-draw axes-level properties (tick direction, grid, legend) are applied by `bosonPlotter.applyPostRenderStyle`.
+
+### Dialog Sections
+
+| Section | Controls |
+|---------|----------|
+| **Template** | Dropdown of built-in and user templates; "Save as…" to persist current values as a named user template (prefixed `user:` in the list); "Delete" to remove a user template |
+| **Typography** | Font face, axis font size, title font size, legend font size |
+| **Lines** | Line width (primary), line width (thin/secondary), line style (`-` / `--` / `:` / `-.` / `auto`), alpha |
+| **Markers** | Marker size, shape, face mode (outline / filled) |
+| **Axes** | Tick direction (in / out / both), box on/off, grid alpha, minor ticks, major tick length |
+| **Palette** | Colour cycle override (8 options: Template default, Tab10, Viridis, Plasma, Tol bright, Tol muted, Okabe-Ito, APS-like, Nature-like, Grayscale) |
+| **Legend** | Position, box on/off, font weight |
+
+### Palette Picker
+
+The Palette section overrides the dataset colour cycle independently of the main colormap dropdown (which controls waterfall / 2D gradient colours). Selecting "Template default" removes the override and falls back to the template's built-in colour set. Colour-blind-safe options are Tol bright (CB), Tol muted (CB), and Okabe-Ito (CB).
+
+### Apply-to Scope
+
+Three mutually exclusive radio buttons control which layer the Apply button writes to:
+
+- **Whole plot** — writes to `appData.styleOverrides` (layer 2 — affects all datasets)
+- **Active dataset** — writes to `ds.styleOverride` on the currently selected dataset (layer 3)
+- **Active channel** — writes to `ds.channelStyles{channelIdx}` for the first selected Y channel (layer 4)
+
+The **Reset** button clears all overrides in the selected scope and reverts to template defaults. **Apply** commits without closing. Closing the dialog discards any uncommitted changes.
+
+### Programmatic Access
+
+```matlab
+% Open the dialog from scripts / tests
+api.openPlotStyle()
+
+% Read or write global overrides directly
+overrides = api.getStyleOverrides();
+api.setStyleOverrides(struct('lineWidth', 2.0, 'fontSize', 14));
+```
 
 ## GUI Development Notes
 

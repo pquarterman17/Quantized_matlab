@@ -1,11 +1,36 @@
 function colors = colorMaps(colormapName, nColors)
 %COLORMAPS  Generate nColors from a named colormap (no GUI dependencies).
 %
-%   colors = bosonPlotter.colorMaps('viridis', 8)
-%   colors = bosonPlotter.colorMaps('jet', 12)
+% Syntax
+% ------
+%   colors = bosonPlotter.colorMaps(colormapName, nColors)
 %
-%   Supports all MATLAB built-in colormaps plus viridis, plasma, inferno.
-%   Returns [nColors × 3] RGB matrix.
+% Inputs
+% ------
+%   colormapName  (char) Name of the colormap. Supported values:
+%                   Built-in MATLAB colormaps: 'parula', 'hot', 'jet',
+%                     'turbo', 'gray', 'bone', 'copper', 'cool', 'spring',
+%                     'summer', 'autumn', 'winter', and any other name
+%                     accepted by feval(name, 256).
+%                   Custom perceptual colormaps: 'viridis', 'plasma', 'inferno'.
+%                   Special alias: 'lines (MATLAB default)' returns lines(nColors).
+%   nColors       (positive integer) Number of distinct colours to sample.
+%
+% Outputs
+% -------
+%   colors  [nColors×3] double — RGB values in [0, 1]. Sampled evenly
+%           across the full colormap range.
+%
+% Examples
+% --------
+%   % Get 8 colours from viridis for a waterfall plot
+%   c = bosonPlotter.colorMaps('viridis', 8);
+%   for k = 1:8
+%       plot(x, y(:,k), 'Color', c(k,:));
+%   end
+%
+%   % Jet colormap, 12 colours
+%   c = bosonPlotter.colorMaps('jet', 12);
 
     if strcmpi(colormapName, 'lines (MATLAB default)')
         colors = lines(nColors);

@@ -31,6 +31,10 @@ function result = multiPanel(datasets, options)
 %       YLabels     — cell array of Y-axis labels (one per panel, default: from data)
 %       FigureSize  — [width height] in cm (default: from template or auto)
 %       Residuals   — struct with .yFit for the first dataset (used in '2x1r' mode)
+%       Appearance  — pre-resolved style struct from bosonPlotter.resolveStyle
+%                     (default: empty struct → resolved from Template or screen default).
+%                     When non-empty, Template is ignored and this struct is used
+%                     directly. Back-fills figWidth_cm / figHeight_cm if absent.
 %
 %   Output (struct):
 %       .fig     — figure handle

@@ -42,7 +42,16 @@ function appearance = resolveStyle(template, globalOverrides, ds, channelIdx)
 %       a = bosonPlotter.resolveStyle(t, struct('lineWidth', 2.0));
 %       a = bosonPlotter.resolveStyle(t, [], ds, 2);         % per-channel
 %
-%   See also styles.template, bosonPlotter.userTemplates, bosonPlotter.renderPlot
+%       % Typical three-step pipeline used inside renderPlot:
+%       %   1. Merge template + global overrides once, before the dataset loop
+%       a      = bosonPlotter.resolveStyle(tpl, appData.styleOverrides);
+%       %   2. Per-dataset: layer ds.styleOverride + ds.channelStyles{k}
+%       aDs    = bosonPlotter.applyDsOverride(a, ds, channelIdx);
+%       %   3. After all plot() calls: apply axes/legend-level fields
+%       bosonPlotter.applyPostRenderStyle(targetAx, aDs);
+%
+%   See also styles.template, bosonPlotter.userTemplates, bosonPlotter.renderPlot,
+%            bosonPlotter.applyDsOverride, bosonPlotter.applyPostRenderStyle
 
     arguments
         template         (1,1) struct

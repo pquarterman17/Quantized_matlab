@@ -173,6 +173,44 @@ fprintf('Hc = %.1f Oe, Mr = %.4f emu\n', loop.Hc, loop.Mr);
 | Function | Description |
 |----------|-------------|
 | `hysteresisAnalysis(H, M)` | Extract Hc, Mr, Ms, and loop area from a magnetic hysteresis loop |
+| `convertMagUnits(xIn, yIn)` | Convert magnetometry field and moment arrays between unit systems |
+
+#### convertMagUnits
+
+Converts field (x) and moment (y) arrays between supported unit systems without mutating the input data. If a conversion requires sample mass or volume but those are not supplied (or are zero), the function returns the input unchanged and populates the fifth output `warnMsg` with a human-readable explanation.
+
+**Supported field units:** `'Oe'`, `'T'`, `'mT'`, `'A/m'`
+
+**Supported moment units:** `'emu'`, `'A·m²'`, `'emu/g'`, `'emu/cm³'`, `'kA/m'`
+
+```matlab
+% Load a VSM hysteresis loop (field in Oe, moment in emu)
+data = parser.importQDVSM('loop.dat', XAxis='field', YAxis='moment');
+H = data.time;
+M = data.values(:,1);
+
+% Convert field from Oe to T (50,000 Oe → 5 T)
+[H_T, M_emu, xU, yU] = utilities.convertMagUnits(H, M, ...
+    'FromField', 'Oe', 'ToField', 'T');
+fprintf('H range: %.2f to %.2f %s\n', min(H_T), max(H_T), xU);
+
+% Convert moment to emu/g using sample mass 12.5 mg
+[~, M_g, ~, yU] = utilities.convertMagUnits(H, M, ...
+    'ToMoment', 'emu/g', 'SampleMass', 0.0125);
+fprintf('Ms ≈ %.2f %s\n', max(M_g), yU);
+
+% Convert moment to kA/m using sample volume 0.06 cm³
+[~, M_kAm, ~, yU, warn] = utilities.convertMagUnits(H, M, ...
+    'ToMoment', 'kA/m', 'SampleVolume', 0.06);
+if ~isempty(warn)
+    warning(warn);   % surface the reason if conversion was skipped
+end
+
+% No-op: missing volume → returns original emu, populates warnMsg
+[~, M_safe, ~, yU_safe, w] = utilities.convertMagUnits(H, M, ...
+    'ToMoment', 'emu/cm³', 'SampleVolume', 0);
+% M_safe == M, yU_safe == 'emu', w contains the reason string
+```
 
 ---
 

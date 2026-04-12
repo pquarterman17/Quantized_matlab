@@ -52,6 +52,21 @@ function renderPlot(targetAx, ctx)
 %     .setStatus               — @(msg) setStatus(msg)
 %     .logGUIError             — @(tag, msg, ME) logGUIError(tag, msg, ME)
 %
+%   Outputs
+%   -------
+%     (none) — renders directly into targetAx. All side effects are on the
+%     axes and its children (line/errorbar/scatter objects, legend, labels,
+%     tick format, Y2 axis). On error, delegates to ctx.logGUIError and
+%     returns silently to avoid crashing the GUI.
+%
+%   Notes
+%   -----
+%     renderPlot resolves the effective appearance once before the dataset
+%     loop (via ctx.appearance or a fallback to styles.template('screen')),
+%     then calls bosonPlotter.applyDsOverride per-dataset to layer
+%     ds.styleOverride and ds.channelStyles{k}. After all plot calls,
+%     bosonPlotter.applyPostRenderStyle applies axes/legend-level fields.
+%
 %   Examples
 %     bosonPlotter.renderPlot(ax, ctx)
 

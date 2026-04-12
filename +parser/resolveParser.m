@@ -19,7 +19,18 @@ function result = resolveParser(filepath)
 %       filepath - Path to the data file (string or char)
 %
 %   OUTPUT:
-%       result   - Struct with .name, .fallback, .isBrukerRaw fields
+%       result   - Struct with fields:
+%                    .name        (char) Parser function name to call, e.g.
+%                                 'importXRDML', 'importQDVSM', 'importTIFF'.
+%                                 Empty string if no parser is registered.
+%                    .fallback    (char) Name of a secondary parser to try if
+%                                 the primary fails. Non-empty only for .dat
+%                                 files (primary: 'importQDVSM', fallback:
+%                                 'importPPMS'). Empty string otherwise.
+%                    .isBrukerRaw (logical) true only when the file is a .raw
+%                                 file whose first 3 bytes are 'RAW' (Bruker
+%                                 format). Used by importAuto to select the
+%                                 correct Bruker code path.
 %
 %   EXAMPLES:
 %       res = parser.resolveParser('scan.raw');

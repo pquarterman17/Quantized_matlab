@@ -18,11 +18,45 @@ function mask = filterRows(dataStruct, expression)
 %   Outputs:
 %     mask  — [N×1] logical, true = row passes the filter
 %
-%   Examples:
+%   Inputs
+%   ------
+%     dataStruct  (struct) Unified data struct as returned by
+%                 parser.createDataStruct. Must have fields .time, .values,
+%                 .labels. The .time column is always accessible as token 'x'.
+%                 Other columns are accessible by their .labels entry
+%                 (case-insensitive; partial word match on space/underscore/
+%                 parenthesis delimiters; shortest match wins).
+%     expression  (char) Filter expression string. Empty or whitespace-only
+%                 returns an all-true mask (no filtering).
+%                 Token grammar:
+%                   Column tokens  — label name (case-insensitive) or 'x'
+%                   Numeric literals — decimal or scientific notation (1e-3)
+%                   Comparison ops  — > < >= <= == ~=
+%                   Logical ops     — & (AND), | (OR), ~ (NOT)
+%                   Arithmetic ops  — + - * /
+%                   Functions       — abs(col), between(col, lo, hi)
+%                   Grouping        — parentheses ( )
+%                 Operator precedence: ~ > * / > + - > comparisons > & > |
+%
+%   Outputs
+%   -------
+%     mask  ([N×1] logical) true = row passes the filter, false = excluded.
+%           Always a column vector of the same length as dataStruct.time.
+%
+%   Examples
+%   --------
 %     mask = bosonPlotter.filterRows(d, 'Temp > 300')
 %     mask = bosonPlotter.filterRows(d, 'Field >= -500 & Field <= 500')
 %     mask = bosonPlotter.filterRows(d, 'between(x, 0, 1e-3)')
-%     mask = bosonPlotter.filterRows(d, '')   % all-true mask
+%     mask = bosonPlotter.filterRows(d, '')   % all-true mask (no filtering)
+%
+%     % Arithmetic in expression: keep rows where abs(Moment) > noise floor
+%     mask = bosonPlotter.filterRows(d, 'abs(Moment) > 1e-5')
+%
+%     % Apply mask to plot
+%     d2 = d;
+%     d2.time   = d.time(mask);
+%     d2.values = d.values(mask, :);
 
 arguments
     dataStruct (1,1) struct

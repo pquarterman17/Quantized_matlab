@@ -1,13 +1,56 @@
 function map = computeQSpace(map)
-%COMPUTEQSPACE  Lazily compute Qx/Qz grids for a 2D map struct.
-%   map = parser.computeQSpace(map) checks whether the map has a stored
-%   wavelength (map.wavelength_A) but no Qx/Qz grids yet, and computes them.
-%   If Qx already exists, this is a no-op.
+%COMPUTEQSPACE  Lazily compute Qx/Qz reciprocal-space grids for a 2D map struct.
 %
-%   Standard coplanar geometry:
+% Syntax
+% ------
+%   map = parser.computeQSpace(map)
+%
+% Inputs
+% ------
+%   map  (struct) 2D area-detector map struct, typically from the
+%        .map2D field produced by parser.importXRDML. Required fields:
+%          .axis1        — [N×1] double, omega motor positions (degrees)
+%          .axis2        — [1×M] double, 2theta positions (degrees)
+%          .intensity    — [N×M] double, intensity matrix
+%          .wavelength_A — (1×1) double, X-ray wavelength in Angstroms.
+%                          If missing, NaN, or <= 0, the function is a no-op.
+%        Optional (checked to skip recomputation):
+%          .Qx, .Qz     — if .Qx already exists, the function returns immediately
+%
+% Outputs
+% -------
+%   map  (struct) Input struct with the following fields added (when
+%        wavelength is available and Qx was not already present):
+%          .Qx     — [N×M] double, in-plane momentum transfer (Ang^-1)
+%          .Qz     — [N×M] double, out-of-plane momentum transfer (Ang^-1)
+%          .QxUnit — 'Ang^-1'
+%          .QzUnit — 'Ang^-1'
+%
+%        If wavelength_A is absent/invalid or .Qx already exists, the
+%        struct is returned unchanged (no-op).
+%
+% Notes
+% -----
+%   Standard coplanar geometry (symmetric diffraction):
+%     theta  = 2theta / 2
 %     Qx = (4pi/lambda) * sin(theta) * sin(omega - theta)
 %     Qz = (4pi/lambda) * sin(theta) * cos(omega - theta)
-%   where theta = 2theta/2, omega = motor position (axis1).
+%   where omega = axis1 (degrees), 2theta = axis2 (degrees).
+%
+% Examples
+% --------
+%   % Called automatically by importXRDML for area-detector files:
+%   data = parser.importXRDML('reciprocalmap.xrdml');
+%   map  = data.metadata.parserSpecific.map2D;   % .Qx / .Qz already populated
+%
+%   % Manual usage (e.g., after adding a wavelength to a previously loaded map):
+%   map.wavelength_A = 1.5406;   % Cu Kalpha
+%   map = parser.computeQSpace(map);
+%   surf(map.Qx, map.Qz, log10(map.intensity + 1));
+%
+% See Also
+% --------
+%   parser.importXRDML
 
     if isfield(map, 'Qx')
         return;  % already computed
