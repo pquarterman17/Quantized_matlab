@@ -527,6 +527,10 @@ function varargout = BosonPlotter(options)
             'MenuSelectedFcn', @(~,~) onDatasetMetaEdit('rename'));
         uimenu(cmDatasets, 'Text', 'Reload from Disk', ...
             'MenuSelectedFcn', @(~,~) onDatasetMetaEdit('reload'));
+        uimenu(cmDatasets, 'Text', 'Edit Column Mapping...', 'Separator', 'on', ...
+            'MenuSelectedFcn', @(~,~) onEditColumnMapping());
+        uimenu(cmDatasets, 'Text', 'Save as Template...', ...
+            'MenuSelectedFcn', @(~,~) onSaveAsTemplate());
         lbDatasets.ContextMenu = cmDatasets;
     catch
         % R2022a/R2022b: uicontextmenu not supported on uifigure — skip silently.
@@ -895,7 +899,7 @@ function varargout = BosonPlotter(options)
     statusGL.Layout.Row = 3; statusGL.Layout.Column = 1;
 
     lblStatusBar = uilabel(statusGL, 'Text', 'Ready', ...
-        'FontSize', 9, 'FontColor', [0.5 0.5 0.5], ...
+        'FontSize', 10, 'FontColor', [0.7 0.7 0.7], ...
         'HorizontalAlignment', 'left');
     lblStatusBar.Layout.Column = 1;
 
@@ -969,7 +973,7 @@ function varargout = BosonPlotter(options)
     corrGL = uigridlayout(corrPanel,[29 4], ...
         'RowHeight',    {24, 24, 20, 22,22,22,22, 20, 22,22,22,22, 0,0, 20, 0,0, 0,0, ...
                          0,0,0,0,0,0, 24,22, 22, 22}, ...
-        'ColumnWidth',  {80,'1x',80,'1x'}, ...
+        'ColumnWidth',  {62,'1x',62,'1x'}, ...
         'Padding',      [4 4 4 4], ...
         'RowSpacing',   2, ...
         'ColumnSpacing', 3);
@@ -3335,6 +3339,16 @@ function varargout = BosonPlotter(options)
 
         % Filter out invalid indices (e.g. the placeholder 0)
         indicesToRemove(indicesToRemove < 1 | indicesToRemove > numel(appData.datasets)) = [];
+        if isempty(indicesToRemove), return; end
+
+        % Confirm when removing multiple datasets
+        if numel(indicesToRemove) > 1 && ~headless
+            answer = uiconfirm(fig, ...
+                sprintf('Remove %d selected datasets?', numel(indicesToRemove)), ...
+                'Confirm Remove', 'Options', {'Remove', 'Cancel'}, ...
+                'DefaultOption', 'Remove', 'CancelOption', 'Cancel');
+            if strcmp(answer, 'Cancel'), return; end
+        end
 
         % Sort indices in descending order so removal doesn't affect remaining indices
         indicesToRemove = sort(indicesToRemove, 'descend');
@@ -12314,11 +12328,16 @@ function varargout = BosonPlotter(options)
             'CloseRequestFcn', @(~,~) closeAdvMenu(), ...
             'KeyPressFcn', @(~,evt) onAdvMenuKey(evt));
 
-        % Scrollable panel so all content is accessible even at small sizes
-        advScrollPanel = uipanel(advMenuFig, 'BorderType', 'none', 'Scrollable', 'on');
-        advScrollPanel.Position = [0 0 advMenuFig.Position(3) advMenuFig.Position(4)];
-        advMenuFig.SizeChangedFcn = @(~,~) set(advScrollPanel, ...
-            'Position', [0 0 advMenuFig.Position(3) advMenuFig.Position(4)]);
+        % Top-level layout: filter bar + scrollable button panel
+        advRootGL = uigridlayout(advMenuFig, [2 1], ...
+            'RowHeight', {24, '1x'}, 'Padding', [6 4 6 0], 'RowSpacing', 4);
+        efAdvFilter = uieditfield(advRootGL, 'text', 'Value', '', ...
+            'Placeholder', 'Filter tools...', 'FontSize', 10, ...
+            'ValueChangedFcn', @(src,~) filterGridButtons(advMenuGL, src.Value));
+        efAdvFilter.Layout.Row = 1;
+
+        advScrollPanel = uipanel(advRootGL, 'BorderType', 'none', 'Scrollable', 'on');
+        advScrollPanel.Layout.Row = 2;
 
         % 26 rows x 2 cols: 7 headers, 6 separators, 13 button rows
         advMenuGL = uigridlayout(advScrollPanel, [26 2], ...
@@ -13313,6 +13332,24 @@ end  % BosonPlotter
 % ════════════════════════════════════════════════════════════════════════
 %  Module-level helpers  (stateless — no access to GUI handles)
 % ════════════════════════════════════════════════════════════════════════
+
+function filterGridButtons(gl, query)
+%FILTERGRIDBUTTONS  Show/hide buttons in a uigridlayout by text match.
+%   Hides rows containing buttons whose Text doesn't match the query.
+%   Empty query shows all. Used by the Advanced Tools filter bar.
+    allBtns = findall(gl, 'Type', 'uibutton');
+    q = lower(strtrim(query));
+    for bi = 1:numel(allBtns)
+        b = allBtns(bi);
+        if isempty(q)
+            b.Visible = 'on';
+        elseif contains(lower(b.Text), q) || contains(lower(b.Tooltip), q)
+            b.Visible = 'on';
+        else
+            b.Visible = 'off';
+        end
+    end
+end
 
 function baseUnit = stripSIPrefix(unitStr)
 %STRIPSIPREFIX  Remove a leading SI prefix from a unit string.
