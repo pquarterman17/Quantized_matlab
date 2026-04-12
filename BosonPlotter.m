@@ -1069,21 +1069,21 @@ function varargout = BosonPlotter()
     btnYTranslate.Layout.Row = CROW.TOOLS; btnYTranslate.Layout.Column = [1 2];
 
     btnAutoPeak = uibutton(corrGL,'Text','Auto Find Peaks', ...
-        'ButtonPushedFcn',@onAutoPeak, ...
+        'ButtonPushedFcn',@(~,~)[], ...
         'BackgroundColor',BTN_INTERACT,'FontColor',[1 1 1], ...
         'Tooltip','Detect peaks automatically using SNIP background estimation and SNR-based filtering', ...
         'Visible','off');
     btnAutoPeak.Layout.Row = CROW.TOOLS; btnAutoPeak.Layout.Column = 3;
 
     btnManualPeak = uibutton(corrGL,'Text','Add Peak', ...
-        'ButtonPushedFcn',@onManualPeakAdd, ...
+        'ButtonPushedFcn',@(~,~)[], ...
         'BackgroundColor',[0.45 0.20 0.55],'FontColor',[1 1 1], ...
         'Tooltip','Click once on a peak in the plot to add it to the peak list (click button again to finish)', ...
         'Visible','off');
     btnManualPeak.Layout.Row = CROW.TOOLS; btnManualPeak.Layout.Column = 4;
 
     btnRemovePeakClick = uibutton(corrGL,'Text','Click-Rm', ...
-        'ButtonPushedFcn',@onRemovePeakClickMode, ...
+        'ButtonPushedFcn',@(~,~)[], ...
         'BackgroundColor',BTN_DANGER,'FontColor',BTN_FG, ...
         'FontSize', 9, ...
         'Tooltip','Click on a peak marker in the plot to remove it (click button again to finish)', ...
@@ -3676,7 +3676,7 @@ function varargout = BosonPlotter()
         lbY2.ValueChangedFcn = @(~,~) onPlot([],[]);
 
         appData.selectedPeakIdx = 0;   % clear peak selection on dataset switch
-        refreshPeakTable();
+        peakCb.refreshPeakTable();
 
         % Refresh data table if visible
         appData.tableMask   = [];  % reset mask on dataset switch
@@ -4235,7 +4235,7 @@ function varargout = BosonPlotter()
         if ~isvalid(peakFig)
             return;  % figure was deleted — should not happen in normal use
         end
-        refreshPeakTable();
+        peakCb.refreshPeakTable();
         peakFig.Visible = 'on';
         figure(peakFig);  % bring to front
     end
@@ -4340,27 +4340,6 @@ function varargout = BosonPlotter()
         btnManualPeak.Enable          = 'on';
     end
 
-    % ── Peak callbacks (delegated to +bosonPlotter/peakCallbacks.m) ─────
-    %  Original ~978 lines extracted.  Thin wrappers below exist only so
-    %  that @-handle references created BEFORE peakCb was initialised can
-    %  still resolve.  At runtime the buttons are re-wired to peakCb.*
-    %  directly (see the wiring block above).
-
-    function onAutoPeak(s,e),           peakCb.onAutoPeak(s,e);           end
-    function onManualPeakAdd(s,e),      peakCb.onManualPeakAdd(s,e);      end
-    function onManualPeakClick(s,e),    peakCb.onManualPeakClick(s,e);    end
-    function onRemovePeakClickMode(s,e),peakCb.onRemovePeakClickMode(s,e);end
-    function onRemovePeakClick(s,e),    peakCb.onRemovePeakClick(s,e);    end
-    function onFitPeaks(s,e),           peakCb.onFitPeaks(s,e);           end
-    function onFitAllPeaks(s,e),        peakCb.onFitAllPeaks(s,e);        end
-    function onShowDecomposition(s,e),  peakCb.onShowDecomposition(s,e);  end
-    function onClearPeaks(s,e),         peakCb.onClearPeaks(s,e);         end
-    function onRemoveSelectedPeak(s,e), peakCb.onRemoveSelectedPeak(s,e); end
-    function onPeakTableSelect(s,e),    peakCb.onPeakTableSelect(s,e);    end
-    function refreshPeakTable(),        peakCb.refreshPeakTable();        end
-    function onSavePeakSummary(s,e),    peakCb.onSavePeakSummary(s,e);    end
-    function onExportPeakXLSX(s,e),     peakCb.onExportPeakXLSX(s,e);    end
-
     % ── Fit curve visibility / color ─────────────────────────────────────
 
     function onWavelengthChanged(src, ~)
@@ -4379,7 +4358,7 @@ function varargout = BosonPlotter()
         else
             ddXraySource.Value = 'Custom';
         end
-        refreshPeakTable();
+        peakCb.refreshPeakTable();
     end
 
     function onXraySourceChanged(src, ~)
@@ -4395,7 +4374,7 @@ function varargout = BosonPlotter()
                 ds = appData.datasets{appData.activeIdx};
                 ds.wavelengthOverride_A = wl;
                 appData.datasets{appData.activeIdx} = ds;
-                refreshPeakTable();
+                peakCb.refreshPeakTable();
             end
         end
         % 'Custom' selected: leave efWavelength unchanged for manual entry
@@ -4408,7 +4387,7 @@ function varargout = BosonPlotter()
         if ~isnan(v) && v > 0
             appData.kFactor = v;
         end
-        refreshPeakTable();
+        peakCb.refreshPeakTable();
     end
 
     function onInstBroadeningChanged(src, ~)
@@ -4416,7 +4395,7 @@ function varargout = BosonPlotter()
     %   Saves value to appData and refreshes the Size (nm) column.
         v = src.Value;
         appData.instBroadening_deg = guiTernary(isnan(v) || v < 0, 0, v);
-        refreshPeakTable();
+        peakCb.refreshPeakTable();
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -5914,7 +5893,7 @@ function varargout = BosonPlotter()
         end
 
         cancelInteractions();
-        refreshPeakTable();
+        peakCb.refreshPeakTable();
         onPlot([],[]);
     end
 
@@ -12179,7 +12158,7 @@ function varargout = BosonPlotter()
                 ds.snipBackground = struct('x', xv(valid), 'bg', bgEst(1:sum(valid)));
             end
             appData.datasets{appData.activeIdx} = ds;
-            refreshPeakTable();
+            peakCb.refreshPeakTable();
             onPlot([], []);
             showPeakWindow();
         end
