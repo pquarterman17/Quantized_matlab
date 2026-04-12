@@ -19,11 +19,12 @@ function varargout = materialsCalcGUI()
 % ════════════════════════════════════════════════════════════════════════
 % BUTTON COLOR PALETTE
 % ════════════════════════════════════════════════════════════════════════
-BTN_PRIMARY = [0.20 0.60 0.20];   % green — primary action
-BTN_TOOL    = [0.35 0.35 0.35];   % dark gray — secondary / tool
+bp_ = styles.buttonPalette();
+BTN_PRIMARY = bp_.primary;   % green — primary action
+BTN_TOOL    = bp_.tool;      % dark gray — secondary / tool
 BTN_TOOL_FG = [0.95 0.95 0.95];   % light text on tool buttons
-BTN_EXPORT  = [0.15 0.45 0.75];   % blue — copy / export
-BTN_FG      = [1.00 1.00 1.00];   % white foreground text
+BTN_EXPORT  = bp_.export;    % slate — copy / export
+BTN_FG      = bp_.fg;        % white foreground text
 INPUT_BG    = [0.18 0.18 0.18];   % dark input background
 INPUT_FG    = [0.90 0.90 0.90];   % light input text
 

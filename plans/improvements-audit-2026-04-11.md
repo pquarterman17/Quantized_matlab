@@ -143,9 +143,7 @@ Layout, interaction, theming, tooltips, and accessibility across all GUIs.
 
 28. ~~**Figure Builder scroll/resize**~~ — done, see Completed section
 
-29. **Dialog theme propagation** — popup dialogs leak light mode when parent is dark. — popup dialogs leak light mode when parent is dark.
-    `templateDialog.m:46-78`, Dataset Math, Plot Templates, Batch Figure Export, Integrate
-    — none read `appData.theme`. Add shared `applyDialogTheme(dlg)` helper
+29. ~~**Dialog theme propagation**~~ — done: `+bosonPlotter/applyDialogTheme.m` helper wired into 4 inline dialogs (settings, plot templates, integration, dataset math)
 
 30. ~~**xrdConvertGUI resize + contrast**~~ — done (Lane B agent): Resize='on', min 480x600
 
@@ -157,17 +155,15 @@ Layout, interaction, theming, tooltips, and accessibility across all GUIs.
 
 ### Tier 2 — Medium Impact
 
-34. **Corrections panel header click-target** — label-styled `uibutton` with tiny
-    triangle glyph. Add hover background via `MouseEnterFcn`
+34. ~~**Corrections panel header click-target**~~ — skipped: uibutton in uifigure doesn't support MouseEnterFcn natively; would require WindowButtonMotionFcn hit-test overhead
 
-35. **Collapse empty Y2 listbox** — `lbY2` always visible with `'(none)'` placeholder.
-    Collapse row to 0 height when no Y2 channel selected
+35. ~~**Collapse empty Y2 listbox**~~ — done (Lane 1): grid row collapses to 0 when no Y2 channel selected
 
 36. ~~**Rename "WF" checkbox**~~ — done, changed to "Waterfall"
 
 37. ~~**Expand Save/Export by default**~~ — done, sectionCollapsed.saveTools = false
 
-38. **Advanced Analysis filter** — 26-row menu. Add top `uieditfield` filter
+38. ~~**Advanced Analysis filter**~~ — done (Lane 1): search bar filters button list by text/tooltip match
 
 39. ~~**FermiViewer toolbar overflow**~~ — done (Lane E agent)
 
@@ -177,18 +173,17 @@ Layout, interaction, theming, tooltips, and accessibility across all GUIs.
 
 ### Tier 3 — Nice-to-Have
 
-42. **Corrections panel label columns** — 80px wasteful for 6-12 char labels, drop to 60px
+42. ~~**Corrections panel label columns**~~ — already at 62px (not 80 as claimed)
 
-43. **Status bar readability** — 9pt gray on dark, below WCAG AA. Use 10pt + lighter color
+43. ~~**Status bar readability**~~ — done (Lane 1): FontColor changed to [0.85 0.85 0.85]
 
-44. **Numeric waterfall spacing field** — `efWaterfallSpacing` is `text` not `numeric`
+44. ~~**Numeric waterfall spacing field**~~ — done (Lane 1): changed to numeric uieditfield with Limits [0 Inf]
 
-45. **Keyboard focus shortcuts** — Ctrl+L for dataset list, Ctrl+Y for Y selector
+45. ~~**Keyboard focus shortcuts**~~ — done: Ctrl+L → dataset list, Ctrl+Shift+Y → Y channel selector
 
-46. **Multi-select delete confirmation** — `uiconfirm` when `numel(selected) > 1`
+46. ~~**Multi-select delete confirmation**~~ — already implemented (uiconfirm at line 3397)
 
-47. **Button palette consistency** — BosonPlotter 8 roles, FermiViewer 4,
-    materialsCalcGUI 3. Extract shared `+styles/buttonPalette.m`
+47. ~~**Button palette consistency**~~ — done: `+styles/buttonPalette.m` with 7 named roles; FermiViewer + materialsCalcGUI wired to shared palette
 
 ---
 

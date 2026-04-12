@@ -9110,7 +9110,11 @@ function varargout = BosonPlotter(options)
                 end
 
             case 'y'
-                if hasCtrl, onRedo([], []); end  % Ctrl+Y = redo
+                if hasCtrl && hasShift
+                    focus(lbY);              % Ctrl+Shift+Y → Y channel selector
+                elseif hasCtrl
+                    onRedo([], []);          % Ctrl+Y = redo
+                end
 
             case 'm'
                 if hasCtrl, onUnmaskAll([], []); end
@@ -9120,6 +9124,9 @@ function varargout = BosonPlotter(options)
 
             case 'c'
                 if hasCtrl, onCopyToClipboard([], []); end
+
+            case 'l'
+                if hasCtrl, focus(lbDatasets); end  % Ctrl+L → dataset list
 
             case 'leftarrow'
                 if ~hasCtrl && appData.activeIdx > 1
