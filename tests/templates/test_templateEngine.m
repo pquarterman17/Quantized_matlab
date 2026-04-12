@@ -356,6 +356,116 @@ function results = test_templateEngine()
         recordError('TEST 13', ME);
     end
 
+    % ────────────────────────────────────────────────────────────────
+    %  Test 14: Synonym matching — "Temp" + "Mag" map to canonical forms
+    % ────────────────────────────────────────────────────────────────
+    fprintf('\n== TEST 14: Synonym matching (Temp/Mag → temperature/moment) ==\n');
+    try
+        % Use highly unusual column names that won't match shipped templates
+        tmpl = struct();
+        tmpl.name = 'test_synonym_uniqueparser';
+        tmpl.type = 'tabular';
+        tmpl.match.columnNames = {'Temperature', 'Susceptibility', 'Frequency'};
+        tmpl.match.parserName  = 'importCSV';
+        tmpl.overrides = struct('labels', struct(), 'units', struct());
+        templates.TemplateEngine.save(tmpl);
+
+        % Data uses abbreviated / synonym forms of all three columns
+        data = makeTabularData({'Temp', 'Chi', 'Freq'}, {'K', 'emu/Oe', 'Hz'}, 'importCSV');
+        [matched, conf] = templates.TemplateEngine.match(data, Type='tabular');
+
+        check('synonym match: confidence >= 0.9', conf >= 0.9);
+        check('synonym match: correct template found', ...
+            ~isempty(matched) && strcmp(matched.name, 'test_synonym_uniqueparser'));
+        fprintf('  Synonym match confidence: %.3f\n', conf);
+
+        % Also verify normalizeNames works by calling scoreTemplate indirectly:
+        % If synonyms are working, 'Temp' normalises to 'temperature' which
+        % matches 'Temperature' in the template's columnNames.
+        data2 = makeTabularData({'Temperature', 'Susceptibility', 'Frequency'}, ...
+            {'K', 'emu/Oe', 'Hz'}, 'importCSV');
+        [~, conf2] = templates.TemplateEngine.match(data2, Type='tabular');
+        check('synonym: abbreviated confidence equals verbose confidence', ...
+            abs(conf - conf2) < 0.05);
+        fprintf('  Verbose match confidence: %.3f\n', conf2);
+
+        % Cleanup
+        templates.TemplateEngine.delete('test_synonym_uniqueparser');
+    catch ME
+        recordError('TEST 14', ME);
+    end
+
+    % ────────────────────────────────────────────────────────────────
+    %  Test 15: Unit stripping in fingerprint / matching
+    % ────────────────────────────────────────────────────────────────
+    fprintf('\n== TEST 15: Unit stripping in column name normalization ==\n');
+    try
+        % Labels with units in parens vs without should match the same template
+        tmpl = struct();
+        tmpl.name = 'test_unit_strip';
+        tmpl.type = 'tabular';
+        tmpl.match.columnNames = {'Temperature', 'Moment'};
+        tmpl.match.parserName  = 'importCSV';
+        tmpl.overrides = struct('labels', struct(), 'units', struct());
+        templates.TemplateEngine.save(tmpl);
+
+        % Data with unit suffixes embedded in label strings
+        dataWithUnits = makeTabularData( ...
+            {'Temperature (K)', 'Moment (emu)'}, {'', ''}, 'importCSV');
+        dataPlain = makeTabularData( ...
+            {'Temperature', 'Moment'}, {'K', 'emu'}, 'importCSV');
+
+        [~, confWithUnits] = templates.TemplateEngine.match(dataWithUnits, Type='tabular');
+        [~, confPlain]     = templates.TemplateEngine.match(dataPlain,     Type='tabular');
+
+        check('unit-stripped labels match template', confWithUnits > 0.5);
+        check('plain labels still match template', confPlain > 0.5);
+        check('unit-stripped confidence close to plain', ...
+            abs(confWithUnits - confPlain) < 0.15);
+        fprintf('  Confidence with units in labels: %.3f, plain: %.3f\n', ...
+            confWithUnits, confPlain);
+
+        templates.TemplateEngine.delete('test_unit_strip');
+    catch ME
+        recordError('TEST 15', ME);
+    end
+
+    % ────────────────────────────────────────────────────────────────
+    %  Test 16: TemplateManager launches and lists templates
+    % ────────────────────────────────────────────────────────────────
+    fprintf('\n== TEST 16: TemplateManager launch and list ==\n');
+    try
+        templates.TemplateManager();          % no parent — standalone
+        drawnow;
+
+        % Find the figure by name
+        allFigs = findall(groot, 'Type', 'figure');
+        mgr = [];
+        for k = 1:numel(allFigs)
+            if strcmp(allFigs(k).Name, 'Template Manager')
+                mgr = allFigs(k);
+                break;
+            end
+        end
+
+        check('TemplateManager figure opened', ~isempty(mgr) && isvalid(mgr));
+
+        if ~isempty(mgr) && isvalid(mgr)
+            % Verify list box is populated
+            lb = findall(mgr, 'Type', 'uilistbox');
+            check('list box present', ~isempty(lb));
+            if ~isempty(lb)
+                check('list box has items', numel(lb(1).Items) >= 1);
+            end
+
+            % Close gracefully
+            close(mgr);
+            check('TemplateManager closed without error', true);
+        end
+    catch ME
+        recordError('TEST 16', ME);
+    end
+
     % ════════════════════════════════════════════════════════════════
     %  Summary
     % ════════════════════════════════════════════════════════════════

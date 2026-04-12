@@ -283,19 +283,77 @@ end
 
 
 function tokens = normalizeNames(names)
-%NORMALIZENAMES  Tokenize and lowercase column names for fuzzy matching.
-%   "Temperature (K)" → {"temperature", "k"}
+%NORMALIZENAMES  Tokenize, lowercase, strip units, and expand synonyms.
+%
+%   Processing pipeline per label:
+%     1. Strip parenthesised unit suffix: "Temperature (K)" → "Temperature"
+%     2. Lowercase and replace non-alphanumeric with spaces
+%     3. Split on whitespace, drop empty tokens
+%     4. Map each token to its canonical synonym (first element of its group)
+%
+%   Result is de-duplicated so Jaccard operates on a set, not a bag.
     if ischar(names), names = {names}; end
     if isstruct(names) || (~iscell(names) && isstring(names))
         names = cellstr(names);
     end
+
+    % Build flat lookup: synonym string → canonical string (first in group)
+    synTable = templates.synonymTable();
+    synMap = containers.Map('KeyType', 'char', 'ValueType', 'char');
+    for g = 1:numel(synTable)
+        group = synTable{g};
+        if isempty(group), continue; end
+        canonical = group{1};
+        for s = 1:numel(group)
+            key = lower(strtrim(char(group{s})));
+            if ~isKey(synMap, key)
+                synMap(key) = canonical;
+            end
+        end
+    end
+
     tokens = {};
     for k = 1:numel(names)
-        raw = lower(char(names{k}));
+        raw = strtrim(char(names{k}));
+
+        % Step 1: strip trailing "(unit)" or "[unit]" suffix
+        raw = regexprep(raw, '\s*[\(\[][^\)\]]*[\)\]]\s*$', '');
+
+        % Step 2: lowercase, replace non-alphanumeric with space
+        raw = lower(raw);
         raw = regexprep(raw, '[^a-z0-9]', ' ');
+
+        % Step 3: split and drop empties
         parts = strsplit(strtrim(raw));
         parts(cellfun(@isempty, parts)) = [];
-        tokens = [tokens, parts]; %#ok<AGROW>
+
+        % Step 4: synonym expansion — map each token to its canonical form.
+        %   Multi-word synonyms (e.g. "magnetic field") are handled by
+        %   also trying adjacent-pair combinations.
+        %   First attempt single-token lookup; then try pairs.
+        expanded = {};
+        i = 1;
+        while i <= numel(parts)
+            % Try two-word match first (greedy)
+            if i + 1 <= numel(parts)
+                pair = [parts{i} ' ' parts{i+1}];
+                if isKey(synMap, pair)
+                    expanded{end+1} = synMap(pair); %#ok<AGROW>
+                    i = i + 2;
+                    continue;
+                end
+            end
+            % Single-token lookup
+            tok = parts{i};
+            if isKey(synMap, tok)
+                expanded{end+1} = synMap(tok); %#ok<AGROW>
+            else
+                expanded{end+1} = tok; %#ok<AGROW>
+            end
+            i = i + 1;
+        end
+
+        tokens = [tokens, expanded]; %#ok<AGROW>
     end
     tokens = unique(tokens);
 end
