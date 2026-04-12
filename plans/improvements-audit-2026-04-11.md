@@ -6,7 +6,7 @@ BosonPlotter, FermiViewer, materialsCalcGUI, xrdConvertGUI, and all `+` packages
 
 **Status:** Active
 **Created:** 2026-04-11
-**Updated:** 2026-04-11
+**Updated:** 2026-04-12
 
 ---
 
@@ -19,6 +19,7 @@ This audit spans the full toolbox. The four workstreams are largely independent:
 - **W2 — Refactor/Perf** targets BosonPlotter.m internals (lineCache, struct copy-back, extraction)
 - **W3 — UI** targets layout/theming/tooltips across all GUIs
 - **W4 — Docs** targets README coverage, stale docs, and thin docstrings
+- **W5 — Version Compatibility** removes dead pre-R2022b guards and adds version-branching for newer MATLAB features
 
 ### Data / control flow
 ```
@@ -247,6 +248,43 @@ Stale docs, missing feature docs, thin package READMEs, and function docstrings.
     - [ ] `colorMaps.m` — list supported colormap names
     - [ ] `computeQSpace.m` — document `map` input/output fields
     - [ ] `resolveParser.m` — document result struct fields
+
+---
+
+## W5 — Version Compatibility
+
+Enforce R2022b floor, remove dead guards for pre-R2022b, and branch for newer
+MATLAB where it provides a meaningfully better solution (with Command Window notice
+on the fallback path per CLAUDE.md convention).
+
+### Tier 1 — High Impact
+
+60. **Remove dead version guards** — `copygraphics`, `exportgraphics`, `uistyle`/`addStyle`/`removeStyle` all predate R2022b; the try/catch fallbacks are dead code
+    - [ ] `BosonPlotter.m:9173-9177` — remove try/catch around `copygraphics`, it's R2020a+
+    - [ ] `BosonPlotter.m:9833-9844` — remove try/catch around `copygraphics` vector copy, it's R2020a+
+    - [ ] `BosonPlotter.m:11579-11584` — remove try/catch around `removeStyle`, it's R2019b+
+    - [ ] `BosonPlotter.m:11595-11600` — remove try/catch around `uistyle`/`addStyle`, it's R2019b+
+    - [ ] `+bosonPlotter/multiPanel.m:277` — remove `exist('exportgraphics')` guard, it's R2020a+
+
+61. **Native line alpha on R2024b+** — replace undocumented `Edge.ColorData` hack with documented 4-element `Color`
+    - [ ] `+bosonPlotter/applyAlphaToLine.m` — use `isMATLABReleaseOlderThan('R2024b')` to branch: on R2024b+ use `set(h,'Color',[r g b a])`, on older use current `Edge`/`Bar` primitive approach
+    - [ ] Keep white-blend fallback only for the R2022b path (last resort)
+    - [ ] Print one-time `fprintf('Note: Line transparency using fallback mode. Upgrade to R2024b+ for native alpha support.\n')` on the old path
+    - [ ] Update `tests/gui/test_renderPlot_styling.m` to cover both branches
+
+### Tier 2 — Medium Impact
+
+62. **`containers.Map` → `dictionary` migration** — `dictionary` is R2022b+ (at our floor), typed, and faster; 20 files use `containers.Map`
+    - [ ] Audit each of the 20 call sites — some may need `containers.Map` for heterogeneous value types (`dictionary` requires homogeneous)
+    - [ ] Migrate eligible sites (homogeneous value type) to `dictionary`
+    - [ ] Leave `containers.Map` where heterogeneous values are required (e.g. `'KeyType','char','ValueType','any'`)
+
+### Tier 3 — Nice-to-Have
+
+63. **Future version opportunities to watch** — not actionable now, but worth branching when the codebase encounters them:
+    - `uispreadsheet` (R2025a) — native spreadsheet widget for DataWorkspace if/when we raise the floor
+    - `backgroundPool` / `parfeval` improvements (R2023b+) — async parser loading
+    - `uicolorpicker` (if/when introduced) — replace `uisetcolor` in Plot Style dialog
 
 ---
 

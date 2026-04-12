@@ -42,6 +42,7 @@ quantized_matlab/
 - **Functions:** `PascalCase` — **Variables:** `camelCase` — **Struct fields:** lowercase
 - **Parameters:** named arguments via `arguments` block (R2021b+)
 - **No external toolboxes** — MATLAB built-ins only
+- **Minimum version:** R2022b. If backward compatibility to R2022b would require a significantly inferior solution, use version detection (`isMATLABReleaseOlderThan('R20XXx')`) to branch: implement the best solution for current MATLAB and a fallback for R2022b. When the fallback path is taken, print a one-time warning to the Command Window: `fprintf('Note: [feature] using fallback mode. Upgrade to R20XXx+ for full support.\n')`
 - **Unified data struct:** all parsers return `.time`, `.values`, `.labels`, `.units`, `.metadata` via `parser.createDataStruct()`
 - **Section dividers:** `% ════════...` style
 - **Pipeline:** parse → correct → plot (each stage independent)
