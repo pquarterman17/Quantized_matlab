@@ -280,6 +280,95 @@ else
 end
 
 % ════════════════════════════════════════════════════════════════════
+%  HISTORY TABLE & COPY-AS-MATLAB-CODE
+% ════════════════════════════════════════════════════════════════════
+
+fprintf('\n--- History table / Copy as MATLAB code ---\n');
+
+% History tab is selectable
+try
+    api.selectTab('history');
+    fprintf('  PASS: history tab selectable\n'); passed = passed + 1;
+catch ME
+    fprintf('  FAIL: history tab not selectable (%s)\n', ME.message); failed = failed + 1;
+end
+
+% Unit converter stores a MATLAB call in history (already ran api.convert above)
+api.selectTab('unitConverter');
+api.convert(1, 'Oe', 'T');
+h = api.getHistory();
+if ~isempty(h)
+    lastEntry = h{end};
+    if numel(lastEntry) >= 5 && ~isempty(lastEntry{5})
+        fprintf('  PASS: unit-converter history entry has MATLAB call\n'); passed = passed + 1;
+    else
+        fprintf('  FAIL: unit-converter history entry missing MATLAB call\n'); failed = failed + 1;
+    end
+else
+    fprintf('  FAIL: history is empty after unit converter\n'); failed = failed + 1;
+end
+
+% Semiconductor intrinsic stores a MATLAB call
+api.selectTab('semiconductor');
+api.calcIntrinsic('Si');
+h = api.getHistory();
+lastEntry = h{end};
+if numel(lastEntry) >= 5 && contains(lastEntry{5}, 'intrinsicCarrierConc')
+    fprintf('  PASS: semiconductor intrinsic has MATLAB call\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: semiconductor intrinsic missing MATLAB call (got: %s)\n', ...
+        lastEntry{end}); failed = failed + 1;
+end
+
+% Crystal d-spacing stores a MATLAB call
+api.selectTab('crystal');
+api.calcDSpacing(3.905, 0, 0, 1);
+h = api.getHistory();
+lastEntry = h{end};
+if numel(lastEntry) >= 5 && contains(lastEntry{5}, 'dSpacing')
+    fprintf('  PASS: crystal d-spacing has MATLAB call\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: crystal d-spacing missing MATLAB call (got: %s)\n', ...
+        lastEntry{end}); failed = failed + 1;
+end
+
+% getHistoryMatlabCall returns the stored call string
+nRows = numel(api.getHistory());
+call = api.getHistoryMatlabCall(nRows);
+if ischar(call) && ~isempty(call)
+    fprintf('  PASS: getHistoryMatlabCall returns non-empty string\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: getHistoryMatlabCall returned empty or non-char\n'); failed = failed + 1;
+end
+
+% copyHistoryRowAsMatlabCode returns the string and copies to clipboard
+copied = api.copyHistoryRowAsMatlabCode(nRows);
+if ischar(copied) && ~isempty(copied)
+    fprintf('  PASS: copyHistoryRowAsMatlabCode returns non-empty string\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: copyHistoryRowAsMatlabCode returned empty (row %d)\n', nRows); failed = failed + 1;
+end
+
+% Out-of-range row does not crash
+try
+    api.copyHistoryRowAsMatlabCode(99999);
+    fprintf('  PASS: out-of-range row handled gracefully\n'); passed = passed + 1;
+catch
+    fprintf('  FAIL: out-of-range row threw error\n'); failed = failed + 1;
+end
+
+% History entry structure: {time, tabKey, description, latex, matlabCall}
+h = api.getHistory();
+if ~isempty(h)
+    e = h{1};
+    if numel(e) == 5 && ischar(e{1}) && ischar(e{2})
+        fprintf('  PASS: history entry has 5-cell structure\n'); passed = passed + 1;
+    else
+        fprintf('  FAIL: history entry structure unexpected (numel=%d)\n', numel(e)); failed = failed + 1;
+    end
+end
+
+% ════════════════════════════════════════════════════════════════════
 %  CLEANUP
 % ════════════════════════════════════════════════════════════════════
 

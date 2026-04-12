@@ -67,6 +67,7 @@ try; navTree.FontColor = LABEL_FG; catch; end
 % ── tree category definitions ──────────────────────────────────────────
 navCategories = { ...
     'Reference',         {'Unit Converter',  'unitConverter'; ...
+                          [char(9660) ' History'],   'history'; ...
                           [char(9733) ' Favorites'], 'favorites'}; ...
     'Materials',         {'Crystal',          'crystal'; ...
                           'Thin Film',         'thinFilm'; ...
@@ -104,7 +105,7 @@ end
 navKeys  = {'unitConverter', 'crystal', 'electrical', 'semiconductor', ...
             'thinFilm', 'xrayNeutron', 'superconductor', 'magnetic', ...
             'optics', 'vacuum', 'electrochemistry', 'thermal', 'diffusion', ...
-            'reflectivity', 'substrates', 'periodicTable', 'favorites'};
+            'reflectivity', 'substrates', 'periodicTable', 'favorites', 'history'};
 
 % Select the first node (activeNavKey is set in APP STATE block below)
 navTree.SelectedNodes = navNodeMap('unitConverter');
@@ -185,6 +186,7 @@ buildReflectivityTab(tabs.reflectivity);
 buildSubstratesTab(tabs.substrates);
 buildPeriodicTableTab(tabs.periodicTable);
 buildFavoritesTab(tabs.favorites);
+buildHistoryTab(tabs.history);
 appData.api.exportReport = @(fp) exportReportToFile(fp);
 
 % Apply consistent dark theme to all widgets
@@ -228,6 +230,9 @@ if nargout > 0
     % Favorites API
     api.addFavorite    = appData.api.addFavorite;
     api.getFavorites   = appData.api.getFavorites;
+    % History table API
+    api.copyHistoryRowAsMatlabCode = appData.api.copyHistoryRowAsMatlabCode;
+    api.getHistoryMatlabCall       = appData.api.getHistoryMatlabCall;
     % History export
     api.exportReport   = appData.api.exportReport;
     varargout{1}       = api;
@@ -237,15 +242,17 @@ end
 % HISTORY HELPER
 % ════════════════════════════════════════════════════════════════════════
 
-    function addHistory(description, latexStr)
-        entry = {char(datetime('now','Format','HH:mm:ss')), description, latexStr};
+    function addHistory(description, latexStr, matlabCall)
+        if nargin < 3, matlabCall = ''; end
+        entry = {char(datetime('now','Format','HH:mm:ss')), appData.activeNavKey, description, latexStr, matlabCall};
         appData.history{end+1} = entry;
         if numel(appData.history) > appData.historyMax
             appData.history(1) = [];
         end
-        appData.lastResult = description;
-        appData.lastLatex  = latexStr;
-        appData.lastTab    = appData.activeNavKey;
+        appData.lastResult    = description;
+        appData.lastLatex     = latexStr;
+        appData.lastMatlabCall = matlabCall;
+        appData.lastTab       = appData.activeNavKey;
         setStatus(description);
         % Enable copy/save buttons
         btnCopyResult.Enable = 'on';
@@ -253,6 +260,10 @@ end
             btnCopyLatex.Enable = 'on';
         end
         btnSaveFav.Enable = 'on';
+        % Refresh history table if it exists
+        if isfield(appData.api, 'refreshHistoryTable')
+            appData.api.refreshHistoryTable();
+        end
     end
 
     function h = getHistoryFcn()
@@ -461,7 +472,9 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 efResult.Value = num2str(res, 6);
                 lblDetail.Text = info.description;
                 lastLatex = info.latex;
-                addHistory(info.description, info.latex);
+                mcall = sprintf('[result, info] = calc.unitConvert(%s, ''%s'', ''%s'');', ...
+                    num2str(val, '%g'), from, to);
+                addHistory(info.description, info.latex, mcall);
             catch ME
                 efResult.Value = '';
                 lblDetail.Text = '';
@@ -692,7 +705,10 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 desc = sprintf('d<sub>%d%d%d</sub> = %.5g %s  [%s]', ...
                     efDh.Value, efDk.Value, efDl.Value, r.d, char(197), r.system);
                 lblDResult.Text = desc;
-                addHistory(desc, r.latex);
+                mcall = sprintf('result = calc.crystal.dSpacing(%g, %g, %g, %g, ''b'', %g, ''c'', %g, ''alpha'', %g, ''beta'', %g, ''gamma'', %g);', ...
+                    efDa.Value, efDh.Value, efDk.Value, efDl.Value, ...
+                    efDb.Value, efDc.Value, efDal.Value, efDbe.Value, efDga.Value);
+                addHistory(desc, r.latex, mcall);
             catch ME
                 lblDResult.Text = ['Error: ' ME.message];
                 setStatus(['d-spacing error: ' ME.message]);
@@ -1071,7 +1087,9 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 desc = sprintf('%s = %.4g %s%scm  (R<sub>s</sub> = %.4g %s/sq, t = %.4g nm)', ...
                     char(961), r.rho, char(937), char(183), efRsVal.Value, char(937), efRsTh.Value);
                 lblRsResult.Text = desc;
-                addHistory(desc, r.latex);
+                mcall = sprintf('result = calc.electrical.resistivity(%g, %g);  %% Rs (Ohm/sq), t (cm)', ...
+                    efRsVal.Value, efRsTh.Value*1e-7);
+                addHistory(desc, r.latex, mcall);
             catch ME
                 lblRsResult.Text = ['Error: ' ME.message];
                 setStatus(ME.message);
@@ -1347,7 +1365,9 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 desc = sprintf('n<sub>i</sub> = %.4g cm<sup>-3</sup>  (T = %g K)', r.ni, r.T);
                 lblNiResult.Text = desc;
                 lblNiNcNv.Text = sprintf('N<sub>c</sub> = %.3g cm<sup>-3</sup>,  N<sub>v</sub> = %.3g cm<sup>-3</sup>', r.Nc, r.Nv);
-                addHistory(desc, r.latex);
+                mcall = sprintf('result = calc.semiconductor.intrinsicCarrierConc(''Eg'', %g, ''meStar'', %g, ''mhStar'', %g, ''T'', %g);', ...
+                    efNiEg.Value, efNiMe.Value, efNiMh.Value, efNiT.Value);
+                addHistory(desc, r.latex, mcall);
             catch ME
                 lblNiResult.Text = ['Error: ' ME.message];
                 setStatus(ME.message);
@@ -4136,11 +4156,158 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         fprintf(fid, '============================================================\n\n');
         for hi = 1:numel(appData.history)
             entry = appData.history{hi};
-            fprintf(fid, '[%s] %s\n', entry{1}, entry{2});
+            desc = regexprep(entry{3}, '<[^>]+>', '');  % strip HTML
+            fprintf(fid, '[%s] [%s] %s\n', entry{1}, entry{2}, desc);
+            if numel(entry) >= 5 && ~isempty(entry{5})
+                fprintf(fid, '    MATLAB: %s\n', entry{5});
+            end
         end
         fprintf(fid, '\n============================================================\n');
         fprintf(fid, 'Total calculations: %d\n', numel(appData.history));
         fclose(fid);
+    end
+
+% ════════════════════════════════════════════════════════════════════════
+% HISTORY TAB
+% ════════════════════════════════════════════════════════════════════════
+
+    function buildHistoryTab(tab)
+    %BUILDHISTORYTAB  Session history table with "Copy as MATLAB code" context menu.
+    %
+    % Columns: Time | Tab | Description | MATLAB Call
+    % Right-click a row to copy the MATLAB function call to the clipboard.
+    % If no MATLAB call was recorded for that entry, the action is disabled.
+
+        outerGL = uigridlayout(tab);
+        outerGL.RowHeight   = {28, '1x', 28};
+        outerGL.ColumnWidth = {'1x'};
+        outerGL.Padding     = [6 6 6 6];
+
+        % Header
+        lblHdr = uilabel(outerGL, ...
+            'Text', 'Session history — right-click a row to copy it as a MATLAB function call.', ...
+            'FontSize', 11, 'FontColor', [0.5 0.5 0.5], ...
+            'WordWrap', 'on');
+        lblHdr.Layout.Row = 1;
+
+        % History table
+        tblHistory = uitable(outerGL, ...
+            'ColumnName',  {'Time', 'Tab', 'Description', 'MATLAB Call'}, ...
+            'ColumnWidth', {60, 100, '1x', 200}, ...
+            'RowName',     {}, ...
+            'ColumnSortable', [false false false false], ...
+            'Multiselect', 'off');
+        tblHistory.Layout.Row = 2;
+
+        % Context menu: "Copy as MATLAB code"
+        cm = uicontextmenu(fig);
+        miCopyCode = uimenu(cm, ...
+            'Text',              'Copy as MATLAB code', ...
+            'MenuSelectedFcn',   @onCopyMatlabCode);
+        miCopySep  = uimenu(cm, ...
+            'Text',              'Copy description', ...
+            'MenuSelectedFcn',   @onCopyDescription, ...
+            'Separator',         'off');
+        tblHistory.ContextMenu = cm;
+
+        % Clear button
+        btnClear = uibutton(outerGL, 'push', 'Text', 'Clear History', ...
+            'BackgroundColor', [0.7 0.2 0.2], 'FontColor', [1 1 1], ...
+            'ButtonPushedFcn', @(~,~) onClearHistory());
+        btnClear.Layout.Row = 3;
+
+        % ── inner helpers ──────────────────────────────────────────────
+
+        function refreshTable()
+            n = numel(appData.history);
+            if n == 0
+                tblHistory.Data = {'','','',''};
+                return;
+            end
+            d = cell(n, 4);
+            for ri = 1:n
+                e = appData.history{ri};
+                % e = {timestamp, tabKey, description, latexStr, matlabCall}
+                d{ri, 1} = e{1};
+                d{ri, 2} = e{2};
+                descPlain = regexprep(e{3}, '<[^>]+>', '');  % strip HTML
+                d{ri, 3} = descPlain;
+                if numel(e) >= 5
+                    d{ri, 4} = e{5};
+                else
+                    d{ri, 4} = '';
+                end
+            end
+            tblHistory.Data = d;
+            % Scroll to bottom so newest entry is visible
+            scroll(tblHistory, 'bottom');
+        end
+
+        function onCopyMatlabCode(~, ~)
+            % Determine selected row — DisplaySelectionIndicator is not
+            % available on all platforms, so fall back to UserData trick.
+            row = getSelectedRow();
+            if row < 1 || row > numel(appData.history), return; end
+            e = appData.history{row};
+            if numel(e) >= 5 && ~isempty(e{5})
+                clipboard('copy', e{5});
+                setStatus(['Copied MATLAB code for row ' num2str(row)]);
+            else
+                setStatus('No MATLAB call recorded for this entry');
+            end
+        end
+
+        function onCopyDescription(~, ~)
+            row = getSelectedRow();
+            if row < 1 || row > numel(appData.history), return; end
+            e = appData.history{row};
+            desc = regexprep(e{3}, '<[^>]+>', '');
+            clipboard('copy', desc);
+            setStatus(['Copied description for row ' num2str(row)]);
+        end
+
+        function row = getSelectedRow()
+            % uitable Selection returns [row, col] indices of selected cells.
+            sel = tblHistory.Selection;
+            if isempty(sel)
+                row = 0;
+            else
+                row = sel(1, 1);
+            end
+        end
+
+        function onClearHistory()
+            appData.history = {};
+            refreshTable();
+            setStatus('History cleared');
+        end
+
+        % Register API hooks used by addHistory callback and headless tests
+        appData.api.refreshHistoryTable = @() refreshTable();
+
+        appData.api.copyHistoryRowAsMatlabCode = @(row) copyRowByIndex(row);
+        function result = copyRowByIndex(row)
+            result = '';
+            if row < 1 || row > numel(appData.history), return; end
+            e = appData.history{row};
+            if numel(e) >= 5 && ~isempty(e{5})
+                result = e{5};
+                clipboard('copy', result);
+                setStatus(['Copied MATLAB code for row ' num2str(row)]);
+            else
+                setStatus('No MATLAB call recorded for this entry');
+            end
+        end
+
+        appData.api.getHistoryMatlabCall = @(row) getMatlabCallByIndex(row);
+        function call = getMatlabCallByIndex(row)
+            call = '';
+            if row < 1 || row > numel(appData.history), return; end
+            e = appData.history{row};
+            if numel(e) >= 5
+                call = e{5};
+            end
+        end
     end
 
 % ════════════════════════════════════════════════════════════════════════
