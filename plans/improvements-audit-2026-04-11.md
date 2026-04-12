@@ -85,10 +85,9 @@ Features that reduce friction on common BosonPlotter tasks.
 
 11. **Quick unit-prefix cycling** — Alt+Up/Down cycles prefix index on X/Y
 
-12. **Extension-specific file filter presets** — split `uigetfile` one-liner into
-    grouped entries (`*.xrdml;*.raw;*.brml → XRD`, `*.dat → VSM/PPMS`, etc.)
+12. ~~**Extension-specific file filter presets**~~ — done, grouped into XRD/VSM/CSV/Excel/Microscopy/Images/Neutron
 
-13. **"Copy Row as MATLAB code" for materialsCalcGUI** — context menu on history table
+13. ~~**"Copy Row as MATLAB code" for materialsCalcGUI**~~ — done (Lane F agent): history panel + context menu + 4 tabs wired
 
 14. **Keyboard shortcut for "next peak"** — Down/Up/Enter on `peakFig`
 
@@ -176,19 +175,17 @@ Layout, interaction, theming, tooltips, and accessibility across all GUIs.
 35. **Collapse empty Y2 listbox** — `lbY2` always visible with `'(none)'` placeholder.
     Collapse row to 0 height when no Y2 channel selected
 
-36. **Rename "WF" checkbox** — plenty of space, change to "Waterfall"
+36. ~~**Rename "WF" checkbox**~~ — done, changed to "Waterfall"
 
-37. **Expand Save/Export by default** — common items buried two clicks deep
+37. ~~**Expand Save/Export by default**~~ — done, sectionCollapsed.saveTools = false
 
 38. **Advanced Analysis filter** — 26-row menu. Add top `uieditfield` filter
 
-39. **FermiViewer toolbar overflow** — row 2 packs 14 controls, clips on narrow windows.
-    Replace `|` labels with dividers, raise min widths
+39. ~~**FermiViewer toolbar overflow**~~ — done (Lane E agent)
 
-40. **FermiViewer tools panel vs EDS content** — 276px panel hosting 520px content.
-    Cap section height to `figH * 0.6`
+40. ~~**FermiViewer EDS height cap**~~ — done (Lane E agent)
 
-41. **xrdConvertGUI tooltips** — no tooltips on Format/Intensity/Output dropdowns
+41. ~~**xrdConvertGUI tooltips**~~ — done (Lane E agent)
 
 ### Tier 3 — Nice-to-Have
 
