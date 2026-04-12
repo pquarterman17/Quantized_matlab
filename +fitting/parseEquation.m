@@ -299,7 +299,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 
 function tf = shouldPop(stackOp, newOp)
-    prec = dictionary(string({'+','-','*','/','^'}), [1,1,2,2,3]);
+    prec = dictionary(["+","-","*","/","^"], [1,1,2,2,3]);
     if ~isKey(prec, stackOp)
         tf = false;
         return;
