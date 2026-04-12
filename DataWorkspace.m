@@ -584,11 +584,7 @@ end
         uimenu(cm, 'Text', 'Move Column Left',    'MenuSelectedFcn', @onMoveColLeft,  'Separator', 'on');
         uimenu(cm, 'Text', 'Move Column Right',   'MenuSelectedFcn', @onMoveColRight);
         uimenu(cm, 'Text', 'Move Column to Start','MenuSelectedFcn', @onMoveColStart);
-        if ~isSpreadsheet
-            uimenu(cm, 'Text', 'Mask selected rows',   'MenuSelectedFcn', @onMaskRows, 'Separator', 'on');
-        else
-            uimenu(cm, 'Text', 'Mask selected rows',   'MenuSelectedFcn', @onMaskRows, 'Separator', 'on');
-        end
+        uimenu(cm, 'Text', 'Mask selected rows', 'MenuSelectedFcn', @onMaskRows, 'Separator', 'on');
         uimenu(cm, 'Text', 'Unmask selected rows', 'MenuSelectedFcn', @onUnmaskRows);
         uimenu(cm, 'Text', 'Unmask all rows',      'MenuSelectedFcn', @onUnmaskAll, 'Separator', 'on');
         % Computed column operations (shown when a computed column is selected)
@@ -630,8 +626,8 @@ end
         cols  = model.getComputedColumns(dsIdx);
         if isempty(cols), return; end
 
-        % Find the column name from the table column index
-        T       = buildTableFromData(data, cols);
+        % Determine the column index within computed columns.
+        % Table layout: 1 X col + M value cols + computed cols.
         nRegular = 1 + size(data.values, 2);  % X + value columns
         tblCol   = state.selCols(1);
         if tblCol <= nRegular, return; end  % not a computed column
@@ -650,7 +646,6 @@ end
         cols  = model.getComputedColumns(dsIdx);
         if isempty(cols), return; end
 
-        T        = buildTableFromData(data, cols);
         nRegular = 1 + size(data.values, 2);
         tblCol   = state.selCols(1);
         if tblCol <= nRegular, return; end
