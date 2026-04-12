@@ -566,8 +566,11 @@ try
     api.autoPeaks();
     drawnow;
 
-    assert(strcmp(api.peakFig.Visible, 'on'), 'peakFig should be visible after auto-detect');
-    fprintf('  Peak window visible after autoPeaks: yes\n');
+    % In headless mode (Visible='off'), the peak window stays hidden
+    expectVis = tern(strcmp(api.fig.Visible,'off'), 'off', 'on');
+    assert(strcmp(api.peakFig.Visible, expectVis), ...
+        sprintf('peakFig should be %s after auto-detect', expectVis));
+    fprintf('  Peak window after autoPeaks: Visible=%s\n', api.peakFig.Visible);
 
     fprintf('  PASS\n');
     passed = passed + 1;
@@ -587,7 +590,9 @@ try
 
     api.autoPeaks();
     drawnow;
-    assert(strcmp(api.peakFig.Visible, 'on'), 'peakFig should be visible');
+    expectVis = tern(strcmp(api.fig.Visible,'off'), 'off', 'on');
+    assert(strcmp(api.peakFig.Visible, expectVis), ...
+        sprintf('peakFig should be %s', expectVis));
 
     % Close the peak window (should hide, not delete)
     api.peakFig.Visible = 'off';
@@ -601,7 +606,8 @@ try
     % Re-open via API
     api.showPeakWindow();
     drawnow;
-    assert(strcmp(api.peakFig.Visible, 'on'), 'peakFig should reopen via showPeakWindow');
+    assert(strcmp(api.peakFig.Visible, expectVis), ...
+        sprintf('peakFig should be %s via showPeakWindow', expectVis));
     fprintf('  Peak window reopened: yes\n');
 
     fprintf('  PASS\n');
@@ -987,4 +993,9 @@ end
 function safeClose(a)
 %SAFECLOSE  Close GUI figure, ignoring errors if already closed.
     try a.close(); catch, end
+end
+
+function v = tern(cond, a, b)
+%TERN  Inline ternary: returns a if cond is true, b otherwise.
+    if cond, v = a; else, v = b; end
 end

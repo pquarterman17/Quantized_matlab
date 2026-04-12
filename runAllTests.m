@@ -182,6 +182,18 @@ if nSuites == 0
     return;
 end
 
+% ── Suppress figure pop-ups for GUI test groups ──────────────────────
+% Setting DefaultFigureVisible='off' ensures every uifigure (main
+% windows, popups, dialogs) is created invisible.  This prevents tests
+% from stealing focus and disrupting interactive work on the machine.
+guiGroups = ["gui","emgui","calcgui","xrd2d"];
+suppressFigures = any(strcmp(options.Group, guiGroups)) || strcmp(options.Group, "all");
+if suppressFigures
+    origVis = get(0, 'DefaultFigureVisible');
+    set(0, 'DefaultFigureVisible', 'off');
+    restoreVis = onCleanup(@() set(0, 'DefaultFigureVisible', origVis));
+end
+
 % ── Run each suite ────────────────────────────────────────────────────
 passed  = false(1, nSuites);
 msgs    = cell(1,  nSuites);

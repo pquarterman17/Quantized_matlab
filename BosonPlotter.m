@@ -283,10 +283,23 @@ function varargout = BosonPlotter(options)
     initH = min(1000, availH - 80);  % leave room for menu bar / dock
     initX = max(20, round((availW - initW) / 2));
     initY = max(40, round((availH - initH) / 2));
-    fig = uifigure('Name','Data Import & Preview', ...
-                   'Position',[initX initY initW initH], ...
-                   'AutoResizeChildren','off', ...
-                   'Visible', options.Visible);
+    % Headless mode: figure starts hidden and popup dialogs stay hidden.
+    % Triggered by Visible='off' or by DefaultFigureVisible='off' (set
+    % by runAllTests for GUI groups).
+    headless = options.Visible == "off" || ...
+               strcmp(get(0,'DefaultFigureVisible'), 'off');
+    figArgs = {'Name','Data Import & Preview', ...
+               'Position',[initX initY initW initH], ...
+               'AutoResizeChildren','off'};
+    if headless
+        % Visible='off' + off-screen position + callback-hidden.
+        % On Windows, drawnow can activate invisible uifigures and
+        % steal focus.  Pushing the window off-screen and suppressing
+        % HandleVisibility prevents taskbar presence and focus theft.
+        figArgs = [figArgs, {'Visible','off','HandleVisibility','off', ...
+                             'Position',[-9999 -9999 initW initH]}];
+    end
+    fig = uifigure(figArgs{:});
     MIN_FIG_H = 500;   % reduced minimum so GUI works on small screens
     LAYOUT_DEFAULTS = struct('figW',initW,'figH',initH,'ctrlPanelW',190, ...
         'corrPanelW',320,'axLimPanelW',200,'fileListW',180);
@@ -4287,8 +4300,10 @@ function varargout = BosonPlotter(options)
             return;  % figure was deleted — should not happen in normal use
         end
         refreshPeakTable();
-        peakFig.Visible = 'on';
-        figure(peakFig);  % bring to front
+        if ~headless
+            peakFig.Visible = 'on';
+            figure(peakFig);  % bring to front
+        end
     end
 
     function configurePeakWindowForMode(mode)
@@ -11824,7 +11839,7 @@ function varargout = BosonPlotter(options)
 
         % Bring to front if already open
         if ~isempty(plotOptFig) && isvalid(plotOptFig)
-            figure(plotOptFig);
+            if ~headless, figure(plotOptFig); end
             return;
         end
 
@@ -12167,7 +12182,7 @@ function varargout = BosonPlotter(options)
 
         % Bring to front if already open (prevents "lost window" problem)
         if ~isempty(advMenuFig) && isvalid(advMenuFig)
-            figure(advMenuFig);
+            if ~headless, figure(advMenuFig); end
             return;
         end
 
@@ -12472,8 +12487,10 @@ function varargout = BosonPlotter(options)
                 end
                 ax.ButtonDownFcn = restoreFcn;
                 fig.Pointer = 'arrow';
-                intFig.Visible = 'on';
-                figure(intFig);
+                if ~headless
+                    intFig.Visible = 'on';
+                    figure(intFig);
+                end
                 setStatus(sprintf('%s set to %.4g', upper(wh), xClick));
             end
         end
