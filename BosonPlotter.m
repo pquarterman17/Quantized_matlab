@@ -525,6 +525,8 @@ function varargout = BosonPlotter(options)
             'MenuSelectedFcn', @(~,~) onDatasetMetaEdit('notes'));
         uimenu(cmDatasets, 'Text', 'Rename...', ...
             'MenuSelectedFcn', @(~,~) onDatasetMetaEdit('rename'));
+        uimenu(cmDatasets, 'Text', 'Reload from Disk', ...
+            'MenuSelectedFcn', @(~,~) onDatasetMetaEdit('reload'));
         lbDatasets.ContextMenu = cmDatasets;
     catch
         % R2022a/R2022b: uicontextmenu not supported on uifigure — skip silently.
@@ -966,7 +968,7 @@ function varargout = BosonPlotter(options)
 
     corrGL = uigridlayout(corrPanel,[29 4], ...
         'RowHeight',    {24, 24, 20, 22,22,22,22, 20, 22,22,22,22, 0,0, 20, 0,0, 0,0, ...
-                         0,0,0,0,0,0, 24,22, 22, 0}, ...
+                         0,0,0,0,0,0, 24,22, 22, 22}, ...
         'ColumnWidth',  {80,'1x',80,'1x'}, ...
         'Padding',      [4 4 4 4], ...
         'RowSpacing',   2, ...
@@ -1479,6 +1481,24 @@ function varargout = BosonPlotter(options)
         'Enable','off');
     btnRedo.Layout.Row = CROW.ACTIONS; btnRedo.Layout.Column = 4;
 
+    % Row REDO (29): Correction presets — dropdown + Save + Delete
+    ddPreset = uidropdown(corrGL, ...
+        'Items', [{'(presets)'}, bosonPlotter.correctionPresets.list()], ...
+        'Value', '(presets)', 'FontSize', 9, ...
+        'Tooltip', 'Load a saved set of correction parameters', ...
+        'ValueChangedFcn', @(~,~) onDatasetMetaEdit('load-preset'));
+    ddPreset.Layout.Row = CROW.REDO; ddPreset.Layout.Column = [1 2];
+
+    btnSavePreset = uibutton(corrGL, 'Text', 'Save', 'FontSize', 9, ...
+        'Tooltip', 'Save current correction settings as a named preset', ...
+        'ButtonPushedFcn', @(~,~) onDatasetMetaEdit('save-preset'));
+    btnSavePreset.Layout.Row = CROW.REDO; btnSavePreset.Layout.Column = 3;
+
+    btnDeletePreset = uibutton(corrGL, 'Text', char(10005), 'FontSize', 9, ...
+        'Tooltip', 'Delete the selected preset', ...
+        'ButtonPushedFcn', @(~,~) onDatasetMetaEdit('delete-preset'));
+    btnDeletePreset.Layout.Row = CROW.REDO; btnDeletePreset.Layout.Column = 4;
+
     % Row MASK: Mask Selection | Hide | Unmask All
     btnMaskSelect = uibutton(corrGL,'Text','Mask Selection', ...
         'ButtonPushedFcn',@onArmMaskSelection, ...
@@ -1778,11 +1798,12 @@ function varargout = BosonPlotter(options)
         'Tooltip','Clear all manual axis limits and reset to auto-scale');
     btnAutoLimits.Layout.Row = 4; btnAutoLimits.Layout.Column = 2;
 
-    cbShowLegend = uicheckbox(axLimGL, ...
-        'Text', 'Legend', 'Value', true, 'FontSize', 9, ...
-        'Tooltip', 'Show/hide the plot legend', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    cbShowLegend.Layout.Row = 4; cbShowLegend.Layout.Column = 3;
+    ddLegendLoc = uidropdown(axLimGL, ...
+        'Items', {'best','NE','NW','SE','SW','EastOutside','off'}, ...
+        'Value', 'best', 'FontSize', 9, ...
+        'Tooltip', 'Legend location ("off" hides it)', ...
+        'ValueChangedFcn', @onToolbarLegendToggle);
+    ddLegendLoc.Layout.Row = 4; ddLegendLoc.Layout.Column = 3;
 
     ddDatasetColor = uidropdown(axLimGL, ...
         'Items', DS_COLOR_NAMES, 'ItemsData', DS_COLOR_RGBS, ...
@@ -5130,10 +5151,13 @@ function varargout = BosonPlotter(options)
     end
 
     function setShowLegendDirect(tf)
-    %SETSHOWLEGENDDIRECT  Test hook: toggle the show-legend checkbox
-    %   and replot.  Mirrors the user clicking the "Show legend"
-    %   checkbox in the main window.
-        cbShowLegend.Value = logical(tf);
+    %SETSHOWLEGENDDIRECT  Test hook: set legend visibility.
+        if logical(tf)
+            ddLegendLoc.Value = 'best';
+            appData.styleOverrides.legendLocation = 'best';
+        else
+            ddLegendLoc.Value = 'off';
+        end
         onPlot([], []);
     end
 
@@ -8172,7 +8196,7 @@ function varargout = BosonPlotter(options)
         rCtx_.scaleX             = ddScaleX.Value;
         rCtx_.scaleY             = ddScaleY.Value;
         rCtx_.scaleY2            = ddScaleY2.Value;
-        rCtx_.showLegend         = cbShowLegend.Value;
+        rCtx_.showLegend         = ~strcmp(ddLegendLoc.Value, 'off');
         rCtx_.showRaw            = cbShowRaw.Value;
         rCtx_.countsPerSec       = cbCountsPerSec.Value;
         rCtx_.style              = appData.style;
@@ -9026,8 +9050,20 @@ function varargout = BosonPlotter(options)
     end
 
     function onToolbarLegendToggle(~,~)
-    %ONTOOLBARLEGENDTOGGLE  Toggle the legend checkbox and replot.
-        cbShowLegend.Value = ~cbShowLegend.Value;
+    %ONTOOLBARLEGENDTOGGLE  Toggle legend on/off and replot.
+    %   Also called by ddLegendLoc ValueChangedFcn when user picks a location.
+        if nargin == 0 || isempty(gcbo) || gcbo ~= ddLegendLoc
+            % Called from keyboard shortcut or toolbar button — toggle
+            if strcmp(ddLegendLoc.Value, 'off')
+                ddLegendLoc.Value = 'best';
+            else
+                ddLegendLoc.Value = 'off';
+            end
+        end
+        loc = ddLegendLoc.Value;
+        if ~strcmp(loc, 'off')
+            appData.styleOverrides.legendLocation = loc;
+        end
         onPlot([], []);
     end
 
@@ -10733,8 +10769,58 @@ function varargout = BosonPlotter(options)
     end
 
     function onDatasetMetaEdit(mode)
-    %ONDATASETMETAEDIT  Edit notes or rename the active dataset via input dialog.
-    %   mode: 'notes' or 'rename'
+    %ONDATASETMETAEDIT  Dataset operations and correction preset management.
+    %   mode: 'notes', 'rename', 'reload', 'save-preset', 'load-preset', 'delete-preset'
+
+        % Preset operations don't require a loaded dataset
+        if startsWith(mode, 'save-preset') || startsWith(mode, 'load-preset') || startsWith(mode, 'delete-preset')
+            switch mode
+                case 'save-preset'
+                    answer = inputdlg('Preset name:', 'Save Correction Preset', [1 40]);
+                    if isempty(answer) || isempty(strtrim(answer{1})), return; end
+                    pName = strtrim(answer{1});
+                    p = struct('xOff', efXOffset.Value, 'yOff', efYOffset.Value, ...
+                        'bgSlope', efBGSlope.Value, 'bgInt', efBGIntercept.Value, ...
+                        'smoothEnabled', cbSmooth.Value, 'smoothWindow', efSmoothWin.Value, ...
+                        'smoothMethod', ddSmoothMethod.Value, 'normMethod', ddNormalize.Value, ...
+                        'derivativeMode', ddDerivative.Value, ...
+                        'xTrimMin', efXTrimMin.Value, 'xTrimMax', efXTrimMax.Value);
+                    bosonPlotter.correctionPresets.save(pName, p);
+                    ddPreset.Items = [{'(presets)'}, bosonPlotter.correctionPresets.list()];
+                    ddPreset.Value = '(presets)';
+                    setStatus(sprintf('Preset "%s" saved.', pName));
+                case 'load-preset'
+                    selName = ddPreset.Value;
+                    if strcmp(selName, '(presets)'), return; end
+                    try
+                        p = bosonPlotter.correctionPresets.load(selName);
+                    catch
+                        uialert(fig, sprintf('Preset "%s" not found.', selName), 'Load Error');
+                        return;
+                    end
+                    if isfield(p,'xOff'),    efXOffset.Value = p.xOff; end
+                    if isfield(p,'yOff'),    efYOffset.Value = p.yOff; end
+                    if isfield(p,'bgSlope'), efBGSlope.Value = p.bgSlope; end
+                    if isfield(p,'bgInt'),   efBGIntercept.Value = p.bgInt; end
+                    if isfield(p,'smoothEnabled'), cbSmooth.Value = p.smoothEnabled; end
+                    if isfield(p,'smoothWindow'),  efSmoothWin.Value = p.smoothWindow; end
+                    if isfield(p,'smoothMethod'),   ddSmoothMethod.Value = p.smoothMethod; end
+                    if isfield(p,'normMethod'),     ddNormalize.Value = p.normMethod; end
+                    if isfield(p,'derivativeMode'), ddDerivative.Value = p.derivativeMode; end
+                    if isfield(p,'xTrimMin'), efXTrimMin.Value = p.xTrimMin; end
+                    if isfield(p,'xTrimMax'), efXTrimMax.Value = p.xTrimMax; end
+                    setStatus(sprintf('Loaded preset "%s" — click Apply to use.', selName));
+                case 'delete-preset'
+                    selName = ddPreset.Value;
+                    if strcmp(selName, '(presets)'), return; end
+                    bosonPlotter.correctionPresets.delete(selName);
+                    ddPreset.Items = [{'(presets)'}, bosonPlotter.correctionPresets.list()];
+                    ddPreset.Value = '(presets)';
+                    setStatus(sprintf('Preset "%s" deleted.', selName));
+            end
+            return;
+        end
+
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig, 'Load a file first.', 'No data'); return;
         end
@@ -10764,6 +10850,25 @@ function varargout = BosonPlotter(options)
                 rebuildDatasetList(true);
                 onPlot([], []);
                 setStatus(sprintf('Renamed to: %s', newName));
+            case 'reload'
+                fp = ds.filepath;
+                if ~isfile(fp)
+                    uialert(fig, sprintf('File not found:\n%s', fp), 'Reload Failed');
+                    return;
+                end
+                try
+                    [newData, pName] = guiImport(fp);
+                    appData.datasets{appData.activeIdx}.data = newData;
+                    appData.datasets{appData.activeIdx}.corrData = [];
+                    appData.datasets{appData.activeIdx}.parserName = pName;
+                    appData.datasets{appData.activeIdx}.mask = true(size(newData.time));
+                    updateControlsForActiveDataset();
+                    onPlot([], []);
+                    [~, fn, fext] = fileparts(fp);
+                    setStatus(sprintf('Reloaded %s%s from disk.', fn, fext));
+                catch ME
+                    uialert(fig, sprintf('Reload failed:\n%s', ME.message), 'Reload Error');
+                end
         end
     end
 

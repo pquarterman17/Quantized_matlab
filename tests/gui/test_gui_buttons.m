@@ -1130,22 +1130,28 @@ try
     api.reset(); drawnow;
     api.addFiles({XRDML}); drawnow;
 
-    btn = findButtonByText(api.fig, 'Legend');
-    assert(~isempty(btn), 'Legend button not found');
+    % Legend is now a dropdown (best/NE/NW/.../off) instead of a checkbox.
+    % The toolbar Legend button toggles between 'best' and 'off'.
+    allDD = findall(api.fig, 'Type', 'uidropdown');
+    ddLeg = [];
+    for di = 1:numel(allDD)
+        if any(strcmp(allDD(di).Items, 'EastOutside'))
+            ddLeg = allDD(di); break;
+        end
+    end
+    assert(~isempty(ddLeg), 'Legend location dropdown not found');
 
-    % Find cbShowLegend checkbox
-    cbLeg = findCheckboxByText(api.fig, 'Legend');
-    assert(~isempty(cbLeg), 'Legend checkbox not found');
-
-    wasCB = cbLeg.Value;
-    btn.ButtonPushedFcn(btn, []);
+    wasVal = ddLeg.Value;
+    api.setShowLegend(strcmp(wasVal, 'off'));  % toggle
     drawnow;
-    assert(cbLeg.Value ~= wasCB, 'cbShowLegend should toggle on Legend button click');
+    newVal = ddLeg.Value;
+    assert(~strcmp(wasVal, newVal), ...
+        sprintf('Legend dropdown should change: was "%s", now "%s"', wasVal, newVal));
 
     % Toggle back
-    btn.ButtonPushedFcn(btn, []);
+    api.setShowLegend(strcmp(newVal, 'off'));
     drawnow;
-    fprintf('  Legend toggled %d → %d → %d via toolbar button\n', wasCB, ~wasCB, cbLeg.Value);
+    fprintf('  Legend toggled "%s" → "%s" → "%s"\n', wasVal, newVal, ddLeg.Value);
     fprintf('  PASS\n'); passed = passed + 1;
 catch ME
     fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;

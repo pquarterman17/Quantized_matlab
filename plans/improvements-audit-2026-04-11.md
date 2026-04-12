@@ -71,14 +71,11 @@ Features that reduce friction on common BosonPlotter tasks.
 
 5. ~~**Bulk-apply corrections to selected/all datasets**~~ — already implemented (`btnApplyAll` + `onApplyCorrectionsAll`)
 
-6. **Correction presets (named, saved)** — "Save/Load Preset..." dropdown under
-   corrections; persist to `prefdir/boson_corr_presets.mat`
+6. ~~**Correction presets (named, saved)**~~ — done, see Completed section
 
-7. **Legend location dropdown** — add `ddLegendLoc` (NE/NW/SE/SW/EastOutside/none),
-   pass through to `legend()` calls
+7. ~~**Legend location dropdown**~~ — done, see Completed section
 
-8. **Reload-from-disk button** — context menu "Reload from disk" re-calls
-   `guiImport(ds.filepath)` replacing `ds.data`, preserving corrections
+8. ~~**Reload-from-disk button**~~ — done, see Completed section
 
 9. ~~**xrdConvertGUI: remember last folders**~~ — done (Lane B agent)
 
@@ -292,3 +289,12 @@ Stale docs, missing feature docs, thin package READMEs, and function docstrings.
 - ~~**materialsCalcGUI keyboard shortcuts**~~ — already existed: WindowKeyPressFcn + primaryBtnMap
 - ~~**materialsCalcGUI dark theme**~~ (2026-04-11) — full dark theme with applyDarkPanelTheme() utility
 - ~~**Package READMEs**~~ (2026-04-11) — all 7 expanded: +bosonPlotter (37 funcs), +utilities (38), +plotting (15), +parser (27), +styles (4), +imaging (52), +scripts (7)
+- ~~**Correction presets**~~ (2026-04-11) — `+bosonPlotter/correctionPresets.m` static class, dropdown+save+delete in corrections panel row 29, persisted to `prefdir/boson_corr_presets.mat`
+- ~~**Legend location dropdown**~~ (2026-04-11) — replaced checkbox with dropdown (best/NE/NW/SE/SW/EastOutside/off), wired to `styleOverrides.legendLocation`
+- ~~**Reload from disk**~~ (2026-04-11) — "Reload from Disk" context menu entry, re-imports via guiImport preserving corrections state
+- ~~**FermiViewer toolbar overflow**~~ (2026-04-11) — removed separator labels, raised ColumnSpacing, min 32px buttons
+- ~~**FermiViewer EDS height cap**~~ (2026-04-11) — toggleSection caps at figH*0.6
+- ~~**xrdConvertGUI tooltips**~~ (2026-04-11) — tooltips on all dropdowns and controls
+- ~~**Plot Style Dialog docs**~~ (2026-04-11) — 4-layer cascade, palette picker, apply-to scopes
+- ~~**Data table split docs**~~ (2026-04-11) — tblUnits + tblData architecture documented
+- ~~**Function docstrings**~~ (2026-04-11) — multiPanel, peakCallbacks, renderPlot, filterRows, colorMaps, computeQSpace, resolveParser, resolveStyle, convertMagUnits
