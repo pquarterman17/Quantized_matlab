@@ -247,10 +247,7 @@ on the fallback path per CLAUDE.md convention).
 
 ### Tier 2 — Medium Impact
 
-62. **`containers.Map` → `dictionary` migration** — `dictionary` is R2022b+ (at our floor), typed, and faster; 20 files use `containers.Map`
-    - [ ] Audit each of the 20 call sites — some may need `containers.Map` for heterogeneous value types (`dictionary` requires homogeneous)
-    - [ ] Migrate eligible sites (homogeneous value type) to `dictionary`
-    - [ ] Leave `containers.Map` where heterogeneous values are required (e.g. `'KeyType','char','ValueType','any'`)
+62. ~~**`containers.Map` → `dictionary` migration**~~ — done: 8 of 36 sites migrated (homogeneous value types); 28 kept as `containers.Map` (heterogeneous `'ValueType','any'`, serialized to .mat, or function-handle values). Migrated: createDataStruct, importCIF, unitConvert, edsKFactorTable, massAbsorptionCoeff, parseEquation (2 maps), coDepositionRatio, materialsCalcGUI.
 
 ### Tier 3 — Nice-to-Have
 
