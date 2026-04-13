@@ -87,12 +87,21 @@ navCategories = { ...
                           'Vacuum',            'vacuum'}; ...
 };
 
+% Category icons (R2023a+ only — uitreenode Icon property)
+hasTreeIcons = ~isMATLABReleaseOlderThan('R2023a');
+catIcons = containers.Map( ...
+    {'Reference','Materials','Electronic','Optics & Scattering','Thermal-Magnetic'}, ...
+    {'exchange',  'grid_3x3','memory',    'light_mode',         'thermostat'});
+
 % Build the tree and collect a navKey → node map for selectPanel
 navNodeMap = containers.Map('KeyType','char','ValueType','any');
 for ci = 1:size(navCategories, 1)
     catName   = navCategories{ci, 1};
     leaves    = navCategories{ci, 2};   % Nx2 cell: {displayName, key}
     catNode   = uitreenode(navTree, 'Text', catName);
+    if hasTreeIcons && catIcons.isKey(catName)
+        try catNode.Icon = catIcons(catName); catch; end
+    end
     for li = 1:size(leaves, 1)
         leafNode = uitreenode(catNode, ...
             'Text',     leaves{li, 1}, ...
@@ -426,10 +435,10 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             'ButtonPushedFcn', @(~,~) doSwap());
         btnSwap.Layout.Row = 3; btnSwap.Layout.Column = 2;
 
-        btnCopyResult = uibutton(gl, 'push', 'Text', 'Copy Result', ...
+        btnUCCopyResult = uibutton(gl, 'push', 'Text', 'Copy Result', ...
             'BackgroundColor', BTN_EXPORT, 'FontColor', BTN_FG, ...
             'ButtonPushedFcn', @(~,~) doCopyResult());
-        btnCopyResult.Layout.Row = 3; btnCopyResult.Layout.Column = 3;
+        btnUCCopyResult.Layout.Row = 3; btnUCCopyResult.Layout.Column = 3;
 
         btnCopyLatex = uibutton(gl, 'push', 'Text', 'Copy LaTeX', ...
             'BackgroundColor', BTN_EXPORT, 'FontColor', BTN_FG, ...
@@ -4653,6 +4662,8 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             clipboard('copy', strjoin(lines, newline));
             setStatus(sprintf('Copied %s properties to clipboard', name));
         end
+
+        registerPrimaryBtn('substrates', btnCopySub);
     end
 
 % ════════════════════════════════════════════════════════════════════════
