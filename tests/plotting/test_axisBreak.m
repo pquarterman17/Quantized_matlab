@@ -71,7 +71,7 @@ try
     fprintf('  PASS\n'); passed = passed + 1;
 catch ME
     fprintf('  FAIL: %s\n', ME.message);
-    try, close(fig); catch; end
+    try, close(fig); catch, end
     failed = failed + 1;
 end
 
@@ -104,7 +104,7 @@ try
     fprintf('  PASS\n'); passed = passed + 1;
 catch ME
     fprintf('  FAIL: %s\n', ME.message);
-    try, close(fig); catch; end
+    try, close(fig); catch, end
     failed = failed + 1;
 end
 
@@ -133,7 +133,7 @@ try
     fprintf('  PASS\n'); passed = passed + 1;
 catch ME
     fprintf('  FAIL: %s\n', ME.message);
-    try, close(fig); catch; end
+    try, close(fig); catch, end
     failed = failed + 1;
 end
 
@@ -156,7 +156,7 @@ try
     fprintf('  PASS\n'); passed = passed + 1;
 catch ME
     fprintf('  FAIL: %s\n', ME.message);
-    try, close(fig); catch; end
+    try, close(fig); catch, end
     failed = failed + 1;
 end
 
@@ -182,7 +182,7 @@ try
     fprintf('  PASS\n'); passed = passed + 1;
 catch ME
     fprintf('  FAIL: %s\n', ME.message);
-    try, close(fig); catch; end
+    try, close(fig); catch, end
     failed = failed + 1;
 end
 
@@ -204,7 +204,7 @@ try
     fprintf('  PASS\n'); passed = passed + 1;
 catch ME
     fprintf('  FAIL: %s\n', ME.message);
-    try, close(fig); catch; end
+    try, close(fig); catch, end
     failed = failed + 1;
 end
 
@@ -234,7 +234,7 @@ try
     fprintf('  PASS\n'); passed = passed + 1;
 catch ME
     fprintf('  FAIL: %s\n', ME.message);
-    try, close(fig); catch; end
+    try, close(fig); catch, end
     failed = failed + 1;
 end
 
@@ -265,7 +265,7 @@ try
     fprintf('  PASS\n'); passed = passed + 1;
 catch ME
     fprintf('  FAIL: %s\n', ME.message);
-    try, close(fig); catch; end
+    try, close(fig); catch, end
     failed = failed + 1;
 end
 

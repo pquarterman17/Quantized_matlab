@@ -122,8 +122,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 ax.Visible = 'off';
 
-ax1 = axes(fig, 'Position', pos1); %#ok<LAXES>
-ax2 = axes(fig, 'Position', pos2); %#ok<LAXES>
+ax1 = axes(fig, 'Position', pos1);
+ax2 = axes(fig, 'Position', pos2);
 
 CopyAxesAppearance(ax, ax1);
 CopyAxesAppearance(ax, ax2);
@@ -136,7 +136,7 @@ lines = findobj(ax, 'Type', 'line', '-or', 'Type', 'scatter', ...
 
 for k = numel(lines):-1:1
     src = lines(k);
-    CopyGraphicsObject(src, ax1, ax2, breakAxis, lowerLim, upperLim);
+    CopyGraphicsObject(src, ax1, ax2);
 end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -212,7 +212,7 @@ function CopyAxesAppearance(src, dst)
     hold(dst, 'on');
 end
 
-function CopyGraphicsObject(src, ax1, ax2, breakAxis, lowerLim, upperLim)
+function CopyGraphicsObject(src, ax1, ax2)
 %COPYGRAPHICSOBJECT  Replicate a graphics object into each sub-axes.
 %   Data points are not filtered — both axes share identical data, and
 %   clipping is handled automatically by the axis limits set afterwards.
@@ -273,9 +273,6 @@ function CopyGraphicsObject(src, ax1, ax2, breakAxis, lowerLim, upperLim)
             'HandleVisibility', src.HandleVisibility);
     end
 
-    % suppress unused-variable lint on breakAxis / lowerLim / upperLim
-    % (kept as parameters for future filtering extension)
-    unused = {breakAxis, lowerLim, upperLim}; %#ok<NASGU>
 end
 
 function marks = DrawBreakMarks(fig, ax1, ax2, breakAxis, breakStyle)
@@ -284,8 +281,8 @@ function marks = DrawBreakMarks(fig, ax1, ax2, breakAxis, breakStyle)
 %   Each call to annotation returns one handle; we collect all of them.
 
     % Get figure-normalised positions of the two sub-axes boundary edges
-    ax1Pos = GetNormPos(fig, ax1);
-    ax2Pos = GetNormPos(fig, ax2);
+    ax1Pos = GetNormPos(ax1);
+    ax2Pos = GetNormPos(ax2);
 
     % For a Y break: ax1 is bottom, ax2 is top.
     % The boundary is between ax1.top and ax2.bottom.
@@ -324,13 +321,12 @@ function marks = DrawBreakMarks(fig, ax1, ax2, breakAxis, breakStyle)
     marks = [markList{:}];
 end
 
-function pos = GetNormPos(fig, ax)
+function pos = GetNormPos(ax)
 %GETNORMPOS  Return axes Position in figure-normalised units.
     origUnits = ax.Units;
     ax.Units  = 'normalized';
     pos = ax.Position;
     ax.Units = origUnits;
-    unused = fig; %#ok<NASGU> % fig kept as parameter for future TightInset handling
 end
 
 function handles = DrawSingleMark(fig, xCenter, yCenter, breakStyle, breakAxis)
