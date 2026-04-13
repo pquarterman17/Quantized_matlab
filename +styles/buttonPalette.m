@@ -4,7 +4,7 @@ function p = buttonPalette()
 %   p = styles.buttonPalette()
 %
 %   Returns a struct with named RGB color fields for consistent button
-%   styling across BosonPlotter, FermiViewer, materialsCalcGUI, and
+%   styling across BosonPlotter, FermiViewer, DiraCulator, and
 %   DataWorkspace.
 %
 %   Fields:

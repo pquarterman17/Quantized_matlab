@@ -1,16 +1,16 @@
-# Materials Calculator — Feature Reference
+# DiraCulator — Feature Reference
 
 > For core conventions and quick-start, see [CLAUDE.md](../CLAUDE.md). For the backend API, see [+calc/README.md](../+calc/README.md).
 
-`materialsCalcGUI` is a standalone dark-themed calculator covering 18 panels across 5 domains. It shares no state with BosonPlotter and can be run completely headless via its API struct.
+`DiraCulator` is a standalone dark-themed calculator covering 18 panels across 5 domains. It shares no state with BosonPlotter and can be run completely headless via its API struct.
 
 ---
 
 ## Getting Started
 
 ```matlab
-materialsCalcGUI              % open interactively
-api = materialsCalcGUI();     % headless — returns api struct for scripting/testing
+DiraCulator              % open interactively
+api = DiraCulator();     % headless — returns api struct for scripting/testing
 ```
 
 The window opens at **Unit Converter**, the default panel. Select any panel from the tree on the left. Every calculation appends a timestamped entry to the History panel and enables the **Copy Result**, **Copy LaTeX**, and **Save** buttons in the status bar.
@@ -353,7 +353,7 @@ These hooks are implemented via `appData.api` callbacks registered in `buildXray
 ## Headless API
 
 ```matlab
-api = materialsCalcGUI();     % returns api struct; GUI opens but can be hidden
+api = DiraCulator();     % returns api struct; GUI opens but can be hidden
 
 % Navigation
 api.selectTab('crystal')      % switch to any panel by navKey

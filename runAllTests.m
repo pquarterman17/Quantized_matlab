@@ -105,9 +105,10 @@ SUITES = {
     T('gui','test_magUnitConversion'),      'gui',    'Mag unit conversion: Oe→T live dropdown change + ds.data preservation + missing-mass warn'
     T('gui','test_plotStyleDialog'),        'gui',    'Plot Style dialog (Phase B) + session round-trip (Phase C): overrides, precedence, reset, save/load'
     T('gui','test_rowLevelMasking'),        'gui',    'Row-level masking: no mask column, context menu, soft-red row style'
+    T('gui','test_plotInteractions'),       'gui',    'Plot interactions: double-click labels, context menus on traces, cursor panel readout'
     T('gui','test_2dMapStyling'),           'gui',    '2D heatmap axes pick up active template font/tick (Phase F)'
     T('gui','test_contour_features'),       'contour','Contour/heatmap: gridding, plot styles, edge cases, export'
-    T('gui','test_materials_calc_gui'),     'calcgui','Materials calculator GUI API'
+    T('gui','test_diraculator'),            'calcgui','DiraCulator GUI API'
     % ── Imaging tests ─────────────────────────────────────────────────
     T('imaging','test_em_parsers'),         'em',     'EM image parsers: importTIFF + importRawImage'
     T('imaging','test_imaging_utils'),      'em',     'Imaging utilities: contrast, filter, FFT, profile, scale bar, thumbnail'
