@@ -143,6 +143,7 @@ SUITES = {
     % ── Fitting tests ────────────────────────────────────────────────────
     T('fitting','test_peak_detection'),   'fitting', 'Robust peak detection, background estimation, prominence'
     T('fitting','test_curve_fitting'),    'fitting', 'Curve fitting engine, models, autoGuess, parseEquation'
+    T('fitting','test_constraints_batchfit'), 'fitting', 'Parameter constraints + batch fit dialog'
     T('fitting','test_templates_fft'),   'fitting', 'Publication templates and FFT filtering'
     T('fitting','test_resample_stats'),  'fitting', 'Resampling, descriptive stats, t-test, linear regression'
     T('fitting','test_batch_roi'),       'fitting', 'Batch fitting, peak tracking'
@@ -159,6 +160,7 @@ SUITES = {
     T('fitting','test_surfaceFit'),          'fitting', 'Surface/3D fitting: models, autoGuess, surfaceFit engine'
     T('fitting','test_odrFit'),              'fitting', 'Orthogonal distance regression (Deming): closed-form slope, jackknife errors, λ dependence, ODR-vs-OLS on symmetric noise'
     T('fitting','test_anovaPca'),            'fitting', 'One-way ANOVA and PCA (SVD-based): F-distribution p-values, explained variance, orthonormal loadings'
+    T('fitting','test_cursor_anchor'),       'fitting', 'Cursor fit region + anchor spline background (pure-computation layer)'
     % ── Plotting tests ───────────────────────────────────────────────────
     T('plotting','test_boxViolinSwarm'),    'plotting', 'Box/violin/swarm plots — objects, KDE, swarm, edge cases'
     T('plotting','test_colorScatterZ'),     'plotting', 'colorScatterZ — scatter, CData, colormaps, colorbar, edge cases'
@@ -168,14 +170,14 @@ SUITES = {
     T('plotting','test_polarContour'),      'plotting', 'polarContour — filled-contour intensity maps on polar coordinates (XRD pole figures, texture plots)'
     % ── Spectral tests ───────────────────────────────────────────────────
     T('calc','test_fftSpectral'),          'spectral','FFT spectral analysis, windows, Welch PSD, cross-correlation'
+    % ── Signal processing tests ──────────────────────────────────────────
+    T('calc','test_signal_processing'),   'sigproc', 'Signal processing: FFT filter (LP/HP/BP/notch) + smoothing roundtrips'
     % ── Interpolation 2-D tests ──────────────────────────────────────────
     T('calc','test_interpolate2D'),        'interp2d','2-D interpolation: linear, natural, TPS, IDW, regrid2D'
     % ── Baseline tests ───────────────────────────────────────────────────
     T('calc','test_baselines'),            'baseline','Baseline estimation: ALS, rolling ball, modified polynomial'
     % ── Error propagation tests ──────────────────────────────────────────
     T('calc','test_errorProp'),            'errorprop','Error propagation: linear Taylor, Monte Carlo, wrappers'
-    % ── Signal processing tests ──────────────────────────────────────────
-    T('calc','test_signal_processing'),   'sigproc', 'Signal processing: FFT filter (LP/HP/BP/notch) + smoothing roundtrips'
     % ── Utilities tests ──────────────────────────────────────────────────
     T('utilities','test_toOrigin'),        'utilities','Origin COM bridge: call sequence, qualified path, log handling (mock COM)'
     T('utilities','test_convertMagUnits'), 'utilities','Magnetometry unit conversion: Oe/T/mT/A/m, emu/A·m²/emu·g⁻¹/kA·m⁻¹, raw-preserve'
