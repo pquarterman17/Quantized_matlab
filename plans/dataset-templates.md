@@ -236,16 +236,16 @@ Winner = max(confidence) across all templates × all steps.
    - [x] Unit stripping: "Temperature (K)" → "temperature" + unit "K" — enhanced `normalizeNames`
    - [x] Abbreviation expansion: "Res" → "Resistance", "Mag" → "Magnetic"
 
-9. **Template analytics / feedback** — track which templates get used
+9. ~~**Template analytics / feedback**~~ — track which templates get used
    - [ ] Log template applications to `prefdir/boson_template_log.json`
    - [ ] Track: template name, confidence, was it auto-applied or user-selected, did user edit after
    - [ ] Summary report: "Template X was edited 5 times after auto-apply" → signal to update the default
 
-10. **Batch template application** — apply template across multiple files
+10. ~~**Batch template application**~~ — apply template across multiple files
     - [ ] `scripts.batchApplyTemplate(folder, templateName)` — import all matching files with the same template
     - [ ] Integration with `scripts.batchImport` — optional template parameter
 
-11. **Template inheritance** — compose templates from base + specialization
+11. ~~**Template inheritance**~~ — compose templates from base + specialization
     - [ ] `"extends": "ppms_base"` field in template JSON
     - [ ] Base template defines common columns, child overrides/adds specifics
     - [ ] Avoids duplication across related instrument configurations
