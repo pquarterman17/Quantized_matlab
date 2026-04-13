@@ -118,6 +118,9 @@ Feature-level docs are in separate files to keep this context compact:
 | Plot formatting and export | [+plotting/README.md](+plotting/README.md) |
 | Visual themes and templates | [+styles/README.md](+styles/README.md) |
 | Curve fitting engine and models | [+fitting/README.md](+fitting/README.md) |
+| DataWorkspace package | [+dataWorkspace/README.md](+dataWorkspace/README.md) |
+| **Physics theory** (LaTeX formulas, derivations) | [docs/theory/](docs/theory/) |
+| **Tutorials** (step-by-step workflows) | [docs/tutorials/](docs/tutorials/) |
 
 ## GUI Development Notes
 
