@@ -70,7 +70,6 @@ end
 %   Using the normal equations directly (no Statistics Toolbox).
 H  = field;
 Ry = hallResistance;
-n  = numel(H);
 Hm = mean(H);
 Rm = mean(Ry);
 SXX = sum((H  - Hm).^2);
