@@ -129,7 +129,8 @@ ddCFCh.Layout.Row = 2; ddCFCh.Layout.Column = 2;
 
 % X range
 uilabel(cfTopGL, 'Text', 'X min:', 'HorizontalAlignment', 'right');
-efCFXmin = uieditfield(cfTopGL, 'numeric', 'Value', min(xData));
+efCFXmin = uieditfield(cfTopGL, 'numeric', 'Value', min(xData), ...
+    'ValueChangedFcn', @(~,~) onXRangeEdited());
 efCFXmin.Layout.Row = 2; efCFXmin.Layout.Column = 4;
 
 btnCFPickMin = uibutton(cfTopGL, 'Text', 'Pick', ...
@@ -139,7 +140,8 @@ btnCFPickMin = uibutton(cfTopGL, 'Text', 'Pick', ...
 btnCFPickMin.Layout.Row = 2; btnCFPickMin.Layout.Column = 5;
 
 uilabel(cfTopGL, 'Text', 'X max:', 'HorizontalAlignment', 'right');
-efCFXmax = uieditfield(cfTopGL, 'numeric', 'Value', max(xData));
+efCFXmax = uieditfield(cfTopGL, 'numeric', 'Value', max(xData), ...
+    'ValueChangedFcn', @(~,~) onXRangeEdited());
 efCFXmax.Layout.Row = 3; efCFXmax.Layout.Column = 2;
 
 btnCFPickMax = uibutton(cfTopGL, 'Text', 'Pick', ...
@@ -162,11 +164,19 @@ btnCFParseCustom = uibutton(cfTopGL, 'Text', 'Parse', ...
     'ButtonPushedFcn', @(~,~) onParseCustom());
 btnCFParseCustom.Layout.Row = 3; btnCFParseCustom.Layout.Column = 6;
 
-% Equation display
+% Equation display (columns 1-4; columns 5-6 hold the cursor toggle)
 lblCFEqn = uilabel(cfTopGL, 'Text', catalog(1).equation, ...
     'FontSize', 11, 'FontColor', [0.4 0.7 0.4], ...
     'Interpreter', 'none');
-lblCFEqn.Layout.Row = 4; lblCFEqn.Layout.Column = [1 6];
+lblCFEqn.Layout.Row = 4; lblCFEqn.Layout.Column = [1 4];
+
+% Cursor toggle (columns 5-6, row 4)
+cbCFCursors = uicheckbox(cfTopGL, 'Text', 'Cursors', ...
+    'Value', true, ...
+    'FontSize', 9, ...
+    'Tooltip', 'Show draggable vertical cursors on the fit axes to set the X range', ...
+    'ValueChangedFcn', @(~,~) onCFCursorsToggled());
+cbCFCursors.Layout.Row = 4; cbCFCursors.Layout.Column = [5 6];
 
 % ── Row 2: Action buttons ────────────────────────────────────────────
 cfBtnRow = uigridlayout(cfRootGL, [1 4], ...
@@ -216,11 +226,15 @@ cfAxRes.Box = 'on'; grid(cfAxRes, 'on');
 bosonPlotter.applyAppearanceToAxes(cfAxRes, options.Appearance);
 
 % ── Row 4: Parameter table ───────────────────────────────────────────
+% Columns: Name | Value (fitted) | ±Error | Guess | Lower | Upper | Fixed | Constraint
+% Constraint column: empty = free param, non-empty expression = constrained
+%   e.g. "2*p1"  or  "p1 + p2"  (p1, p2 refer to position in parameter list)
 tblCFParams = uitable(cfRootGL, ...
-    'ColumnName', {'Name', 'Value', char(177)+' Error', 'Guess', 'Lower', 'Upper', 'Fixed'}, ...
-    'ColumnEditable', [false, false, false, true, true, true, true], ...
-    'ColumnFormat', {'char', 'char', 'char', 'numeric', 'numeric', 'numeric', 'logical'}, ...
-    'ColumnWidth', {'auto', 80, 70, 70, 65, 65, 45}, ...
+    'ColumnName', {'Name', 'Value', char(177)+' Error', 'Guess', 'Lower', 'Upper', 'Fixed', 'Constraint'}, ...
+    'ColumnEditable', [false, false, false, true, true, true, true, true], ...
+    'ColumnFormat', {'char', 'char', 'char', 'numeric', 'numeric', 'numeric', 'logical', 'char'}, ...
+    'ColumnWidth', {'auto', 75, 65, 65, 60, 60, 42, 100}, ...
+    'Tooltip', 'Constraint column: leave empty for a free parameter. Enter an expression like "2*p1" or "p1+p2" to constrain this parameter to the others.', ...
     'Data', {});
 tblCFParams.Layout.Row = 4;
 
@@ -261,7 +275,7 @@ uibutton(cfBottomGL, 'Text', 'Copy', ...
     'ButtonPushedFcn', @(~,~) onCFCopyResults());
 uibutton(cfBottomGL, 'Text', 'Close', ...
     'FontSize', 9, ...
-    'ButtonPushedFcn', @(~,~) delete(cfFig));
+    'ButtonPushedFcn', @(~,~) onCFClose());
 
 % ── Row 6: Secondary actions + extended stats ────────────────────────
 cfBottom2GL = uigridlayout(cfRootGL, [1 4], ...
@@ -288,6 +302,9 @@ uibutton(cfBottom2GL, 'Text', 'Global Fit', ...
     'Tooltip', 'Fit the same model to multiple datasets with shared parameter constraints', ...
     'ButtonPushedFcn', @(~,~) onGlobalFit());
 
+% Cursor state (created after axes exist; [] when cursors are off or removed)
+cfCursors = [];
+
 % State for fit results
 cfResult = struct('params', [], 'errors', [], 'model', '', ...
     'xFit', [], 'yFit', [], 'R2', NaN, 'RMSE', NaN, ...
@@ -300,6 +317,13 @@ cfHistory = {};   % cell array of structs; newest at end
 
 % Initialise parameter table for the default model
 onCFModelChanged();
+
+% Initialise draggable cursors on the fit axes
+cfCursors = bosonPlotter.fitCursors(cfAxFit, ...
+    efCFXmin.Value, efCFXmax.Value, @onCursorRangeChanged);
+
+% Remove cursors when the dialog closes
+cfFig.CloseRequestFcn = @(~,~) onCFClose();
 
 % ════════════════════════════════════════════════════════════════════════
 % Nested functions
@@ -352,7 +376,7 @@ onCFModelChanged();
     function populateTable(pNames, p0, lb, ub)
     %POPULATETABLE  Fill parameter table with names, defaults, bounds.
         nP = numel(pNames);
-        tblData = cell(nP, 7);
+        tblData = cell(nP, 8);
         for pi = 1:nP
             tblData{pi, 1} = pNames{pi};       % Name
             tblData{pi, 2} = '';                % Value (fitted)
@@ -361,12 +385,13 @@ onCFModelChanged();
             tblData{pi, 5} = lb(pi);            % Lower bound
             tblData{pi, 6} = ub(pi);            % Upper bound
             tblData{pi, 7} = false;             % Fixed
+            tblData{pi, 8} = '';                % Constraint expression (empty = free)
         end
         tblCFParams.Data = tblData;
     end
 
-    function [fcn, pNames, p0, lb, ub, fixedMask] = resolveModel()
-    %RESOLVEMODEL  Get current model function, params, bounds from UI state.
+    function [fcn, pNames, p0, lb, ub, fixedMask, constraintExprs] = resolveModel()
+    %RESOLVEMODEL  Get current model function, params, bounds, constraints from UI state.
         modelName = ddCFModel.Value;
 
         if strcmp(modelName, 'Custom Equation')
@@ -389,12 +414,21 @@ onCFModelChanged();
         lb = repmat(-Inf, 1, nP);
         ub = repmat(Inf, 1, nP);
         fixedMask = false(1, nP);
+        constraintExprs = repmat({''}, 1, nP);
 
+        nRows = size(tblCFParams.Data, 1);
         for pi = 1:nP
-            p0(pi) = readNumericCell(tblCFParams.Data{pi, 4}, 0);
-            lb(pi) = readNumericCell(tblCFParams.Data{pi, 5}, -Inf);
-            ub(pi) = readNumericCell(tblCFParams.Data{pi, 6}, Inf);
+            if pi > nRows, break; end
+            p0(pi)        = readNumericCell(tblCFParams.Data{pi, 4}, 0);
+            lb(pi)        = readNumericCell(tblCFParams.Data{pi, 5}, -Inf);
+            ub(pi)        = readNumericCell(tblCFParams.Data{pi, 6}, Inf);
             fixedMask(pi) = logical(tblCFParams.Data{pi, 7});
+            if size(tblCFParams.Data, 2) >= 8
+                raw = tblCFParams.Data{pi, 8};
+                if ischar(raw) || isstring(raw)
+                    constraintExprs{pi} = strtrim(char(raw));
+                end
+            end
         end
     end
 
@@ -487,7 +521,7 @@ onCFModelChanged();
         end
 
         try
-            [fcn, ~, p0, ~, ~, ~] = resolveModel();
+            [fcn, ~, p0, ~, ~, ~, ~] = resolveModel();
         catch ME
             uialert(cfFig, ME.message, 'Simulate Error');
             return;
@@ -520,7 +554,7 @@ onCFModelChanged();
         end
 
         try
-            [fcn, pNames, p0, lb, ub, fixedMask] = resolveModel();
+            [fcn, pNames, p0, lb, ub, fixedMask, constraintExprs] = resolveModel();
         catch ME
             uialert(cfFig, ME.message, 'Fit Error');
             return;
@@ -528,10 +562,19 @@ onCFModelChanged();
 
         w = getWeights(ySeg);
 
+        % Determine if any constraint expressions are non-empty
+        hasConstraints = any(~cellfun(@isempty, constraintExprs));
+
         cfFig.Pointer = 'watch'; drawnow;
         try
-            res = fitting.curveFit(xSeg, ySeg, fcn, p0, ...
-                Lower=lb, Upper=ub, Fixed=fixedMask, Weights=w);
+            if hasConstraints
+                res = fitting.curveFit(xSeg, ySeg, fcn, p0, ...
+                    Lower=lb, Upper=ub, Fixed=fixedMask, Weights=w, ...
+                    Constraints=constraintExprs, ParamNames=pNames);
+            else
+                res = fitting.curveFit(xSeg, ySeg, fcn, p0, ...
+                    Lower=lb, Upper=ub, Fixed=fixedMask, Weights=w);
+            end
 
             % Dense x grid for smooth fit curve display
             xFit = linspace(min(xSeg), max(xSeg), 500)';
@@ -826,6 +869,55 @@ onCFModelChanged();
         end
         clipboard('copy', strjoin(lines, newline));
         options.StatusFcn('Fit results copied to clipboard');
+    end
+
+    function onCFClose()
+    %ONCFCLOSE  Clean up cursors then delete the dialog.
+        if ~isempty(cfCursors) && isfield(cfCursors, 'remove')
+            try
+                cfCursors.remove();
+            catch
+            end
+        end
+        cfCursors = [];
+        if isvalid(cfFig)
+            delete(cfFig);
+        end
+    end
+
+    function onCFCursorsToggled()
+    %ONCFCURSORSTOGGLED  Show or hide the draggable cursors.
+        if cbCFCursors.Value
+            % Create cursors if not already present
+            if isempty(cfCursors)
+                cfCursors = bosonPlotter.fitCursors(cfAxFit, ...
+                    efCFXmin.Value, efCFXmax.Value, @onCursorRangeChanged);
+            end
+        else
+            % Remove cursors
+            if ~isempty(cfCursors) && isfield(cfCursors, 'remove')
+                cfCursors.remove();
+                cfCursors = [];
+            end
+        end
+    end
+
+    function onCursorRangeChanged(xL, xR)
+    %ONCURSORRANGECHANGED  Sync edit fields when a cursor is dragged.
+        efCFXmin.Value = xL;
+        efCFXmax.Value = xR;
+        options.StatusFcn(sprintf('Fit range: [%.4g, %.4g]', xL, xR));
+    end
+
+    function onXRangeEdited()
+    %ONXRANGEEDITED  Move cursors when the user edits the X min/max fields.
+        if ~isempty(cfCursors) && isfield(cfCursors, 'setRange')
+            xL = efCFXmin.Value;
+            xR = efCFXmax.Value;
+            if xL < xR
+                cfCursors.setRange(xL, xR);
+            end
+        end
     end
 
     function cfPickXRange(which)
