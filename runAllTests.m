@@ -178,6 +178,8 @@ SUITES = {
     T('calc','test_baselines'),            'baseline','Baseline estimation: ALS, rolling ball, modified polynomial'
     % ── Error propagation tests ──────────────────────────────────────────
     T('calc','test_errorProp'),            'errorprop','Error propagation: linear Taylor, Monte Carlo, wrappers'
+    % ── Signal processing tests ──────────────────────────────────────────
+    T('calc','test_signal_processing'),   'sigproc', 'Signal processing: FFT filter (LP/HP/BP/notch) + smoothing roundtrips'
     % ── Utilities tests ──────────────────────────────────────────────────
     T('utilities','test_toOrigin'),        'utilities','Origin COM bridge: call sequence, qualified path, log handling (mock COM)'
     T('utilities','test_convertMagUnits'), 'utilities','Magnetometry unit conversion: Oe/T/mT/A/m, emu/A·m²/emu·g⁻¹/kA·m⁻¹, raw-preserve'
