@@ -618,37 +618,32 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
-%  19. Data table refresh exercises getPlotData (Bug regression)
+%  19. refreshDataTable updates info label; getPlotData regression
 % ════════════════════════════════════════════════════════════════════════
-fprintf('\n══ TEST 19: Data table refresh exercises getPlotData ══\n');
+fprintf('\n══ TEST 19: refreshDataTable info label + getPlotData ══\n');
 try
     api.reset();
     api.addFiles({XRDML_F});
     drawnow;
 
-    % Explicitly call refreshDataTable — this exercises getPlotData
+    % refreshDataTable now updates the compact info label (not a uitable)
     api.refreshDataTable();
     drawnow;
 
-    td = api.getTableData();
-    assert(~isempty(td.colNames), 'Column names should be populated');
-    % Working copy is populated by refreshDataTable if data loaded
+    % Verify getPlotData itself works (the core regression this test protects)
     datasets = api.getDatasets();
     nExpected = numel(datasets{1}.data.time);
-    if ~isempty(td.working)
-        nRows = size(td.working, 1);
-        assert(nRows == nExpected, ...
-            sprintf('Working copy rows (%d) should match data.time length (%d)', nRows, nExpected));
-        fprintf('  Table rows: %d, columns: %d\n', nRows, numel(td.colNames));
-    else
-        fprintf('  Table working copy empty (UI hidden) — getPlotData path verified\n');
-    end
-
-    % Verify getPlotData itself works (the core regression test)
     d = api.getPlotData(1);
     assert(~isempty(d.time), 'getPlotData should return data');
     assert(numel(d.time) == nExpected, 'getPlotData data size should match');
     fprintf('  getPlotData(1): %d points — OK\n', numel(d.time));
+
+    % Verify info label was updated (contains "rows")
+    infoLabels = findall(api.fig, 'Type', 'uilabel');
+    texts = arrayfun(@(h) char(h.Text), infoLabels, 'UniformOutput', false);
+    hasRowInfo = any(cellfun(@(t) contains(t, 'rows'), texts));
+    assert(hasRowInfo, 'Info label should contain "rows" after refreshDataTable');
+    fprintf('  Info label updated — OK\n');
 
     fprintf('  PASS\n');
     passed = passed + 1;
@@ -782,11 +777,7 @@ try
     api.addFiles({XRDML_F});
     drawnow;
 
-    % Refresh table first (stats reads from tableWorkingCopy)
-    api.refreshDataTable();
-    drawnow;
-
-    % Call descriptive stats — opens a popup figure
+    % descriptiveStats now reads directly from getPlotData + ds.mask
     api.descriptiveStats();
     drawnow;
     fprintf('  descriptiveStats() completed without error\n');

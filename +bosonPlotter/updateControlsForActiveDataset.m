@@ -204,9 +204,7 @@ function updateControlsForActiveDataset(appData, ui, callbacks)
     appData.selectedPeakIdx = 0;   % clear peak selection on dataset switch
     callbacks.refreshPeakTable();
 
-    % Refresh data table if visible
-    appData.tableMask   = [];  % reset mask on dataset switch
+    % Update dataset info bar
     appData.filterMask  = [];  % reset row filter on dataset switch
-    ui.efFilter.Value   = '';  % clear filter text field
     callbacks.refreshDataTable();
 end

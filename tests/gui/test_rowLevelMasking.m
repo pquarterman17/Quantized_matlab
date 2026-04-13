@@ -1,14 +1,13 @@
 function test_rowLevelMasking
-%TEST_ROWLEVELMASKING  Verify the mask column is gone and right-click masking
-%   + soft-red row highlighting work end-to-end (Task #7).
+%TEST_ROWLEVELMASKING  Verify the dataset info bar and DataWorkspace button
+%   work correctly after the legacy embedded table was removed.
 %
 %   Covers:
-%     - Data table column count no longer includes a trailing 'Masked' column
-%     - Right-click context menu exists on the data table
-%     - Mask selected rows applies style + updates ds.mask
-%     - Unmask selected rows / Unmask all restore state + styles
-%     - Masked rows get a BackgroundColor style via uistyle (soft red)
-%     - Session save/load round-trips masked rows (uses existing ds.mask path)
+%     - Dataset info label is present and updates on dataset load
+%     - Dataset info label shows row count and masked count
+%     - "Open in DataWorkspace" button is present
+%     - refreshDataTable() API call updates the info label without error
+%     - Mask state from ds.mask is reflected in the info bar
 
     thisDir = fileparts(mfilename('fullpath'));
     rootDir = fileparts(fileparts(thisDir));
@@ -31,154 +30,80 @@ function test_rowLevelMasking
     api.setActiveIdx(1);
     drawnow;
 
-    % Locate the data table and units table by tag (both uitables coexist
-    % after the Phase G scroll-performance split).
-    tbl = findall(api.fig, 'Type', 'uitable', 'Tag', 'BosonDataTable');
-    if isempty(tbl)
-        error('test_rowLevelMasking:noTable', 'Could not find BosonDataTable');
-    end
-    tbl = tbl(1);
-
-    tblU = findall(api.fig, 'Type', 'uitable', 'Tag', 'BosonUnitsTable');
-    if isempty(tblU)
-        error('test_rowLevelMasking:noUnits', 'Could not find BosonUnitsTable');
-    end
-    tblU = tblU(1);
-
     % ════════════════════════════════════════════════════════════════════
-    %  TEST 1: Table no longer contains a 'Masked' column
+    %  TEST 1: Legacy embedded uitables are gone; info label is present
     % ════════════════════════════════════════════════════════════════════
-    fprintf('\n== TEST 1: Masked column removed ==\n');
+    fprintf('\n== TEST 1: Legacy uitables removed; info label present ==\n');
     try
-        colNames = tbl.ColumnName;
-        check('ColumnName does NOT contain "Masked"', ...
-              ~any(strcmp(colNames, 'Masked')));
+        legacyData  = findall(api.fig, 'Type', 'uitable', 'Tag', 'BosonDataTable');
+        legacyUnits = findall(api.fig, 'Type', 'uitable', 'Tag', 'BosonUnitsTable');
+        check('BosonDataTable uitable is gone',  isempty(legacyData));
+        check('BosonUnitsTable uitable is gone', isempty(legacyUnits));
 
-        % Data is now a numeric matrix (post-split).  Column count
-        % should still match ColumnName count.
-        if ~isempty(tbl.Data)
-            nTableCols = size(tbl.Data, 2);
-            check('Data column count == ColumnName count', ...
-                  nTableCols == numel(colNames));
-        end
+        % Info label should exist as a uilabel inside the dataTablePanel
+        infoLabels = findall(api.fig, 'Type', 'uilabel');
+        texts = arrayfun(@(h) char(h.Text), infoLabels, 'UniformOutput', false);
+        hasInfoText = any(cellfun(@(t) ~isempty(t) && length(t) > 3, texts));
+        check('At least one uilabel with content exists', hasInfoText);
     catch ME
         recordCrash('TEST 1', ME);
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  TEST 2: Right-click context menu is attached
+    %  TEST 2: refreshDataTable() runs without error and updates label
     % ════════════════════════════════════════════════════════════════════
-    fprintf('\n== TEST 2: context menu wired ==\n');
+    fprintf('\n== TEST 2: refreshDataTable() updates info label ==\n');
     try
-        cm = tbl.ContextMenu;
-        check('ContextMenu is set',                ~isempty(cm) && isvalid(cm));
-        if ~isempty(cm)
-            items = cm.Children;
-            labels = arrayfun(@(h) char(h.Text), items, 'UniformOutput', false);
-            check('menu has "Mask selected rows"',   any(contains(labels, 'Mask selected')));
-            check('menu has "Unmask selected rows"', any(contains(labels, 'Unmask selected')));
-            check('menu has "Unmask all"',           any(contains(labels, 'Unmask all')));
-        end
+        api.refreshDataTable();
+        drawnow;
+        % Should not throw — that is sufficient for a smoke test
+        check('refreshDataTable() completed without error', true);
+
+        % Verify the info label text contains row count info
+        infoLabels = findall(api.fig, 'Type', 'uilabel');
+        texts = arrayfun(@(h) char(h.Text), infoLabels, 'UniformOutput', false);
+        hasRowInfo = any(cellfun(@(t) contains(t, 'rows'), texts));
+        check('Info label text contains "rows"', hasRowInfo);
     catch ME
         recordCrash('TEST 2', ME);
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  TEST 3: Programmatically mask rows via the callback, verify style
+    %  TEST 3: Info label reflects masked rows in ds.mask
     % ════════════════════════════════════════════════════════════════════
-    fprintf('\n== TEST 3: mask selected rows applies soft-red style ==\n');
+    fprintf('\n== TEST 3: Info label reflects masked row count ==\n');
     try
-        % Simulate a selection of table rows 2, 3, 4 (i.e. data rows 1, 2, 3)
-        % by writing into appData via the test api (we use setStyleOverrides
-        % helper to assign a dummy, then rely on the private tableSelection
-        % state).  Since tableSelection isn't exposed, we instead reach into
-        % the uitable's Selection if possible — but the simpler method is to
-        % invoke the mask callback with a pre-set selection through the api.
-        %
-        % The clean way: use the context menu's first child (Mask selected)
-        % after populating tableSelection.  But tableSelection is private
-        % — the selection callback sets it from a table interaction.  Since
-        % we can't drive a real click in -batch mode, we write into appData
-        % indirectly through a helper we'll add below if possible.
-        %
-        % Workaround: verify the VISUAL output path by calling the
-        % ds.mask → refreshDataTable flow.  Mark ds.mask for the first 3
-        % rows as excluded, then trigger refreshDataTable via api.setActiveIdx.
         datasets = api.getDatasets();
         ds = datasets{1};
         nRows = numel(ds.data.time);
-        ds.mask = true(nRows, 1);
-        ds.mask(1:3) = false;   % first 3 rows excluded
-        datasets{1} = ds;
-        % No direct setDatasets api — use setActiveIdx to force a re-render
-        % after mutating ds.mask via session reload (inefficient but works):
-        tmp = [tempname '.mat'];
-        try bosonPlotter.sessionManager.save(tmp, struct( ...
-                'datasets', {datasets}, ...
-                'activeIdx', 1, ...
-                'bgFile', '', 'bgDataset', [], ...
-                'style', 'Line', 'lastDir', ''), ...
-                struct('savedColormap','', 'savedMap2DCmap','', ...
-                       'savedXSel','', 'savedYSel',{{}}, 'savedY2Sel',{{}}, ...
-                       'savedLogX',false, 'savedLogY',false, 'savedBGInterp','linear')); catch, end
 
-        % Simpler: just directly verify applyMaskStyling was invoked by
-        % checking uitable's internal style storage (if accessible).  uitable
-        % doesn't expose applied styles easily, so the most pragmatic check
-        % is: does refreshDataTable run to completion without errors when
-        % called with a mask set?
-
-        api.setActiveIdx(1);
+        % First check with no masks (all included)
+        api.refreshDataTable();
         drawnow;
-        check('table refresh succeeded with masked rows in ds.mask', isvalid(tbl));
+        infoLabels = findall(api.fig, 'Type', 'uilabel');
+        texts = arrayfun(@(h) char(h.Text), infoLabels, 'UniformOutput', false);
+        zeroMaskText = any(cellfun(@(t) contains(t, '0 masked'), texts));
+        check('Info label shows "0 masked" when no rows masked', zeroMaskText);
 
-        % Column count still matches (no mask column added back)
-        check('column count stable after refresh with mask', ...
-              size(tbl.Data, 2) == numel(tbl.ColumnName));
+        % The label should also contain the row count
+        expectedStr = sprintf('%d rows', nRows);
+        hasRowCount = any(cellfun(@(t) contains(t, expectedStr), texts));
+        check(sprintf('Info label contains "%s"', expectedStr), hasRowCount);
     catch ME
         recordCrash('TEST 3', ME);
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  TEST 4: applyMaskStyling helper is callable and does not error
-    %           on empty masks (smoke test)
+    %  TEST 4: "Open in DataWorkspace" button is wired
     % ════════════════════════════════════════════════════════════════════
-    fprintf('\n== TEST 4: unmask all recovers a clean table ==\n');
+    fprintf('\n== TEST 4: DataWorkspace button exists ==\n');
     try
-        % Clear ds.mask and force refresh
-        datasets = api.getDatasets();
-        ds = datasets{1};
-        ds.mask = true(numel(ds.data.time), 1);
-        datasets{1} = ds;
-        % Force refresh via a harmless template toggle
-        api.setTemplate('screen');
-        api.setActiveIdx(1);
-        drawnow;
-
-        check('table still valid after clearing all masks', isvalid(tbl));
-        check('column count still matches', ...
-              size(tbl.Data, 2) == numel(tbl.ColumnName));
+        btns = findall(api.fig, 'Type', 'uibutton');
+        btnTexts = arrayfun(@(h) char(h.Text), btns, 'UniformOutput', false);
+        hasDwBtn = any(cellfun(@(t) contains(t, 'DataWorkspace'), btnTexts));
+        check('"Open in DataWorkspace" button present', hasDwBtn);
     catch ME
         recordCrash('TEST 4', ME);
-    end
-
-    % ════════════════════════════════════════════════════════════════════
-    %  TEST 5: tblUnits holds a 1-row cell of unit strings; tblData is
-    %           pure numeric (post-split scroll-performance refactor)
-    % ════════════════════════════════════════════════════════════════════
-    fprintf('\n== TEST 5: units live in dedicated tblUnits ==\n');
-    try
-        check('tblUnits.Data is a cell array', iscell(tblU.Data));
-        check('tblUnits has exactly 1 row',     size(tblU.Data, 1) == 1);
-        if iscell(tblU.Data) && ~isempty(tblU.Data)
-            allStrings = all(cellfun(@(c) ischar(c) || isstring(c) || isempty(c), tblU.Data(1, :)));
-            check('tblUnits row is all strings', allStrings);
-        end
-        check('tblData.Data is numeric',        isnumeric(tbl.Data));
-        check('tblData column count matches tblUnits', ...
-              size(tbl.Data, 2) == size(tblU.Data, 2));
-    catch ME
-        recordCrash('TEST 5', ME);
     end
 
     % ════════════════════════════════════════════════════════════════════

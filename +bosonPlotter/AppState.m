@@ -118,15 +118,9 @@ classdef AppState < handle
         % ── Inset zoom ─────────────────────────────────────────────
         insetAx                   = []
 
-        % ── Data table ─────────────────────────────────────────────
-        tableVisible    logical = true
-        tableWorkingCopy double = []
-        tableUnits      cell   = {}
-        tableMask       logical = logical([])
-        filterMask      logical = logical([])  % [N×1] logical from filter bar; [] = no filter
-        tableEdited     logical = false
-        tableRowCap     double  = 500
-        tableSelection  double  = []   % [Nx2] selected cells from CellSelectionCallback
+        % ── Filter / mask state ────────────────────────────────────
+        % Legacy embedded table removed; DataWorkspace is the spreadsheet.
+        filterMask      logical = logical([])  % [N×1] logical — reserved for future filter bar
 
         % ── Collapsible sections ───────────────────────────────────
         sectionCollapsed struct = struct( ...
