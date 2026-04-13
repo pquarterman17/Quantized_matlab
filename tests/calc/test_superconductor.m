@@ -221,6 +221,192 @@ for ti = 1:size(latexTests, 1)
     end
 end
 
+% ── extractTc ─────────────────────────────────────────────────────────
+fprintf('--- extractTc ---\n');
+
+% Synthetic Nb-like R(T): sigmoid centred at Tc = 9.2 K, width ~0.3 K
+Tc_true = 9.2;
+T_data  = linspace(5, 15, 400)';
+R_data  = 1 ./ (1 + exp(-10 * (T_data - Tc_true)));   % 0..1 normalised
+
+try
+    r = calc.superconductor.extractTc(T_data, R_data);
+    tol = 0.15;   % K
+    midOk  = abs(r.Tc_midpoint   - Tc_true) < tol;
+    onOk   = abs(r.Tc_onset      - Tc_true) < 0.5;   % onset is up-shifted
+    derivOk = abs(r.Tc_derivative - Tc_true) < tol;
+    widthOk = r.transitionWidth > 0 && r.transitionWidth < 2;
+    if midOk && onOk && derivOk && widthOk
+        fprintf('  PASS: extractTc midpoint=%.3f K, deriv=%.3f K (true %.3f K)\n', ...
+            r.Tc_midpoint, r.Tc_derivative, Tc_true);
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: extractTc mid=%.3f on=%.3f deriv=%.3f width=%.3f\n', ...
+            r.Tc_midpoint, r.Tc_onset, r.Tc_derivative, r.transitionWidth);
+        failed = failed + 1;
+    end
+catch ME
+    fprintf('  FAIL: extractTc (clean) — %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% Method='midpoint' returns only midpoint (others should be NaN)
+try
+    r = calc.superconductor.extractTc(T_data, R_data, Method='midpoint');
+    if abs(r.Tc_midpoint - Tc_true) < 0.15 && isnan(r.Tc_derivative)
+        fprintf('  PASS: extractTc Method=midpoint isolates correctly\n');
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: extractTc Method=midpoint: mid=%.3f deriv=%.3f (expect NaN)\n', ...
+            r.Tc_midpoint, r.Tc_derivative);
+        failed = failed + 1;
+    end
+catch ME
+    fprintf('  FAIL: extractTc Method=midpoint — %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% Noisy R(T) — midpoint should still land within 0.3 K
+try
+    rng(42);
+    R_noisy = R_data + 0.01 * randn(size(R_data));
+    r = calc.superconductor.extractTc(T_data, R_noisy);
+    if abs(r.Tc_midpoint - Tc_true) < 0.30
+        fprintf('  PASS: extractTc noisy data mid=%.3f K\n', r.Tc_midpoint);
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: extractTc noisy mid=%.3f K (expected within 0.3 K of %.3f)\n', ...
+            r.Tc_midpoint, Tc_true);
+        failed = failed + 1;
+    end
+catch ME
+    fprintf('  FAIL: extractTc noisy — %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% Edge: too few points should error
+try
+    calc.superconductor.extractTc([1;2;3], [1;2;3]);
+    fprintf('  FAIL: extractTc too-few-points — should have errored\n');
+    failed = failed + 1;
+catch
+    fprintf('  PASS: extractTc rejects < 5 points\n');
+    passed = passed + 1;
+end
+
+% ── beanJc ────────────────────────────────────────────────────────────
+fprintf('--- beanJc ---\n');
+
+% Synthetic M(H) loop: known deltaM = 0.02 emu, rectangular sample
+% a = 0.3 cm, b = 0.5 cm, t = 0.01 cm → vol = 0.0015 cm^3
+% geomFactor = a*(1 - a/(3b)) = 0.3*(1 - 0.3/1.5) = 0.3*0.8 = 0.24
+% Jc = 20 * deltaM * a / (vol * geomFactor)
+%    = 20 * 0.02 * 0.3 / (0.0015 * 0.24) = 0.12 / 3.6e-4 = 333.33 A/cm^2
+try
+    dM_known = 0.02;   % emu (full width)
+    a_s = 0.3; b_s = 0.5; t_s = 0.01;
+    vol_s = a_s * b_s * t_s;
+    gf    = a_s * (1 - a_s/(3*b_s));
+    Jc_expected = 20 * dM_known * a_s / (vol_s * gf);
+
+    % Build synthetic loop: triangle wave, ±1000 Oe
+    H_loop = [linspace(-1000, 1000, 100), linspace(1000, -1000, 100)]';
+    % Ascending: M = -deltaM/2; Descending: M = +deltaM/2  (constant width)
+    M_asc_v  = -dM_known/2 * ones(100, 1);
+    M_desc_v =  dM_known/2 * ones(100, 1);
+    M_loop   = [M_asc_v; M_desc_v];
+
+    dims.width = b_s; dims.length = a_s; dims.thickness = t_s;
+    res = calc.superconductor.beanJc(H_loop, M_loop, dims);
+
+    Jc_mean = mean(res.Jc(~isnan(res.Jc)));
+    relErr  = abs(Jc_mean - Jc_expected) / Jc_expected;
+    if relErr < 0.05
+        fprintf('  PASS: beanJc rectangular Jc=%.1f A/cm^2 (expected %.1f, err=%.1f%%)\n', ...
+            Jc_mean, Jc_expected, relErr*100);
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: beanJc rectangular Jc=%.1f, expected %.1f (err=%.1f%%)\n', ...
+            Jc_mean, Jc_expected, relErr*100);
+        failed = failed + 1;
+    end
+catch ME
+    fprintf('  FAIL: beanJc rectangular — %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% Cylindrical: Jc = (3/(2*r)) * deltaM / vol = (3/(2*r)) * dM / (pi*r^2*t)
+% r = 0.15 cm, t = 0.01 cm → vol = pi*0.0225*0.01 = 7.069e-4 cm^3
+% Jc = 3/(2*0.15) * 0.02 / 7.069e-4 = 10 * 28.28 = 282.8 A/cm^2
+try
+    r_cyl = 0.15; t_cyl = 0.01;
+    vol_cyl = pi * r_cyl^2 * t_cyl;
+    Jc_cyl_exp = (3/(2*r_cyl)) * dM_known / vol_cyl;
+
+    dims_cyl.radius = r_cyl; dims_cyl.thickness = t_cyl;
+    res_cyl = calc.superconductor.beanJc(H_loop, M_loop, dims_cyl, ...
+                                         Geometry='cylindrical');
+    Jc_cyl_mean = mean(res_cyl.Jc(~isnan(res_cyl.Jc)));
+    relErrC = abs(Jc_cyl_mean - Jc_cyl_exp) / Jc_cyl_exp;
+    if relErrC < 0.05
+        fprintf('  PASS: beanJc cylindrical Jc=%.1f A/cm^2 (expected %.1f)\n', ...
+            Jc_cyl_mean, Jc_cyl_exp);
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: beanJc cylindrical Jc=%.1f, expected %.1f (err=%.1f%%)\n', ...
+            Jc_cyl_mean, Jc_cyl_exp, relErrC*100);
+        failed = failed + 1;
+    end
+catch ME
+    fprintf('  FAIL: beanJc cylindrical — %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% Output fields present
+try
+    res2 = calc.superconductor.beanJc(H_loop, M_loop, dims);
+    if isfield(res2,'Jc') && isfield(res2,'field') && isfield(res2,'deltaM') && ...
+       numel(res2.Jc) == numel(res2.field) && numel(res2.Jc) == numel(res2.deltaM)
+        fprintf('  PASS: beanJc output struct fields and sizes OK\n');
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: beanJc output struct missing fields or size mismatch\n');
+        failed = failed + 1;
+    end
+catch ME
+    fprintf('  FAIL: beanJc output struct check — %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% FieldUnit='T' conversion: same Jc regardless of field unit
+try
+    H_T   = H_loop / 1e4;
+    res_T = calc.superconductor.beanJc(H_T, M_loop, dims, FieldUnit='T');
+    Jc_T_mean = mean(res_T.Jc(~isnan(res_T.Jc)));
+    Jc_Oe_mean = mean(res.Jc(~isnan(res.Jc)));
+    if abs(Jc_T_mean - Jc_Oe_mean) / Jc_Oe_mean < 0.01
+        fprintf('  PASS: beanJc FieldUnit=T gives same Jc as Oe\n');
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: beanJc FieldUnit=T Jc=%.1f vs Oe Jc=%.1f\n', Jc_T_mean, Jc_Oe_mean);
+        failed = failed + 1;
+    end
+catch ME
+    fprintf('  FAIL: beanJc FieldUnit=T — %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% Edge: too few points should error
+try
+    dims_e.width=0.3; dims_e.length=0.5; dims_e.thickness=0.01;
+    calc.superconductor.beanJc((1:5)', (1:5)', dims_e);
+    fprintf('  FAIL: beanJc too-few-points — should have errored\n');
+    failed = failed + 1;
+catch
+    fprintf('  PASS: beanJc rejects < 10 points\n');
+    passed = passed + 1;
+end
+
 % ── SUMMARY ──────────────────────────────────────────────────────────
 fprintf('\n=== Results: %d passed, %d failed ===\n', passed, failed);
 if failed > 0
