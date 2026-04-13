@@ -4,9 +4,9 @@ Comprehensive improvement plan for `DiraCulator.m` covering UX fixes, missing ba
 exposure, cross-tab workflows, documentation, and code quality. Sourced from a UX agent audit,
 documentation agent audit, and manual backend gap analysis.
 
-**Status:** Active
+**Status:** Complete
 **Created:** 2026-04-12
-**Updated:** 2026-04-12 (items 1–5 landed)
+**Updated:** 2026-04-12 (all 33 items landed)
 
 ---
 
@@ -282,5 +282,29 @@ DiraCulator.m (4,580 lines)
 - ~~**3. Add temperature input to Langevin card**~~ (2026-04-12) — Replaced hardcoded T=300K with editable field + validation
 - ~~**4. Visual distinction for error results**~~ (2026-04-12) — `errText()` helper wraps errors in red HTML span; ~45 catch blocks updated
 - ~~**5. Fix refreshPTColoring crash**~~ (2026-04-12) — Renamed to `refreshPTColors()` matching actual function name
+- ~~**6. Add Limits to numeric fields**~~ (2026-04-12) — Agent C: physically meaningful bounds on all tabs
+- ~~**7. Substrates tab: canonical API**~~ (2026-04-12) — Agent C: replaced hardcoded struct with calc.substrates calls
+- ~~**8. Review registerPrimaryBtn**~~ (2026-04-12) — Agent C: Electrical changed to btnRsToRho
+- ~~**12–14. Fill out Optics/Vacuum/Electrochem**~~ (2026-04-12) — Agent B: refractive↔dielectric, knudsenNumber, gasFlow, ohmicDrop
+- ~~**15. Semiconductor new cards**~~ (2026-04-12) — Agent B: Fermi level, Debye length, built-in potential, sheet carrier density, thermal velocity
+- ~~**16. Thin Film new cards**~~ (2026-04-12) — Agent B: sputter rate, projected range, dose→concentration, multilayer thermal conductivity
+- ~~**17. Superconductor: depairing current**~~ (2026-04-12) — Agent B
+- ~~**18. Crystal new cards**~~ (2026-04-12) — Agent B: tetragonal distortion, strain from Poisson, atomic density
+- ~~**19. X-ray/Neutron new cards**~~ (2026-04-12) — Agent B: weight↔atomic%, co-deposition ratio + scroll wrapper
+- ~~**20. Magnetic refactor to +calc**~~ (2026-04-12) — Agent C: bohrMagnetonConvert, demagFactor
+- ~~**21. Hall Effect refactor**~~ (2026-04-12) — Agent C: uses calc.semiconductor.hallCoefficient
+- ~~**22. Shared formula/density state**~~ (2026-04-12) — Agent C: syncFormula links efNSLDFormula↔efMWFormula
 - ~~**23. "Open in Reflectivity Builder" from SLD cards**~~ (2026-04-12) — Implemented as part of item 2 cross-tab flow
+- ~~**24. User guide**~~ (2026-04-12) — Agent A: docs/gui_diraculator.md
+- ~~**25. CLAUDE.md section**~~ (2026-04-12) — Agent A: DiraCulator section added
+- ~~**26. Per-tab builder docstrings**~~ (2026-04-12) — Agent A: 18 %BUILDXXXTAB one-liners
+- ~~**27. API method table**~~ (2026-04-12) — Agent A: 29-method table in +calc/README.md
+- ~~**28. Physics formula comments**~~ (2026-04-12) — Agent A: formula comments above all card dividers
+- ~~**29. Backend docstring sweep**~~ (2026-04-12) — Agent A: verified all +calc functions already have docstrings
+- ~~**30. test_calc_modules.m comments**~~ (2026-04-12) — Agent A: already has section dividers
 - ~~**31. Extract error display helper**~~ (2026-04-12) — Completed as part of item 4
+- ~~**32. Dark theme verification**~~ (2026-04-12) — Agent C: confirmed sweep covers all widgets
+- ~~**33. Rename to DiraCulator**~~ (2026-04-12) — File, function, title, all references across 10 files
+- ~~**9. Nav tree category icons**~~ (2026-04-12) — R2023a+ Icon property with version guard
+- ~~**10. Rename shadowed btnCopyResult**~~ (2026-04-12) — Local → btnUCCopyResult in Unit Converter
+- ~~**11. Register substrates primaryBtn**~~ (2026-04-12) — Copy All button registered for Enter key

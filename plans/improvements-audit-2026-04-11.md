@@ -2,7 +2,7 @@
 
 Comprehensive codebase audit produced by four parallel subagents (Usability, Refactor/Perf,
 UI, Docs) running in isolated worktrees at HEAD `c9fcb0d`. Covers `quantized_matlab` —
-BosonPlotter, FermiViewer, materialsCalcGUI, xrdConvertGUI, and all `+` packages.
+BosonPlotter, FermiViewer, DiraCulator, xrdConvertGUI, and all `+` packages.
 
 **Status:** Active
 **Created:** 2026-04-11
@@ -49,7 +49,7 @@ Feature docs (docs/*.md) ← W4 stale doc fixes
 | 5 | lineCache fast-path restore | W2 — Perf | Regression from Phase G — every replot is full-cost |
 | 6 | CSV export with writematrix | W2 — Perf | 10-100x speedup on big files |
 | 21 | Plot Style dialog scroll/resize | W3 — UI | Apply button unreachable on laptops |
-| 26 | materialsCalcGUI tooltips | W3 — UI | 377 widgets, zero tooltips |
+| 26 | DiraCulator tooltips | W3 — UI | 377 widgets, zero tooltips |
 | 1 | Recent Files menu | W1 — Usability | Single biggest friction reducer |
 
 ---
@@ -88,7 +88,7 @@ Features that reduce friction on common BosonPlotter tasks.
 
 12. ~~**Extension-specific file filter presets**~~ — done, grouped into XRD/VSM/CSV/Excel/Microscopy/Images/Neutron
 
-13. ~~**"Copy Row as MATLAB code" for materialsCalcGUI**~~ — done (Lane F agent): history panel + context menu + 4 tabs wired
+13. ~~**"Copy Row as MATLAB code" for DiraCulator**~~ — done (Lane F agent): history panel + context menu + 4 tabs wired
 
 14. ~~**Keyboard shortcut for "next peak"**~~ — done, Up/Down/Enter/Delete in Peak Analysis window via peakCallbacks.onKeyPress
 
@@ -147,11 +147,11 @@ Layout, interaction, theming, tooltips, and accessibility across all GUIs.
 
 30. ~~**xrdConvertGUI resize + contrast**~~ — done (Lane B agent): Resize='on', min 480x600
 
-31. ~~**materialsCalcGUI nav overhaul**~~ — done (Lane B agent): uitree with 5 categories
+31. ~~**DiraCulator nav overhaul**~~ — done (Lane B agent): uitree with 5 categories
 
-32. ~~**materialsCalcGUI keyboard shortcuts**~~ — already implemented (WindowKeyPressFcn + primaryBtnMap)
+32. ~~**DiraCulator keyboard shortcuts**~~ — already implemented (WindowKeyPressFcn + primaryBtnMap)
 
-33. ~~**materialsCalcGUI theme consistency**~~ — done (Lane B agent): full dark theme with applyDarkPanelTheme()
+33. ~~**DiraCulator theme consistency**~~ — done (Lane B agent): full dark theme with applyDarkPanelTheme()
 
 ### Tier 2 — Medium Impact
 
@@ -183,7 +183,7 @@ Layout, interaction, theming, tooltips, and accessibility across all GUIs.
 
 46. ~~**Multi-select delete confirmation**~~ — already implemented (uiconfirm at line 3397)
 
-47. ~~**Button palette consistency**~~ — done: `+styles/buttonPalette.m` with 7 named roles; FermiViewer + materialsCalcGUI wired to shared palette
+47. ~~**Button palette consistency**~~ — done: `+styles/buttonPalette.m` with 7 named roles; FermiViewer + DiraCulator wired to shared palette
 
 ---
 
@@ -244,7 +244,7 @@ on the fallback path per CLAUDE.md convention).
 
 ### Tier 2 — Medium Impact
 
-62. ~~**`containers.Map` → `dictionary` migration**~~ — done: 8 of 36 sites migrated (homogeneous value types); 28 kept as `containers.Map` (heterogeneous `'ValueType','any'`, serialized to .mat, or function-handle values). Migrated: createDataStruct, importCIF, unitConvert, edsKFactorTable, massAbsorptionCoeff, parseEquation (2 maps), coDepositionRatio, materialsCalcGUI.
+62. ~~**`containers.Map` → `dictionary` migration**~~ — done: 8 of 36 sites migrated (homogeneous value types); 28 kept as `containers.Map` (heterogeneous `'ValueType','any'`, serialized to .mat, or function-handle values). Migrated: createDataStruct, importCIF, unitConvert, edsKFactorTable, massAbsorptionCoeff, parseEquation (2 maps), coDepositionRatio, DiraCulator.
 
 ### Tier 3 — Nice-to-Have
 
@@ -274,7 +274,7 @@ on the fallback path per CLAUDE.md convention).
 - ~~**Delete dead `%{...%}` block**~~ (2026-04-11) — 176-line commented curve-fitting block removed
 - ~~**Delete duplicate safeEvalMathExpr**~~ (2026-04-11) — removed local stub, kept +bosonPlotter/ version
 - ~~**Plot Style dialog scroll/resize**~~ (2026-04-11) — dynamic `dlgH = min(780, screenH-120)`, `Resize='on'`, root grid `Scrollable='on'`, 4 regression assertions
-- ~~**materialsCalcGUI tooltips**~~ (2026-04-11) — 108 of ~159 eligible input widgets got physics-accurate tooltips
+- ~~**DiraCulator tooltips**~~ (2026-04-11) — 108 of ~159 eligible input widgets got physics-accurate tooltips
 - ~~**Architecture.md stale fixes**~~ (2026-04-11) — `drawToAxes → renderPlot`, added `styleOverrides`/`activeTemplate`, expanded Extracted Subsystems table
 - ~~**CLAUDE.md Detailed Documentation table**~~ (2026-04-11) — added +plotting, +styles, +fitting rows
 - ~~**Create `+fitting/README.md`**~~ (2026-04-11) — 19 functions + 23-model catalog, biggest doc gap closed
@@ -287,9 +287,9 @@ on the fallback path per CLAUDE.md convention).
 - ~~**Bulk-apply corrections**~~ — already existed: `btnApplyAll` + `onApplyCorrectionsAll`
 - ~~**xrdConvertGUI folder memory**~~ (2026-04-11) — getpref/setpref for last input/output dirs, min size enforcement
 - ~~**xrdConvertGUI resize + contrast**~~ (2026-04-11) — Resize='on', min 480x600, white FontColor on Convert
-- ~~**materialsCalcGUI uitree nav**~~ (2026-04-11) — replaced listbox with uitree, 5 categories, all expanded by default
-- ~~**materialsCalcGUI keyboard shortcuts**~~ — already existed: WindowKeyPressFcn + primaryBtnMap
-- ~~**materialsCalcGUI dark theme**~~ (2026-04-11) — full dark theme with applyDarkPanelTheme() utility
+- ~~**DiraCulator uitree nav**~~ (2026-04-11) — replaced listbox with uitree, 5 categories, all expanded by default
+- ~~**DiraCulator keyboard shortcuts**~~ — already existed: WindowKeyPressFcn + primaryBtnMap
+- ~~**DiraCulator dark theme**~~ (2026-04-11) — full dark theme with applyDarkPanelTheme() utility
 - ~~**Package READMEs**~~ (2026-04-11) — all 7 expanded: +bosonPlotter (37 funcs), +utilities (38), +plotting (15), +parser (27), +styles (4), +imaging (52), +scripts (7)
 - ~~**Correction presets**~~ (2026-04-11) — `+bosonPlotter/correctionPresets.m` static class, dropdown+save+delete in corrections panel row 29, persisted to `prefdir/boson_corr_presets.mat`
 - ~~**Legend location dropdown**~~ (2026-04-11) — replaced checkbox with dropdown (best/NE/NW/SE/SW/EastOutside/off), wired to `styleOverrides.legendLocation`

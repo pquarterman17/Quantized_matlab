@@ -14,6 +14,8 @@ context section, Tier 1/2/3 with continuous numbering, completed section at bott
 | [parser-roadmap.md](parser-roadmap.md) | New parsers (Oxford, Raman, OPUS, SPC) — blocked on example files | Paused |
 | [porting_plan.md](porting_plan.md) | Architecture plan for MATLAB → Python+Tauri port (thin_film_toolkit) | Active |
 
+| [materialscalc-improvements.md](materialscalc-improvements.md) | DiraCulator: 33 items — UX, backend cards, cross-tab, docs, rename | **Complete** |
+
 ## Archive
 
 Completed plans kept for reference in [`archive/`](archive/):
@@ -25,8 +27,8 @@ Completed plans kept for reference in [`archive/`](archive/):
 | originpro-inspired-features.md | 2026-03-21 | 8 phases: curve fitting, templates, stats, batch fit, ROI, multi-panel |
 | origin_feature_gaps.md | 2026-03-21 | 7 OriginPro gaps: SG filter, templates, fitting, FFT, resample, stats, ROI |
 | advanced-figure-builder.md | 2026-03 | 5-tier figure builder with waterfall, multi-panel, inset zoom |
-| materials-calculator.md | 2026-03 | 6-phase calculator: constants, 10 packages, GUI, 152 tests |
-| materials_calculator_plan.md | 2026-03 | Detailed architecture for materials calculator phases 1-6 |
+| materials-calculator.md | 2026-03 | 6-phase calculator: constants, 10 packages, GUI, 152 tests (now DiraCulator) |
+| materials_calculator_plan.md | 2026-03 | Detailed architecture for materials calculator phases 1-6 (now DiraCulator) |
 | emviewer-phase1.md | 2026-03 | FermiViewer Phase 1: 20 features |
 | emviewer-phase2.md | 2026-03 | FermiViewer Phase 2: 20 features |
 | emviewer-phase3.md | 2026-03 | FermiViewer Phase 3: 20 DM-parity features |

@@ -1,4 +1,5 @@
 # Materials Calculator & Unit Converter — Architecture Plan
+> **Note:** Renamed to **DiraCulator** on 2026-04-12. File is now `DiraCulator.m`.
 
 ## Progress Summary
 
