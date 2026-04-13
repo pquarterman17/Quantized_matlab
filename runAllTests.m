@@ -106,6 +106,7 @@ SUITES = {
     T('gui','test_plotStyleDialog'),        'gui',    'Plot Style dialog (Phase B) + session round-trip (Phase C): overrides, precedence, reset, save/load'
     T('gui','test_rowLevelMasking'),        'gui',    'Row-level masking: no mask column, context menu, soft-red row style'
     T('gui','test_plotInteractions'),       'gui',    'Plot interactions: double-click labels, context menus on traces, cursor panel readout'
+    T('gui','test_insetGraph'),             'gui',    'Inset graph: create, region limits, rect/connectors, remove, replacement, Position option'
     T('gui','test_2dMapStyling'),           'gui',    '2D heatmap axes pick up active template font/tick (Phase F)'
     T('gui','test_contour_features'),       'contour','Contour/heatmap: gridding, plot styles, edge cases, export'
     T('gui','test_diraculator'),            'calcgui','DiraCulator GUI API'

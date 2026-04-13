@@ -911,6 +911,12 @@ function varargout = BosonPlotter(options)
         uimenu(cmAxes, 'Text', 'Refresh State (F5)', 'Separator', 'on', ...
             'MenuSelectedFcn', @(~,~) refreshState());
 
+        % Inset graph
+        uimenu(cmAxes, 'Text', 'Add Inset...', 'Separator', 'on', ...
+            'MenuSelectedFcn', @(~,~) onCreateInsetFromMenu());
+        uimenu(cmAxes, 'Text', 'Remove Inset', ...
+            'MenuSelectedFcn', @(~,~) onRemoveInset());
+
         % Toolbar customisation
         uimenu(cmAxes, 'Text', 'Customise Toolbar...', 'Separator', 'on', ...
             'MenuSelectedFcn', @(~,~) onCustomiseToolbar());
@@ -10066,7 +10072,12 @@ function varargout = BosonPlotter(options)
     end
 
     function onCreateInset(~,~)
-    %ONCREATEINSET  Create an inset axes showing a zoomed region (#18).
+    %ONCREATEINSET  Toolbar button: delegate to onCreateInsetFromMenu.
+        onCreateInsetFromMenu();
+    end
+
+    function onCreateInsetFromMenu()
+    %ONCREATEINSETFROMMENU  Right-click menu: prompt for region, then create inset.
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig,'Load a file first.','No data'); return;
         end
@@ -10078,25 +10089,20 @@ function varargout = BosonPlotter(options)
         xLo = str2double(answer{1}); xHi = str2double(answer{2});
         yLo = str2double(answer{3}); yHi = str2double(answer{4});
         if any(isnan([xLo xHi yLo yHi])), return; end
-
-        % Create inset axes in top-right corner of the main axes
-        axPos = getpixelposition(ax, true);
-        insetW = axPos(3) * 0.35;
-        insetH = axPos(4) * 0.35;
-        insetPos = [axPos(1)+axPos(3)-insetW-20, axPos(2)+axPos(4)-insetH-20, insetW, insetH];
-        if isprop(appData, 'insetAx') && ~isempty(appData.insetAx) && isvalid(appData.insetAx)
-            delete(appData.insetAx);
+        if xLo >= xHi || yLo >= yHi
+            uialert(fig,'Region bounds must satisfy min < max.','Invalid Region');
+            return;
         end
-        insetAx = axes(fig, 'Units', 'pixels', 'Position', insetPos);
-        box(insetAx, 'on'); grid(insetAx, 'on');
-        insetAx.FontSize = 8;
-        drawToAxes(insetAx);
-        insetAx.XLim = [xLo xHi];
-        insetAx.YLim = [yLo yHi];
-        legend(insetAx, 'off');
-        title(insetAx, '');
-        xlabel(insetAx, ''); ylabel(insetAx, '');
-        appData.insetAx = insetAx;
+        try
+            bosonPlotter.insetGraph(ax, [xLo xHi yLo yHi]);
+        catch ME
+            uialert(fig, sprintf('Inset creation failed:\n%s', ME.message), 'Inset Error');
+        end
+    end
+
+    function onRemoveInset()
+    %ONREMOVEINSET  Right-click menu: remove the inset and its decorations.
+        bosonPlotter.insetGraph_remove(ax);
     end
 
     % ── Interactive Data Cursor ────────────────────────────────────────
