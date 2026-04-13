@@ -136,6 +136,26 @@ catalog = [ ...
     mdl('Square Root', 'Other', 'y = a·√x + b', ...
         @(x,p) p(1)*sqrt(abs(x)) + p(2), ...
         {'a','b'}, [1 0], [-INF -INF], [INF INF])
+
+    % ── Heat Capacity — Debye & Einstein phonon models ─────────────────
+    % C(T) = gamma*T + n * C_Debye(T, thetaD)
+    % p = [gamma (mJ/mol/K²), thetaD (K), n (atoms/f.u.)]
+    mdl('Debye', 'Thermal', 'C = γT + n·C_D(T,θD)', ...
+        @(x,p) debyeHeatCapacity(x, p), ...
+        {'gamma','thetaD','n'}, [5 200 1], [0 1 0.1], [INF INF 20])
+
+    % C(T) = gamma*T + n * C_Einstein(T, thetaE)
+    % p = [gamma (mJ/mol/K²), thetaE (K), n]
+    mdl('Einstein', 'Thermal', 'C = γT + n·C_E(T,θE)', ...
+        @(x,p) einsteinHeatCapacity(x, p), ...
+        {'gamma','thetaE','n'}, [5 150 1], [0 1 0.1], [INF INF 20])
+
+    % Combined Debye + Einstein with two characteristic temperatures
+    % p = [gamma, thetaD, nD, thetaE, nE]
+    mdl('Debye+Einstein', 'Thermal', 'C = γT + n_D·C_D(T,θD) + n_E·C_E(T,θE)', ...
+        @(x,p) debyeEinsteinHeatCapacity(x, p), ...
+        {'gamma','thetaD','n_D','thetaE','n_E'}, [5 200 0.8 150 0.2], ...
+        [0 1 0 1 0], [INF INF 20 INF 20])
 ];
 
 end
@@ -204,4 +224,118 @@ function M = stonerWohlfarthFcn(H, p)
     % Effective field relative to coercive field (sign follows H direction)
     Heff = H - sign(H) .* Hc;
     M = Ms .* tanh(Heff ./ Hk);
+end
+
+% ════════════════════════════════════════════════════════════════════════
+% Local helper — Debye heat capacity (electronic + lattice)
+% ════════════════════════════════════════════════════════════════════════
+function C = debyeHeatCapacity(T, p)
+%DEBYEHEATCAPACITY  C(T) = gamma*T + n * 9*R*(T/thetaD)^3 * integral.
+%
+%   p = [gamma (mJ/mol/K^2), thetaD (K), n (atoms/formula unit)]
+%
+%   Debye integral: integral from 0 to thetaD/T of x^4*e^x/(e^x-1)^2 dx
+%   evaluated numerically. Full heat capacity per mole:
+%     C_Debye(T, thetaD) = 9*R*(T/thetaD)^3 * integral
+%
+%   Total: C(T) = gamma*T + n * C_Debye(T, thetaD)   [mJ/mol/K]
+%   Note: gamma in mJ/mol/K^2 so gamma*T in mJ/mol/K; 9*R in J/mol/K
+%   converted to mJ: multiply by 1000.
+    gamma  = p(1);    % mJ/(mol·K²)
+    thetaD = max(p(2), 1);
+    n      = max(p(3), 0);
+    R      = 8.314;   % J/(mol·K)
+
+    T = T(:);
+    C = zeros(size(T));
+    for k = 1:numel(T)
+        Tk = max(T(k), 0.01);
+        u  = thetaD / Tk;
+        % Debye integral: int_0^u x^4*e^x/(e^x-1)^2 dx
+        dInt = debyeIntegral(u);
+        C_lattice_J = 9 * R * (1/u)^3 * dInt;   % J/(mol·K)
+        C(k) = gamma * Tk + n * C_lattice_J * 1000;  % mJ/(mol·K)
+    end
+end
+
+% ════════════════════════════════════════════════════════════════════════
+% Local helper — Einstein heat capacity
+% ════════════════════════════════════════════════════════════════════════
+function C = einsteinHeatCapacity(T, p)
+%EINSTEINHEATHCAPACITY  C(T) = gamma*T + n * 3*R*(thetaE/T)^2*e^u/(e^u-1)^2.
+%
+%   p = [gamma (mJ/mol/K^2), thetaE (K), n]
+    gamma  = p(1);
+    thetaE = max(p(2), 1);
+    n      = max(p(3), 0);
+    R      = 8.314;
+
+    T = T(:);
+    C = zeros(size(T));
+    for k = 1:numel(T)
+        Tk = max(T(k), 0.01);
+        u  = thetaE / Tk;
+        eu = exp(min(u, 500));   % cap to avoid overflow
+        C_ein_J = 3 * R * u^2 * eu / max((eu - 1)^2, eps);
+        C(k) = gamma * Tk + n * C_ein_J * 1000;
+    end
+end
+
+% ════════════════════════════════════════════════════════════════════════
+% Local helper — Combined Debye + Einstein model
+% ════════════════════════════════════════════════════════════════════════
+function C = debyeEinsteinHeatCapacity(T, p)
+%DEBYEEINSTEINHEATCAPACITY  C = gamma*T + nD*C_D + nE*C_E.
+%
+%   p = [gamma, thetaD, nD, thetaE, nE]
+    pD = [p(1), p(2), p(3)];   % Debye part
+    pE = [p(1), p(4), p(5)];   % Einstein part (shares gamma — not double-counted)
+
+    % Combine: gamma*T once + nD * Debye_lattice + nE * Einstein_lattice
+    R = 8.314;
+    gamma  = p(1);
+    thetaD = max(p(2), 1);
+    nD     = max(p(3), 0);
+    thetaE = max(p(4), 1);
+    nE     = max(p(5), 0);
+
+    T = T(:);
+    C = zeros(size(T));
+    for k = 1:numel(T)
+        Tk = max(T(k), 0.01);
+
+        uD = thetaD / Tk;
+        dInt = debyeIntegral(uD);
+        C_D_J = 9 * R * (1/uD)^3 * dInt;
+
+        uE = thetaE / Tk;
+        euE = exp(min(uE, 500));
+        C_E_J = 3 * R * uE^2 * euE / max((euE - 1)^2, eps);
+
+        C(k) = gamma * Tk + (nD * C_D_J + nE * C_E_J) * 1000;
+    end
+end
+
+% ════════════════════════════════════════════════════════════════════════
+% Local helper — Debye integral (numerical)
+% ════════════════════════════════════════════════════════════════════════
+function I = debyeIntegral(u)
+%DEBYEINTEGRAL  Numerically evaluate integral_0^u x^4*e^x/(e^x-1)^2 dx.
+%
+%   For large u (u > 30), the integrand decays exponentially and the
+%   integral converges to the analytic Debye function limit (4*pi^4/15).
+%   For small u, uses adaptive Gauss-Legendre quadrature via integral().
+    if u > 30
+        % Converged: Debye function approaches D(inf) * 3 = 4*pi^4/15
+        I = 4 * pi^4 / 15;
+        return;
+    end
+    if u < 1e-4
+        % Leading-order: integrand ~ x^2, integral ~ u^3/3
+        I = u^3 / 3;
+        return;
+    end
+    % Numerical integration (MATLAB built-in, no toolbox needed)
+    integrand = @(x) x.^4 .* exp(x) ./ max((exp(x) - 1).^2, eps);
+    I = integral(integrand, 0, u, 'RelTol', 1e-6, 'AbsTol', 1e-10);
 end

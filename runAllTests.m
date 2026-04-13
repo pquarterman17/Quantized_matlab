@@ -35,6 +35,7 @@ function runAllTests(options)
 %                   Curie-Weiss analysis, Stoner-Wohlfarth model
 %       templates — dataset template engine (fingerprint, match, apply, save/load)
 %       workspace — DataWorkspace model (WorkspaceModel add/remove/mask/undo/events)
+%       physics3 — Tier-3 physics: BCS gap, Debye/Einstein, FORC, Kissinger, relaxation
 %       all      — all of the above, in order
 %
 %   Examples:
@@ -61,7 +62,7 @@ options.Group = validatestring(options.Group, ...
      "xrayneutron", "superconductor", "cif", "optics", "vacuum", "electrochemistry", ...
      "eels", "eels_adv", "diffindex", "diff_sim", "edsquant", "contour", "fitting", "plotting", ...
      "spectral", "interp2d", "baseline", "errorprop", "utilities", "templates", "workspace", ...
-     "transport", "magnetic"]);
+     "transport", "magnetic", "physics3"]);
 
 % Build absolute paths to test scripts so `run` works regardless of CWD.
 % Tests are organized into subdirectories: parser/, gui/, imaging/, calc/, batch/
@@ -138,6 +139,7 @@ SUITES = {
     T('calc','test_calc_electrochemistry'),'electrochemistry', 'Electrochemistry: Nernst, BV, Tafel'
     T('calc','test_transport_analysis'),  'transport', 'VFT model, Hall analysis, Wiedemann-Franz'
     T('calc','test_magnetic_analysis'),   'magnetic', 'Magnetic analysis: Brillouin, M(T) bg, Curie-Weiss, Stoner-Wohlfarth'
+    T('calc','test_physics_tier3'),       'physics3', 'Physics Tier-3: BCS gap, Debye/Einstein, FORC, Kissinger, relaxation'
     % ── Fitting tests ────────────────────────────────────────────────────
     T('fitting','test_peak_detection'),   'fitting', 'Robust peak detection, background estimation, prominence'
     T('fitting','test_curve_fitting'),    'fitting', 'Curve fitting engine, models, autoGuess, parseEquation'
