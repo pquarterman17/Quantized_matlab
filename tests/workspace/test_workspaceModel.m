@@ -659,6 +659,133 @@ catch ex
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  U. ColumnRoles — setErrorFor / getErrorFor / clearErrorFor
+% ════════════════════════════════════════════════════════════════════════
+
+fprintf('\n══ TEST U: ColumnRoles error bar designation ══\n');
+try
+    roles = dataWorkspace.ColumnRoles(3);
+
+    % Initially no error bars
+    assert(roles.getErrorFor(1) == 0, 'no error bar initially for col 1');
+    assert(roles.getErrorFor(2) == 0, 'no error bar initially for col 2');
+
+    % Designate col 3 as error bars for col 2
+    roles = roles.setErrorFor(2, 3);
+    assert(roles.getErrorFor(2) == 3, 'col 3 should be error bar for col 2');
+    assert(roles.getErrorFor(1) == 0, 'col 1 should have no error bar');
+
+    % Overwrite designation
+    roles = roles.setErrorFor(2, 1);
+    assert(roles.getErrorFor(2) == 1, 'overwrite: col 1 should be error bar for col 2');
+    assert(numel(roles.errorFor.yCols) == 1, 'should have exactly 1 designation');
+
+    % Clear
+    roles = roles.clearErrorFor(2);
+    assert(roles.getErrorFor(2) == 0, 'error bar should be cleared');
+    assert(isempty(roles.errorFor.yCols), 'errorFor should be empty after clear');
+
+    % clearErrorFor on non-designated column is a no-op
+    roles2 = dataWorkspace.ColumnRoles(2);
+    roles2 = roles2.clearErrorFor(1);  % should not error
+    assert(roles2.getErrorFor(1) == 0, 'no-op clear should leave col 1 without error bar');
+
+    % Self-reference error
+    errFired = false;
+    try, roles.setErrorFor(1, 1); catch, errFired = true; end
+    assert(errFired, 'setErrorFor with same y and err should error');
+
+    fprintf('PASS\n'); passed = passed + 1;
+catch ex
+    fprintf('FAIL: %s\n', ex.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  V. ColumnRoles — getPlotGroups includes .errorData
+% ════════════════════════════════════════════════════════════════════════
+
+fprintf('\n══ TEST V: getPlotGroups errorData ══\n');
+try
+    t   = (1:5)';
+    vals = [t, t*2, t*0.1];   % col 1 = Y, col 2 = Y2, col 3 = error for col 1
+    d = struct('time', t, 'values', vals, ...
+               'labels', {{'Y','Y2','Err'}}, 'units', {{'u','u','u'}}, ...
+               'metadata', struct());
+
+    roles = dataWorkspace.ColumnRoles(3);
+    roles = roles.setErrorFor(1, 3);   % col 3 is error for col 1
+
+    groups = roles.getPlotGroups(d);
+    assert(numel(groups) == 1, 'should have 1 group');
+    g = groups{1};
+    assert(~isempty(g.errorData),         'errorData should not be empty');
+    assert(size(g.errorData, 2) == 3,     'errorData should have 3 columns (one per Y)');
+    assert(isequal(g.errorData(:,1), vals(:,3)), 'errorData col 1 = vals col 3');
+    assert(all(g.errorData(:,2) == 0),    'errorData col 2 has no designation → zeros');
+    assert(all(g.errorData(:,3) == 0),    'errorData col 3 has no designation → zeros');
+
+    % No error bars → errorData is []
+    roles2 = dataWorkspace.ColumnRoles(2);
+    g2 = roles2.getPlotGroups(d);
+    assert(isempty(g2{1}.errorData), 'no designation → errorData should be []');
+
+    fprintf('PASS\n'); passed = passed + 1;
+catch ex
+    fprintf('FAIL: %s\n', ex.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  W. WorkspaceModel — createSnapshot / restoreFromSnapshot
+% ════════════════════════════════════════════════════════════════════════
+
+fprintf('\n══ TEST W: createSnapshot / restoreFromSnapshot ══\n');
+try
+    model = dataWorkspace.WorkspaceModel();
+    model.addDataset(makeData(6, 'snap1'), 'snap1.dat', 'test');
+    model.addDataset(makeData(4, 'snap2'), 'snap2.dat', 'test');
+    model.setActive(2);
+    model.setMask(1, [true; false; true; true; true; true]);
+
+    snap = model.createSnapshot();
+    assert(isfield(snap, 'datasets'),        'snap should have datasets');
+    assert(isfield(snap, 'mask'),            'snap should have mask');
+    assert(isfield(snap, 'columnRoles'),     'snap should have columnRoles');
+    assert(isfield(snap, 'computedColumns'), 'snap should have computedColumns');
+    assert(isfield(snap, 'activeIdx'),       'snap should have activeIdx');
+    assert(isfield(snap, 'version'),         'snap should have version');
+    assert(snap.activeIdx == 2,              'snap.activeIdx should be 2');
+
+    % Restore into a fresh model
+    model2 = dataWorkspace.WorkspaceModel();
+    model2.restoreFromSnapshot(snap);
+
+    assert(model2.count() == 2,              'restored model should have 2 datasets');
+    assert(model2.activeIdx == 2,            'restored activeIdx should be 2');
+    m = model2.getMask(1);
+    assert(m(2) == false,                    'restored mask row 2 should be false');
+    assert(all(m([1 3 4 5 6])),              'restored mask other rows should be true');
+
+    % Events fired on restore
+    ctr = containers.Map({'data','sel'}, {0, 0});
+    model3 = dataWorkspace.WorkspaceModel();
+    addlistener(model3, 'DataChanged',      @(~,~) bumpCtr(ctr,'data'));
+    addlistener(model3, 'SelectionChanged', @(~,~) bumpCtr(ctr,'sel'));
+    model3.restoreFromSnapshot(snap);
+    assert(ctr('data') >= 1, 'DataChanged should fire on restoreFromSnapshot');
+    assert(ctr('sel')  >= 1, 'SelectionChanged should fire on restoreFromSnapshot');
+
+    % Missing field error
+    errFired = false;
+    badSnap.datasets = {}; badSnap.mask = {};
+    try, model2.restoreFromSnapshot(badSnap); catch, errFired = true; end
+    assert(errFired, 'restoreFromSnapshot with missing fields should error');
+
+    fprintf('PASS\n'); passed = passed + 1;
+catch ex
+    fprintf('FAIL: %s\n', ex.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  Summary
 % ════════════════════════════════════════════════════════════════════════
 

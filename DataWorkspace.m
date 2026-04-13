@@ -73,8 +73,8 @@ rootGL = uigridlayout(fig, [2 1], ...
 % ════════════════════════════════════════════════════════════════════════
 %  Toolbar row
 % ════════════════════════════════════════════════════════════════════════
-tbGL = uigridlayout(rootGL, [1 9], ...
-    'ColumnWidth',   {90, 90, 90, 110, 110, 80, 110, '1x', 90}, ...
+tbGL = uigridlayout(rootGL, [1 11], ...
+    'ColumnWidth',   {90, 90, 90, 110, 110, 80, 110, 110, 110, '1x', 90}, ...
     'Padding',       [0 0 0 0], ...
     'ColumnSpacing', 4, ...
     'BackgroundColor', BG);
@@ -143,14 +143,32 @@ btnAddColumn = uibutton(tbGL, ...
     'ButtonPushedFcn', @onAddColumn);
 btnAddColumn.Layout.Column = 7;
 
-% Spacer at column 8
+btnSave = uibutton(tbGL, ...
+    'Text',            [char(128190) ' Save Workspace...'], ...
+    'Tooltip',         'Save all datasets to a .dwk file', ...
+    'BackgroundColor', BTN, ...
+    'FontColor',       FG, ...
+    'FontSize',        10, ...
+    'ButtonPushedFcn', @onSaveWorkspace);
+btnSave.Layout.Column = 8;
+
+btnLoad = uibutton(tbGL, ...
+    'Text',            [char(128194) ' Load Workspace...'], ...
+    'Tooltip',         'Load a previously saved .dwk workspace file', ...
+    'BackgroundColor', BTN, ...
+    'FontColor',       FG, ...
+    'FontSize',        10, ...
+    'ButtonPushedFcn', @onLoadWorkspace);
+btnLoad.Layout.Column = 9;
+
+% Spacer at column 10
 
 lblStatus = uilabel(tbGL, ...
     'Text',                'No datasets loaded', ...
     'FontColor',           [0.6 0.6 0.6], ...
     'FontSize',            10, ...
     'HorizontalAlignment', 'right');
-lblStatus.Layout.Column = 9;
+lblStatus.Layout.Column = 11;
 
 % ════════════════════════════════════════════════════════════════════════
 %  Content area: [left panel | table area]
@@ -304,6 +322,13 @@ if nargout > 0
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  Autosave recovery check (runs after figure is visible)
+% ════════════════════════════════════════════════════════════════════════
+if strcmp(options.Visible, 'on') && dataWorkspace.WorkspaceAutosave.check()
+    offerAutosaveRecovery();
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  Toolbar callbacks
 % ════════════════════════════════════════════════════════════════════════
 
@@ -367,6 +392,77 @@ end
             return;
         end
         showAddColumnDialog();
+    end
+
+    function onSaveWorkspace(~, ~)
+    %ONSAVEWORKSPACE  Save all datasets to a .dwk workspace file.
+        if model.count() == 0
+            uialert(fig, 'No datasets to save.', 'Save Workspace');
+            return;
+        end
+        % Suggest a filename derived from the first dataset
+        ds1 = model.datasets{1};
+        if isfield(ds1, 'metadata') && isfield(ds1.metadata, 'source') ...
+                && ~isempty(ds1.metadata.source)
+            [~, nm] = fileparts(ds1.metadata.source);
+            defName = [nm '.dwk'];
+        else
+            defName = 'workspace.dwk';
+        end
+        [fname, fdir] = uiputfile('*.dwk', 'Save Workspace', defName);
+        if isequal(fname, 0), return; end
+        fp = fullfile(fdir, fname);
+        try
+            snap = model.createSnapshot();  %#ok<NASGU>
+            save(fp, 'snap', '-v7.3');
+            setStatusBar(sprintf('Workspace saved: %s', fname));
+        catch ME
+            uialert(fig, ME.message, 'Save Workspace failed');
+        end
+    end
+
+    function onLoadWorkspace(~, ~)
+    %ONLOADWORKSPACE  Load a .dwk workspace file and replace all model state.
+        [fname, fdir] = uigetfile('*.dwk', 'Load Workspace');
+        if isequal(fname, 0), return; end
+        fp = fullfile(fdir, fname);
+        try
+            tmp = load(fp);
+            if ~isfield(tmp, 'snap')
+                error('Invalid workspace file: missing "snap" variable.');
+            end
+            model.pushUndo('before load workspace');
+            model.restoreFromSnapshot(tmp.snap);
+            % Restart autosave timer with the refreshed model
+            dataWorkspace.WorkspaceAutosave.start(model);
+            setStatusBar(sprintf('Workspace loaded: %s', fname));
+        catch ME
+            uialert(fig, ME.message, 'Load Workspace failed');
+        end
+    end
+
+    function offerAutosaveRecovery()
+    %OFFERAUTOSAVERECOVERY  Offer to restore the last autosave on startup.
+        answer = uiconfirm(fig, ...
+            ['A DataWorkspace autosave file was found. ' ...
+             'This may indicate the previous session ended unexpectedly. ' ...
+             'Restore the saved state?'], ...
+            'Restore Autosave', ...
+            'Options', {'Restore', 'Discard'}, ...
+            'DefaultOption', 'Restore', ...
+            'CancelOption',  'Discard');
+        if strcmp(answer, 'Restore')
+            try
+                dataWorkspace.WorkspaceAutosave.restore(model);
+                dataWorkspace.WorkspaceAutosave.start(model);
+                setStatusBar('Autosave restored.');
+            catch ME
+                uialert(fig, ME.message, 'Autosave restore failed');
+                dataWorkspace.WorkspaceAutosave.cleanup();
+            end
+        else
+            dataWorkspace.WorkspaceAutosave.cleanup();
+        end
     end
 
     function showAddColumnDialog(existingName, existingExpr, existingUnit)
@@ -590,6 +686,9 @@ end
         % Computed column operations (shown when a computed column is selected)
         uimenu(cm, 'Text', 'Edit Formula...',    'MenuSelectedFcn', @onEditFormula,   'Separator', 'on');
         uimenu(cm, 'Text', 'Remove Column',      'MenuSelectedFcn', @onRemoveColumn);
+        % Error bar designation
+        uimenu(cm, 'Text', 'Set as Error Bar for...', 'MenuSelectedFcn', @onSetErrorBar, 'Separator', 'on');
+        uimenu(cm, 'Text', 'Clear Error Bar Role',    'MenuSelectedFcn', @onClearErrorBar);
     end
 
     function onMaskRows(~, ~)
@@ -663,6 +762,119 @@ end
         if strcmp(answer, 'Remove')
             model.removeComputedColumn(dsIdx, colName);
             setStatusBar(sprintf('Computed column "%s" removed.', colName));
+        end
+    end
+
+% ════════════════════════════════════════════════════════════════════════
+%  Error bar callbacks
+% ════════════════════════════════════════════════════════════════════════
+
+    function onSetErrorBar(~, ~)
+    %ONSETERRORBAR  Designate the selected column as error bars for a Y column.
+    %   The selected column is the error column (errColIdx).
+    %   A dialog lists other value columns to attach to.
+        if model.activeIdx == 0 || isempty(state.selCols), return; end
+        dsIdx  = model.activeIdx;
+        data   = model.getData(dsIdx);
+        nVal   = size(data.values, 2);
+        if nVal < 2, return; end
+
+        % Selected column in the table (col 1 = X, cols 2.. = value columns)
+        tblCol   = state.selCols(1);
+        errValIdx = tblCol - 1;  % 1-based into .values
+        if errValIdx < 1 || errValIdx > nVal, return; end
+
+        % Build list of other Y columns
+        labels = data.labels;
+        while numel(labels) < nVal
+            labels{end+1} = sprintf('Col%d', numel(labels)+1);  %#ok<AGROW>
+        end
+        otherIdx  = setdiff(1:nVal, errValIdx);
+        otherLbls = labels(otherIdx);
+
+        if isempty(otherLbls)
+            uialert(fig, 'No other Y columns available.', 'Set Error Bar');
+            return;
+        end
+
+        % Pick via listdlg-style modal
+        [sel, ok] = showColumnPickerDialog( ...
+            'Set as Error Bar for:', otherLbls, 'Set Error Bar');
+        if ~ok || isempty(sel), return; end
+
+        yColIdx = otherIdx(sel);
+        roles = model.getColumnRoles(dsIdx);
+        roles = roles.setErrorFor(yColIdx, errValIdx);
+        model.pushUndo('set error bar');
+        model.setColumnRoles(dsIdx, roles);
+        setStatusBar(sprintf('Column "%s" set as error bars for "%s".', ...
+            labels{errValIdx}, labels{yColIdx}));
+    end
+
+    function onClearErrorBar(~, ~)
+    %ONCLEARERRORBAR  Clear the error bar designation from the selected column.
+    %   The selected column is treated as the Y column whose error bar designation
+    %   should be removed.
+        if model.activeIdx == 0 || isempty(state.selCols), return; end
+        dsIdx    = model.activeIdx;
+        data     = model.getData(dsIdx);
+        nVal     = size(data.values, 2);
+        tblCol   = state.selCols(1);
+        yValIdx  = tblCol - 1;
+        if yValIdx < 1 || yValIdx > nVal, return; end
+
+        roles = model.getColumnRoles(dsIdx);
+        if roles.getErrorFor(yValIdx) == 0
+            setStatusBar('No error bar designation to clear for this column.');
+            return;
+        end
+        roles = roles.clearErrorFor(yValIdx);
+        model.pushUndo('clear error bar');
+        model.setColumnRoles(dsIdx, roles);
+        setStatusBar('Error bar designation cleared.');
+    end
+
+    function [sel, ok] = showColumnPickerDialog(prompt, items, title)
+    %SHOWCOLUMNPICKERDIALOG  Compact modal list picker; returns 1-based index.
+        sel = [];
+        ok  = false;
+
+        dlg = uifigure('Name', title, ...
+            'Position',    [0 0 300 200], ...
+            'Color',       BG, ...
+            'Resize',      'off', ...
+            'WindowStyle', 'modal');
+        movegui(dlg, 'center');
+
+        dlgGL = uigridlayout(dlg, [3 2], ...
+            'RowHeight',    {20, '1x', 34}, ...
+            'ColumnWidth',  {'1x', 80}, ...
+            'Padding',      [10 10 10 10], ...
+            'RowSpacing',   6, ...
+            'BackgroundColor', BG);
+
+        lbl = uilabel(dlgGL, 'Text', prompt, 'FontColor', FG, 'FontSize', 10);
+        lbl.Layout.Row    = 1;
+        lbl.Layout.Column = [1 2];
+
+        lst = uilistbox(dlgGL, 'Items', items, ...
+            'BackgroundColor', TBL, 'FontColor', FG, 'FontSize', 10);
+        lst.Layout.Row    = 2;
+        lst.Layout.Column = [1 2];
+
+        uibutton(dlgGL, 'Text', 'OK', ...
+            'BackgroundColor', ACC, 'FontColor', [1 1 1], 'FontSize', 10, ...
+            'ButtonPushedFcn', @doOK).Layout.Column = 1;
+        uibutton(dlgGL, 'Text', 'Cancel', ...
+            'BackgroundColor', BTN, 'FontColor', FG, 'FontSize', 10, ...
+            'ButtonPushedFcn', @(~,~) delete(dlg)).Layout.Column = 2;
+
+        uiwait(dlg);
+
+        function doOK(~, ~)
+            sel = find(strcmp(items, lst.Value), 1);
+            ok  = true;
+            delete(dlg);
         end
     end
 
@@ -1090,6 +1302,9 @@ end
         compCols = model.getComputedColumns(model.activeIdx);
         T    = buildTableFromData(data, compCols);
 
+        % Badge error columns with (E) in the header
+        T = badgeErrorColumns(T, data, model.getColumnRoles(model.activeIdx));
+
         % Highlight masked rows with a distinct background color
         m = model.mask{model.activeIdx};
         if numel(m) == height(T) && any(~m)
@@ -1309,6 +1524,8 @@ end
             data = parser.importAuto(fp);
             [~, ~, parserTag] = fileparts(fp);
             model.addDataset(data, fp, ['importAuto' parserTag]);
+            % (Re)start autosave timer now that the model has data
+            dataWorkspace.WorkspaceAutosave.start(model);
         catch ME
             uialert(fig, ME.message, sprintf('Import failed: %s', fp));
         end
@@ -1333,7 +1550,9 @@ end
 % ════════════════════════════════════════════════════════════════════════
 
     function onClose(~, ~)
-    %ONCLOSE  Clean up listeners and delete the figure.
+    %ONCLOSE  Clean up listeners, autosave timer, and delete the figure.
+        % Stop autosave timer and remove the recovery file (clean exit)
+        dataWorkspace.WorkspaceAutosave.cleanup();
         % Delete listeners to prevent callbacks on a dead figure
         for k = 1:numel(guiListeners)
             if isvalid(guiListeners{k})
@@ -1342,6 +1561,32 @@ end
         end
         guiListeners = {};  %#ok<NASGU>
         delete(fig);
+    end
+
+% ════════════════════════════════════════════════════════════════════════
+%  Column header badge helper
+% ════════════════════════════════════════════════════════════════════════
+
+    function T = badgeErrorColumns(T, data, roles)
+    %BADGEERRORCOLUMNS  Append (E) to variable names of error-designated columns.
+    %
+    %   T     — MATLAB table built by buildTableFromData
+    %   data  — unified data struct (for column count)
+    %   roles — dataWorkspace.ColumnRoles for the active dataset
+        if isempty(roles.errorFor.errCols)
+            return;  % nothing to badge
+        end
+        nVal   = size(data.values, 2);
+        varNms = T.Properties.VariableNames;
+        % errCols are 1-based value column indices; table col 2 = value col 1
+        for ki = 1:numel(roles.errorFor.errCols)
+            ec = roles.errorFor.errCols(ki);
+            tblIdx = ec + 1;  % +1 because col 1 is X
+            if tblIdx >= 1 && tblIdx <= numel(varNms) && ec <= nVal
+                varNms{tblIdx} = [varNms{tblIdx} '_E'];
+            end
+        end
+        T.Properties.VariableNames = varNms;
     end
 
 end  % DataWorkspace

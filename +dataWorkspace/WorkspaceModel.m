@@ -602,6 +602,72 @@ classdef WorkspaceModel < handle
         end
 
         % ════════════════════════════════════════════════════════════════════════
+        %  Session persistence — snapshot save / restore
+        % ════════════════════════════════════════════════════════════════════════
+
+        function snap = createSnapshot(obj)
+        %CREATESNAPSHOT  Return a struct capturing all serializable model state.
+        %
+        %   snap = model.createSnapshot()
+        %
+        %   Outputs:
+        %     snap — struct with fields:
+        %              .datasets        — cell array of unified data structs
+        %              .mask            — cell array of logical row masks
+        %              .columnRoles     — cell array of ColumnRoles objects
+        %              .computedColumns — cell array of computed column arrays
+        %              .activeIdx       — current active dataset index
+        %              .timestamp       — datetime of snapshot creation
+        %              .version         — format version string (for future compat)
+        %
+        %   The snapshot can be passed to save() then later to restoreFromSnapshot().
+            snap.datasets        = obj.datasets;
+            snap.mask            = obj.mask;
+            snap.columnRoles     = obj.columnRoles;
+            snap.computedColumns = obj.computedColumns;
+            snap.activeIdx       = obj.activeIdx;
+            snap.timestamp       = datetime('now');
+            snap.version         = '1.0';
+        end
+
+        function restoreFromSnapshot(obj, snap)
+        %RESTOREFROMSNAPSHOT  Replace all model state from a snapshot struct.
+        %
+        %   model.restoreFromSnapshot(snap)
+        %
+        %   Inputs:
+        %     snap — struct previously produced by createSnapshot(), or a struct
+        %            loaded from a .dwk file (which is a .mat with the same fields)
+        %
+        %   Fires DataChanged and SelectionChanged after restore.  Any outstanding
+        %   listeners see the new state immediately.
+            arguments
+                obj  (1,1) dataWorkspace.WorkspaceModel
+                snap (1,1) struct
+            end
+
+            % Required fields — error early with a clear message
+            requiredFields = {'datasets', 'mask', 'columnRoles', ...
+                              'computedColumns', 'activeIdx'};
+            for k = 1:numel(requiredFields)
+                if ~isfield(snap, requiredFields{k})
+                    error('dataWorkspace:WorkspaceModel:badSnapshot', ...
+                        'Snapshot is missing required field "%s".', requiredFields{k});
+                end
+            end
+
+            obj.datasets        = snap.datasets;
+            obj.mask            = snap.mask;
+            obj.columnRoles     = snap.columnRoles;
+            obj.computedColumns = snap.computedColumns;
+            obj.activeIdx       = snap.activeIdx;
+            obj.undoStack       = {};  % do not restore undo history
+
+            notify(obj, 'DataChanged');
+            notify(obj, 'SelectionChanged');
+        end
+
+        % ════════════════════════════════════════════════════════════════════════
         %  Multi-dataset operations
         % ════════════════════════════════════════════════════════════════════════
 

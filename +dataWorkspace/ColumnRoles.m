@@ -26,11 +26,14 @@ classdef ColumnRoles
 %   displayOrder — [1×N] index permutation for visual column order
 %   xGroups      — struct array; each element has .xCol and .yCols
 %   skipped      — [1×N] logical; true = column is not plotted
+%   errorFor     — struct with parallel arrays .yCols and .errCols
+%                  recording which error column provides bars for each Y
 %
 % ── Examples ──────────────────────────────────────────────────────────────
 %
 %   roles = dataWorkspace.ColumnRoles(3);
 %   roles = roles.addXGroup(1, [2 3]);   % col 1 is X for cols 2 and 3
+%   roles = roles.setErrorFor(2, 3);     % col 3 provides error bars for col 2
 %   groups = roles.getPlotGroups(dataStruct);
 %
 % ════════════════════════════════════════════════════════════════════════
@@ -42,6 +45,9 @@ classdef ColumnRoles
         displayOrder  (1,:) double   % visual column permutation
         xGroups       (1,:) struct   % struct array with .xCol and .yCols
         skipped       (1,:) logical  % true = column excluded from plots
+        errorFor             = struct('yCols', zeros(1,0), 'errCols', zeros(1,0))
+        % errorFor — struct with parallel arrays .yCols and .errCols
+        %            recording which error column provides bars for each Y
     end
 
     % ════════════════════════════════════════════════════════════════════════
@@ -67,6 +73,7 @@ classdef ColumnRoles
             defaultGroup.xCol  = 0;
             defaultGroup.yCols = 1:numCols;
             obj.xGroups = defaultGroup;
+            % errorFor initialized to empty via property default value
         end
 
         % ════════════════════════════════════════════════════════════════════════
@@ -146,6 +153,85 @@ classdef ColumnRoles
             obj.displayOrder = newOrder;
         end
 
+        function obj = setErrorFor(obj, yColIdx, errColIdx)
+        %SETERRORFOR  Designate errColIdx as the error-bar column for yColIdx.
+        %
+        %   roles = roles.setErrorFor(yColIdx, errColIdx)
+        %
+        %   Inputs:
+        %     yColIdx  — 1-based value column index that will have error bars
+        %     errColIdx — 1-based value column index providing the error data
+        %
+        %   Overwrites any previous error designation for yColIdx.
+        %   Returns a modified copy (value class semantics).
+            arguments
+                obj       (1,1) dataWorkspace.ColumnRoles
+                yColIdx   (1,1) double {mustBePositive, mustBeInteger}
+                errColIdx (1,1) double {mustBePositive, mustBeInteger}
+            end
+
+            if yColIdx == errColIdx
+                error('dataWorkspace:ColumnRoles:selfReference', ...
+                    'A column cannot provide error bars for itself.');
+            end
+            n = obj.numColumns();
+            if yColIdx > n || errColIdx > n
+                error('dataWorkspace:ColumnRoles:badColIndex', ...
+                    'Column index exceeds total column count (%d).', n);
+            end
+
+            % Remove any existing designation for yColIdx first
+            obj = obj.clearErrorFor(yColIdx);
+
+            obj.errorFor.yCols(end+1)   = yColIdx;
+            obj.errorFor.errCols(end+1) = errColIdx;
+        end
+
+        function obj = clearErrorFor(obj, yColIdx)
+        %CLEARERRORFOR  Remove the error-bar designation for yColIdx.
+        %
+        %   roles = roles.clearErrorFor(yColIdx)
+        %
+        %   Inputs:
+        %     yColIdx — 1-based value column index
+        %
+        %   No-op if yColIdx had no designation.
+        %   Returns a modified copy.
+            arguments
+                obj     (1,1) dataWorkspace.ColumnRoles
+                yColIdx (1,1) double {mustBePositive, mustBeInteger}
+            end
+
+            pos = find(obj.errorFor.yCols == yColIdx, 1);
+            if ~isempty(pos)
+                obj.errorFor.yCols(pos)   = [];
+                obj.errorFor.errCols(pos) = [];
+            end
+        end
+
+        function errIdx = getErrorFor(obj, yColIdx)
+        %GETERRORFOR  Return the error-bar column index for yColIdx (0 = none).
+        %
+        %   errIdx = roles.getErrorFor(yColIdx)
+        %
+        %   Inputs:
+        %     yColIdx — 1-based value column index
+        %
+        %   Outputs:
+        %     errIdx — 1-based index of the error column, or 0 if none
+            arguments
+                obj     (1,1) dataWorkspace.ColumnRoles
+                yColIdx (1,1) double {mustBePositive, mustBeInteger}
+            end
+
+            pos = find(obj.errorFor.yCols == yColIdx, 1);
+            if isempty(pos)
+                errIdx = 0;
+            else
+                errIdx = obj.errorFor.errCols(pos);
+            end
+        end
+
         function groups = getPlotGroups(obj, dataStruct)
         %GETPLOTGROUPS  Extract plot-ready data groups from a data struct.
         %
@@ -163,6 +249,13 @@ classdef ColumnRoles
         %
         %   Skipped columns are excluded from their respective groups.
         %   Groups with no non-skipped Y columns are omitted from output.
+        %
+        %   Each group also has:
+        %     .errorData — [N×K] matrix of error values (columns matching .yData),
+        %                  or [] when no error bars are designated.  Columns with
+        %                  no error bar designation receive a column of zeros; when
+        %                  no active column in the group has an error designation
+        %                  the whole .errorData field is [].
             arguments
                 obj        (1,1) dataWorkspace.ColumnRoles
                 dataStruct (1,1) struct
@@ -189,10 +282,27 @@ classdef ColumnRoles
                 lbls   = dataStruct.labels(activeCols);
                 units  = dataStruct.units(activeCols);
 
-                outGroup.xData  = xData;
-                outGroup.yData  = yData;
-                outGroup.labels = lbls;
-                outGroup.units  = units;
+                % Build errorData: collect error columns for each active Y col
+                nRows   = size(yData, 1);
+                nActive = numel(activeCols);
+                errMat  = zeros(nRows, nActive);
+                hasAny  = false;
+                for ki = 1:nActive
+                    eIdx = obj.getErrorFor(activeCols(ki));
+                    if eIdx > 0 && eIdx <= size(dataStruct.values, 2)
+                        errMat(:, ki) = dataStruct.values(:, eIdx);
+                        hasAny = true;
+                    end
+                end
+
+                outGroup.xData     = xData;
+                outGroup.yData     = yData;
+                outGroup.labels    = lbls;
+                outGroup.units     = units;
+                outGroup.errorData = [];
+                if hasAny
+                    outGroup.errorData = errMat;
+                end
 
                 groups{end+1} = outGroup; %#ok<AGROW>
             end
