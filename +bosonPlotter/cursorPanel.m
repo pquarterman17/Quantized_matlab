@@ -1,4 +1,4 @@
-function panel = cursorPanel(parentGL, row, ax, getAppDataFn)
+function panel = cursorPanel(parentGL, row, ~, getAppDataFn)
 %CURSORPANEL  Create and return a docked cursor-readout panel.
 %
 %   Syntax

@@ -8296,7 +8296,7 @@ function varargout = BosonPlotter(options)
         if isempty(appData.cursorText) || ~isvalid(appData.cursorText), return; end
         if isempty(appData.datasets) || appData.activeIdx < 1
             set(appData.cursorText, 'Visible', 'off');
-            try, cursorPanelObj.update(NaN, NaN); catch, end
+            try; cursorPanelObj.update(NaN, NaN); catch; end
             return;
         end
         % Suppress "Negative data ignored" warning from ax.CurrentPoint
@@ -8308,7 +8308,7 @@ function varargout = BosonPlotter(options)
         if x < ax.XLim(1) || x > ax.XLim(2) || ...
            y < ax.YLim(1) || y > ax.YLim(2)
             set(appData.cursorText, 'Visible', 'off');
-            try, cursorPanelObj.update(NaN, NaN); catch, end
+            try; cursorPanelObj.update(NaN, NaN); catch; end
             return;
         end
         cursorStr = sprintf('x = %.5g\ny = %.5g', x, y);
@@ -8350,7 +8350,7 @@ function varargout = BosonPlotter(options)
             'Visible', 'on');
 
         % Update the persistent cursor readout panel at the bottom of the axes area
-        try, cursorPanelObj.update(x, y); catch, end
+        try; cursorPanelObj.update(x, y); catch; end
     end
 
     function onAxesButtonDown(~,~)
