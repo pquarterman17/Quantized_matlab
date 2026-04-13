@@ -258,13 +258,13 @@ function varargout = BosonPlotter(options)
     if ~isempty(options.Model) && isa(options.Model, 'dataWorkspace.WorkspaceModel')
         appData.model = options.Model;
         % Populate datasets from model
-        for mi = 1:appData.model.count()
-            rawDs = appData.model.datasets{mi};
+        for modelIdx = 1:appData.model.count()
+            rawDs = appData.model.datasets{modelIdx};
             ds = buildDs('', rawDs, '');
             if isfield(rawDs, 'metadata')
-                m = rawDs.metadata;
-                if isfield(m, 'source'),     ds.filepath   = m.source;     end
-                if isfield(m, 'parserName'), ds.parserName = m.parserName; end
+                md = rawDs.metadata;
+                if isfield(md, 'source'),     ds.filepath   = md.source;     end
+                if isfield(md, 'parserName'), ds.parserName = md.parserName; end
             end
             appData.datasets{end+1} = ds;
         end
