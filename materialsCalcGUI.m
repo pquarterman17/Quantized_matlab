@@ -277,6 +277,11 @@ end
         end
     end
 
+    function s = errText(msg)
+    %ERRTEXT  Wrap message in red HTML span for error display in labels.
+        s = sprintf('<span style="color:#e64040">Error: %s</span>', msg);
+    end
+
     function onCopyLastResult()
         if isfield(appData, 'lastResult') && ~isempty(appData.lastResult)
             % Strip HTML tags for clipboard
@@ -623,7 +628,13 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         efDga.Layout.Row=4; efDga.Layout.Column=2;
         lblDResult = uilabel(gD,'Text','','FontSize',11, ...
             'Interpreter','html');
-        lblDResult.Layout.Row=4; lblDResult.Layout.Column=[3 9];
+        lblDResult.Layout.Row=4; lblDResult.Layout.Column=[3 8];
+        btnDUseQ2T = uibutton(gD,'push','Text',[char(8594) ' Q/2' char(952)], ...
+            'BackgroundColor',BTN_TOOL,'FontColor',BTN_TOOL_FG,'FontSize',9, ...
+            'Enable','off','Tooltip','Send d-spacing to the Q/2θ converter', ...
+            'ButtonPushedFcn',@(~,~) sendDToQ2T());
+        btnDUseQ2T.Layout.Row=4; btnDUseQ2T.Layout.Column=9;
+        lastDVal = NaN;
 
         % Apply default constraints for Cubic
         onCrystalSystemChanged();
@@ -706,12 +717,14 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 desc = sprintf('d<sub>%d%d%d</sub> = %.5g %s  [%s]', ...
                     efDh.Value, efDk.Value, efDl.Value, r.d, char(197), r.system);
                 lblDResult.Text = desc;
+                lastDVal = r.d;
+                btnDUseQ2T.Enable = 'on';
                 mcall = sprintf('result = calc.crystal.dSpacing(%g, %g, %g, %g, ''b'', %g, ''c'', %g, ''alpha'', %g, ''beta'', %g, ''gamma'', %g);', ...
                     efDa.Value, efDh.Value, efDk.Value, efDl.Value, ...
                     efDb.Value, efDc.Value, efDal.Value, efDbe.Value, efDga.Value);
                 addHistory(desc, r.latex, mcall);
             catch ME
-                lblDResult.Text = ['Error: ' ME.message];
+                lblDResult.Text = errText(ME.message);
                 setStatus(['d-spacing error: ' ME.message]);
             end
         end
@@ -756,7 +769,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 lbl2TResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
-                lbl2TResult.Text = ['Error: ' ME.message];
+                lbl2TResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -770,7 +783,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 lbl2TResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
-                lbl2TResult.Text = ['Error: ' ME.message];
+                lbl2TResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -837,7 +850,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 end
                 lblMMCtResult.Text = descCT;
             catch ME
-                lblMMResult.Text = ['Error: ' ME.message];
+                lblMMResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -897,7 +910,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 desc = sprintf('V=%.4g Å³, ρ=%.4g g/cm³', rV.volume, rD.density);
                 addHistory(desc, rV.latex);
             catch ME
-                lblVCResult.Text = ['Error: ' ME.message];
+                lblVCResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -1003,7 +1016,22 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             setStatus('Plane spacing table copied to clipboard.');
         end
 
+        function sendDToQ2T()
+            if isnan(lastDVal), return; end
+            if isfield(appData.api, 'fillQ2TFromD')
+                appData.api.fillQ2TFromD(lastDVal);
+                selectPanel('xrayNeutron');
+                setStatus(sprintf('d = %.5g %s sent to Q/2%s converter', lastDVal, char(197), char(952)));
+            end
+        end
+
         % API hooks
+        appData.api.fillVCMolarMass = @(M) fillVCMolarMassHook(M);
+        function fillVCMolarMassHook(M)
+            efVCM.Value = M;
+            setStatus(sprintf('M = %.4f g/mol received from Molecular Weight', M));
+        end
+
         registerPrimaryBtn('crystal', btnDCalc);
         appData.api.calcDSpacing = @(a,h,k,l) apiDSpacing(a,h,k,l);
         function txt = apiDSpacing(a,h,k,l)
@@ -1033,10 +1061,18 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildElectricalTab(tab)
-        gl = uigridlayout(tab);
-        gl.RowHeight   = {'3x', '2x', '2x', '2x', '2x'};
+        outerGL = uigridlayout(tab);
+        outerGL.RowHeight   = {'1x'};
+        outerGL.ColumnWidth = {'1x'};
+        outerGL.Padding     = [6 6 6 6];
+
+        scroll = uipanel(outerGL, 'BorderType', 'none', 'Scrollable', 'on');
+        scroll.Layout.Row = 1; scroll.Layout.Column = 1;
+
+        gl = uigridlayout(scroll);
+        gl.RowHeight   = {110, 80, 80, 80, 110};
         gl.ColumnWidth = {'1x'};
-        gl.Padding     = [6 6 6 6];
+        gl.Padding     = [4 4 4 4];
         gl.RowSpacing  = 8;
 
         % ── Card 1: Resistivity / Sheet Resistance ─────────────────────
@@ -1092,7 +1128,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                     efRsVal.Value, efRsTh.Value*1e-7);
                 addHistory(desc, r.latex, mcall);
             catch ME
-                lblRsResult.Text = ['Error: ' ME.message];
+                lblRsResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -1105,7 +1141,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 lblRhoResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
-                lblRhoResult.Text = ['Error: ' ME.message];
+                lblRhoResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -1141,7 +1177,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 lblCondResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
-                lblCondResult.Text = ['Error: ' ME.message];
+                lblCondResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -1180,7 +1216,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 lblMobResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
-                lblMobResult.Text = ['Error: ' ME.message];
+                lblMobResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -1219,7 +1255,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 lblJDResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
-                lblJDResult.Text = ['Error: ' ME.message];
+                lblJDResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -1275,7 +1311,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 latex = sprintf('R_H = %.3g~\\text{cm}^3/\\text{C},\\ n = %.3g~\\text{cm}^{-3}', RH, abs(n));
                 addHistory(desc, latex);
             catch ME
-                lblHallResult.Text = ['Error: ' ME.message];
+                lblHallResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -1290,10 +1326,18 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildSemiconductorTab(tab)
-        gl = uigridlayout(tab);
-        gl.RowHeight   = {'3x', '2x', '3x', '2x'};
+        outerGL = uigridlayout(tab);
+        outerGL.RowHeight   = {'1x'};
+        outerGL.ColumnWidth = {'1x'};
+        outerGL.Padding     = [6 6 6 6];
+
+        scroll = uipanel(outerGL, 'BorderType', 'none', 'Scrollable', 'on');
+        scroll.Layout.Row = 1; scroll.Layout.Column = 1;
+
+        gl = uigridlayout(scroll);
+        gl.RowHeight   = {135, 105, 135, 105};
         gl.ColumnWidth = {'1x'};
-        gl.Padding     = [6 6 6 6];
+        gl.Padding     = [4 4 4 4];
         gl.RowSpacing  = 8;
 
         % Material presets available for dropdowns
@@ -1370,7 +1414,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                     efNiEg.Value, efNiMe.Value, efNiMh.Value, efNiT.Value);
                 addHistory(desc, r.latex, mcall);
             catch ME
-                lblNiResult.Text = ['Error: ' ME.message];
+                lblNiResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -1422,7 +1466,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 lblDopType.Text = sprintf('Type: %s', r.type);
                 addHistory(desc, r.latex);
             catch ME
-                lblDopResult.Text = ['Error: ' ME.message];
+                lblDopResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -1496,7 +1540,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 lblDepXnXp.Text = sprintf('x<sub>n</sub> = %.4g nm,  x<sub>p</sub> = %.4g nm', r.xn, r.xp);
                 addHistory(desc, r.latex);
             catch ME
-                lblDepResult.Text = ['Error: ' ME.message];
+                lblDepResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -1542,7 +1586,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 lblTransL.Text = desc;
                 addHistory(desc, rL.latex);
             catch ME
-                lblTransD.Text = ['Error: ' ME.message];
+                lblTransD.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -1615,7 +1659,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 lblDRResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
-                lblDRResult.Text = ['Error: ' ME.message];
+                lblDRResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -1651,7 +1695,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 lblKTResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
-                lblKTResult.Text = ['Error: ' ME.message];
+                lblKTResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -1709,7 +1753,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 lblSSResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
-                lblSSResult.Text = ['Error: ' ME.message];
+                lblSSResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -1785,7 +1829,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 end
                 addHistory(lblTMStrain.Text, r.latex);
             catch ME
-                lblTMStrain.Text = ['Error: ' ME.message];
+                lblTMStrain.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -1829,7 +1873,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 lblIDResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
-                lblIDResult.Text = ['Error: ' ME.message];
+                lblIDResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -1872,7 +1916,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 latex = sprintf('D = \\frac{K\\lambda}{\\beta\\cos\\theta} = %.1f~\\text{\\AA}', D);
                 addHistory(desc, latex);
             catch ME
-                lblSchResult.Text = ['Error: ' ME.message];
+                lblSchResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -2136,7 +2180,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                         b.Enable     = 'on';
                     end
                 end
-                refreshPTColoring();
+                refreshPTColors();
                 return
             end
             for ki = 1:numel(k)
@@ -2255,7 +2299,14 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         lblNSLDDetail = uilabel(gNSLD,'Text','','FontSize',10, ...
             'FontColor',[0.5 0.5 0.5],'Interpreter','html');
-        lblNSLDDetail.Layout.Row=3; lblNSLDDetail.Layout.Column=[1 5];
+        lblNSLDDetail.Layout.Row=3; lblNSLDDetail.Layout.Column=[1 4];
+        btnSLDToRefl = uibutton(gNSLD,'push','Text',[char(8594) ' Reflectivity'], ...
+            'BackgroundColor',BTN_TOOL,'FontColor',BTN_TOOL_FG,'FontSize',9, ...
+            'Enable','off','Tooltip','Add this material as a layer in the Reflectivity builder', ...
+            'ButtonPushedFcn',@(~,~) sendSLDToReflectivity());
+        btnSLDToRefl.Layout.Row=3; btnSLDToRefl.Layout.Column=5;
+        lastSLDe6 = NaN;
+        lastSLDFormula = '';
 
         function doNeutronSLD()
             try
@@ -2264,10 +2315,22 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                     r.SLDe6, char(215), char(197));
                 lblNSLDResult.Text = desc;
                 lblNSLDDetail.Text = sprintf('M = %.2f g/mol, formula: %s', r.M, r.formula);
+                lastSLDe6 = r.SLDe6;
+                lastSLDFormula = efNSLDFormula.Value;
+                btnSLDToRefl.Enable = 'on';
                 addHistory(desc, r.latex);
             catch ME
-                lblNSLDResult.Text = ['Error: ' ME.message];
+                lblNSLDResult.Text = errText(ME.message);
                 setStatus(ME.message);
+            end
+        end
+
+        function sendSLDToReflectivity()
+            if isnan(lastSLDe6), return; end
+            if isfield(appData.api, 'addLayer')
+                appData.api.addLayer(lastSLDFormula, lastSLDe6);
+                selectPanel('reflectivity');
+                setStatus(sprintf('Added %s (SLD = %.4g) to Reflectivity stack', lastSLDFormula, lastSLDe6));
             end
         end
 
@@ -2306,7 +2369,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                     char(961), r.electronDensity, char(197), char(179));
                 addHistory(desc, r.latex);
             catch ME
-                lblXSLDResult.Text = ['Error: ' ME.message];
+                lblXSLDResult.Text = errText(ME.message);
                 lblXSLDResult.FontAngle = 'normal';
                 setStatus(ME.message);
             end
@@ -2362,7 +2425,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 lblQ2TResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
-                lblQ2TResult.Text = ['Error: ' ME.message];
+                lblQ2TResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -2375,7 +2438,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 lblQ2TResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
-                lblQ2TResult.Text = ['Error: ' ME.message];
+                lblQ2TResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -2386,7 +2449,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         gMW = uigridlayout(pMW);
         gMW.RowHeight   = {24, 24};
-        gMW.ColumnWidth = {70,'1x',90};
+        gMW.ColumnWidth = {70,'1x',90,90};
         gMW.Padding     = [6 4 6 4];
         gMW.RowSpacing  = 4;
 
@@ -2402,16 +2465,32 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         lblMWResult = uilabel(gMW,'Text','','FontSize',11, ...
             'Interpreter','html');
         lblMWResult.Layout.Row=2; lblMWResult.Layout.Column=[1 3];
+        btnMWToCellVol = uibutton(gMW,'push','Text',[char(8594) ' Cell Vol'], ...
+            'BackgroundColor',BTN_TOOL,'FontColor',BTN_TOOL_FG,'FontSize',9, ...
+            'Enable','off','Tooltip','Send molar mass to Crystal tab Unit Cell Density', ...
+            'ButtonPushedFcn',@(~,~) sendMWToCellVol());
+        btnMWToCellVol.Layout.Row=2; btnMWToCellVol.Layout.Column=4;
+        lastMW = NaN;
 
         function doMolWeight()
             try
                 r = calc.xrayNeutron.molecularWeight(efMWFormula.Value);
                 desc = sprintf('M(%s) = %.4f g/mol', r.formula, r.M);
                 lblMWResult.Text = desc;
+                lastMW = r.M;
+                btnMWToCellVol.Enable = 'on';
                 addHistory(desc, r.latex);
             catch ME
-                lblMWResult.Text = ['Error: ' ME.message];
+                lblMWResult.Text = errText(ME.message);
                 setStatus(ME.message);
+            end
+        end
+
+        function sendMWToCellVol()
+            if isnan(lastMW), return; end
+            if isfield(appData.api, 'fillVCMolarMass')
+                appData.api.fillVCMolarMass(lastMW);
+                selectPanel('crystal');
             end
         end
 
@@ -2420,6 +2499,31 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         appData.api.calcNeutronSLD = @(formula, density) apiNeutronSLD(formula, density);
         appData.api.calcXraySLD    = @(formula, density) apiXraySLD(formula, density);
         appData.api.calcQToTwoTheta = @(Q, lam) apiQTo2T(Q, lam);
+        appData.api.fillQ2TFromD = @(d) fillQ2TFromDHook(d);
+        function fillQ2TFromDHook(d)
+            efQ2TVal.Value = d;
+            doDTo2Theta_Q2T();
+        end
+        % Wrapper that converts d → 2θ using the Q/2θ card's fields
+        function doDTo2Theta_Q2T()
+            try
+                lam = efQ2TLam.Value;
+                d = efQ2TVal.Value;
+                sinTheta = lam / (2 * d);
+                if abs(sinTheta) > 1
+                    lblQ2TResult.Text = 'Error: d too small for this wavelength';
+                    return;
+                end
+                twoTheta = 2 * asind(sinTheta);
+                Q = 2 * pi / d;
+                desc = sprintf('d = %.4g %s  %s  2%s = %.4f%s,  Q = %.4g %s<sup>-1</sup>', ...
+                    d, char(197), char(8594), char(952), twoTheta, char(176), Q, char(197));
+                lblQ2TResult.Text = desc;
+                addHistory(desc, '');
+            catch ME
+                lblQ2TResult.Text = errText(ME.message);
+            end
+        end
 
         function result = apiNeutronSLD(formula, density)
             efNSLDFormula.Value = formula;
@@ -2525,7 +2629,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                     char(955), r.lambda0, r.Tc);
                 addHistory(desc, r.latex);
             catch ME
-                lblLondonResult.Text = ['Error: ' ME.message];
+                lblLondonResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -2590,7 +2694,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 lblXiResult.Text = desc;
                 addHistory(desc, r.latex);
             catch ME
-                lblXiResult.Text = ['Error: ' ME.message];
+                lblXiResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -2636,7 +2740,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                     r.type, char(8730), 1/sqrt(2));
                 addHistory(desc, r.latex);
             catch ME
-                lblGLResult.Text = ['Error: ' ME.message];
+                lblGLResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -2715,7 +2819,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 lblHcType.Text = sprintf('Type %s superconductor', r.type);
                 addHistory(desc, r.latex);
             catch ME
-                lblHcResult.Text = ['Error: ' ME.message];
+                lblHcResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
@@ -2747,9 +2851,19 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildMagneticTab(tab)
-        gl = uigridlayout(tab);
-        gl.RowHeight = {'3x', '2x', '2x', '2x', '2x'}; gl.ColumnWidth = {'1x'};
-        gl.Padding = [6 6 6 6]; gl.RowSpacing = 8;
+        outerGL = uigridlayout(tab);
+        outerGL.RowHeight   = {'1x'};
+        outerGL.ColumnWidth = {'1x'};
+        outerGL.Padding     = [6 6 6 6];
+
+        scroll = uipanel(outerGL, 'BorderType', 'none', 'Scrollable', 'on');
+        scroll.Layout.Row = 1; scroll.Layout.Column = 1;
+
+        gl = uigridlayout(scroll);
+        gl.RowHeight   = {130, 75, 75, 75, 75};
+        gl.ColumnWidth = {'1x'};
+        gl.Padding     = [4 4 4 4];
+        gl.RowSpacing  = 8;
 
         % ── Card 1: Moment Conversions ──────────────────────────────────
         pMom = uipanel(gl,'Title','Moment Conversions','FontWeight','bold');
@@ -2900,7 +3014,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         pLang = uipanel(gl,'Title','Langevin / Superparamagnetism','FontWeight','bold');
         pLang.Layout.Row = 4;
         gLang = uigridlayout(pLang);
-        gLang.RowHeight = {24,24}; gLang.ColumnWidth = {80,'1x',80,'1x',90};
+        gLang.RowHeight = {24,24}; gLang.ColumnWidth = {80,'1x',60,'1x',50,'1x',90};
         gLang.Padding = [6 4 6 4]; gLang.RowSpacing = 4;
 
         uilabel(gLang,'Text',[char(956) ' (emu):'],'HorizontalAlignment','right');
@@ -2911,19 +3025,27 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         efLangH = uieditfield(gLang,'numeric','Value',10000, ...
             'Tooltip','Applied field H (Oe) — CGS, 1 T = 10⁴ Oe');
         efLangH.Layout.Row=1; efLangH.Layout.Column=4;
+        uilabel(gLang,'Text','T (K):','HorizontalAlignment','right');
+        efLangT = uieditfield(gLang,'numeric','Value',300, ...
+            'Tooltip','Temperature T (K) — Langevin parameter x = μH/(k_BT)');
+        efLangT.Layout.Row=1; efLangT.Layout.Column=6;
         btnLangCalc = uibutton(gLang,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
             'ButtonPushedFcn',@(~,~) doLangevin());
-        btnLangCalc.Layout.Row=1; btnLangCalc.Layout.Column=5;
+        btnLangCalc.Layout.Row=1; btnLangCalc.Layout.Column=7;
 
         lblLangResult = uilabel(gLang,'Text','','FontSize',11,'Interpreter','html');
-        lblLangResult.Layout.Row=2; lblLangResult.Layout.Column=[1 5];
+        lblLangResult.Layout.Row=2; lblLangResult.Layout.Column=[1 7];
 
         function doLangevin()
             mu = efLangMu.Value;  % emu
             H = efLangH.Value;    % Oe
+            T = efLangT.Value;    % K
             kB = 1.381e-16;       % erg/K (CGS)
-            T = 300;              % assume room temperature
+            if T <= 0
+                lblLangResult.Text = errText('Temperature must be > 0 K');
+                return;
+            end
             x = mu * H / (kB * T);
             if abs(x) < 1e-10
                 L = 0;
@@ -2983,9 +3105,19 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildOpticsTab(tab)
-        gl = uigridlayout(tab);
-        gl.RowHeight = {'3x', '2x', '2x', '2x'}; gl.ColumnWidth = {'1x'};
-        gl.Padding = [6 6 6 6]; gl.RowSpacing = 8;
+        outerGL = uigridlayout(tab);
+        outerGL.RowHeight   = {'1x'};
+        outerGL.ColumnWidth = {'1x'};
+        outerGL.Padding     = [6 6 6 6];
+
+        scroll = uipanel(outerGL, 'BorderType', 'none', 'Scrollable', 'on');
+        scroll.Layout.Row = 1; scroll.Layout.Column = 1;
+
+        gl = uigridlayout(scroll);
+        gl.RowHeight   = {110, 75, 75, 75};
+        gl.ColumnWidth = {'1x'};
+        gl.Padding     = [4 4 4 4];
+        gl.RowSpacing  = 8;
 
         % Card 1: Fresnel Coefficients
         pFres = uipanel(gl,'Title','Fresnel Coefficients','FontWeight','bold');
@@ -3015,7 +3147,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 lblFresR.Text = desc;
                 lblFresD.Text = sprintf('T<sub>s</sub> = %.4f, T<sub>p</sub> = %.4f', r.Ts, r.Tp);
                 addHistory(desc, r.latex);
-            catch ME, lblFresR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            catch ME, lblFresR.Text = errText(ME.message); setStatus(ME.message);
             end
         end
 
@@ -3043,7 +3175,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                     char(952),rc.thetaC,char(176),char(952),rb.thetaB,char(176));
                 lblAngR.Text = desc;
                 addHistory(desc, rc.latex);
-            catch ME, lblAngR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            catch ME, lblAngR.Text = errText(ME.message); setStatus(ME.message);
             end
         end
 
@@ -3071,7 +3203,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 r = calc.optics.penetrationDepth(efPN.Value,efPK.Value,efPLam.Value);
                 desc = sprintf('Depth = %.4g (same unit as %s)', r.depth, char(955));
                 lblPenR.Text = desc; addHistory(desc, r.latex);
-            catch ME, lblPenR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            catch ME, lblPenR.Text = errText(ME.message); setStatus(ME.message);
             end
         end
 
@@ -3096,7 +3228,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 r = calc.optics.skinDepth(efSRho.Value,efSFreq.Value);
                 desc = sprintf('%s = %.4g %sm', char(948), r.deltaUm, char(956));
                 lblSkinR.Text = desc; addHistory(desc, r.latex);
-            catch ME, lblSkinR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            catch ME, lblSkinR.Text = errText(ME.message); setStatus(ME.message);
             end
         end
 
@@ -3148,7 +3280,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 mfp = kB * T / (sqrt(2) * pi * d^2 * P);
                 desc = sprintf('MFP = %.4g m (%.4g mm) [%s]', mfp, mfp*1e3, ddMFPGas.Items{ddMFPGas.ItemsData == d});
                 lblMFPR.Text = desc; addHistory(desc, '');
-            catch ME, lblMFPR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            catch ME, lblMFPR.Text = errText(ME.message); setStatus(ME.message);
             end
         end
 
@@ -3170,7 +3302,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 r = calc.vacuum.monolayerTime(efMonoP.Value);
                 desc = sprintf('t<sub>mono</sub> = %.3g s', r.tMono);
                 lblMonoR.Text = desc; addHistory(desc, r.latex);
-            catch ME, lblMonoR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            catch ME, lblMonoR.Text = errText(ME.message); setStatus(ME.message);
             end
         end
 
@@ -3198,7 +3330,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 r = calc.vacuum.sputterYield(efSYMat.Value, efSYIon.Value, efSYE.Value);
                 desc = sprintf('Y(%s/%s, %g eV) = %.2f atoms/ion', efSYMat.Value, efSYIon.Value, efSYE.Value, r.Y);
                 lblSYR.Text = desc; addHistory(desc, r.latex);
-            catch ME, lblSYR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            catch ME, lblSYR.Text = errText(ME.message); setStatus(ME.message);
             end
         end
 
@@ -3229,7 +3361,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 r = calc.vacuum.pumpDownTime(efPV.Value,efPS.Value,efPP0.Value,efPPf.Value);
                 desc = sprintf('t = %.1f s (%.1f min), %s = %.2f s', r.time, r.timeMin, char(964), r.tau);
                 lblPumpR.Text = desc; addHistory(desc, r.latex);
-            catch ME, lblPumpR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            catch ME, lblPumpR.Text = errText(ME.message); setStatus(ME.message);
             end
         end
 
@@ -3277,7 +3409,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 lblNerR.Text = desc;
                 lblNerD.Text = sprintf('E%s = %.3f V, n = %d, Q = %.4g', char(8320), r.E0, r.n, r.Q);
                 addHistory(desc, r.latex);
-            catch ME, lblNerR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            catch ME, lblNerR.Text = errText(ME.message); setStatus(ME.message);
             end
         end
 
@@ -3305,7 +3437,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 r = calc.electrochemistry.butlerVolmer(efBVJ0.Value,efBVEta.Value,alpha=efBVAlpha.Value);
                 desc = sprintf('j = %.4g A/cm%s', r.j, char(178));
                 lblBVR.Text = desc; addHistory(desc, r.latex);
-            catch ME, lblBVR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            catch ME, lblBVR.Text = errText(ME.message); setStatus(ME.message);
             end
         end
 
@@ -3330,7 +3462,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 r = calc.electrochemistry.tafelSlope(alpha=efTafA.Value,T=efTafT.Value);
                 desc = sprintf('b = %.1f mV/decade', r.bMv);
                 lblTafR.Text = desc; addHistory(desc, r.latex);
-            catch ME, lblTafR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            catch ME, lblTafR.Text = errText(ME.message); setStatus(ME.message);
             end
         end
 
@@ -3358,7 +3490,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 r = calc.electrochemistry.doubleLayerCapacitance(efDLCE.Value,efDLCD.Value,efDLCA.Value);
                 desc = sprintf('C = %.4g %sF (%.1f %sF/cm%s)', r.CuF, char(956), r.Cspec*1e6, char(956), char(178));
                 lblDLCR.Text = desc; addHistory(desc, r.latex);
-            catch ME, lblDLCR.Text = ['Error: ' ME.message]; setStatus(ME.message);
+            catch ME, lblDLCR.Text = errText(ME.message); setStatus(ME.message);
             end
         end
 
