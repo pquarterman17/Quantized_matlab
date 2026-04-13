@@ -1446,6 +1446,10 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 I  = efHallI.Value;
                 B  = efHallB.Value;
                 t  = efHallT.Value * 1e-7;   % nm to cm
+                if I == 0 || B == 0
+                    lblHallResult.Text = errText('Current I and field B must be non-zero');
+                    return;
+                end
                 RH = VH * t / (I * B);        % cm³/C (experimental: R_H = V_H·t/(I·B))
                 nAbs = abs(1 / (RH * calc.constants().e));  % majority carrier density cm⁻³
                 % Use hallCoefficient in single-carrier limit to get apparentType + latex
@@ -2814,7 +2818,9 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         function sendSLDToReflectivity()
             if isnan(lastSLDe6), return; end
             if isfield(appData.api, 'addLayer')
-                appData.api.addLayer(lastSLDFormula, lastSLDe6);
+                % addLayer signature: (name, formula, thickness, density, roughness)
+                % Use SLD density mode defaults: thickness 100 Å, roughness 3 Å
+                appData.api.addLayer(lastSLDFormula, lastSLDFormula, 100, lastSLDe6, 3);
                 selectPanel('reflectivity');
                 setStatus(sprintf('Added %s (SLD = %.4g) to Reflectivity stack', lastSLDFormula, lastSLDe6));
             end
@@ -4390,6 +4396,10 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         function doDebye()
             vs = efDebVs.Value;
             n = efDebN.Value;
+            if n <= 0
+                lblDebResult.Text = errText('Atom density must be > 0');
+                return;
+            end
             hbar = 1.054571817e-34;
             kB = 1.380649e-23;
             thetaD = (hbar / kB) * vs * (6 * pi^2 * n)^(1/3);
@@ -4566,6 +4576,10 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             D = efFickD.Value;
             dC = efFickDC.Value;
             dx = efFickDx.Value;
+            if dx <= 0
+                lblFickResult.Text = errText([char(916) 'x must be > 0']);
+                return;
+            end
             J = -D * dC / dx;  % atoms/(cm²·s)
             desc = sprintf('J = -D %sC/%sx = %.4g atoms/(cm%s%ss)', ...
                 char(8706), char(8706), abs(J), char(178), char(183));
