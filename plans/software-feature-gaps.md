@@ -103,6 +103,20 @@ other and can be implemented in parallel.
     - [ ] Hexbin or square binning
     - [ ] Colormap by point density
 
+13. **Smart unit/symbol rendering in axis labels** — auto-prettify common scientific notation
+    - [ ] Extend `greekify()` (BosonPlotter local function) to handle unit symbols and formatting
+    - [ ] Angstrom: `Ang` / `Angstrom` / `A` (in unit context) → `Å` (U+00C5)
+    - [ ] Inverse units: `1/Ang` → `Å⁻¹`, `1/cm` → `cm⁻¹`, `1/nm` → `nm⁻¹`
+    - [ ] Superscripts: `^2` → `²`, `^3` → `³`, `^-1` → `⁻¹`, `^-2` → `⁻²`
+    - [ ] Subscripts: common patterns like `H_c` → `Hc` with subscript, `T_c` → `Tc`
+    - [ ] Multiplication dot: `*` or `·` in unit strings → `·` (middle dot U+00B7)
+    - [ ] Common unit abbreviations: `emu/cm^3` → `emu/cm³`, `A/m^2` → `A/m²`
+    - [ ] Ohm: `Ohm` / `ohm` → `Ω`
+    - [ ] Micro: already handled (`mu` → `μ`), verify `uOhm` → `μΩ` etc.
+    - [ ] Apply to axis labels, legend entries, data table column headers, and export figure text
+    - [ ] Must be idempotent (applying twice doesn't double-convert)
+    - [ ] Must not corrupt data values or column names (only display strings)
+
 ---
 
 ## Completed
