@@ -3056,9 +3056,9 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 case 'Sphere'
                     r = calc.magnetic.demagFactor('sphere');
                 case 'Thin film (in-plane)'
+                    % In-plane field: N_ip = 0 (no demagnetization along film plane)
                     r = calc.magnetic.demagFactor('thin_film');
-                    % thin_film returns Nz=1 (oop); in-plane is Nxy
-                    r.Nz = r.Nxy; r.Nxy = 1 - r.Nz;
+                    tmpNz = r.Nz; r.Nz = r.Nxy; r.Nxy = tmpNz;
                 case 'Thin film (out-of-plane)'
                     r = calc.magnetic.demagFactor('thin_film');
                 case 'Long cylinder (axial)'
@@ -3963,7 +3963,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
             data = [data; ...
                 {'Density',         sprintf('%.3f', s.density),     ['g/cm' char(179)]};
-                {'CTE',             sprintf('%.2g', s.thermalExpansion * 1e-6), '1/K'};
+                {'CTE',             sprintf('%.2g', s.thermalExpansion),         '10⁻⁶/K'};
                 {[char(949) '_r'],  sprintf('%.1f', s.dielectric),  ''}];
             tblSub.Data = data;
             setStatus(sprintf('Substrate: %s %s', s.formula, s.orientation));
@@ -3984,7 +3984,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 lines{end+1} = sprintf('alpha=%.1f  beta=%.1f  gamma=%.1f deg', s.alpha, s.beta, s.gamma);
             end
             lines{end+1} = sprintf('Density: %.3f g/cm3', s.density);
-            lines{end+1} = sprintf('CTE: %.2g /K', s.thermalExpansion * 1e-6);
+            lines{end+1} = sprintf('CTE: %.2g e-6/K', s.thermalExpansion);
             lines{end+1} = sprintf('eps_r: %.1f', s.dielectric);
             clipboard('copy', strjoin(lines, newline));
             setStatus(sprintf('Copied %s properties to clipboard', name));
