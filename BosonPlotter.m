@@ -3977,6 +3977,10 @@ function varargout = BosonPlotter(options)
                     ds.corrData   = [];
                     ds.parserName = 'importSIMS';
                     appData.datasets{appData.activeIdx} = ds;
+                    try
+                        appData.model.updateDataset(appData.activeIdx, ds);
+                    catch
+                    end
                     rebuildDatasetList();
                     updateControlsForActiveDataset();
                     onPlot([],[]);
@@ -5397,6 +5401,10 @@ function varargout = BosonPlotter(options)
             ds.normMethod    = normVal;
 
             appData.datasets{di} = ds;
+            try
+                appData.model.updateDataset(di, ds);
+            catch
+            end
         end
 
         % Refresh plot
@@ -5871,6 +5879,10 @@ function varargout = BosonPlotter(options)
         if isfield(ds,'fieldUnit')  && strcmp(ds.fieldUnit,  'Oe (raw)'),  ds.fieldUnit  = 'Oe';  end
         if isfield(ds,'momentUnit') && strcmp(ds.momentUnit, 'emu (raw)'), ds.momentUnit = 'emu'; end
         appData.datasets{dsIdx} = ds;
+        try
+            appData.model.updateDataset(dsIdx, ds);
+        catch
+        end
 
         % Sync UI widgets only when this is the active dataset
         if dsIdx == appData.activeIdx
@@ -6116,6 +6128,10 @@ function varargout = BosonPlotter(options)
         ds.data     = newData;
         ds.corrData = [];  % stale corrections discarded — user must re-apply
         appData.datasets{dsIdx} = ds;
+        try
+            appData.model.updateDataset(dsIdx, ds);
+        catch
+        end
         rebuildDatasetList(false);
         if appData.activeIdx == dsIdx
             onPlot([], []);
@@ -7763,6 +7779,10 @@ function varargout = BosonPlotter(options)
         newDs.displayName = cutLabel;
         newDs.legendName  = cutLabel;
         appData.datasets{end+1} = newDs;
+        try
+            appData.model.addDataset(newDs.data, newDs.filepath, newDs.parserName);
+        catch
+        end
         rebuildDatasetList(numel(appData.datasets));
         updateControlsForActiveDataset();
         fprintf('[BosonPlotter] Line-cut added: %s — %s\n', [fn fext], cutLabel);
@@ -7782,6 +7802,10 @@ function varargout = BosonPlotter(options)
             ds, bx0, by0, bx1, by1, profileAxis, fig, wgts2);
         if isempty(newDs), return; end
         appData.datasets{end+1} = newDs;
+        try
+            appData.model.addDataset(newDs.data, newDs.filepath, newDs.parserName);
+        catch
+        end
         rebuildDatasetList(numel(appData.datasets));
         updateControlsForActiveDataset();
         if hasFixedBoxSize()
@@ -9942,6 +9966,10 @@ function varargout = BosonPlotter(options)
                 ds.data = d;
             end
             appData.datasets{appData.activeIdx} = ds;
+            try
+                appData.model.updateDataset(appData.activeIdx, ds);
+            catch
+            end
             updateControlsForActiveDataset();
             onPlot([],[]);
             setStatus(sprintf('Added column "%s".', colName));
@@ -11506,6 +11534,10 @@ function varargout = BosonPlotter(options)
         if ~isempty(idx)
             ds.data.values(:, idx) = result.filtered;
             appData.datasets{appData.activeIdx} = ds;
+            try
+                appData.model.updateDataset(appData.activeIdx, ds);
+            catch
+            end
             onPlot([], []);
             setStatus(sprintf('FFT filter: %s (cutoff=%s) applied to %s', filterType, cutoffStr, yLbl));
         end
@@ -11620,6 +11652,10 @@ function varargout = BosonPlotter(options)
             newDS = buildDs('[Digitized]', data, 'digitizer');
             appData.datasets{end+1} = newDS;
             appData.activeIdx = numel(appData.datasets);
+            try
+                appData.model.addDataset(newDS.data, newDS.filepath, newDS.parserName);
+            catch
+            end
             updateFileList();
             updateControlsForActiveDataset();
             onPlot([], []);

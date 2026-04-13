@@ -139,6 +139,11 @@ function onApplyCorrections(appData, ui, callbacks)
     ds.fieldUnit     = ui.ddFieldUnit.Value;
     ds.unitSystem    = ui.ddUnitSystem.Value;
     appData.datasets{appData.activeIdx} = ds;
+    try
+        appData.model.updateDataset(appData.activeIdx, ds);
+    catch
+        % Model sync is best-effort — do not break corrections if model is invalid.
+    end
 
     % ════════════════════════════════════════════════════════════════════
     %  Cross-polarization propagation (neutron data only)
@@ -189,6 +194,10 @@ function onApplyCorrections(appData, ui, callbacks)
             pds.xTrimMax   = xTrimMax;
             pds.normMethod = normVal;
             appData.datasets{pki} = pds;
+            try
+                appData.model.updateDataset(pki, pds);
+            catch
+            end
         end
     end
 
