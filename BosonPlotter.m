@@ -123,6 +123,11 @@ function varargout = BosonPlotter(options)
 %     peaks = api.getPeaks();
 %     api.close();
 %
+%   Shared-model usage (linked to DataWorkspace):
+%     dwApi = DataWorkspace();           % or DataWorkspace(Visible='off')
+%     m = dwApi.getModel();
+%     api  = BosonPlotter(Model=m);      % datasets pre-loaded from model
+%
 % ── Dataset Struct (appData.datasets{i}) ──────────────────────────────────
 %
 %   .data          — raw parsed data struct (from parser)
@@ -239,6 +244,7 @@ function varargout = BosonPlotter(options)
 
     arguments
         options.Visible (1,1) string {mustBeMember(options.Visible,["on","off"])} = "on"
+        options.Model         = []   % existing WorkspaceModel (shared with DataWorkspace)
     end
 
     % ── Shared application state (handle class — pass-by-reference) ──────
@@ -248,7 +254,29 @@ function varargout = BosonPlotter(options)
     appData = bosonPlotter.AppState();
 
     % ── Shared WorkspaceModel (observed by DataWorkspace if open) ────────
-    appData.model = dataWorkspace.WorkspaceModel();
+    % Accept an existing model from DataWorkspace (shared-model mode)
+    if ~isempty(options.Model) && isa(options.Model, 'dataWorkspace.WorkspaceModel')
+        appData.model = options.Model;
+        % Populate datasets from model
+        for mi = 1:appData.model.count()
+            rawDs = appData.model.datasets{mi};
+            ds = buildDs('', rawDs, '');
+            if isfield(rawDs, 'metadata')
+                m = rawDs.metadata;
+                if isfield(m, 'source'),     ds.filepath   = m.source;     end
+                if isfield(m, 'parserName'), ds.parserName = m.parserName; end
+            end
+            appData.datasets{end+1} = ds;
+        end
+        if ~isempty(appData.datasets)
+            appData.activeIdx = 1;
+        end
+    else
+        appData.model = dataWorkspace.WorkspaceModel();
+    end
+
+    % Handle to any linked DataWorkspace figure (single-instance enforcement)
+    linkedDW = [];
 
     % Fields with non-default values (overriding AppState property defaults)
     appData.style      = 'Line';
@@ -776,12 +804,9 @@ function varargout = BosonPlotter(options)
     tbActions(end+1) = struct('id','animate',    'label',[char(9654) ' Animate'], ...
         'tooltip','Animate dataset sequence', ...
         'callback',@(~,~) onToggleAnimation([],[]));
-    tbActions(end+1) = struct('id','spreadsheet', 'label',[char(9783) ' Sheet'], ...
-        'tooltip','Open dataset in spreadsheet view', ...
-        'callback',@(~,~) onSpreadsheetPopup([],[]));
-    tbActions(end+1) = struct('id','dataworkspace', 'label',[char(9638) ' Workspace'], ...
-        'tooltip','Open DataWorkspace (full spreadsheet with shared model)', ...
-        'callback',@(~,~) DataWorkspace(Model=appData.model));
+    tbActions(end+1) = struct('id','workspace', 'label',[char(9783) ' Data Table'], ...
+        'tooltip','Open shared DataWorkspace (single instance; right-click for new window)', ...
+        'callback',@(~,~) openLinkedDataWorkspace());
     tbActions(end+1) = struct('id','undo',        'label',[char(8617) ' Undo'], ...
         'tooltip','Undo last operation  [Ctrl+Z]', ...
         'callback',@(~,~) onUndo([],[]));
@@ -1556,8 +1581,8 @@ function varargout = BosonPlotter(options)
         'RowHeight', {22, 22, 14, 26, '1x'}, 'Padding', [2 2 2 2], 'RowSpacing', 1);
 
     % Toolbar row
-    tableBarGL = uigridlayout(dataTableInnerGL, [1 7], ...
-        'ColumnWidth', {70, 70, 55, 50, 50, 50, '1x'}, ...
+    tableBarGL = uigridlayout(dataTableInnerGL, [1 8], ...
+        'ColumnWidth', {70, 70, 55, 50, 50, 50, '1x', 100}, ...
         'RowHeight', {'1x'}, ...
         'Padding', [2 0 2 0], 'ColumnSpacing', 3);
     tableBarGL.Layout.Row = 1;
@@ -1608,6 +1633,13 @@ function varargout = BosonPlotter(options)
         'FontSize', 8, 'FontColor', [0.55 0.55 0.55], ...
         'HorizontalAlignment', 'right');
     lblTableStats.Layout.Column = 7;
+
+    btnOpenDW = uibutton(tableBarGL, 'Text', [char(9783) ' Data Table'], ...
+        'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
+        'FontSize', 8, ...
+        'Tooltip', 'Open shared DataWorkspace (single instance)', ...
+        'ButtonPushedFcn', @(~,~) openLinkedDataWorkspace());
+    btnOpenDW.Layout.Column = 8;
 
     % ── Filter bar row ────────────────────────────────────────────────────
     % Layout: [label | edit field (stretch) | Filter btn | Clear btn]
@@ -2596,6 +2628,16 @@ function varargout = BosonPlotter(options)
 
     % Populate recent dropdown from persisted state
     updateRecentDropdown();
+
+    % ── If launched with a shared Model, refresh dataset list now ────────
+    % (datasets were loaded into appData.datasets before the GUI was built,
+    %  but rebuildDatasetList / updateControlsForActiveDataset need all GUI
+    %  handles to exist — they are guaranteed to exist at this point)
+    if ~isempty(options.Model) && isa(options.Model, 'dataWorkspace.WorkspaceModel') ...
+            && ~isempty(appData.datasets)
+        rebuildDatasetList(true);
+        updateControlsForActiveDataset();
+    end
 
     % ── Autosave: check for crash recovery ───────────────────────────
     % Deferred to here so all GUI callbacks exist before restoring data.
@@ -6627,25 +6669,16 @@ function varargout = BosonPlotter(options)
         efSavePath.Value = fullfile(fpath,fname);
     end
 
-    function onSpreadsheetPopup(~,~)
-    %ONSPREADSHEETPOPUP  Open the active dataset in a spreadsheet popup.
-        if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a file first.', 'No data');
+    function openLinkedDataWorkspace()
+    %OPENLINKEDDATAWORKSPACE  Open the shared DataWorkspace (single instance).
+    %   Left-click behaviour: bring existing window to front if open,
+    %   otherwise create a new one and store its figure handle.
+        if ~isempty(linkedDW) && isvalid(linkedDW)
+            figure(linkedDW);   % bring to front
             return;
         end
-        idx = appData.activeIdx;
-        ds  = appData.datasets{idx};
-        % Prefer corrected data if available, else raw
-        if ~isempty(ds.corrData)
-            plotD = ds.corrData;
-        else
-            plotD = ds.data;
-        end
-        titleStr = ds.displayName;
-        bosonPlotter.spreadsheetPopup(plotD, ...
-            'Title',    titleStr, ...
-            'OnEdit',   @(r,c,v) onSpreadsheetEdit(idx, r, c, v), ...
-            'ReadOnly', false);
+        dwApi  = DataWorkspace(Model=appData.model, Visible='on');
+        linkedDW = dwApi.fig;
     end
 
     function onSpreadsheetEdit(dsIdx, rowIdx, colIdx, newValue)

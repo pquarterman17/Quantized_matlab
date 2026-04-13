@@ -11,6 +11,9 @@ function varargout = DataWorkspace(options)
 %
 %   Visible  'on' (default) | 'off'
 %            Set to 'off' for headless / automated testing.
+%   Model    [] (default) | dataWorkspace.WorkspaceModel
+%            When provided, this model is shared with the caller (e.g.
+%            BosonPlotter) so both GUIs observe the same dataset list.
 %
 % ── Outputs ───────────────────────────────────────────────────────────────
 %
@@ -21,10 +24,15 @@ function varargout = DataWorkspace(options)
 %
 % ── Examples ──────────────────────────────────────────────────────────────
 %
-%   DataWorkspace                      % interactive launch
-%   api = DataWorkspace(Visible='off') % headless for tests
+%   DataWorkspace                              % interactive launch
+%   api = DataWorkspace(Visible='off')         % headless for tests
 %   api.addFiles({'data.dat'})
 %   model = api.getModel();
+%
+%   % Shared-model launch from BosonPlotter:
+%   m    = dataWorkspace.WorkspaceModel();
+%   bpApi = BosonPlotter(Model=m);
+%   dwApi = DataWorkspace(Model=m);
 %
 % ════════════════════════════════════════════════════════════════════════
 
@@ -63,8 +71,8 @@ fig = uifigure( ...
 % ════════════════════════════════════════════════════════════════════════
 %  Root grid: [toolbar ; content]
 % ════════════════════════════════════════════════════════════════════════
-rootGL = uigridlayout(fig, [2 1], ...
-    'RowHeight',   {34, '1x'}, ...
+rootGL = uigridlayout(fig, [3 1], ...
+    'RowHeight',   {34, '1x', 26}, ...
     'ColumnWidth', {'1x'}, ...
     'Padding',     [4 4 4 4], ...
     'RowSpacing',  4, ...
@@ -127,12 +135,17 @@ btnMerge.Layout.Column = 5;
 
 btnPlot = uibutton(tbGL, ...
     'Text',            [char(9654) ' Plot...'], ...
-    'Tooltip',         'Open active dataset in BosonPlotter', ...
+    'Tooltip',         'Open in BosonPlotter (left-click: single instance; right-click: new window)', ...
     'BackgroundColor', BTN, ...
     'FontColor',       FG, ...
     'FontSize',        10, ...
     'ButtonPushedFcn', @onPlotSelected);
 btnPlot.Layout.Column = 6;
+% Right-click context menu for "Open New Plotter"
+cmPlot = uicontextmenu(fig);
+uimenu(cmPlot, 'Text', 'Open New Plotter', ...
+    'MenuSelectedFcn', @(~,~) openNewBosonPlotter());
+btnPlot.ContextMenu = cmPlot;
 
 btnAddColumn = uibutton(tbGL, ...
     'Text',            [char(402) ' Add Column...'], ...
@@ -286,8 +299,17 @@ lblStatusBar = uilabel(rightGL, ...
 lblStatusBar.Layout.Row = 5;
 
 % ════════════════════════════════════════════════════════════════════════
+%  Dataset tab bar (bottom of figure, row 3 of rootGL)
+%  Empty tabs act as sheet selectors — clicking activates the dataset.
+% ════════════════════════════════════════════════════════════════════════
+tabGroup = uitabgroup(rootGL, ...
+    'SelectionChangedFcn', @onTabSelectionChanged);
+tabGroup.Layout.Row = 3;
+
+% ════════════════════════════════════════════════════════════════════════
 %  GUI state
 % ════════════════════════════════════════════════════════════════════════
+linkedBP            = [];        % handle to linked BosonPlotter figure (single-instance)
 state.selRows       = [];        % selected row indices in the table
 state.selCols       = [];        % selected column indices in the table
 
@@ -1109,25 +1131,26 @@ end
 % ════════════════════════════════════════════════════════════════════════
 
     function onPlotSelected(~, ~)
-    %ONPLOTSELECTED  Export active dataset to a temp CSV then open BosonPlotter.
-        if model.activeIdx == 0
-            uialert(fig, 'No active dataset to plot.', 'Plot');
+    %ONPLOTSELECTED  Open BosonPlotter with the shared model (single instance).
+    %   Reuses an already-open BosonPlotter by bringing it to front.
+    %   Right-click the button for "Open New Plotter".
+        if ~isempty(linkedBP) && isvalid(linkedBP)
+            figure(linkedBP);   % bring existing window to front
             return;
         end
-
-        data    = model.getData(model.activeIdx);
-        T       = buildTableFromData(data);
-        tmpFile = [tempname, '.csv'];
         try
-            writetable(T, tmpFile);
+            bpApi    = BosonPlotter(Model=model, Visible='on');
+            linkedBP = bpApi.fig;
+            setStatusBar('Opened BosonPlotter with shared model.');
         catch ME
-            uialert(fig, ME.message, 'Plot: temp file write failed');
-            return;
+            uialert(fig, ME.message, 'BosonPlotter failed to open');
         end
+    end
 
+    function openNewBosonPlotter()
+    %OPENNEWBOSONPLOTTER  Open a fresh BosonPlotter (ignores single-instance rule).
         try
-            BosonPlotter();
-            setStatusBar(['Exported temp CSV — open it in BosonPlotter: ' tmpFile]);
+            BosonPlotter(Model=model, Visible='on');
         catch ME
             uialert(fig, ME.message, 'BosonPlotter failed to open');
         end
@@ -1241,6 +1264,7 @@ end
         resetSortFilterState();
         refreshTable();
         refreshSelectionInList();
+        syncTabSelection();
     end
 
     function onModelMaskChanged(~, ~)
@@ -1276,6 +1300,68 @@ end
             lblStatus.Text = '1 dataset';
         else
             lblStatus.Text = sprintf('%d datasets', n);
+        end
+        refreshTabBar();
+    end
+
+    function refreshTabBar()
+    %REFRESHTABBAR  Rebuild the bottom tab bar to match model.datasets.
+        if ~isvalid(tabGroup), return; end
+        n = model.count();
+
+        % Build the desired tab title list
+        titles = cell(1, n);
+        for k = 1:n
+            ds = model.datasets{k};
+            if isfield(ds, 'metadata') && isfield(ds.metadata, 'source') ...
+                    && ~isempty(ds.metadata.source)
+                [~, nm, ext] = fileparts(ds.metadata.source);
+                titles{k} = [nm ext];
+            else
+                titles{k} = sprintf('Dataset %d', k);
+            end
+        end
+
+        % Reconcile existing tabs with desired list (add/remove only as needed)
+        existingTabs = tabGroup.Children;
+        nExist = numel(existingTabs);
+
+        % Remove excess tabs (from the end)
+        for k = nExist : -1 : n + 1
+            delete(existingTabs(k));
+        end
+
+        % Update or add tabs
+        existingTabs = tabGroup.Children;  % refresh after deletions
+        for k = 1:n
+            if k <= numel(existingTabs)
+                existingTabs(k).Title = titles{k};
+            else
+                uitab(tabGroup, 'Title', titles{k});
+            end
+        end
+
+        % Sync selected tab to model.activeIdx
+        syncTabSelection();
+    end
+
+    function syncTabSelection()
+    %SYNCTABSELECTION  Select the tab that matches model.activeIdx.
+        tabs = tabGroup.Children;
+        if isempty(tabs) || model.activeIdx == 0, return; end
+        idx = model.activeIdx;
+        if idx >= 1 && idx <= numel(tabs)
+            tabGroup.SelectedTab = tabs(idx);
+        end
+    end
+
+    function onTabSelectionChanged(~, evt)
+    %ONTABSELECTIONCHANGED  Switch active dataset when a tab is clicked.
+        if ~isvalid(fig), return; end
+        tabs = tabGroup.Children;
+        idx  = find(tabs == evt.NewValue, 1);
+        if ~isempty(idx) && idx ~= model.activeIdx
+            model.setActive(idx);
         end
     end
 
