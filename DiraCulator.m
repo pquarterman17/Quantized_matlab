@@ -1,11 +1,11 @@
-function varargout = materialsCalcGUI()
+function varargout = DiraCulator()
 % ════════════════════════════════════════════════════════════════════════
-% Standalone GUI for materials property calculations.
+% DiraCulator — Materials property calculator GUI.
 % ════════════════════════════════════════════════════════════════════════
 %
 % Syntax:
-%   materialsCalcGUI()
-%   api = materialsCalcGUI()
+%   DiraCulator()
+%   api = DiraCulator()
 %
 % Description:
 %   Opens a tabbed uifigure calculator covering: unit conversions, crystal
@@ -39,7 +39,7 @@ STATUSBAR_BG = [0.10 0.10 0.10];  % status bar background
 % ════════════════════════════════════════════════════════════════════════
 % MAIN FIGURE
 % ════════════════════════════════════════════════════════════════════════
-fig = uifigure('Name', 'Materials Calculator — Thin Film Toolkit', ...
+fig = uifigure('Name', 'DiraCulator — Thin Film Toolkit', ...
     'Position', [80 60 780 640], ...
     'Resize', 'on', ...
     'Color', FIG_BG);
@@ -5336,7 +5336,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         delete(fig);
     end
 
-end  % materialsCalcGUI
+end  % DiraCulator
 
 % ════════════════════════════════════════════════════════════════════════
 % PERIODIC TABLE LAYOUT DATA

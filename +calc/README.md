@@ -1,6 +1,6 @@
 # +calc/ — Materials Calculator Backend
 
-Backend functions for `materialsCalcGUI`. Organized into subpackages by domain.
+Backend functions for `DiraCulator`. Organized into subpackages by domain.
 
 ## Top-Level Functions
 
@@ -31,8 +31,8 @@ Backend functions for `materialsCalcGUI`. Organized into subpackages by domain.
 ## GUI
 
 ```matlab
-materialsCalcGUI              % interactive (18 panels)
-api = materialsCalcGUI();     % headless API for testing/scripting
+DiraCulator              % interactive (18 panels)
+api = DiraCulator();     % headless API for testing/scripting
 api.convert(1, 'eV', 'nm')
 api.calcDSpacing(3.905, 1, 1, 0)
 api.calcNeutronSLD('SrTiO3', 5.12)

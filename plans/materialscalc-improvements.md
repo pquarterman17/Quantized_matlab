@@ -1,6 +1,6 @@
 # Materials Calculator GUI — Improvements Plan
 
-Comprehensive improvement plan for `materialsCalcGUI.m` covering UX fixes, missing backend
+Comprehensive improvement plan for `DiraCulator.m` covering UX fixes, missing backend
 exposure, cross-tab workflows, documentation, and code quality. Sourced from a UX agent audit,
 documentation agent audit, and manual backend gap analysis.
 
@@ -14,14 +14,14 @@ documentation agent audit, and manual backend gap analysis.
 
 ### How the pieces fit together
 
-`materialsCalcGUI.m` is a 4,580-line uifigure with 18 panels navigated via a sidebar tree.
+`DiraCulator.m` is a 4,580-line uifigure with 18 panels navigated via a sidebar tree.
 Each panel is built by a `buildXxxTab()` nested function that creates input fields, buttons,
 and result labels, then calls into the `+calc/` package hierarchy (~85 functions across 11
 subpackages). A global history/favorites system, status bar with copy buttons, and headless
 API complete the architecture.
 
 ```
-materialsCalcGUI.m (4,580 lines)
+DiraCulator.m (4,580 lines)
   ├── Navigation: uitree sidebar (5 categories, 18 leaf panels)
   ├── Status bar: Copy Result / Copy LaTeX / Save Favorite
   ├── 18 buildXxxTab() nested functions → call +calc subpackages
@@ -218,7 +218,7 @@ materialsCalcGUI.m (4,580 lines)
     - [ ] Reflectivity builder workflow
     - [ ] Periodic table interaction
 
-25. **Add CLAUDE.md section for materialsCalcGUI** — Currently one line in the file tree.
+25. **Add CLAUDE.md section for DiraCulator** — Currently one line in the file tree.
     Add a section matching the BosonPlotter/DataWorkspace/FermiViewer pattern:
     - [ ] Navigation model
     - [ ] Headless API pattern
@@ -260,10 +260,10 @@ materialsCalcGUI.m (4,580 lines)
     may not pick up the post-hoc `applyDarkInputTheme` sweep if they use non-standard types.
     Verify all 18 tabs render correctly after theme application.
 
-33. **Rename to "Diraculator"** — Rename the GUI tool from `materialsCalcGUI` to `Diraculator`.
+33. **Rename to "Diraculator"** — Rename the GUI tool from `DiraCulator` to `Diraculator`.
     Scope: file rename, figure title, all references in CLAUDE.md, docs/, tests/, plans/,
     README files, and any caller sites (e.g. BosonPlotter menu items).
-    - [ ] Rename `materialsCalcGUI.m` → `Diraculator.m`
+    - [ ] Rename `DiraCulator.m` → `Diraculator.m`
     - [ ] Update function name inside the file
     - [ ] Update figure title string (`'Name'` property)
     - [ ] Update CLAUDE.md references
@@ -271,7 +271,7 @@ materialsCalcGUI.m (4,580 lines)
     - [ ] Update `docs/gui_materialscalc.md` → `docs/gui_diraculator.md`
     - [ ] Update test files (`tests/calc/` and `runAllTests` group)
     - [ ] Update plans/ references
-    - [ ] Grep for any remaining `materialsCalcGUI` strings repo-wide
+    - [ ] Grep for any remaining `DiraCulator` strings repo-wide
 
 ---
 

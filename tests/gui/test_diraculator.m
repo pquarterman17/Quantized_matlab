@@ -1,7 +1,7 @@
-%TEST_MATERIALS_CALC_GUI  Headless API tests for materialsCalcGUI.
+%TEST_DIRACULATOR  Headless API tests for DiraCulator.
 %
 %   Run:
-%     run tests/test_materials_calc_gui
+%     run tests/gui/test_diraculator
 
 clear; clc;
 
@@ -11,7 +11,7 @@ if ~contains(path, rootDir)
     addpath(rootDir);
 end
 
-fprintf('\n=== test_materials_calc_gui ===\n');
+fprintf('\n=== test_diraculator ===\n');
 passed = 0;
 failed = 0;
 
@@ -21,7 +21,7 @@ failed = 0;
 
 fprintf('\n--- Launch ---\n');
 
-api = materialsCalcGUI();
+api = DiraCulator();
 
 if isvalid(api.fig)
     fprintf('  PASS: GUI launched\n'); passed = passed + 1;
