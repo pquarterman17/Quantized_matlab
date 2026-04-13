@@ -757,8 +757,8 @@ function varargout = BosonPlotter(options)
     % ── Right: preview axes ───────────────────────────────────────────────
     axPanel = uipanel(contentGL,'Title','Preview','FontSize',11);
     axPanel.Layout.Column = 3;
-    axGL = uigridlayout(axPanel,[2 1],'Padding',[2 2 2 2],'RowSpacing',1, ...
-        'RowHeight',{18,'1x'});
+    axGL = uigridlayout(axPanel,[3 1],'Padding',[2 2 2 2],'RowSpacing',1, ...
+        'RowHeight',{18,'1x',20});
 
     % ── Dynamic axes toolbar (right-aligned buttons, order from user prefs) ──
     % The toolbar is built/rebuilt by buildToolbar().  A single-row grid with
@@ -828,6 +828,9 @@ function varargout = BosonPlotter(options)
     xlabel(ax,'');
     ylabel(ax,'');
 
+    % ── Persistent cursor readout panel (row 3 of axGL) ───────────────────
+    cursorPanelObj = bosonPlotter.cursorPanel(axGL, 3, ax, @() appData);
+
     % Table state (UI built later in dataTablePanel after analysisGL is created)
     appData.tableVisible    = true;   % visible by default in analysis area
     appData.tableWorkingCopy = [];
@@ -886,9 +889,15 @@ function varargout = BosonPlotter(options)
         uimenu(cmAxes, 'Text', 'Toggle Data Cursor', 'Separator', 'on', ...
             'MenuSelectedFcn', @(~,~) onToggleDataCursor([], []));
 
+        % Label editing (via double-click on plot labels or this menu entry)
+        uimenu(cmAxes, 'Text', 'Edit Axis Labels...', 'Separator', 'on', ...
+            'MenuSelectedFcn', @(~,~) onEditAxisLabelsMenu());
+
         % Actions
         uimenu(cmAxes, 'Text', 'Auto-Scale', 'Separator', 'on', ...
             'MenuSelectedFcn', @(~,~) onAutoLimits([], []));
+        uimenu(cmAxes, 'Text', 'Set Axis Limits...', ...
+            'MenuSelectedFcn', @(~,~) onSetAxisLimitsMenu());
         uimenu(cmAxes, 'Text', 'Copy Plot to Clipboard', ...
             'MenuSelectedFcn', @(~,~) onCopyPlotToClipboard());
         uimenu(cmAxes, 'Text', 'Copy Data to Clipboard', ...
@@ -910,6 +919,10 @@ function varargout = BosonPlotter(options)
     catch
         % R2022a/R2022b: uicontextmenu not supported on uifigure uiaxes.
     end
+
+    % Detect whether ContextMenu on uifigure children is supported (R2023b+).
+    % Used by plotInteractions to skip line context-menu wiring on older MATLAB.
+    cmSupported_ = ~isMATLABReleaseOlderThan('R2023b');
 
     % Persistent x,y readout — normalized coords so it sticks to the top-right corner
     % regardless of axis scale.  HandleVisibility='off' keeps it alive through cla().
@@ -2462,6 +2475,8 @@ function varargout = BosonPlotter(options)
     % CorrStyle / LivePreview selectors
     ui.ddCorrStyle      = ddCorrStyle;
     ui.cbLivePreview    = cbLivePreview;
+    % Cursor readout panel
+    ui.cursorPanel      = cursorPanelObj;
 
     % ── Callback struct for applyParserAnalysisConfig ─────────────────────
     apacCb_ = struct();
@@ -2600,6 +2615,10 @@ function varargout = BosonPlotter(options)
     api.setToolbarConfig    = @(cfg) setToolbarConfigDirect(cfg);
     api.getToolbarGL        = @() axToolbarGL;
     api.getToolbarRegistry  = @() tbActions;
+
+    % ── Plot interactions API (for testing) ───────────────────────────
+    api.getCursorPanel      = @() cursorPanelObj;
+    api.getAxGL             = @() axGL;
 
     % ── Drag-to-plot API (for testing) ────────────────────────────────
     api.setChannelFromDrag  = @(col, tgt) setChannelFromDrag(col, tgt);
@@ -7563,6 +7582,34 @@ function varargout = BosonPlotter(options)
         end
 
         bosonPlotter.renderPlot(targetAx, rCtx_);
+
+        % ── Wire double-click / context menus on plot objects ──────────────
+        % Only for the main axes; export/thumbnail axes get no interactions.
+        if rCtx_.isMainAx
+            try
+                piCb_.getDatasets    = @() appData.datasets;
+                piCb_.getActiveIdx   = @() appData.activeIdx;
+                piCb_.setActiveIdx   = @setActiveIdxDirect;
+                piCb_.setCustomXLabel = @(s) setIfChanged(efCustomXLabel, s);
+                piCb_.setCustomYLabel = @(s) setIfChanged(efCustomYLabel, s);
+                piCb_.setCustomTitle  = @(s) setIfChanged(efCustomTitle,  s);
+                piCb_.onAutoLimits    = @() onAutoLimits([],[]);
+                piCb_.isContextMenuSupported = cmSupported_;
+                bosonPlotter.plotInteractions(targetAx, fig, piCb_);
+            catch piME
+                logGUIError('plotInteractions', piME.message, piME);
+            end
+        end
+    end
+
+    function setIfChanged(ef, newVal)
+    %SETIFCHANGED  Update a text edit field and trigger replot when changed.
+    %   Programmatic .Value assignment does NOT fire ValueChangedFcn in
+    %   uifigures, so onPlot must be invoked explicitly after the update.
+        if ~isequal(ef.Value, newVal)
+            ef.Value = newVal;
+            onPlot([],[]);
+        end
     end
 
 
@@ -8198,6 +8245,40 @@ function varargout = BosonPlotter(options)
         onPlot([],[]);
     end
 
+    function onEditAxisLabelsMenu()
+    %ONEDITAXISLABELSMENU  Context-menu entry: open a dialog to edit all axis labels.
+    %   Provides the same edits as double-clicking each label individually.
+        prompts = {'X-Axis Label:', 'Y-Axis Label:', 'Plot Title:'};
+        defaults = {efCustomXLabel.Value, efCustomYLabel.Value, efCustomTitle.Value};
+        answer = inputdlg(prompts, 'Edit Axis Labels', [1 52], defaults);
+        if isempty(answer), return; end
+        changed = false;
+        if ~isequal(efCustomXLabel.Value, answer{1})
+            efCustomXLabel.Value = answer{1};  changed = true;
+        end
+        if ~isequal(efCustomYLabel.Value, answer{2})
+            efCustomYLabel.Value = answer{2};  changed = true;
+        end
+        if ~isequal(efCustomTitle.Value, answer{3})
+            efCustomTitle.Value  = answer{3};  changed = true;
+        end
+        if changed, onPlot([],[]); end
+    end
+
+    function onSetAxisLimitsMenu()
+    %ONSETAXISLIMITSMENU  Context-menu entry: edit axis limits via dialog.
+        prompts  = {'X Min:', 'X Max:', 'Y Min:', 'Y Max:'};
+        defaults = {efXMin.Value, efXMax.Value, efYMin.Value, efYMax.Value};
+        answer   = inputdlg(prompts, 'Set Axis Limits', [1 38], defaults);
+        if isempty(answer), return; end
+        efXMin.Value = strtrim(answer{1});
+        efXMax.Value = strtrim(answer{2});
+        efYMin.Value = strtrim(answer{3});
+        efYMax.Value = strtrim(answer{4});
+        saveAxisLimsToActiveDataset();
+        onPlot([],[]);
+    end
+
     function onMouseHover(~,~)
     %ONMOUSEHOVER  Update x,y readout and set resize cursor near panel borders.
     %  Fires continuously while the mouse moves over the figure in idle (non-drag) mode.
@@ -8215,6 +8296,7 @@ function varargout = BosonPlotter(options)
         if isempty(appData.cursorText) || ~isvalid(appData.cursorText), return; end
         if isempty(appData.datasets) || appData.activeIdx < 1
             set(appData.cursorText, 'Visible', 'off');
+            try, cursorPanelObj.update(NaN, NaN); catch, end
             return;
         end
         % Suppress "Negative data ignored" warning from ax.CurrentPoint
@@ -8226,6 +8308,7 @@ function varargout = BosonPlotter(options)
         if x < ax.XLim(1) || x > ax.XLim(2) || ...
            y < ax.YLim(1) || y > ax.YLim(2)
             set(appData.cursorText, 'Visible', 'off');
+            try, cursorPanelObj.update(NaN, NaN); catch, end
             return;
         end
         cursorStr = sprintf('x = %.5g\ny = %.5g', x, y);
@@ -8265,6 +8348,9 @@ function varargout = BosonPlotter(options)
         set(appData.cursorText, ...
             'String',  cursorStr, ...
             'Visible', 'on');
+
+        % Update the persistent cursor readout panel at the bottom of the axes area
+        try, cursorPanelObj.update(x, y); catch, end
     end
 
     function onAxesButtonDown(~,~)
