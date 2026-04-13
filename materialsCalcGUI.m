@@ -545,7 +545,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         scroll.Layout.Row = 1; scroll.Layout.Column = 1;
 
         gl = uigridlayout(scroll);
-        gl.RowHeight   = {110, 90, 100, 110, 260};
+        gl.RowHeight   = {110, 90, 100, 110, 260, 75, 75, 90};
         gl.ColumnWidth = {'1x'};
         gl.Padding     = [4 4 4 4];
         gl.RowSpacing  = 8;
@@ -1032,6 +1032,94 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             setStatus(sprintf('M = %.4f g/mol received from Molecular Weight', M));
         end
 
+        % ── Card 6: Tetragonal Distortion ───────────────────────────────
+        pTD = uipanel(gl,'Title','Tetragonal Distortion','FontWeight','bold');
+        pTD.Layout.Row = 6; pTD.Layout.Column = 1;
+        gTD = uigridlayout(pTD);
+        gTD.RowHeight = {24,24}; gTD.ColumnWidth = {130,'1x',130,'1x',130,'1x',120};
+        gTD.Padding = [6 4 6 4]; gTD.RowSpacing = 4;
+        uilabel(gTD,'Text','a relaxed (Å):','HorizontalAlignment','right');
+        efTDa = uieditfield(gTD,'numeric','Value',3.905,'Tooltip','Bulk or relaxed in-plane lattice parameter in Å');
+        efTDa.Layout.Row=1; efTDa.Layout.Column=2;
+        uilabel(gTD,'Text','c measured (Å):','HorizontalAlignment','right').Layout.Column=3;
+        efTDc = uieditfield(gTD,'numeric','Value',3.92,'Tooltip','Measured out-of-plane lattice parameter in Å');
+        efTDc.Layout.Row=1; efTDc.Layout.Column=4;
+        uilabel(gTD,'Text','c relaxed (Å):','HorizontalAlignment','right').Layout.Column=5;
+        efTDcR = uieditfield(gTD,'numeric','Value',3.905,'Tooltip','Relaxed c parameter (defaults to a relaxed if symmetric)');
+        efTDcR.Layout.Row=1; efTDcR.Layout.Column=6;
+        btnTD = uibutton(gTD,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doTetraDist());
+        btnTD.Layout.Row=1; btnTD.Layout.Column=7;
+        lblTDR = uilabel(gTD,'Text','—','FontSize',11,'Interpreter','html','WordWrap','on');
+        lblTDR.Layout.Row=2; lblTDR.Layout.Column=[1 7];
+        function doTetraDist()
+            try
+                r = calc.crystal.tetragonalDistortion(efTDa.Value, efTDc.Value, 'cRelaxed', efTDcR.Value);
+                desc = sprintf('c/a = %.5g, distortion = %.4g%%', r.cOverA, r.distortionPct);
+                lblTDR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblTDR.Text = errText(ME.message); setStatus(ME.message);
+            end
+        end
+
+        % ── Card 7: Strain from Poisson Ratio ───────────────────────────
+        pSP = uipanel(gl,'Title','Strain from Poisson Ratio','FontWeight','bold');
+        pSP.Layout.Row = 7; pSP.Layout.Column = 1;
+        gSP = uigridlayout(pSP);
+        gSP.RowHeight = {24,24}; gSP.ColumnWidth = {130,'1x',130,'1x',120};
+        gSP.Padding = [6 4 6 4]; gSP.RowSpacing = 4;
+        uilabel(gSP,'Text',sprintf('%s in-plane:',char(949)),'HorizontalAlignment','right');
+        efSPe = uieditfield(gSP,'numeric','Value',0.01,'Tooltip','In-plane biaxial strain (dimensionless)');
+        efSPe.Layout.Row=1; efSPe.Layout.Column=2;
+        uilabel(gSP,'Text',sprintf('%s (Poisson):',char(957)),'HorizontalAlignment','right').Layout.Column=3;
+        efSPnu = uieditfield(gSP,'numeric','Value',0.3,'Tooltip','Poisson ratio of the film material');
+        efSPnu.Layout.Row=1; efSPnu.Layout.Column=4;
+        btnSP = uibutton(gSP,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doStrainPoisson());
+        btnSP.Layout.Row=1; btnSP.Layout.Column=5;
+        lblSPR = uilabel(gSP,'Text','—','FontSize',11,'Interpreter','html','WordWrap','on');
+        lblSPR.Layout.Row=2; lblSPR.Layout.Column=[1 5];
+        function doStrainPoisson()
+            try
+                r = calc.crystal.strainFromPoisson(efSPe.Value, efSPnu.Value);
+                desc = sprintf('%s perp = %.4g, %s parallel = %.4g', char(949), r.epsPerp, char(949), r.epsParallel);
+                lblSPR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblSPR.Text = errText(ME.message); setStatus(ME.message);
+            end
+        end
+
+        % ── Card 8: Atomic Density ───────────────────────────────────────
+        pAD = uipanel(gl,'Title','Atomic Density','FontWeight','bold');
+        pAD.Layout.Row = 8; pAD.Layout.Column = 1;
+        gAD = uigridlayout(pAD);
+        gAD.RowHeight = {24,24,24}; gAD.ColumnWidth = {70,'1x',70,'1x',70,'1x',110,'1x',120};
+        gAD.Padding = [6 4 6 4]; gAD.RowSpacing = 4;
+        uilabel(gAD,'Text','a (Å):','HorizontalAlignment','right');
+        efADa = uieditfield(gAD,'numeric','Value',3.905,'Tooltip','Lattice parameter a in Å');
+        efADa.Layout.Row=1; efADa.Layout.Column=2;
+        uilabel(gAD,'Text','b (Å):','HorizontalAlignment','right').Layout.Column=3;
+        efADb = uieditfield(gAD,'numeric','Value',3.905,'Tooltip','Lattice parameter b in Å (leave = a for tetragonal/cubic)');
+        efADb.Layout.Row=1; efADb.Layout.Column=4;
+        uilabel(gAD,'Text','c (Å):','HorizontalAlignment','right').Layout.Column=5;
+        efADc = uieditfield(gAD,'numeric','Value',3.905,'Tooltip','Lattice parameter c in Å');
+        efADc.Layout.Row=1; efADc.Layout.Column=6;
+        uilabel(gAD,'Text','Z (atoms/cell):','HorizontalAlignment','right').Layout.Column=7;
+        efADZ = uieditfield(gAD,'numeric','Value',1,'Tooltip','Number of atoms per unit cell');
+        efADZ.Layout.Row=1; efADZ.Layout.Column=8;
+        btnAD = uibutton(gAD,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doAtomicDensity());
+        btnAD.Layout.Row=2; btnAD.Layout.Column=9;
+        lblADR = uilabel(gAD,'Text','—','FontSize',11,'Interpreter','html','WordWrap','on');
+        lblADR.Layout.Row=3; lblADR.Layout.Column=[1 9];
+        function doAtomicDensity()
+            try
+                r = calc.crystal.atomicDensity(efADa.Value, efADZ.Value, ...
+                    'b', efADb.Value, 'c', efADc.Value);
+                desc = sprintf('n = %.4g atoms/cm<sup>3</sup>', r.density);
+                lblADR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblADR.Text = errText(ME.message); setStatus(ME.message);
+            end
+        end
+
         registerPrimaryBtn('crystal', btnDCalc);
         appData.api.calcDSpacing = @(a,h,k,l) apiDSpacing(a,h,k,l);
         function txt = apiDSpacing(a,h,k,l)
@@ -1335,7 +1423,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         scroll.Layout.Row = 1; scroll.Layout.Column = 1;
 
         gl = uigridlayout(scroll);
-        gl.RowHeight   = {135, 105, 135, 105};
+        gl.RowHeight   = {135, 105, 135, 105, 90, 90, 90, 75, 75};
         gl.ColumnWidth = {'1x'};
         gl.Padding     = [4 4 4 4];
         gl.RowSpacing  = 8;
@@ -1591,6 +1679,161 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % ── Card 5: Fermi Level ──────────────────────────────────────────
+        pFL = uipanel(gl,'Title','Fermi Level','FontWeight','bold');
+        pFL.Layout.Row = 5; pFL.Layout.Column = 1;
+        gFL = uigridlayout(pFL);
+        gFL.RowHeight = {24,24,24}; gFL.ColumnWidth = {110,'1x',110,'1x',110,'1x',120};
+        gFL.Padding = [6 4 6 4]; gFL.RowSpacing = 4;
+        uilabel(gFL,'Text','Eg (eV):','HorizontalAlignment','right');
+        efFLEg = uieditfield(gFL,'numeric','Value',1.12,'Tooltip','Band gap energy in eV');
+        efFLEg.Layout.Row=1; efFLEg.Layout.Column=2;
+        uilabel(gFL,'Text','me* (me):','HorizontalAlignment','right').Layout.Column=3;
+        efFLme = uieditfield(gFL,'numeric','Value',1.08,'Tooltip','Effective electron mass in units of free electron mass');
+        efFLme.Layout.Row=1; efFLme.Layout.Column=4;
+        uilabel(gFL,'Text','mh* (me):','HorizontalAlignment','right').Layout.Column=5;
+        efFLmh = uieditfield(gFL,'numeric','Value',0.56,'Tooltip','Effective hole mass in units of free electron mass');
+        efFLmh.Layout.Row=1; efFLmh.Layout.Column=6;
+        lFLNd = uilabel(gFL,'Text','Nd (cm⁻³):','HorizontalAlignment','right');
+        lFLNd.Layout.Row=2; lFLNd.Layout.Column=1;
+        efFLNd = uieditfield(gFL,'numeric','Value',0,'Tooltip','Donor concentration in cm^-3 (0 for intrinsic)');
+        efFLNd.Layout.Row=2; efFLNd.Layout.Column=2;
+        lFLNa = uilabel(gFL,'Text','Na (cm⁻³):','HorizontalAlignment','right');
+        lFLNa.Layout.Row=2; lFLNa.Layout.Column=3;
+        efFLNa = uieditfield(gFL,'numeric','Value',0,'Tooltip','Acceptor concentration in cm^-3 (0 for intrinsic)');
+        efFLNa.Layout.Row=2; efFLNa.Layout.Column=4;
+        lFLT = uilabel(gFL,'Text','T (K):','HorizontalAlignment','right');
+        lFLT.Layout.Row=2; lFLT.Layout.Column=5;
+        efFLT = uieditfield(gFL,'numeric','Value',300,'Tooltip','Temperature in Kelvin');
+        efFLT.Layout.Row=2; efFLT.Layout.Column=6;
+        btnFL = uibutton(gFL,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doFermiLevel());
+        btnFL.Layout.Row=1; btnFL.Layout.Column=7;
+        lblFLR = uilabel(gFL,'Text','—','FontSize',11,'Interpreter','html','WordWrap','on');
+        lblFLR.Layout.Row=3; lblFLR.Layout.Column=[1 7];
+        function doFermiLevel()
+            try
+                r = calc.semiconductor.fermiLevel('Eg',efFLEg.Value,'meStar',efFLme.Value,...
+                    'mhStar',efFLmh.Value,'Nd',efFLNd.Value,'Na',efFLNa.Value,'T',efFLT.Value);
+                desc = sprintf('EF = %.4g eV (%s)', r.EF, r.type);
+                lblFLR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblFLR.Text = errText(ME.message); setStatus(ME.message);
+            end
+        end
+
+        % ── Card 6: Debye Screening Length ───────────────────────────────
+        pDL = uipanel(gl,'Title','Debye Screening Length','FontWeight','bold');
+        pDL.Layout.Row = 6; pDL.Layout.Column = 1;
+        gDL = uigridlayout(pDL);
+        gDL.RowHeight = {24,24,24}; gDL.ColumnWidth = {110,'1x',110,'1x',110,'1x',120};
+        gDL.Padding = [6 4 6 4]; gDL.RowSpacing = 4;
+        uilabel(gDL,'Text',sprintf('%sr:',char(949)),'HorizontalAlignment','right');
+        efDLeps = uieditfield(gDL,'numeric','Value',11.7,'Tooltip','Relative permittivity (dielectric constant)');
+        efDLeps.Layout.Row=1; efDLeps.Layout.Column=2;
+        uilabel(gDL,'Text','n (cm⁻³):','HorizontalAlignment','right').Layout.Column=3;
+        efDLn = uieditfield(gDL,'numeric','Value',1e16,'Tooltip','Carrier density in cm^-3');
+        efDLn.Layout.Row=1; efDLn.Layout.Column=4;
+        uilabel(gDL,'Text','T (K):','HorizontalAlignment','right').Layout.Column=5;
+        efDLT = uieditfield(gDL,'numeric','Value',300,'Tooltip','Temperature in Kelvin');
+        efDLT.Layout.Row=1; efDLT.Layout.Column=6;
+        btnDL = uibutton(gDL,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doDebyeLength());
+        btnDL.Layout.Row=1; btnDL.Layout.Column=7;
+        lblDLR = uilabel(gDL,'Text','—','FontSize',11,'Interpreter','html','WordWrap','on');
+        lblDLR.Layout.Row=2; lblDLR.Layout.Column=[1 7];
+        function doDebyeLength()
+            try
+                r = calc.semiconductor.debyeLength('epsilon_r',efDLeps.Value,'n',efDLn.Value,'T',efDLT.Value);
+                desc = sprintf('LD = %.4g nm', r.LD);
+                lblDLR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblDLR.Text = errText(ME.message); setStatus(ME.message);
+            end
+        end
+
+        % ── Card 7: Built-in Potential ───────────────────────────────────
+        pBV = uipanel(gl,'Title','Built-in Potential (p-n junction)','FontWeight','bold');
+        pBV.Layout.Row = 7; pBV.Layout.Column = 1;
+        gBV = uigridlayout(pBV);
+        gBV.RowHeight = {24,24,24}; gBV.ColumnWidth = {110,'1x',110,'1x',110,'1x',120};
+        gBV.Padding = [6 4 6 4]; gBV.RowSpacing = 4;
+        uilabel(gBV,'Text','Na (cm⁻³):','HorizontalAlignment','right');
+        efBVNa = uieditfield(gBV,'numeric','Value',1e17,'Tooltip','Acceptor concentration in cm^-3');
+        efBVNa.Layout.Row=1; efBVNa.Layout.Column=2;
+        uilabel(gBV,'Text','Nd (cm⁻³):','HorizontalAlignment','right').Layout.Column=3;
+        efBVNd = uieditfield(gBV,'numeric','Value',1e17,'Tooltip','Donor concentration in cm^-3');
+        efBVNd.Layout.Row=1; efBVNd.Layout.Column=4;
+        uilabel(gBV,'Text','ni (cm⁻³):','HorizontalAlignment','right').Layout.Column=5;
+        efBVni = uieditfield(gBV,'numeric','Value',9.65e9,'Tooltip','Intrinsic carrier concentration in cm^-3');
+        efBVni.Layout.Row=1; efBVni.Layout.Column=6;
+        btnBV = uibutton(gBV,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doBuiltIn());
+        btnBV.Layout.Row=1; btnBV.Layout.Column=7;
+        uilabel(gBV,'Text','T (K):','HorizontalAlignment','right').Layout.Row=2;
+        efBVT = uieditfield(gBV,'numeric','Value',300,'Tooltip','Temperature in Kelvin');
+        efBVT.Layout.Row=2; efBVT.Layout.Column=2;
+        lblBVR = uilabel(gBV,'Text','—','FontSize',11,'Interpreter','html','WordWrap','on');
+        lblBVR.Layout.Row=3; lblBVR.Layout.Column=[1 7];
+        function doBuiltIn()
+            try
+                r = calc.semiconductor.builtInPotential(efBVNa.Value, efBVNd.Value, efBVni.Value, 'T', efBVT.Value);
+                desc = sprintf('Vbi = %.4g V', r.Vbi);
+                lblBVR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblBVR.Text = errText(ME.message); setStatus(ME.message);
+            end
+        end
+
+        % ── Card 8: Sheet Carrier Density ────────────────────────────────
+        pSC = uipanel(gl,'Title','Sheet Carrier Density','FontWeight','bold');
+        pSC.Layout.Row = 8; pSC.Layout.Column = 1;
+        gSC = uigridlayout(pSC);
+        gSC.RowHeight = {24,24}; gSC.ColumnWidth = {130,'1x',130,'1x',120};
+        gSC.Padding = [6 4 6 4]; gSC.RowSpacing = 4;
+        uilabel(gSC,'Text','n (cm⁻³):','HorizontalAlignment','right');
+        efSCn = uieditfield(gSC,'numeric','Value',1e17,'Tooltip','Bulk carrier concentration in cm^-3');
+        efSCn.Layout.Row=1; efSCn.Layout.Column=2;
+        uilabel(gSC,'Text','t (nm):','HorizontalAlignment','right').Layout.Column=3;
+        efSCt = uieditfield(gSC,'numeric','Value',10,'Tooltip','Layer thickness in nm');
+        efSCt.Layout.Row=1; efSCt.Layout.Column=4;
+        btnSC = uibutton(gSC,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doSheetCarrier());
+        btnSC.Layout.Row=1; btnSC.Layout.Column=5;
+        lblSCR = uilabel(gSC,'Text','—','FontSize',11,'Interpreter','html','WordWrap','on');
+        lblSCR.Layout.Row=2; lblSCR.Layout.Column=[1 5];
+        function doSheetCarrier()
+            try
+                r = calc.semiconductor.sheetCarrierDensity(efSCn.Value, efSCt.Value * 1e-7);
+                desc = sprintf('ns = %.4g cm<sup>&#8722;2</sup>', r.ns);
+                lblSCR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblSCR.Text = errText(ME.message); setStatus(ME.message);
+            end
+        end
+
+        % ── Card 9: Thermal Velocity ─────────────────────────────────────
+        pTV = uipanel(gl,'Title','Thermal Velocity','FontWeight','bold');
+        pTV.Layout.Row = 9; pTV.Layout.Column = 1;
+        gTV = uigridlayout(pTV);
+        gTV.RowHeight = {24,24}; gTV.ColumnWidth = {130,'1x',130,'1x',120};
+        gTV.Padding = [6 4 6 4]; gTV.RowSpacing = 4;
+        uilabel(gTV,'Text','m* (me):','HorizontalAlignment','right');
+        efTVm = uieditfield(gTV,'numeric','Value',0.26,'Tooltip','Effective mass in units of free electron mass');
+        efTVm.Layout.Row=1; efTVm.Layout.Column=2;
+        uilabel(gTV,'Text','T (K):','HorizontalAlignment','right').Layout.Column=3;
+        efTVT = uieditfield(gTV,'numeric','Value',300,'Tooltip','Temperature in Kelvin');
+        efTVT.Layout.Row=1; efTVT.Layout.Column=4;
+        btnTV = uibutton(gTV,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doThermalVel());
+        btnTV.Layout.Row=1; btnTV.Layout.Column=5;
+        lblTVR = uilabel(gTV,'Text','—','FontSize',11,'Interpreter','html','WordWrap','on');
+        lblTVR.Layout.Row=2; lblTVR.Layout.Column=[1 5];
+        function doThermalVel()
+            try
+                r = calc.semiconductor.thermalVelocity(efTVm.Value, 'T', efTVT.Value);
+                desc = sprintf('vth = %.4g cm/s', r.vth);
+                lblTVR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblTVR.Text = errText(ME.message); setStatus(ME.message);
+            end
+        end
+
         % API hooks
         registerPrimaryBtn('semiconductor', btnNiCalc);
         appData.api.calcIntrinsic = @(mat) apiIntrinsic(mat);
@@ -1619,7 +1862,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         scroll.Layout.Row = 1; scroll.Layout.Column = 1;
 
         gl = uigridlayout(scroll);
-        gl.RowHeight   = {72, 72, 90, 110, 72, 72};
+        gl.RowHeight   = {72, 72, 90, 110, 72, 72, 75, 90, 75, 110};
         gl.ColumnWidth = {'1x'};
         gl.Padding     = [4 4 4 4];
         gl.RowSpacing  = 8;
@@ -1918,6 +2161,125 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             catch ME
                 lblSchResult.Text = errText(ME.message);
                 setStatus(ME.message);
+            end
+        end
+
+        % ── Card 7: Sputter Rate ─────────────────────────────────────────
+        pSR = uipanel(gl,'Title','Sputter Rate','FontWeight','bold');
+        pSR.Layout.Row = 7; pSR.Layout.Column = 1;
+        gSR = uigridlayout(pSR);
+        gSR.RowHeight = {24,24}; gSR.ColumnWidth = {100,'1x',100,'1x',100,'1x',120};
+        gSR.Padding = [6 4 6 4]; gSR.RowSpacing = 4;
+        uilabel(gSR,'Text','Y (atoms/ion):','HorizontalAlignment','right');
+        efSRY = uieditfield(gSR,'numeric','Value',2.0,'Tooltip','Sputter yield in atoms/ion');
+        efSRY.Layout.Row=1; efSRY.Layout.Column=2;
+        uilabel(gSR,'Text','J (mA/cm²):','HorizontalAlignment','right').Layout.Column=3;
+        efSRJ = uieditfield(gSR,'numeric','Value',1.0,'Tooltip','Ion current density in mA/cm^2');
+        efSRJ.Layout.Row=1; efSRJ.Layout.Column=4;
+        uilabel(gSR,'Text',sprintf('%s (g/cm%s):',char(961),char(179)),'HorizontalAlignment','right').Layout.Column=5;
+        efSRrho = uieditfield(gSR,'numeric','Value',10.5,'Tooltip','Target material density in g/cm^3');
+        efSRrho.Layout.Row=1; efSRrho.Layout.Column=6;
+        btnSR = uibutton(gSR,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doSputterRate());
+        btnSR.Layout.Row=1; btnSR.Layout.Column=7;
+        uilabel(gSR,'Text','M (g/mol):','HorizontalAlignment','right').Layout.Row=2;
+        efSRM = uieditfield(gSR,'numeric','Value',107.87,'Tooltip','Molar mass of target in g/mol');
+        efSRM.Layout.Row=2; efSRM.Layout.Column=2;
+        lblSRR = uilabel(gSR,'Text','—','FontSize',11,'Interpreter','html','WordWrap','on');
+        lblSRR.Layout.Row=2; lblSRR.Layout.Column=[3 7];
+        function doSputterRate()
+            try
+                r = calc.thinFilm.sputterRate(efSRY.Value, efSRJ.Value, efSRrho.Value, efSRM.Value);
+                desc = sprintf('Rate = %.3g nm/s (%.3g nm/min)', r.rate, r.rateNmPerMin);
+                lblSRR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblSRR.Text = errText(ME.message); setStatus(ME.message);
+            end
+        end
+
+        % ── Card 8: Projected Range (SRIM estimate) ───────────────────
+        pPR = uipanel(gl,'Title','Projected Range (SRIM estimate)','FontWeight','bold');
+        pPR.Layout.Row = 8; pPR.Layout.Column = 1;
+        gPR = uigridlayout(pPR);
+        gPR.RowHeight = {24,24,24}; gPR.ColumnWidth = {110,'1x',110,'1x',120};
+        gPR.Padding = [6 4 6 4]; gPR.RowSpacing = 4;
+        uilabel(gPR,'Text','Ion (symbol):','HorizontalAlignment','right');
+        efPRion = uieditfield(gPR,'text','Value','Ar','Tooltip','Ion element symbol, e.g. Ar, N, B');
+        efPRion.Layout.Row=1; efPRion.Layout.Column=2;
+        uilabel(gPR,'Text','Target (symbol):','HorizontalAlignment','right').Layout.Column=3;
+        efPRtgt = uieditfield(gPR,'text','Value','Si','Tooltip','Target element symbol, e.g. Si, Fe, Ti');
+        efPRtgt.Layout.Row=1; efPRtgt.Layout.Column=4;
+        btnPR = uibutton(gPR,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doProjRange());
+        btnPR.Layout.Row=1; btnPR.Layout.Column=5;
+        uilabel(gPR,'Text','Energy (keV):','HorizontalAlignment','right').Layout.Row=2;
+        efPRE = uieditfield(gPR,'numeric','Value',100,'Tooltip','Ion energy in keV');
+        efPRE.Layout.Row=2; efPRE.Layout.Column=2;
+        lblPRR = uilabel(gPR,'Text','—','FontSize',11,'Interpreter','html','WordWrap','on');
+        lblPRR.Layout.Row=3; lblPRR.Layout.Column=[1 5];
+        function doProjRange()
+            try
+                r = calc.thinFilm.projectedRange(efPRion.Value, efPRtgt.Value, efPRE.Value);
+                desc = sprintf('Rp = %.3g nm, %sRp = %.3g nm', r.Rp, char(916), r.deltaRp);
+                lblPRR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblPRR.Text = errText(ME.message); setStatus(ME.message);
+            end
+        end
+
+        % ── Card 9: Dose to Peak Concentration ───────────────────────
+        pDC = uipanel(gl,'Title','Dose to Peak Concentration','FontWeight','bold');
+        pDC.Layout.Row = 9; pDC.Layout.Column = 1;
+        gDC = uigridlayout(pDC);
+        gDC.RowHeight = {24,24}; gDC.ColumnWidth = {130,'1x',100,'1x',100,'1x',120};
+        gDC.Padding = [6 4 6 4]; gDC.RowSpacing = 4;
+        uilabel(gDC,'Text','Dose (ions/cm²):','HorizontalAlignment','right');
+        efDCdose = uieditfield(gDC,'numeric','Value',1e15,'Tooltip','Implant dose in ions/cm^2');
+        efDCdose.Layout.Row=1; efDCdose.Layout.Column=2;
+        uilabel(gDC,'Text','Rp (nm):','HorizontalAlignment','right').Layout.Column=3;
+        efDCRp = uieditfield(gDC,'numeric','Value',50,'Tooltip','Projected range in nm');
+        efDCRp.Layout.Row=1; efDCRp.Layout.Column=4;
+        uilabel(gDC,'Text',sprintf('%sRp (nm):',char(916)),'HorizontalAlignment','right').Layout.Column=5;
+        efDCdRp = uieditfield(gDC,'numeric','Value',15,'Tooltip','Straggle (standard deviation) in nm');
+        efDCdRp.Layout.Row=1; efDCdRp.Layout.Column=6;
+        btnDC = uibutton(gDC,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doDoseConc());
+        btnDC.Layout.Row=1; btnDC.Layout.Column=7;
+        lblDCR = uilabel(gDC,'Text','—','FontSize',11,'Interpreter','html','WordWrap','on');
+        lblDCR.Layout.Row=2; lblDCR.Layout.Column=[1 7];
+        function doDoseConc()
+            try
+                r = calc.thinFilm.doseToConcentration(efDCdose.Value, efDCRp.Value, efDCdRp.Value);
+                desc = sprintf('Cpeak = %.3g atoms/cm<sup>3</sup>', r.Cpeak);
+                lblDCR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblDCR.Text = errText(ME.message); setStatus(ME.message);
+            end
+        end
+
+        % ── Card 10: Multilayer Thermal Conductivity ──────────────────
+        pMT = uipanel(gl,'Title','Multilayer Thermal Conductivity','FontWeight','bold');
+        pMT.Layout.Row = 10; pMT.Layout.Column = 1;
+        gMT = uigridlayout(pMT);
+        gMT.RowHeight = {24,24,24,24}; gMT.ColumnWidth = {150,'1x',150,'1x',120};
+        gMT.Padding = [6 4 6 4]; gMT.RowSpacing = 4;
+        uilabel(gMT,'Text','Thicknesses (nm):','HorizontalAlignment','right');
+        efMTt = uieditfield(gMT,'text','Value','10 20 10','Tooltip','Space-separated layer thicknesses in nm, e.g. 10 20 10');
+        efMTt.Layout.Row=1; efMTt.Layout.Column=2;
+        uilabel(gMT,'Text',sprintf('%s (W/m/K):',char(954)),'HorizontalAlignment','right').Layout.Column=3;
+        efMTk = uieditfield(gMT,'text','Value','150 10 150','Tooltip','Space-separated thermal conductivities in W/m/K, matching order of thicknesses');
+        efMTk.Layout.Row=1; efMTk.Layout.Column=4;
+        btnMT = uibutton(gMT,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doMultilayerK());
+        btnMT.Layout.Row=1; btnMT.Layout.Column=5;
+        lblMTR = uilabel(gMT,'Text','—','FontSize',11,'Interpreter','html','WordWrap','on');
+        lblMTR.Layout.Row=2; lblMTR.Layout.Column=[1 5];
+        function doMultilayerK()
+            try
+                thk = str2double(strsplit(strtrim(efMTt.Value)));
+                kap = str2double(strsplit(strtrim(efMTk.Value)));
+                r = calc.thinFilm.multilayerThermalConductivity(thk(:), kap(:));
+                desc = sprintf('%s series = %.4g W/m/K, %s parallel = %.4g W/m/K', ...
+                    char(954), r.kSeries, char(954), r.kParallel);
+                lblMTR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblMTR.Text = errText(ME.message); setStatus(ME.message);
             end
         end
 
@@ -2264,10 +2626,18 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildXrayNeutronTab(tab)
-        gl = uigridlayout(tab);
-        gl.RowHeight   = {'3x', '2x', '3x', '2x'};
+        outerGL = uigridlayout(tab);
+        outerGL.RowHeight   = {'1x'};
+        outerGL.ColumnWidth = {'1x'};
+        outerGL.Padding     = [6 6 6 6];
+
+        scroll = uipanel(outerGL,'BorderType','none','Scrollable','on');
+        scroll.Layout.Row = 1; scroll.Layout.Column = 1;
+
+        gl = uigridlayout(scroll);
+        gl.RowHeight   = {110, 85, 110, 85, 90, 115};
         gl.ColumnWidth = {'1x'};
-        gl.Padding     = [6 6 6 6];
+        gl.Padding     = [4 4 4 4];
         gl.RowSpacing  = 8;
 
         % ── Card 1: Neutron SLD ──────────────────────────────────────
@@ -2494,6 +2864,80 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % ── Card 5: Weight% ↔ Atomic% ───────────────────────────────────
+        pWA = uipanel(gl,'Title','Weight% / Atomic% Conversion','FontWeight','bold');
+        pWA.Layout.Row = 5; pWA.Layout.Column = 1;
+        gWA = uigridlayout(pWA);
+        gWA.RowHeight = {24,24,24}; gWA.ColumnWidth = {140,'1x',80,'1x',100,100};
+        gWA.Padding = [6 4 6 4]; gWA.RowSpacing = 4;
+        uilabel(gWA,'Text','Elements (e.g. Fe Ni):','HorizontalAlignment','right');
+        efWAels = uieditfield(gWA,'text','Value','Fe Ni','Tooltip','Space-separated element symbols, e.g. Fe Ni Cu');
+        efWAels.Layout.Row=1; efWAels.Layout.Column=2;
+        uilabel(gWA,'Text','Values (%):','HorizontalAlignment','right').Layout.Column=3;
+        efWAvals = uieditfield(gWA,'text','Value','70 30','Tooltip','Space-separated percentages summing to 100');
+        efWAvals.Layout.Row=1; efWAvals.Layout.Column=4;
+        btnWAw2a = uibutton(gWA,'push','Text','wt% to at%','BackgroundColor',BTN_TOOL,'FontColor',BTN_TOOL_FG,...
+            'ButtonPushedFcn',@(~,~) doWtToAt());
+        btnWAw2a.Layout.Row=1; btnWAw2a.Layout.Column=5;
+        btnWAa2w = uibutton(gWA,'push','Text','at% to wt%','BackgroundColor',BTN_TOOL,'FontColor',BTN_TOOL_FG,...
+            'ButtonPushedFcn',@(~,~) doAtToWt());
+        btnWAa2w.Layout.Row=1; btnWAa2w.Layout.Column=6;
+        lblWAR = uilabel(gWA,'Text','—','FontSize',11,'Interpreter','html','WordWrap','on');
+        lblWAR.Layout.Row=2; lblWAR.Layout.Column=[1 6];
+        function doWtToAt()
+            try
+                els = strsplit(strtrim(efWAels.Value));
+                vals = str2double(strsplit(strtrim(efWAvals.Value)));
+                r = calc.xrayNeutron.weightToAtomicPercent(els, vals);
+                parts = arrayfun(@(i) sprintf('%s: %.2f at%%', els{i}, r.atomicPct(i)), ...
+                    1:numel(els), 'UniformOutput', false);
+                desc = strjoin(parts, ', ');
+                lblWAR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblWAR.Text = errText(ME.message); setStatus(ME.message);
+            end
+        end
+        function doAtToWt()
+            try
+                els = strsplit(strtrim(efWAels.Value));
+                vals = str2double(strsplit(strtrim(efWAvals.Value)));
+                r = calc.xrayNeutron.atomicToWeightPercent(els, vals);
+                parts = arrayfun(@(i) sprintf('%s: %.2f wt%%', els{i}, r.weightPct(i)), ...
+                    1:numel(els), 'UniformOutput', false);
+                desc = strjoin(parts, ', ');
+                lblWAR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblWAR.Text = errText(ME.message); setStatus(ME.message);
+            end
+        end
+
+        % ── Card 6: Co-deposition Flux Ratio ────────────────────────────
+        pCD = uipanel(gl,'Title','Co-deposition Flux Ratio','FontWeight','bold');
+        pCD.Layout.Row = 6; pCD.Layout.Column = 1;
+        gCD = uigridlayout(pCD);
+        gCD.RowHeight = {24,24,24,24}; gCD.ColumnWidth = {130,'1x',130,'1x',120};
+        gCD.Padding = [6 4 6 4]; gCD.RowSpacing = 4;
+        uilabel(gCD,'Text','Target formula:','HorizontalAlignment','right');
+        efCDform = uieditfield(gCD,'text','Value','SrTiO3','Tooltip','Target film formula, e.g. SrTiO3, La0.7Sr0.3MnO3');
+        efCDform.Layout.Row=1; efCDform.Layout.Column=2;
+        uilabel(gCD,'Text','Sources (space-sep):','HorizontalAlignment','right').Layout.Column=3;
+        efCDsrc = uieditfield(gCD,'text','Value','Sr TiO2','Tooltip','Space-separated source material formulas, e.g. Sr TiO2');
+        efCDsrc.Layout.Row=1; efCDsrc.Layout.Column=4;
+        btnCD = uibutton(gCD,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doCoDeposition());
+        btnCD.Layout.Row=1; btnCD.Layout.Column=5;
+        lblCDR = uilabel(gCD,'Text','—','FontSize',11,'Interpreter','html','WordWrap','on');
+        lblCDR.Layout.Row=2; lblCDR.Layout.Column=[1 5];
+        function doCoDeposition()
+            try
+                sources = strsplit(strtrim(efCDsrc.Value));
+                r = calc.xrayNeutron.coDepositionRatio(efCDform.Value, sources);
+                parts = arrayfun(@(i) sprintf('%s: %.4g', sources{i}, r.ratios(i)), ...
+                    1:numel(sources), 'UniformOutput', false);
+                desc = ['Flux ratios  ' strjoin(parts, ' : ')];
+                lblCDR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblCDR.Text = errText(ME.message); setStatus(ME.message);
+            end
+        end
+
         % ── Register API ─────────────────────────────────────────────
         registerPrimaryBtn('xrayNeutron', btnNSLDCalc);
         appData.api.calcNeutronSLD = @(formula, density) apiNeutronSLD(formula, density);
@@ -2553,7 +2997,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
     function buildSuperconductorTab(tab)
         gl = uigridlayout(tab);
-        gl.RowHeight   = {'3x', '2x', '2x', '3x'};
+        gl.RowHeight   = {'3x', '2x', '2x', '3x', '2x'};
         gl.ColumnWidth = {'1x'};
         gl.Padding     = [6 6 6 6];
         gl.RowSpacing  = 8;
@@ -2821,6 +3265,61 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             catch ME
                 lblHcResult.Text = errText(ME.message);
                 setStatus(ME.message);
+            end
+        end
+
+        % ── Card 5: Depairing Current ─────────────────────────────────
+        pJd = uipanel(gl,'Title','Depairing Current Density','FontWeight','bold');
+        pJd.Layout.Row = 5; pJd.Layout.Column = 1;
+        gJd = uigridlayout(pJd);
+        gJd.RowHeight = {24,24,24}; gJd.ColumnWidth = {130,'1x',110,'1x',90};
+        gJd.Padding = [6 4 6 4]; gJd.RowSpacing = 4;
+        uilabel(gJd,'Text','Material:','HorizontalAlignment','right');
+        ddJdMat = uidropdown(gJd,'Items',['(custom)',scMats],'Value','Nb', ...
+            'ValueChangedFcn',@(~,~) fillJdFromPreset(), ...
+            'Tooltip','Superconductor preset — auto-fills Hc0, lambda0, Tc');
+        ddJdMat.Layout.Row=1; ddJdMat.Layout.Column=2;
+        uilabel(gJd,'Text','Hc0 (Oe):','HorizontalAlignment','right');
+        efJdHc0 = uieditfield(gJd,'numeric','Value',1980, ...
+            'Tooltip','Zero-T thermodynamic critical field Hc0 (Oe) — Nb ~1980, Al ~100');
+        efJdHc0.Layout.Row=1; efJdHc0.Layout.Column=4;
+        uilabel(gJd,'Text','<html>&lambda;<sub>0</sub> (nm):</html>','HorizontalAlignment','right','Interpreter','html');
+        efJdLam = uieditfield(gJd,'numeric','Value',39, ...
+            'Tooltip','Zero-T London penetration depth lambda0 (nm) — Nb 39, Al 16, YBCO ~150');
+        efJdLam.Layout.Row=2; efJdLam.Layout.Column=2;
+        uilabel(gJd,'Text','Crit. temp Tc (K):','HorizontalAlignment','right');
+        efJdTc = uieditfield(gJd,'numeric','Value',9.25, ...
+            'Tooltip','Critical temperature Tc (K)');
+        efJdTc.Layout.Row=2; efJdTc.Layout.Column=4;
+        uilabel(gJd,'Text','Meas. temp (K):','HorizontalAlignment','right');
+        efJdT = uieditfield(gJd,'numeric','Value',4.2, ...
+            'Tooltip','Measurement temperature T (K) — must be < Tc');
+        efJdT.Layout.Row=1; efJdT.Layout.Column=[3 3];
+        btnJd = uibutton(gJd,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doDepairingCurrent());
+        btnJd.Layout.Row=1; btnJd.Layout.Column=5;
+        lblJdR = uilabel(gJd,'Text','','FontSize',11,'Interpreter','html');
+        lblJdR.Layout.Row=3; lblJdR.Layout.Column=[1 5];
+        function fillJdFromPreset()
+            mat = ddJdMat.Value;
+            if strcmp(mat,'(custom)'), return; end
+            try
+                presets = calc.superconductor.materialPresets();
+                p = presets.(mat);
+                efJdHc0.Value  = p.Hc0;
+                efJdLam.Value  = p.lambda0;
+                efJdTc.Value   = p.Tc;
+            catch
+            end
+        end
+        function doDepairingCurrent()
+            try
+                r = calc.superconductor.depairingCurrent( ...
+                    Hc0=efJdHc0.Value, lambda0=efJdLam.Value, Tc=efJdTc.Value, T=efJdT.Value);
+                desc = sprintf('J<sub>d</sub>(%.1f K) = %.4g MA/cm<sup>2</sup>', r.T, r.JdMA);
+                lblJdR.Text = desc; addHistory(desc, r.latex);
+            catch ME
+                lblJdR.Text = errText(ME.message); setStatus(ME.message);
             end
         end
 
@@ -3114,7 +3613,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         scroll.Layout.Row = 1; scroll.Layout.Column = 1;
 
         gl = uigridlayout(scroll);
-        gl.RowHeight   = {110, 75, 75, 75};
+        gl.RowHeight   = {110, 75, 75, 75, 80};
         gl.ColumnWidth = {'1x'};
         gl.Padding     = [4 4 4 4];
         gl.RowSpacing  = 8;
@@ -3232,6 +3731,55 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Card 5: Refractive Index / Dielectric Function (bidirectional)
+        pRD = uipanel(gl,'Title','Refractive Index / Dielectric Function','FontWeight','bold');
+        pRD.Layout.Row = 5; pRD.Layout.Column = 1;
+        gRD = uigridlayout(pRD);
+        gRD.RowHeight = {24,24}; gRD.ColumnWidth = {40,'1x',40,'1x',100,120};
+        gRD.Padding = [6 4 6 4]; gRD.RowSpacing = 4;
+        uilabel(gRD,'Text','n:','HorizontalAlignment','right');
+        efRDn = uieditfield(gRD,'numeric','Value',3.5, ...
+            'Tooltip','Real part of refractive index n (Si 3.5, glass 1.5, Au ~0.15)');
+        efRDn.Layout.Row=1; efRDn.Layout.Column=2;
+        uilabel(gRD,'Text','k:','HorizontalAlignment','right');
+        efRDk = uieditfield(gRD,'numeric','Value',0.0, ...
+            'Tooltip','Extinction coefficient k, dielectrics near 0, metals 0.1-10');
+        efRDk.Layout.Row=1; efRDk.Layout.Column=4;
+        btnRDnk = uibutton(gRD,'push','Text','n,k to eps','BackgroundColor',BTN_TOOL,'FontColor',BTN_TOOL_FG,...
+            'ButtonPushedFcn',@(~,~) doNkToEps());
+        btnRDnk.Layout.Row=1; btnRDnk.Layout.Column=5;
+        uilabel(gRD,'Text',[char(949) '1:'],'HorizontalAlignment','right');
+        efRDe1 = uieditfield(gRD,'numeric','Value',12.25, ...
+            'Tooltip','Real part of dielectric function e1 = n^2-k^2 (Si ~12.25)');
+        efRDe1.Layout.Row=2; efRDe1.Layout.Column=2;
+        uilabel(gRD,'Text',[char(949) '2:'],'HorizontalAlignment','right');
+        efRDe2 = uieditfield(gRD,'numeric','Value',0.0, ...
+            'Tooltip','Imaginary part of dielectric function e2 = 2nk, absorbers > 0');
+        efRDe2.Layout.Row=2; efRDe2.Layout.Column=4;
+        btnRDeps = uibutton(gRD,'push','Text','eps to n,k','BackgroundColor',BTN_TOOL,'FontColor',BTN_TOOL_FG,...
+            'ButtonPushedFcn',@(~,~) doEpsToNk());
+        btnRDeps.Layout.Row=2; btnRDeps.Layout.Column=5;
+        lblRDResult = uilabel(gRD,'Text','','FontSize',11,'Interpreter','html');
+        lblRDResult.Layout.Row=[1 2]; lblRDResult.Layout.Column=6;
+        function doNkToEps()
+            try
+                r = calc.optics.refractiveToDielectric(efRDn.Value, efRDk.Value);
+                efRDe1.Value = r.eps1; efRDe2.Value = r.eps2;
+                desc = sprintf('%s1=%.4g, %s2=%.4g', char(949), r.eps1, char(949), r.eps2);
+                lblRDResult.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblRDResult.Text = errText(ME.message); setStatus(ME.message);
+            end
+        end
+        function doEpsToNk()
+            try
+                r = calc.optics.dielectricToRefractive(efRDe1.Value, efRDe2.Value);
+                efRDn.Value = r.n; efRDk.Value = r.k;
+                desc = sprintf('n = %.4g, k = %.4g', r.n, r.k);
+                lblRDResult.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblRDResult.Text = errText(ME.message); setStatus(ME.message);
+            end
+        end
+
         registerPrimaryBtn('optics', btnFres);
         appData.api.calcFresnel = @(n1,n2,th) apiFresnel(n1,n2,th);
         function result = apiFresnel(n1,n2,th)
@@ -3245,7 +3793,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
     function buildVacuumTab(tab)
         gl = uigridlayout(tab);
-        gl.RowHeight = {'2x', '2x', '3x', '2x'}; gl.ColumnWidth = {'1x'};
+        gl.RowHeight = {'2x', '2x', '3x', '2x', '2x', '3x'}; gl.ColumnWidth = {'1x'};
         gl.Padding = [6 6 6 6]; gl.RowSpacing = 8;
 
         % Card 1: Mean Free Path
@@ -3365,6 +3913,69 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Card 5: Knudsen Number
+        pKn = uipanel(gl,'Title','Knudsen Number','FontWeight','bold');
+        pKn.Layout.Row = 5; pKn.Layout.Column = 1;
+        gKn = uigridlayout(pKn);
+        gKn.RowHeight = {24,24}; gKn.ColumnWidth = {70,'1x',70,'1x',90};
+        gKn.Padding = [6 4 6 4]; gKn.RowSpacing = 4;
+        uilabel(gKn,'Text','MFP (m):','HorizontalAlignment','right');
+        efKnMFP = uieditfield(gKn,'numeric','Value',1e-4, ...
+            'Tooltip','Mean free path (m) — compute from Card 1 at desired P and T');
+        efKnMFP.Layout.Row=1; efKnMFP.Layout.Column=2;
+        uilabel(gKn,'Text','L (m):','HorizontalAlignment','right');
+        efKnL = uieditfield(gKn,'numeric','Value',0.025, ...
+            'Tooltip','Characteristic length L (m) — tube/chamber diameter; typical 1-100 mm');
+        efKnL.Layout.Row=1; efKnL.Layout.Column=4;
+        btnKn = uibutton(gKn,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doKnudsen()); btnKn.Layout.Row=1; btnKn.Layout.Column=5;
+        lblKnR = uilabel(gKn,'Text','','FontSize',11,'Interpreter','html');
+        lblKnR.Layout.Row=2; lblKnR.Layout.Column=[1 5];
+        function doKnudsen()
+            try
+                r = calc.vacuum.knudsenNumber(efKnMFP.Value, efKnL.Value);
+                desc = sprintf('Kn = %.4g  [%s flow]', r.Kn, r.regime);
+                lblKnR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblKnR.Text = errText(ME.message); setStatus(ME.message);
+            end
+        end
+
+        % Card 6: Gas Flow Conductance
+        pGF = uipanel(gl,'Title','Gas Flow Conductance (Tube)','FontWeight','bold');
+        pGF.Layout.Row = 6; pGF.Layout.Column = 1;
+        gGF = uigridlayout(pGF);
+        gGF.RowHeight = {24,24,24}; gGF.ColumnWidth = {60,'1x',60,'1x',60,'1x',90};
+        gGF.Padding = [6 4 6 4]; gGF.RowSpacing = 4;
+        uilabel(gGF,'Text','P1 (Pa):','HorizontalAlignment','right');
+        efGFP1 = uieditfield(gGF,'numeric','Value',1e-3, ...
+            'Tooltip','Upstream pressure P1 (Pa)');
+        efGFP1.Layout.Row=1; efGFP1.Layout.Column=2;
+        uilabel(gGF,'Text','P2 (Pa):','HorizontalAlignment','right');
+        efGFP2 = uieditfield(gGF,'numeric','Value',1e-5, ...
+            'Tooltip','Downstream pressure P2 (Pa)');
+        efGFP2.Layout.Row=1; efGFP2.Layout.Column=4;
+        uilabel(gGF,'Text','d (m):','HorizontalAlignment','right');
+        efGFd = uieditfield(gGF,'numeric','Value',0.025, ...
+            'Tooltip','Tube inner diameter d (m) — e.g. 0.025 = 25 mm');
+        efGFd.Layout.Row=1; efGFd.Layout.Column=6;
+        uilabel(gGF,'Text','L (m):','HorizontalAlignment','right');
+        efGFL = uieditfield(gGF,'numeric','Value',0.5, ...
+            'Tooltip','Tube length L (m) — conductance decreases with length');
+        efGFL.Layout.Row=2; efGFL.Layout.Column=2;
+        btnGF = uibutton(gGF,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doGasFlow()); btnGF.Layout.Row=2; btnGF.Layout.Column=7;
+        lblGFR = uilabel(gGF,'Text','','FontSize',11,'Interpreter','html');
+        lblGFR.Layout.Row=3; lblGFR.Layout.Column=[1 7];
+        function doGasFlow()
+            try
+                r = calc.vacuum.gasFlow(efGFP1.Value, efGFP2.Value, efGFd.Value, efGFL.Value);
+                desc = sprintf('C<sub>mol</sub>=%.4g L/s, C<sub>visc</sub>=%.4g L/s [%s]', ...
+                    r.Cmol, r.Cvisc, r.regime);
+                lblGFR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblGFR.Text = errText(ME.message); setStatus(ME.message);
+            end
+        end
+
         registerPrimaryBtn('vacuum', btnMFP);
         appData.api.calcMeanFreePath = @(P,T) apiMFP(P,T);
         function result = apiMFP(P,T)
@@ -3378,7 +3989,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
     function buildElectrochemistryTab(tab)
         gl = uigridlayout(tab);
-        gl.RowHeight = {'3x', '2x', '2x', '2x'}; gl.ColumnWidth = {'1x'};
+        gl.RowHeight = {'3x', '2x', '2x', '2x', '2x'}; gl.ColumnWidth = {'1x'};
         gl.Padding = [6 6 6 6]; gl.RowSpacing = 8;
 
         % Card 1: Nernst Potential
@@ -3491,6 +4102,33 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 desc = sprintf('C = %.4g %sF (%.1f %sF/cm%s)', r.CuF, char(956), r.Cspec*1e6, char(956), char(178));
                 lblDLCR.Text = desc; addHistory(desc, r.latex);
             catch ME, lblDLCR.Text = errText(ME.message); setStatus(ME.message);
+            end
+        end
+
+        % Card 5: Ohmic Drop (iR correction)
+        pIR = uipanel(gl,'Title','Ohmic Drop (iR)','FontWeight','bold');
+        pIR.Layout.Row = 5; pIR.Layout.Column = 1;
+        gIR = uigridlayout(pIR);
+        gIR.RowHeight = {24,24}; gIR.ColumnWidth = {70,'1x',70,'1x',90};
+        gIR.Padding = [6 4 6 4]; gIR.RowSpacing = 4;
+        uilabel(gIR,'Text','I (A):','HorizontalAlignment','right');
+        efIRI = uieditfield(gIR,'numeric','Value',1e-3, ...
+            'Tooltip','Current I (A) — positive = anodic; 1 mA typical for small cells');
+        efIRI.Layout.Row=1; efIRI.Layout.Column=2;
+        uilabel(gIR,'Text',['R (' char(937) '):'],'HorizontalAlignment','right');
+        efIRR = uieditfield(gIR,'numeric','Value',50, ...
+            'Tooltip','Uncompensated cell resistance Ru (Ohm) — measure by EIS; 1-200 typical');
+        efIRR.Layout.Row=1; efIRR.Layout.Column=4;
+        btnIR = uibutton(gIR,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
+            'ButtonPushedFcn',@(~,~) doOhmicDrop()); btnIR.Layout.Row=1; btnIR.Layout.Column=5;
+        lblIRR = uilabel(gIR,'Text','','FontSize',11,'Interpreter','html');
+        lblIRR.Layout.Row=2; lblIRR.Layout.Column=[1 5];
+        function doOhmicDrop()
+            try
+                r = calc.electrochemistry.ohmicDrop(efIRI.Value, efIRR.Value);
+                desc = sprintf('V<sub>IR</sub> = %.4g mV (%.4g V)', r.VmV, r.V);
+                lblIRR.Text = desc; addHistory(desc, r.latex);
+            catch ME, lblIRR.Text = errText(ME.message); setStatus(ME.message);
             end
         end
 
