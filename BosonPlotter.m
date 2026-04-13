@@ -2831,6 +2831,7 @@ function varargout = BosonPlotter(options)
                         ds = buildDs(fp, data, parserName);
                         ds.displayName = sprintf('%s%s [%s]', fnBase, fExt, shName);
                         appData.datasets{end+1} = ds;
+                        appData.model.addDataset(data, fp, parserName);
                         nLoaded = nLoaded + 1;
                         addToRecentFiles(fp);
                     catch ME
@@ -3412,6 +3413,7 @@ function varargout = BosonPlotter(options)
         ds.displayName = mergedName;
 
         appData.datasets{end+1} = ds;
+        appData.model.addDataset(ds.data, ds.filepath, ds.parserName);
         appData.activeIdx       = numel(appData.datasets);
 
         cancelInteractions();
@@ -3493,6 +3495,7 @@ function varargout = BosonPlotter(options)
             ds.legendName  = expr;
 
             appData.datasets{end+1} = ds;
+            appData.model.addDataset(ds.data, ds.filepath, ds.parserName);
             appData.activeIdx       = numel(appData.datasets);
 
             rebuildDatasetList(true);
@@ -9605,6 +9608,7 @@ function varargout = BosonPlotter(options)
         dsCopy.displayName = [fn fext ' (copy)'];
         dsCopy.legendName  = [fn fext ' (copy)'];
         appData.datasets{end+1} = dsCopy;
+        appData.model.addDataset(dsCopy.data, dsCopy.filepath, dsCopy.parserName);
         appData.activeIdx = numel(appData.datasets);
         rebuildDatasetList(true);
         updateControlsForActiveDataset();
@@ -9853,6 +9857,7 @@ function varargout = BosonPlotter(options)
         dsNew.displayName = [fn fext ' (resampled)'];
         dsNew.legendName  = [fn fext ' (resampled)'];
         appData.datasets{end+1} = dsNew;
+        appData.model.addDataset(dsNew.data, dsNew.filepath, dsNew.parserName);
         appData.activeIdx = numel(appData.datasets);
         rebuildDatasetList(true);
         updateControlsForActiveDataset();
@@ -10761,6 +10766,7 @@ function varargout = BosonPlotter(options)
                     fp_i = results(bi).filepath;
                     ds_i = buildDs(fp_i, results(bi).data, 'importAuto');
                     appData.datasets{end+1} = ds_i;
+                    appData.model.addDataset(results(bi).data, fp_i, 'importAuto');
                     nAdded = nAdded + 1;
                 catch
                     % Skip files that fail to build dataset struct
@@ -10886,26 +10892,21 @@ function varargout = BosonPlotter(options)
         advMenuFig = uifigure('Name', 'Advanced Tools', ...
             'Position', [figPos(1) + figPos(3) - 400, figPos(2) + figPos(4) - 700, 380, 640], ...
             'Resize', 'on', ...
-            'AutoResizeChildren', 'off', ...
             'CloseRequestFcn', @(~,~) closeAdvMenu(), ...
             'KeyPressFcn', @(~,evt) onAdvMenuKey(evt));
 
-        % ── Fix B2: Search/filter bar above the scrollable panel ────────
-        FILTER_H = 30;
-        figW = advMenuFig.Position(3);
-        figH = advMenuFig.Position(4);
-        filterBar = uipanel(advMenuFig, 'BorderType', 'none', ...
-            'Position', [0, figH - FILTER_H, figW, FILTER_H]);
-        efAdvFilter = uieditfield(filterBar, 'text', ...
+        % ── Top-level grid: filter bar + scrollable button panel ────────
+        advRootGL = uigridlayout(advMenuFig, [2 1], ...
+            'RowHeight', {30, '1x'}, 'Padding', [0 0 0 0], 'RowSpacing', 0);
+        efAdvFilter = uieditfield(advRootGL, 'text', ...
             'Value', '', ...
             'Placeholder', 'Filter tools...', ...
-            'Position', [6, 4, figW - 12, 22], ...
+            'FontSize', 10, ...
             'ValueChangedFcn', @(~,~) onAdvFilterChanged());
+        efAdvFilter.Layout.Row = 1;
 
-        % Scrollable panel so all content is accessible even at small sizes
-        advScrollPanel = uipanel(advMenuFig, 'BorderType', 'none', 'Scrollable', 'on');
-        advScrollPanel.Position = [0 0 figW figH - FILTER_H];
-        advMenuFig.SizeChangedFcn = @(~,~) onAdvMenuResize();
+        advScrollPanel = uipanel(advRootGL, 'BorderType', 'none', 'Scrollable', 'on');
+        advScrollPanel.Layout.Row = 2;
 
         % 26 rows x 2 cols: 7 headers, 6 separators, 13 button rows
         advMenuGL = uigridlayout(advScrollPanel, [26 2], ...
@@ -11024,16 +11025,6 @@ function varargout = BosonPlotter(options)
 
         function onAdvMenuKey(evt)
             if strcmp(evt.Key, 'escape'), closeAdvMenu(); end
-        end
-
-        function onAdvMenuResize()
-        %ONADVMENURESIZE  Keep filter bar pinned to top; scroll panel fills rest.
-            if ~isvalid(advMenuFig), return; end
-            fw = advMenuFig.Position(3);
-            fh = advMenuFig.Position(4);
-            filterBar.Position      = [0, fh - FILTER_H, fw, FILTER_H];
-            efAdvFilter.Position    = [6, 4, fw - 12, 22];
-            advScrollPanel.Position = [0, 0, fw, fh - FILTER_H];
         end
 
         function onAdvFilterChanged()
