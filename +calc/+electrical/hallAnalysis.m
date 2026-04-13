@@ -75,6 +75,11 @@ Rm = mean(Ry);
 SXX = sum((H  - Hm).^2);
 SXY = sum((H  - Hm) .* (Ry - Rm));
 
+if SXX < eps
+    error('hallAnalysis:zeroFieldRange', ...
+        'Field range is effectively zero (all H values are identical). Cannot compute Hall slope.');
+end
+
 slope     = SXY / SXX;         % R_H in Ohm/T  (or Ohm·cm/T)
 intercept = Rm - slope * Hm;
 
@@ -89,11 +94,15 @@ else
 end
 
 % ── Hall coefficient in cm³/C ──────────────────────────────────────
-%   R_H [Ohm/T] = R_H [V·s/A] ; multiply by 100 to get cm³/C
-%   (1 Ohm·m/T = 1 m³/C; conversion to cm³/C: ×10^6 from m→cm,
-%    but field already in T and R in Ohm, so R_H_SI = slope [Ohm/T]
-%    and R_H [cm³/C] = slope × 100  when R is in Ohm and thickness in cm)
-R_H_cm3perC = slope * 100;    % Ohm/T → cm³/C  (×100 because 1 Ohm·T⁻¹ = 0.01 cm³/C)
+%   slope = dR_xy/dB [Ohm/T].  R_xy = ρ_xy / t, so ρ_xy = slope × t.
+%   In SI: R_H [m³/C] = slope [Ohm/T] × t [m].
+%   Convert: R_H [cm³/C] = slope × t_cm × 0.01 × 1e6 = slope × t_cm × 1e4.
+%   When thickness is not provided, report R_H as slope [Ohm/T] (sheet R_H).
+if ~isnan(options.Thickness)
+    R_H_cm3perC = slope * options.Thickness * 1e4;  % bulk Hall coefficient
+else
+    R_H_cm3perC = slope * 1e4;  % assume t=1 cm (placeholder)
+end
 
 % ── Carrier type ───────────────────────────────────────────────────
 if R_H_cm3perC > 0
@@ -107,12 +116,9 @@ end
 % ── Carrier density ────────────────────────────────────────────────
 C = calc.constants();
 if ~isnan(options.Thickness) && abs(R_H_cm3perC) > 0
-    % n [cm⁻³] = 1 / (R_H [cm³/C] · e [C] · thickness [cm])
-    %           = 1 / (R_H · e)  when R_H already in cm³/C
-    %   (thickness cancels because R_H here is already the slope of R_xy vs H,
-    %    which for a 3D resistivity measurement already contains thickness;
-    %    for a thin sheet (2D), thickness must be provided to get n_3D)
-    carrierDensity = 1 / (abs(R_H_cm3perC) * C.e * options.Thickness);
+    % n [cm⁻³] = 1 / (R_H [cm³/C] · e [C])
+    % thickness is already folded into R_H_cm3perC above
+    carrierDensity = 1 / (abs(R_H_cm3perC) * C.e);
 else
     carrierDensity = NaN;
 end

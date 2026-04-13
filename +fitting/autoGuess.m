@@ -199,6 +199,58 @@ switch modelName
             p0(1) = yRange / max(range(sqrtX), eps);
             p0(2) = yMean - p0(1)*mean(sqrtX);
         end
+
+    % ── New physics models ────────────────────────────────────────
+    case 'Brillouin'
+        p0(1) = max(abs(yData));          % Ms
+        p0(2) = 0.5;                      % J (start with spin-1/2)
+        p0(3) = 2;                        % g-factor
+        p0(4) = 300;                      % T (room temperature default)
+
+    case 'Stoner-Wohlfarth'
+        p0(1) = max(abs(yData));          % Ms
+        % Hc from zero-crossing
+        signChange = find(diff(sign(yData)), 1);
+        if ~isempty(signChange)
+            p0(2) = abs(xData(signChange));  % Hc
+        else
+            p0(2) = xRange / 4;
+        end
+        p0(3) = xRange / 2;              % Hk (anisotropy field)
+
+    case 'VFT'
+        p0(1) = min(yData(yData > 0));    % tau_0 (smallest positive y)
+        p0(2) = 0.05;                     % Ea_eV (typical energy barrier)
+        p0(3) = 0;                        % T_0 (start at Arrhenius limit)
+
+    case 'Debye'
+        % C(T) = gamma*T + n*C_Debye(T, theta_D)
+        % At low T: C ≈ gamma*T → gamma from slope
+        lowIdx = xData < xData(end) * 0.1;
+        if sum(lowIdx) > 1
+            p0(1) = mean(yData(lowIdx) ./ max(xData(lowIdx), eps));  % gamma
+        else
+            p0(1) = 0;
+        end
+        p0(2) = max(xData) * 2;          % theta_D (Debye temp > measurement range)
+        p0(3) = 1;                        % n (atoms per formula unit)
+
+    case 'Einstein'
+        p0(1) = 0;                        % gamma
+        p0(2) = max(xData) * 0.5;        % theta_E (Einstein temp)
+        p0(3) = 1;                        % n
+
+    case 'Debye+Einstein'
+        lowIdx = xData < xData(end) * 0.1;
+        if sum(lowIdx) > 1
+            p0(1) = mean(yData(lowIdx) ./ max(xData(lowIdx), eps));
+        else
+            p0(1) = 0;
+        end
+        p0(2) = max(xData) * 2;          % theta_D
+        p0(3) = max(xData) * 0.5;        % theta_E
+        p0(4) = 0.5;                     % fD (Debye fraction)
+        p0(5) = 1;                        % n
 end
 
 end

@@ -94,19 +94,19 @@ fprintf('\n--- Hall analysis ---\n');
 % Synthetic linear R_xy: known slope → correct carrier density
 try
     H    = (-5:0.5:5)';           % T
-    RH   = -2e-4;                 % cm³/C (electron-like; in Ohm/T before ×100)
-    % slope in Ohm/T = RH_cm3/100; R_xy = slope * H
-    slope_OhmPerT = RH / 100;
+    t    = 0.01;                  % cm thickness (100 um film)
+    RH_expected = -2e-4;          % cm³/C (electron-like)
+    % slope [Ohm/T] = R_H [cm³/C] / (t [cm] × 1e4)
+    slope_OhmPerT = RH_expected / (t * 1e4);
     Rxy  = slope_OhmPerT * H;     % perfect linear, no noise
-    t    = 1e-3;                  % cm thickness
     r    = calc.electrical.hallAnalysis(H, Rxy, Thickness=t);
 
     % R_H should match within 1e-6 relative
-    assert(abs(r.R_H - RH) / abs(RH) < 1e-6, ...
-        sprintf('R_H mismatch: got %.4e, expected %.4e', r.R_H, RH));
-    % Carrier density: n = 1/(|R_H|*e*t)
+    assert(abs(r.R_H - RH_expected) / abs(RH_expected) < 1e-6, ...
+        sprintf('R_H mismatch: got %.4e, expected %.4e', r.R_H, RH_expected));
+    % Carrier density: n = 1/(|R_H|*e)
     C = calc.constants();
-    nExpected = 1 / (abs(RH) * C.e * t);
+    nExpected = 1 / (abs(RH_expected) * C.e);
     assert(abs(r.carrierDensity - nExpected) / nExpected < 1e-6, ...
         sprintf('Carrier density mismatch: got %.4e, expected %.4e', r.carrierDensity, nExpected));
     fprintf('  PASS: Hall R_H and carrier density (synthetic linear data)\n'); passed = passed + 1;
@@ -131,7 +131,7 @@ end
 try
     H   = (-3:0.5:3)';
     RH_elec = -1e-3;                     % cm³/C (negative → electrons)
-    Rxy = (RH_elec / 100) * H;
+    Rxy = (RH_elec / (1e-3 * 1e4)) * H;
     r   = calc.electrical.hallAnalysis(H, Rxy, Thickness=1e-3);
     assert(strcmp(r.carrierType, 'electron'), ...
         sprintf('Expected electron, got %s', r.carrierType));
@@ -145,7 +145,7 @@ try
     H      = (-5:0.5:5)';
     RH_val = -5e-4;           % cm³/C
     sigma  = 1000;            % S/cm
-    Rxy    = (RH_val / 100) * H;
+    Rxy    = (RH_val / (1e-3 * 1e4)) * H;
     r      = calc.electrical.hallAnalysis(H, Rxy, Thickness=1e-3, Sigma=sigma);
     muExpected = abs(RH_val) * sigma;
     assert(abs(r.mobility - muExpected) / muExpected < 1e-6, ...
@@ -160,7 +160,7 @@ try
     H_T  = (-5:0.5:5)';
     H_Oe = H_T * 1e4;                    % 1 T = 1e4 Oe
     RH_ref = -2e-4;
-    Rxy  = (RH_ref / 100) * H_T;
+    Rxy  = (RH_ref / (1e-3 * 1e4)) * H_T;
     rT   = calc.electrical.hallAnalysis(H_T,  Rxy, Thickness=1e-3, FieldUnit='T');
     rOe  = calc.electrical.hallAnalysis(H_Oe, Rxy, Thickness=1e-3, FieldUnit='Oe');
     assert(abs(rT.R_H - rOe.R_H) / abs(rT.R_H) < 1e-8, ...
