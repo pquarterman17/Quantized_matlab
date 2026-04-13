@@ -4,6 +4,7 @@ function result = curveFit(xData, yData, modelFcn, p0, options)
 %   result = fitting.curveFit(x, y, @(x,p) model(x,p), p0)
 %   result = fitting.curveFit(x, y, modelFcn, p0, Lower=lb, Upper=ub)
 %   result = fitting.curveFit(x, y, modelFcn, p0, Weights=w, Fixed=mask)
+%   result = fitting.curveFit(x, y, modelFcn, p0, Constraints=c, ParamNames=n)
 %
 %   Inputs:
 %       xData    — [N×1] independent variable
@@ -12,10 +13,16 @@ function result = curveFit(xData, yData, modelFcn, p0, options)
 %       p0       — [1×M] initial parameter vector
 %
 %   Options (name-value):
-%       Lower      — [1×M] lower bounds (default: -Inf)
-%       Upper      — [1×M] upper bounds (default: +Inf)
-%       Weights    — [N×1] weights for weighted least squares (default: ones)
-%       Fixed      — [1×M] logical mask, true = hold parameter at p0 value
+%       Lower       — [1×M] lower bounds (default: -Inf)
+%       Upper       — [1×M] upper bounds (default: +Inf)
+%       Weights     — [N×1] weights for weighted least squares (default: ones)
+%       Fixed       — [1×M] logical mask, true = hold parameter at p0 value
+%       Constraints — {1×M} cell array of constraint expressions.
+%                     Empty string '' = free (fitted). Non-empty = expression
+%                     of free parameters, e.g. '2*p1', 'p1+p2', 'sqrt(p1)'.
+%                     Constrained params are derived; optimizer only sees free ones.
+%       ParamNames  — {1×M} parameter name strings (required for named
+%                     references in Constraints, e.g. 'tau' instead of 'p2')
 %       MaxIter    — max iterations (default: 5000*M)
 %       TolFun     — function tolerance (default: 1e-12)
 %       TolX       — parameter tolerance (default: 1e-10)
@@ -41,14 +48,16 @@ arguments
     yData    (:,1) double
     modelFcn function_handle
     p0       (1,:) double
-    options.Lower    (1,:) double = []
-    options.Upper    (1,:) double = []
-    options.Weights  (:,1) double = []
-    options.Fixed    (1,:) logical = []
-    options.MaxIter  double = []
-    options.TolFun   double = 1e-12
-    options.TolX     double = 1e-10
-    options.CalcErrors logical = true
+    options.Lower       (1,:) double = []
+    options.Upper       (1,:) double = []
+    options.Weights     (:,1) double = []
+    options.Fixed       (1,:) logical = []
+    options.Constraints (1,:) cell = {}
+    options.ParamNames  (1,:) cell = {}
+    options.MaxIter     double = []
+    options.TolFun      double = 1e-12
+    options.TolX        double = 1e-10
+    options.CalcErrors  logical = true
 end
 
 M = numel(p0);
@@ -76,6 +85,37 @@ if ~isempty(options.Fixed)
     assert(numel(options.Fixed) == M, 'fitting:curveFit:fixed', ...
         'Fixed mask must have %d elements.', M);
     fixed = options.Fixed;
+end
+
+% ── Constraints ──────────────────────────────────────────────────────────
+% When Constraints are supplied, constrained parameters are derived from
+% free ones during every model evaluation. The optimizer only sees free
+% parameters; constrained ones are filled in by applyConstraints before
+% passing the full vector to modelFcn.
+useConstraints = ~isempty(options.Constraints);
+constraintExprs = options.Constraints;
+paramNamesForConstraints = options.ParamNames;
+
+if useConstraints
+    assert(numel(constraintExprs) == M, 'fitting:curveFit:constraints', ...
+        'Constraints cell array must have %d elements (one per parameter).', M);
+
+    if isempty(paramNamesForConstraints)
+        % Default names: p1, p2, ...
+        paramNamesForConstraints = arrayfun(@(k) sprintf('p%d', k), 1:M, ...
+            'UniformOutput', false);
+    else
+        assert(numel(paramNamesForConstraints) == M, 'fitting:curveFit:paramNames', ...
+            'ParamNames must have %d elements.', M);
+    end
+
+    % Mark constrained params as "fixed" so the bound-transform logic ignores them.
+    % applyConstraints will handle their values during fromFree().
+    for k = 1:M
+        if ~isempty(strtrim(constraintExprs{k}))
+            fixed(k) = true;
+        end
+    end
 end
 
 w = ones(N, 1);
@@ -115,11 +155,27 @@ p0 = min(p0, ub);
 
     function pBounded = fromFree(pFree)
         % Transform unbounded optimizer space back to bounded params
-        pBounded = p0;  % start from p0 (fixed params stay at p0)
+        pBounded = p0;  % start from p0 (fixed/constrained params stay at p0)
         lbSub = lb(freeIdx);
         ubSub = ub(freeIdx);
         for k = 1:nFree
             pBounded(freeIdx(k)) = freeToBound(pFree(k), lbSub(k), ubSub(k));
+        end
+        % Evaluate constraint expressions to fill in constrained parameters
+        if useConstraints
+            pBounded = applyConstraintExprs(pBounded);
+        end
+    end
+
+    function pFull = applyConstraintExprs(pCurrent)
+        % Fill constrained parameters by evaluating their expressions.
+        % pCurrent already has free params in place; constrained slots get computed.
+        pFreeVals = pCurrent(freeIdx);
+        try
+            pFull = fitting.applyConstraints(pFreeVals, constraintExprs, paramNamesForConstraints);
+        catch
+            % On failure, return pCurrent unchanged (optimizer will see bad cost)
+            pFull = pCurrent;
         end
     end
 

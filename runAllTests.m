@@ -143,6 +143,7 @@ SUITES = {
     % ── Fitting tests ────────────────────────────────────────────────────
     T('fitting','test_peak_detection'),   'fitting', 'Robust peak detection, background estimation, prominence'
     T('fitting','test_curve_fitting'),    'fitting', 'Curve fitting engine, models, autoGuess, parseEquation'
+    T('fitting','test_constraints_batchfit'), 'fitting', 'Parameter constraints + batch fit dialog'
     T('fitting','test_templates_fft'),   'fitting', 'Publication templates and FFT filtering'
     T('fitting','test_resample_stats'),  'fitting', 'Resampling, descriptive stats, t-test, linear regression'
     T('fitting','test_batch_roi'),       'fitting', 'Batch fitting, peak tracking'
