@@ -260,6 +260,19 @@ materialsCalcGUI.m (4,580 lines)
     may not pick up the post-hoc `applyDarkInputTheme` sweep if they use non-standard types.
     Verify all 18 tabs render correctly after theme application.
 
+33. **Rename to "Diraculator"** — Rename the GUI tool from `materialsCalcGUI` to `Diraculator`.
+    Scope: file rename, figure title, all references in CLAUDE.md, docs/, tests/, plans/,
+    README files, and any caller sites (e.g. BosonPlotter menu items).
+    - [ ] Rename `materialsCalcGUI.m` → `Diraculator.m`
+    - [ ] Update function name inside the file
+    - [ ] Update figure title string (`'Name'` property)
+    - [ ] Update CLAUDE.md references
+    - [ ] Update `+calc/README.md` GUI section
+    - [ ] Update `docs/gui_materialscalc.md` → `docs/gui_diraculator.md`
+    - [ ] Update test files (`tests/calc/` and `runAllTests` group)
+    - [ ] Update plans/ references
+    - [ ] Grep for any remaining `materialsCalcGUI` strings repo-wide
+
 ---
 
 ## Completed

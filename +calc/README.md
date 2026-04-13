@@ -31,10 +31,51 @@ Backend functions for `materialsCalcGUI`. Organized into subpackages by domain.
 ## GUI
 
 ```matlab
-materialsCalcGUI              % interactive (13 tabs)
+materialsCalcGUI              % interactive (18 panels)
 api = materialsCalcGUI();     % headless API for testing/scripting
 api.convert(1, 'eV', 'nm')
 api.calcDSpacing(3.905, 1, 1, 0)
 api.calcNeutronSLD('SrTiO3', 5.12)
 api.close()
 ```
+
+### Headless API — Full Method Table
+
+| Method | Arguments | Returns | Panel |
+|--------|-----------|---------|-------|
+| `fig` | — | `uifigure` handle | — |
+| `selectTab` | `navKey` (char) | — | navigation |
+| `getStatus` | — | char | status bar |
+| `close` | — | — | — |
+| `convert` | `value, from, to` | char result string | Unit Converter |
+| `calcDSpacing` | `a, h, k, l` | char label HTML | Crystal |
+| `getDResult` | — | char | Crystal |
+| `getMismatchResult` | — | char | Crystal |
+| `calcPlaneSpacings` | `a, centering` | N×6 cell array | Crystal |
+| `calcIntrinsic` | `materialPreset` (char) | char | Semiconductor |
+| `getNiResult` | — | char | Semiconductor |
+| `selectElement` | `symbol` (char) | — | Periodic Table |
+| `getElementDetail` | — | cell array of lines | Periodic Table |
+| `calcNeutronSLD` | `formula, density` | char | X-ray/Neutron |
+| `calcXraySLD` | `formula, density` | char | X-ray/Neutron |
+| `calcQToTwoTheta` | `Q (Å⁻¹), lambda (Å)` | char | X-ray/Neutron |
+| `calcLondonDepth` | `material (char), T (K)` | char | Superconductor |
+| `calcCriticalFields` | `material (char), T (K)` | char | Superconductor |
+| `calcFresnel` | `n1, n2, theta (deg)` | char | Optics |
+| `calcMeanFreePath` | `P (Pa), T (K)` | char | Vacuum |
+| `calcNernst` | `E0 (V), n, Q` | char | Electrochem |
+| `getMultilayerStack` | — | cell array of layer structs | Reflectivity |
+| `getDensityMode` | — | `'sld'` or `'density'` | Reflectivity |
+| `addLayer` | `name, formula, t(Å), rho, sigma(Å)` | — | Reflectivity |
+| `addFavorite` | `name, tabName, result, latex` | — | Favorites |
+| `getFavorites` | — | cell array of structs | Favorites |
+| `getHistory` | — | cell array of entries | History |
+| `getHistoryMatlabCall` | `rowIndex` | char | History |
+| `copyHistoryRowAsMatlabCode` | `rowIndex` | char (+ clipboard) | History |
+| `exportReport` | `filePath` | — | History |
+
+**Layer struct fields:** `.name`, `.formula`, `.thickness` (Å), `.density` (SLD ×10⁻⁶ Å⁻² or g/cm³ per `getDensityMode`), `.roughness` (Å).
+
+**History entry format:** `{timestamp, tabKey, description, latexStr, matlabCall}` — 5-element cell. `matlabCall` is empty for tabs without reproducible single-line calls.
+
+**navKey values:** `unitConverter`, `crystal`, `thinFilm`, `substrates`, `periodicTable`, `electrical`, `semiconductor`, `electrochemistry`, `optics`, `xrayNeutron`, `reflectivity`, `superconductor`, `magnetic`, `thermal`, `diffusion`, `vacuum`, `favorites`, `history`.

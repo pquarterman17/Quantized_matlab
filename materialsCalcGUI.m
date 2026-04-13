@@ -282,6 +282,15 @@ end
         s = sprintf('<span style="color:#e64040">Error: %s</span>', msg);
     end
 
+    function syncFormula(src, dst)
+    %SYNCFORMULA  Mirror a formula text field to its linked counterpart.
+    % Used to keep efNSLDFormula and efMWFormula in sync without triggering
+    % a calculation loop.
+        if ~strcmp(dst.Value, src.Value)
+            dst.Value = src.Value;
+        end
+    end
+
     function onCopyLastResult()
         if isfield(appData, 'lastResult') && ~isempty(appData.lastResult)
             % Strip HTML tags for clipboard
@@ -376,6 +385,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildUnitConverterTab(tab)
+        %BUILDUNITCONVERTERTAB  Unit conversions: calc.unitConvert; quick-presets for Oe, emu, eV, Ang, Pa, K, GPa, deg.
         gl = uigridlayout(tab);
         gl.RowHeight   = {28, 28, 28, 28, 22, 28, 28};
         gl.ColumnWidth = {60, '1x', 60, '1x'};
@@ -535,6 +545,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildCrystalTab(tab)
+        %BUILDCRYSTALTAB  Crystal structure: dSpacing, twoThetaFromD, latticeMismatch, criticalThickness, unitCellVolume, planeSpacings.
         % Scrollable panel wrapper
         outerGL = uigridlayout(tab);
         outerGL.RowHeight   = {'1x'};
@@ -550,6 +561,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gl.Padding     = [4 4 4 4];
         gl.RowSpacing  = 8;
 
+        % Formula: d = f(a,b,c,h,k,l,alpha,beta,gamma) — generalized Bragg's law for all crystal systems
         % ── Card 1: d-spacing ──────────────────────────────────────────
         pD = uipanel(gl, 'Title', 'd-Spacing', 'FontWeight', 'bold');
         pD.Layout.Row = 1; pD.Layout.Column = 1;
@@ -584,6 +596,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         % Row 2: a, b, c, h, k, l
         uilabel(gD,'Text',['a(' char(197) '):'],'HorizontalAlignment','right','FontSize',9);
         efDa = uieditfield(gD,'numeric','Value',3.905, ...
+            'Limits',[0.1 100], ...
             'Tooltip','Lattice parameter a (Å) — typical 2–15 for inorganic crystals');
         efDa.Layout.Row=2; efDa.Layout.Column=2;
         uilabel(gD,'Text','h:','HorizontalAlignment','right');
@@ -606,24 +619,29 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         % Row 3: b, c, alpha, beta
         uilabel(gD,'Text',['b(' char(197) '):'],'HorizontalAlignment','right','FontSize',9);
         efDb = uieditfield(gD,'numeric','Value',3.905, ...
+            'Limits',[0.1 100], ...
             'Tooltip','Lattice parameter b (Å) — disabled for Cubic/Tetragonal/Hexagonal');
         efDb.Layout.Row=3; efDb.Layout.Column=2;
         uilabel(gD,'Text',['c(' char(197) '):'],'HorizontalAlignment','right','FontSize',9);
         efDc = uieditfield(gD,'numeric','Value',3.905, ...
+            'Limits',[0.1 100], ...
             'Tooltip','Lattice parameter c (Å) — disabled for Cubic');
         efDc.Layout.Row=3; efDc.Layout.Column=4;
         uilabel(gD,'Text',[char(945) ':'],'HorizontalAlignment','right');
         efDal = uieditfield(gD,'numeric','Value',90, ...
+            'Limits',[0 180], ...
             'Tooltip','Lattice angle α (deg) between b and c — 90 for orthogonal systems');
         efDal.Layout.Row=3; efDal.Layout.Column=6;
         uilabel(gD,'Text',[char(946) ':'],'HorizontalAlignment','right');
         efDbe = uieditfield(gD,'numeric','Value',90, ...
+            'Limits',[0 180], ...
             'Tooltip','Lattice angle β (deg) between a and c — 90 for orthogonal systems');
         efDbe.Layout.Row=3; efDbe.Layout.Column=8;
 
         % Row 4: gamma, result
         uilabel(gD,'Text',[char(947) ':'],'HorizontalAlignment','right');
         efDga = uieditfield(gD,'numeric','Value',90, ...
+            'Limits',[0 180], ...
             'Tooltip','Lattice angle γ (deg) between a and b — 90 for orthogonal, 120 for hexagonal');
         efDga.Layout.Row=4; efDga.Layout.Column=2;
         lblDResult = uilabel(gD,'Text','','FontSize',11, ...
@@ -729,6 +747,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: d = lambda/(2*sin(theta)) — Bragg's law; bidirectional 2theta<->d
         % ── Card 2: 2θ ↔ d ────────────────────────────────────────────
         p2T = uipanel(gl, 'Title', ['2' char(952) ' ' char(8596) ' d'], 'FontWeight', 'bold');
         p2T.Layout.Row = 2; p2T.Layout.Column = 1;
@@ -788,6 +807,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: f = (a_film - a_sub)/a_sub; h_c from People-Bean model (calc.crystal.criticalThickness)
         % ── Card 3: Lattice Mismatch & Strain ─────────────────────────
         pMM = uipanel(gl, 'Title', 'Lattice Mismatch & Critical Thickness', 'FontWeight', 'bold');
         pMM.Layout.Row = 3; pMM.Layout.Column = 1;
@@ -800,10 +820,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gMM,'Text','a Film (Å):','HorizontalAlignment','right');
         efMMFilm = uieditfield(gMM,'numeric','Value',3.876, ...
+            'Limits',[0.1 100], ...
             'Tooltip','Film lattice parameter (Å) — in-plane value that mismatches the substrate');
         efMMFilm.Layout.Row=1; efMMFilm.Layout.Column=2;
         uilabel(gMM,'Text','a Sub (Å):','HorizontalAlignment','right');
         efMMSub = uieditfield(gMM,'numeric','Value',3.905, ...
+            'Limits',[0.1 100], ...
             'Tooltip','Substrate lattice parameter (Å) — reference for mismatch f=(a_f−a_s)/a_s');
         efMMSub.Layout.Row=1; efMMSub.Layout.Column=4;
 
@@ -855,6 +877,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: V = a*b*c*sqrt(1-cos^2(a)-cos^2(b)-cos^2(c)+2cos(a)cos(b)cos(c)); rho = Z*M/(NA*V)
         % ── Card 4: Unit Cell Volume & Density ────────────────────────
         pVC = uipanel(gl, 'Title', 'Unit Cell Volume & Density', 'FontWeight', 'bold');
         pVC.Layout.Row = 4; pVC.Layout.Column = 1;
@@ -867,23 +890,28 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gVC,'Text','a (Å):','HorizontalAlignment','right');
         efVCa = uieditfield(gVC,'numeric','Value',3.905, ...
+            'Limits',[0.1 100], ...
             'Tooltip','Lattice parameter a (Å)');
         efVCa.Layout.Row=1; efVCa.Layout.Column=2;
         uilabel(gVC,'Text','b (Å):','HorizontalAlignment','right');
         efVCb = uieditfield(gVC,'numeric','Value',3.905, ...
+            'Limits',[0.1 100], ...
             'Tooltip','Lattice parameter b (Å)');
         efVCb.Layout.Row=1; efVCb.Layout.Column=4;
         uilabel(gVC,'Text','c (Å):','HorizontalAlignment','right');
         efVCc = uieditfield(gVC,'numeric','Value',3.905, ...
+            'Limits',[0.1 100], ...
             'Tooltip','Lattice parameter c (Å)');
         efVCc.Layout.Row=1; efVCc.Layout.Column=6;
 
         uilabel(gVC,'Text','Z:','HorizontalAlignment','right');
         efVCZ = uieditfield(gVC,'numeric','Value',1, ...
+            'Limits',[1 Inf], ...
             'Tooltip','Formula units per unit cell — e.g. Z=4 for NaCl, Z=2 for BCC');
         efVCZ.Layout.Row=2; efVCZ.Layout.Column=2;
         uilabel(gVC,'Text','M (g/mol):','HorizontalAlignment','right');
         efVCM = uieditfield(gVC,'numeric','Value',183.84, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Molar mass of the formula unit (g/mol)');
         efVCM.Layout.Row=2; efVCM.Layout.Column=4;
 
@@ -915,6 +943,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: enumerate (hkl) up to MaxHKL; apply Bravais centering extinctions; d and 2theta via Bragg
         % ── Card 5: Plane Spacing Table ──────────────────────────────
         pPS = uipanel(gl, 'Title', 'Plane Spacing Table', 'FontWeight', 'bold');
         pPS.Layout.Row = 5; pPS.Layout.Column = 1;
@@ -1061,6 +1090,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildElectricalTab(tab)
+        %BUILDELECTRICALTAB  Electrical transport: resistivity, sheetResistance, conductivity, mobility, currentDensity, hallEffect.
         outerGL = uigridlayout(tab);
         outerGL.RowHeight   = {'1x'};
         outerGL.ColumnWidth = {'1x'};
@@ -1075,6 +1105,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gl.Padding     = [4 4 4 4];
         gl.RowSpacing  = 8;
 
+        % Formula: ρ = Rs·t [Ω·cm] (Rs in Ω/sq, t in cm); σ = 1/ρ [S/cm]; Rs for thin-film Van der Pauw
         % ── Card 1: Resistivity / Sheet Resistance ─────────────────────
         pRS = uipanel(gl,'Title','Resistivity / Sheet Resistance','FontWeight','bold');
         pRS.Layout.Row = 1; pRS.Layout.Column = 1;
@@ -1087,10 +1118,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gRS,'Text',['Rs (' char(937) '/sq):'],'HorizontalAlignment','right');
         efRsVal = uieditfield(gRS,'numeric','Value',100, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Sheet resistance Rs (Ω/sq) — typical 1–10⁴ for thin metal/TCO films');
         efRsVal.Layout.Row=1; efRsVal.Layout.Column=2;
         uilabel(gRS,'Text','t (nm):','HorizontalAlignment','right');
         efRsTh = uieditfield(gRS,'numeric','Value',10, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Film thickness t (nm) — used in ρ = Rs·t');
         efRsTh.Layout.Row=1; efRsTh.Layout.Column=4;
 
@@ -1105,6 +1138,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gRS,'Text',[char(961) ' (' char(937) char(183) 'cm):'],'HorizontalAlignment','right');
         efRhoVal = uieditfield(gRS,'numeric','Value',1e-4, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Bulk resistivity ρ (Ω·cm) — metals ~10⁻⁶, semiconductors 10⁻³–10⁶');
         efRhoVal.Layout.Row=3; efRhoVal.Layout.Column=2;
 
@@ -1146,6 +1180,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: σ = 1/ρ [S/cm]; for n-type: σ = n·q·μ_e; for p-type: σ = p·q·μ_h
         % ── Card 2: Conductivity ───────────────────────────────────────
         pCond = uipanel(gl,'Title','Conductivity','FontWeight','bold');
         pCond.Layout.Row = 2; pCond.Layout.Column = 1;
@@ -1158,6 +1193,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gCond,'Text',[char(961) ' (' char(937) char(183) 'cm):'],'HorizontalAlignment','right');
         efCondRho = uieditfield(gCond,'numeric','Value',1e-4, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Resistivity ρ (Ω·cm) — conductivity σ = 1/ρ in S/cm');
         efCondRho.Layout.Row=1; efCondRho.Layout.Column=2;
         btnCondCalc = uibutton(gCond,'push','Text','Calculate', ...
@@ -1182,6 +1218,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: μ = 1/(n·q·ρ) [cm²/V·s]; Hall mobility μ_H = R_H/ρ; q = 1.602×10⁻¹⁹ C
         % ── Card 3: Mobility ──────────────────────────────────────────
         pMob = uipanel(gl,'Title','Mobility','FontWeight','bold');
         pMob.Layout.Row = 3; pMob.Layout.Column = 1;
@@ -1194,10 +1231,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gMob,'Text',[char(961) ' (' char(937) char(183) 'cm):'],'HorizontalAlignment','right');
         efMobRho = uieditfield(gMob,'numeric','Value',1e-2, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Resistivity ρ (Ω·cm) — used with n in μ = 1/(nqρ)');
         efMobRho.Layout.Row=1; efMobRho.Layout.Column=2;
         uilabel(gMob,'Text','n (cm\^-3):','HorizontalAlignment','right');
         efMobN = uieditfield(gMob,'numeric','Value',1e17, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Carrier concentration n (cm⁻³) — typical 10¹⁵–10²⁰ for doped semiconductors');
         efMobN.Layout.Row=1; efMobN.Layout.Column=4;
         btnMobCalc = uibutton(gMob,'push','Text','Calculate', ...
@@ -1221,6 +1260,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: J = I/A [A/cm²]; critical current density Jc ~10⁶ A/cm² for superconductors
         % ── Card 4: Current Density ───────────────────────────────────
         pJD = uipanel(gl,'Title','Current Density','FontWeight','bold');
         pJD.Layout.Row = 4; pJD.Layout.Column = 1;
@@ -1233,10 +1273,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gJD,'Text','I (A):','HorizontalAlignment','right');
         efJDI = uieditfield(gJD,'numeric','Value',1e-3, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Current I (A) — e.g. 1 mA = 1e-3');
         efJDI.Layout.Row=1; efJDI.Layout.Column=2;
         uilabel(gJD,'Text',['Area (cm' char(178) '):'],'HorizontalAlignment','right');
         efJDA = uieditfield(gJD,'numeric','Value',1, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Cross-sectional area (cm²) — J = I/A in A/cm²');
         efJDA.Layout.Row=1; efJDA.Layout.Column=4;
         btnJDCalc = uibutton(gJD,'push','Text','Calculate', ...
@@ -1259,6 +1301,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 setStatus(ME.message);
             end
         end
+        % Formula: R_H = V_H·t/(I·B) [cm³/C]; n = 1/(R_H·q); sign of R_H → carrier type (+ holes, − electrons)
         % ── Card 5: Hall Effect ──────────────────────────────────────────
         pHall = uipanel(gl,'Title','Hall Effect','FontWeight','bold');
         pHall.Layout.Row = 5; pHall.Layout.Column = 1;
@@ -1272,6 +1315,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         efHallVH.Layout.Row=1; efHallVH.Layout.Column=2;
         uilabel(gHall,'Text','I (A):','HorizontalAlignment','right');
         efHallI = uieditfield(gHall,'numeric','Value',1e-3, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Longitudinal current I (A) through the Hall bar');
         efHallI.Layout.Row=1; efHallI.Layout.Column=4;
         btnHallCalc = uibutton(gHall,'push','Text','Calculate', ...
@@ -1281,10 +1325,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gHall,'Text','B (T):','HorizontalAlignment','right');
         efHallB = uieditfield(gHall,'numeric','Value',1, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Magnetic field B (T) — applied perpendicular to current and voltage');
         efHallB.Layout.Row=2; efHallB.Layout.Column=2;
         uilabel(gHall,'Text','t (nm):','HorizontalAlignment','right');
         efHallT = uieditfield(gHall,'numeric','Value',100, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Sample thickness t (nm) along the field direction');
         efHallT.Layout.Row=2; efHallT.Layout.Column=4;
 
@@ -1297,26 +1343,26 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 I  = efHallI.Value;
                 B  = efHallB.Value;
                 t  = efHallT.Value * 1e-7;   % nm to cm
-                q  = 1.602176634e-19;
-                RH = VH * t / (I * B);        % cm³/C
-                n  = 1 / (RH * q);            % cm⁻³
+                RH = VH * t / (I * B);        % cm³/C (experimental: R_H = V_H·t/(I·B))
+                nAbs = abs(1 / (RH * calc.constants().e));  % majority carrier density cm⁻³
+                % Use hallCoefficient in single-carrier limit to get apparentType + latex
                 if RH > 0
-                    carrier = 'p-type (holes)';
+                    hc = calc.semiconductor.hallCoefficient(0, nAbs, 1, 1);
                 else
-                    carrier = 'n-type (electrons)';
+                    hc = calc.semiconductor.hallCoefficient(nAbs, 0, 1, 1);
                 end
+                carrier = sprintf('%s-type', hc.apparentType);
                 desc = sprintf('R<sub>H</sub> = %.3g cm%s/C, n = %.3g cm%s &mdash; %s', ...
-                    RH, char(179), abs(n), [char(8315) char(179)], carrier);
+                    RH, char(179), nAbs, [char(8315) char(179)], carrier);
                 lblHallResult.Text = desc;
-                latex = sprintf('R_H = %.3g~\\text{cm}^3/\\text{C},\\ n = %.3g~\\text{cm}^{-3}', RH, abs(n));
-                addHistory(desc, latex);
+                addHistory(desc, hc.latex);
             catch ME
                 lblHallResult.Text = errText(ME.message);
                 setStatus(ME.message);
             end
         end
 
-        registerPrimaryBtn('electrical', btnCondCalc);
+        registerPrimaryBtn('electrical', btnRsToRho);
     end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -1326,6 +1372,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildSemiconductorTab(tab)
+        %BUILDSEMICONDUCTORTAB  Semiconductor device physics: intrinsicCarrierConc, carrierConcentration, depletionWidth, diffusionCoeff, diffusionLength.
         outerGL = uigridlayout(tab);
         outerGL.RowHeight   = {'1x'};
         outerGL.ColumnWidth = {'1x'};
@@ -1343,6 +1390,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         % Material presets available for dropdowns
         matNames = {'Si','Ge','GaAs','InP','GaN','SiC'};
 
+        % Formula: n_i = sqrt(N_c·N_v)·exp(−E_g/2k_BT); N_c,v ∝ (m*/m_0)^(3/2)·T^(3/2)
         % ── Card 1: Intrinsic Properties ──────────────────────────────
         pNi = uipanel(gl,'Title','Intrinsic Properties','FontWeight','bold');
         pNi.Layout.Row = 1; pNi.Layout.Column = 1;
@@ -1360,6 +1408,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         ddNiMat.Layout.Row=1; ddNiMat.Layout.Column=2;
         uilabel(gNi,'Text','T (K):','HorizontalAlignment','right');
         efNiT = uieditfield(gNi,'numeric','Value',300, ...
+            'Limits',[0.001 Inf], ...
             'Tooltip','Temperature (K) — always Kelvin, never Celsius');
         efNiT.Layout.Row=1; efNiT.Layout.Column=4;
 
@@ -1419,6 +1468,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: n = Nd/2 + sqrt((Nd/2)² + ni²); p = ni²/n; charge neutrality: n + Na = p + Nd (full ionisation)
         % ── Card 2: Doping & Fermi Level ──────────────────────────────
         pDop = uipanel(gl,'Title','Doping & Carrier Concentrations','FontWeight','bold');
         pDop.Layout.Row = 2; pDop.Layout.Column = 1;
@@ -1431,14 +1481,17 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gDop,'Text',['Nd (cm' char(8315) char(179) '):'],'HorizontalAlignment','right');
         efDopNd = uieditfield(gDop,'numeric','Value',1e16, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Donor concentration N_d (cm⁻³) — typical 10¹⁴–10²⁰');
         efDopNd.Layout.Row=1; efDopNd.Layout.Column=2;
         uilabel(gDop,'Text',['Na (cm' char(8315) char(179) '):'],'HorizontalAlignment','right');
         efDopNa = uieditfield(gDop,'numeric','Value',0, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Acceptor concentration N_a (cm⁻³) — 0 for purely n-type');
         efDopNa.Layout.Row=1; efDopNa.Layout.Column=4;
         uilabel(gDop,'Text',['ni (cm' char(8315) char(179) '):'],'HorizontalAlignment','right');
         efDopNi = uieditfield(gDop,'numeric','Value',1.5e10, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Intrinsic carrier concentration n_i (cm⁻³) — Si 1.5e10 at 300 K');
         efDopNi.Layout.Row=1; efDopNi.Layout.Column=6;
 
@@ -1471,6 +1524,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: W = sqrt(2ε₀ε_r·Vbi/(q)·(Na+Nd)/(Na·Nd)); xn/xp partitioned by charge neutrality
         % ── Card 3: Depletion & Junction ──────────────────────────────
         pDep = uipanel(gl,'Title','Depletion Width (p-n Junction)','FontWeight','bold');
         pDep.Layout.Row = 3; pDep.Layout.Column = 1;
@@ -1496,10 +1550,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         efDepVbi.Layout.Row=2; efDepVbi.Layout.Column=2;
         uilabel(gDep,'Text',['Na (cm' char(8315) char(179) '):'],'HorizontalAlignment','right');
         efDepNa = uieditfield(gDep,'numeric','Value',1e16, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Acceptor doping on p-side N_a (cm⁻³)');
         efDepNa.Layout.Row=2; efDepNa.Layout.Column=4;
         uilabel(gDep,'Text',['Nd (cm' char(8315) char(179) '):'],'HorizontalAlignment','right');
         efDepNd = uieditfield(gDep,'numeric','Value',1e17, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Donor doping on n-side N_d (cm⁻³)');
         efDepNd.Layout.Row=2; efDepNd.Layout.Column=6;
 
@@ -1545,6 +1601,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: D = μ·k_BT/q (Einstein relation) [cm²/s]; L = sqrt(D·τ) minority-carrier diffusion length
         % ── Card 4: Transport ─────────────────────────────────────────
         pTrans = uipanel(gl,'Title','Transport (Diffusion Coefficient & Length)','FontWeight','bold');
         pTrans.Layout.Row = 4; pTrans.Layout.Column = 1;
@@ -1557,10 +1614,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gTrans,'Text',[char(956) ' (cm' char(178) '/V' char(183) 's):'],'HorizontalAlignment','right');
         efTransMu = uieditfield(gTrans,'numeric','Value',1400, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Carrier mobility μ (cm²/V·s) — Si electrons 1400, holes 450 at 300 K');
         efTransMu.Layout.Row=1; efTransMu.Layout.Column=2;
         uilabel(gTrans,'Text','\tau (s):','HorizontalAlignment','right');
         efTransTau = uieditfield(gTrans,'numeric','Value',1e-6, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Minority-carrier lifetime τ (s) — typical 1 ns–1 ms');
         efTransTau.Layout.Row=1; efTransTau.Layout.Column=4;
 
@@ -1610,6 +1669,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildThinFilmTab(tab)
+        %BUILDTHINFILMTAB  Thin film deposition: depositionRate, kiessigThickness, stoneyStress, thermalMismatchStrain, doseFromCurrent, Scherrer grain size.
         outerGL = uigridlayout(tab);
         outerGL.RowHeight   = {'1x'};
         outerGL.ColumnWidth = {'1x'};
@@ -1626,6 +1686,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         subNames = calc.substrates.listSubstrates();
 
+        % Formula: rate = thickness(Ang) / time(s) in Ang/s; also expressed in nm/min
         % ── Card 1: Deposition Rate ────────────────────────────────────
         pDep = uipanel(gl,'Title','Deposition Rate','FontWeight','bold');
         pDep.Layout.Row = 1; pDep.Layout.Column = 1;
@@ -1638,10 +1699,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gDR,'Text','Thickness (Å):','HorizontalAlignment','right');
         efDRThick = uieditfield(gDR,'numeric','Value',1000, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Deposited film thickness (Å) — target film amount');
         efDRThick.Layout.Row=1; efDRThick.Layout.Column=2;
         uilabel(gDR,'Text','Time (s):','HorizontalAlignment','right');
         efDRTime = uieditfield(gDR,'numeric','Value',60, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Deposition time (s) — rate = thickness/time');
         efDRTime.Layout.Row=1; efDRTime.Layout.Column=4;
         btnDRCalc = uibutton(gDR,'push','Text','Calculate', ...
@@ -1664,6 +1727,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: t = 2*pi / deltaQ — film thickness from Kiessig fringe period in Q-space
         % ── Card 2: Kiessig Thickness ─────────────────────────────────
         pKT = uipanel(gl,'Title','Kiessig Fringe Thickness','FontWeight','bold');
         pKT.Layout.Row = 2; pKT.Layout.Column = 1;
@@ -1676,6 +1740,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gKT,'Text',[char(916) 'Q (' char(197) char(8315) char(185) '):'],'HorizontalAlignment','right');
         efKTdQ = uieditfield(gKT,'numeric','Value',0.1, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Fringe spacing ΔQ (Å⁻¹) from adjacent Kiessig fringes — t = 2π/ΔQ');
         efKTdQ.Layout.Row=1; efKTdQ.Layout.Column=2;
         btnKTCalc = uibutton(gKT,'push','Text','Calculate', ...
@@ -1700,6 +1765,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: sigma = Es*ts^2 / (6*(1-nu_s)*tf*R) — Stoney equation; assumes tf << ts
         % ── Card 3: Stoney Stress ─────────────────────────────────────
         pSS = uipanel(gl,'Title','Stoney Film Stress','FontWeight','bold');
         pSS.Layout.Row = 3; pSS.Layout.Column = 1;
@@ -1712,19 +1778,23 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gSS,'Text','Es (GPa):','HorizontalAlignment','right');
         efSSEs = uieditfield(gSS,'numeric','Value',130, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Substrate Young''s modulus E_s (GPa) — Si 130, sapphire 345');
         efSSEs.Layout.Row=1; efSSEs.Layout.Column=2;
         uilabel(gSS,'Text',[char(957) 's:'],'HorizontalAlignment','right');
         efSSNus = uieditfield(gSS,'numeric','Value',0.28, ...
+            'Limits',[0 0.5], ...
             'Tooltip','Substrate Poisson ratio ν_s (dimensionless) — typically 0.2–0.35');
         efSSNus.Layout.Row=1; efSSNus.Layout.Column=4;
         uilabel(gSS,'Text',['ts (' char(956) 'm):'],'HorizontalAlignment','right');
         efSSts = uieditfield(gSS,'numeric','Value',500, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Substrate thickness t_s (μm) — typical Si wafer 300–700');
         efSSts.Layout.Row=1; efSSts.Layout.Column=6;
 
         uilabel(gSS,'Text','tf (nm):','HorizontalAlignment','right');
         efSStf = uieditfield(gSS,'numeric','Value',100, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Film thickness t_f (nm) — Stoney assumes t_f ≪ t_s');
         efSStf.Layout.Row=2; efSStf.Layout.Column=2;
         uilabel(gSS,'Text','R (m):','HorizontalAlignment','right');
@@ -1758,6 +1828,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: epsilon = (alpha_f - alpha_s)*deltaT; sigma = E*epsilon/(1-nu) (biaxial)
         % ── Card 4: Thermal Mismatch ──────────────────────────────────
         pTM = uipanel(gl,'Title','Thermal Mismatch Strain & Stress','FontWeight','bold');
         pTM.Layout.Row = 4; pTM.Layout.Column = 1;
@@ -1788,10 +1859,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         efTMdT.Layout.Row=2; efTMdT.Layout.Column=2;
         uilabel(gTM,'Text','E (GPa):','HorizontalAlignment','right');
         efTME = uieditfield(gTM,'numeric','Value',200, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Film Young''s modulus E_f (GPa) — metals 50–400');
         efTME.Layout.Row=2; efTME.Layout.Column=4;
         uilabel(gTM,'Text',[char(957) ':'],'HorizontalAlignment','right');
         efTMNu = uieditfield(gTM,'numeric','Value',0.28, ...
+            'Limits',[0 0.5], ...
             'Tooltip','Film Poisson ratio ν_f (dimensionless) — typically 0.2–0.35');
         efTMNu.Layout.Row=2; efTMNu.Layout.Column=6;
 
@@ -1846,14 +1919,17 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gID,'Text','Current (A):','HorizontalAlignment','right');
         efIDCurr = uieditfield(gID,'numeric','Value',1e-6, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Ion beam current I (A) — assumes singly-charged ions');
         efIDCurr.Layout.Row=1; efIDCurr.Layout.Column=2;
         uilabel(gID,'Text','Time (s):','HorizontalAlignment','right');
         efIDTime = uieditfield(gID,'numeric','Value',60, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Exposure time t (s)');
         efIDTime.Layout.Row=1; efIDTime.Layout.Column=4;
         uilabel(gID,'Text',['Area (cm' char(178) '):'],'HorizontalAlignment','right');
         efIDArea = uieditfield(gID,'numeric','Value',1, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Implant area (cm²) — dose = I·t/(q·A) in ions/cm²');
         efIDArea.Layout.Row=1; efIDArea.Layout.Column=6;
         btnIDCalc = uibutton(gID,'push','Text','Calculate', ...
@@ -1886,14 +1962,17 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gSch,'Text','FWHM:','HorizontalAlignment','right');
         efSchFWHM = uieditfield(gSch,'numeric','Value',0.5, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Peak FWHM β (deg, 2θ) — instrument-corrected integral breadth');
         efSchFWHM.Layout.Row=1; efSchFWHM.Layout.Column=2;
         uilabel(gSch,'Text',[char(955) ':'],'HorizontalAlignment','right');
         efSchLam = uieditfield(gSch,'numeric','Value',1.5406, ...
+            'Limits',[0.01 100], ...
             'Tooltip','X-ray wavelength λ (Å) — Cu Kα₁ = 1.5406');
         efSchLam.Layout.Row=1; efSchLam.Layout.Column=4;
         uilabel(gSch,'Text',['2' char(952) ':'],'HorizontalAlignment','right');
         efSch2T = uieditfield(gSch,'numeric','Value',33, ...
+            'Limits',[0 180], ...
             'Tooltip','Bragg peak position 2θ (deg)');
         efSch2T.Layout.Row=1; efSch2T.Layout.Column=6;
         btnSchCalc = uibutton(gSch,'push','Text','Calculate', ...
@@ -1931,6 +2010,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildPeriodicTableTab(tab)
+        %BUILDPERIODICTABLETAB  Interactive 118-element periodic table: color-by-property (calc.elementData), element detail, search filter.
         % Main layout: toolbar + display options + table + detail panel
         gl = uigridlayout(tab);
         gl.RowHeight   = {28, 24, '1x', 140};
@@ -2264,12 +2344,14 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildXrayNeutronTab(tab)
+        %BUILDXRAYNEUTRONTAB  X-ray and neutron scattering: neutronSLD, xraySLD, qToTwoTheta, twoThetaToQ, molecularWeight (all in +calc.xrayNeutron).
         gl = uigridlayout(tab);
         gl.RowHeight   = {'3x', '2x', '3x', '2x'};
         gl.ColumnWidth = {'1x'};
         gl.Padding     = [6 6 6 6];
         gl.RowSpacing  = 8;
 
+        % Formula: SLD = (NA * rho / M) * sum(b_coh) in units of 10^-6 Ang^-2
         % ── Card 1: Neutron SLD ──────────────────────────────────────
         pNSLD = uipanel(gl,'Title','Neutron Scattering Length Density','FontWeight','bold');
         pNSLD.Layout.Row = 1; pNSLD.Layout.Column = 1;
@@ -2282,10 +2364,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gNSLD,'Text','Formula:','HorizontalAlignment','right');
         efNSLDFormula = uieditfield(gNSLD,'text','Value','SrTiO3', ...
-            'Tooltip','Chemical formula — case-sensitive element symbols, e.g. SrTiO3, Fe2O3, Al2O3');
+            'Tooltip','Chemical formula — case-sensitive element symbols, e.g. SrTiO3, Fe2O3, Al2O3', ...
+            'ValueChangedFcn', @(~,~) syncFormula(efNSLDFormula, efMWFormula));
         efNSLDFormula.Layout.Row=1; efNSLDFormula.Layout.Column=2;
         uilabel(gNSLD,'Text','Density (g/cm³):','HorizontalAlignment','right');
         efNSLDDensity = uieditfield(gNSLD,'numeric','Value',5.12, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Mass density ρ (g/cm³) — SrTiO₃ 5.12, Si 2.33, Fe₂O₃ 5.24');
         efNSLDDensity.Layout.Row=1; efNSLDDensity.Layout.Column=4;
         btnNSLDCalc = uibutton(gNSLD,'push','Text','Calculate', ...
@@ -2334,6 +2418,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: SLD_x = r_e * rho_e where rho_e = (NA*rho*Z_eff/M); shares formula/density from Card 1
         % ── Card 2: X-ray SLD (shares formula/density from Card 1) ───
         pXSLD = uipanel(gl,'Title','X-ray Scattering Length Density','FontWeight','bold');
         pXSLD.Layout.Row = 2; pXSLD.Layout.Column = 1;
@@ -2375,6 +2460,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: Q = 4*pi*sin(theta)/lambda; bidirectional with wavelength presets (Cu/Mo/Co/Ag Kalpha)
         % ── Card 3: Q ↔ 2θ Converter ────────────────────────────────
         pQ2T = uipanel(gl,'Title',['Q / 2' char(952) ' Converter'],'FontWeight','bold');
         pQ2T.Layout.Row = 3; pQ2T.Layout.Column = 1;
@@ -2391,6 +2477,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         efQ2TVal.Layout.Row=1; efQ2TVal.Layout.Column=2;
         uilabel(gQ2T,'Text',[char(955) ' (' char(197) '):'],'HorizontalAlignment','right');
         efQ2TLam = uieditfield(gQ2T,'numeric','Value',1.5406, ...
+            'Limits',[0.01 100], ...
             'Tooltip','Radiation wavelength λ (Å) — Cu Kα 1.5406, Mo Kα 0.7107, neutrons 1–5');
         efQ2TLam.Layout.Row=1; efQ2TLam.Layout.Column=4;
 
@@ -2455,7 +2542,8 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gMW,'Text','Formula:','HorizontalAlignment','right');
         efMWFormula = uieditfield(gMW,'text','Value','Fe2O3', ...
-            'Tooltip','Chemical formula — returns molar mass in g/mol');
+            'Tooltip','Chemical formula — returns molar mass in g/mol', ...
+            'ValueChangedFcn', @(~,~) syncFormula(efMWFormula, efNSLDFormula));
         efMWFormula.Layout.Row=1; efMWFormula.Layout.Column=2;
         btnMWCalc = uibutton(gMW,'push','Text','Calculate', ...
             'BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG, ...
@@ -2552,6 +2640,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildSuperconductorTab(tab)
+        %BUILDSUPERCONDUCTORTAB  Superconductivity: londonDepth, coherenceLength, glParameter, criticalFields (all in +calc.superconductor); presets Nb/NbN/YBCO/MgB2/Al/Pb/In/Sn.
         gl = uigridlayout(tab);
         gl.RowHeight   = {'3x', '2x', '2x', '3x'};
         gl.ColumnWidth = {'1x'};
@@ -2561,6 +2650,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         % Material presets
         scMats = {'Nb','NbN','YBCO','MgB2','Al','Pb','In','Sn'};
 
+        % Formula: lambda(T) = lambda0 / sqrt(1 - (T/Tc)^4) — two-fluid model (Gorter-Casimir)
         % ── Card 1: London Penetration Depth ─────────────────────────
         pLondon = uipanel(gl,'Title','London Penetration Depth','FontWeight','bold');
         pLondon.Layout.Row = 1; pLondon.Layout.Column = 1;
@@ -2581,16 +2671,19 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         uilabel(gLondon,'Text','<html>&lambda;<sub>0</sub> depth (nm):</html>', ...
             'HorizontalAlignment','right','Interpreter','html');
         efLondonLam0 = uieditfield(gLondon,'numeric','Value',39, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Zero-temperature London depth λ₀ (nm) — Nb 39, Al 16, YBCO ~150');
         efLondonLam0.Layout.Row=1; efLondonLam0.Layout.Column=4;
 
         uilabel(gLondon,'Text','Crit. temp T<sub>c</sub> (K):', ...
             'HorizontalAlignment','right','Interpreter','html');
         efLondonTc = uieditfield(gLondon,'numeric','Value',9.25, ...
+            'Limits',[0.001 Inf], ...
             'Tooltip','Superconducting critical temperature T_c (K) — Nb 9.25, Al 1.2, YBCO 93');
         efLondonTc.Layout.Row=2; efLondonTc.Layout.Column=2;
         uilabel(gLondon,'Text','Meas. temp (K):','HorizontalAlignment','right');
         efLondonT = uieditfield(gLondon,'numeric','Value',4.2, ...
+            'Limits',[0.001 Inf], ...
             'Tooltip','Measurement temperature T (K) — must satisfy T < T_c');
         efLondonT.Layout.Row=2; efLondonT.Layout.Column=4;
 
@@ -2634,6 +2727,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: xi(T) = xi0 / sqrt(1 - (T/Tc)^4) — Gorkov temperature dependence
         % ── Card 2: Coherence Length ─────────────────────────────────
         pXi = uipanel(gl,'Title','Coherence Length','FontWeight','bold');
         pXi.Layout.Row = 2; pXi.Layout.Column = 1;
@@ -2654,16 +2748,19 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         uilabel(gXi,'Text','<html>&xi;<sub>0</sub> length (nm):</html>', ...
             'HorizontalAlignment','right','Interpreter','html');
         efXi0 = uieditfield(gXi,'numeric','Value',38, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Zero-temperature coherence length ξ₀ (nm) — Nb 38, Al 1600, YBCO ~2');
         efXi0.Layout.Row=1; efXi0.Layout.Column=4;
 
         uilabel(gXi,'Text','Crit. temp T<sub>c</sub> (K):', ...
             'HorizontalAlignment','right','Interpreter','html');
         efXiTc = uieditfield(gXi,'numeric','Value',9.25, ...
+            'Limits',[0.001 Inf], ...
             'Tooltip','Critical temperature T_c (K)');
         efXiTc.Layout.Row=2; efXiTc.Layout.Column=2;
         uilabel(gXi,'Text','Meas. temp (K):','HorizontalAlignment','right');
         efXiT = uieditfield(gXi,'numeric','Value',4.2, ...
+            'Limits',[0.001 Inf], ...
             'Tooltip','Measurement temperature T (K) — must satisfy T < T_c');
         efXiT.Layout.Row=2; efXiT.Layout.Column=4;
         btnXiCalc = uibutton(gXi,'push','Text','Calculate', ...
@@ -2699,6 +2796,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: kappa = lambda/xi; Type II if kappa > 1/sqrt(2) (~0.707)
         % ── Card 3: GL Parameter ─────────────────────────────────────
         pGL = uipanel(gl,'Title','Ginzburg-Landau Parameter','FontWeight','bold');
         pGL.Layout.Row = 3; pGL.Layout.Column = 1;
@@ -2711,12 +2809,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gGL,'Text','<html>Pen. depth &lambda; (nm):</html>', ...
             'HorizontalAlignment','right','Interpreter','html');
-        efGLLam = uieditfield(gGL,'numeric','Value',39, ...
+        efGLLam = uieditfield(gGL,'numeric','Value',39, 'Limits',[0 Inf], ...
             'Tooltip','Penetration depth λ (nm) — at the measurement temperature');
         efGLLam.Layout.Row=1; efGLLam.Layout.Column=2;
         uilabel(gGL,'Text','<html>Coher. &xi; (nm):</html>', ...
             'HorizontalAlignment','right','Interpreter','html');
-        efGLXi = uieditfield(gGL,'numeric','Value',38, ...
+        efGLXi = uieditfield(gGL,'numeric','Value',38, 'Limits',[0 Inf], ...
             'Tooltip','Coherence length ξ (nm) — κ = λ/ξ; >1/√2 is Type II');
         efGLXi.Layout.Row=1; efGLXi.Layout.Column=4;
         btnGLCalc = uibutton(gGL,'push','Text','Calculate', ...
@@ -2745,6 +2843,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: Hc(T) = Hc0*[1-(T/Tc)^2]; Type II: Hc1 and Hc2 from GL theory via kappa
         % ── Card 4: Critical Fields ──────────────────────────────────
         pHc = uipanel(gl,'Title','Critical Fields','FontWeight','bold');
         pHc.Layout.Row = 4; pHc.Layout.Column = 1;
@@ -2764,17 +2863,17 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         uilabel(gHc,'Text','Crit. field H<sub>c0</sub> (Oe):', ...
             'HorizontalAlignment','right','Interpreter','html');
-        efHcHc0 = uieditfield(gHc,'numeric','Value',1980, ...
+        efHcHc0 = uieditfield(gHc,'numeric','Value',1980, 'Limits',[0 Inf], ...
             'Tooltip','Zero-T thermodynamic critical field H_c0 (Oe) — Nb ~1980, Al ~100');
         efHcHc0.Layout.Row=1; efHcHc0.Layout.Column=4;
 
         uilabel(gHc,'Text','Crit. temp T<sub>c</sub> (K):', ...
             'HorizontalAlignment','right','Interpreter','html');
-        efHcTc = uieditfield(gHc,'numeric','Value',9.25, ...
+        efHcTc = uieditfield(gHc,'numeric','Value',9.25, 'Limits',[0.001 Inf], ...
             'Tooltip','Critical temperature T_c (K)');
         efHcTc.Layout.Row=2; efHcTc.Layout.Column=2;
         uilabel(gHc,'Text','Meas. temp (K):','HorizontalAlignment','right');
-        efHcT = uieditfield(gHc,'numeric','Value',4.2, ...
+        efHcT = uieditfield(gHc,'numeric','Value',4.2, 'Limits',[0.001 Inf], ...
             'Tooltip','Measurement temperature T (K) — H_c(T) = H_c0·[1-(T/T_c)²]');
         efHcT.Layout.Row=2; efHcT.Layout.Column=4;
         btnHcCalc = uibutton(gHc,'push','Text','Calculate', ...
@@ -2851,6 +2950,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildMagneticTab(tab)
+        %BUILDMAGNETICTAB  Magnetic properties: moment conversions, demagnetization factors, Curie-Weiss law, Langevin function, domain wall width.
         outerGL = uigridlayout(tab);
         outerGL.RowHeight   = {'1x'};
         outerGL.ColumnWidth = {'1x'};
@@ -2865,6 +2965,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gl.Padding     = [4 4 4 4];
         gl.RowSpacing  = 8;
 
+        % Formula: 1 emu = 1e-3 A·m²; M (emu/cm³) = m/V; μ_B/atom = m/(N·μ_B), μ_B = 9.274e-21 emu
         % ── Card 1: Moment Conversions ──────────────────────────────────
         pMom = uipanel(gl,'Title','Moment Conversions','FontWeight','bold');
         pMom.Layout.Row = 1;
@@ -2888,11 +2989,11 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         % Row 2: optional parameters for per-atom
         uilabel(gMom,'Text','Volume (cm³):','HorizontalAlignment','right');
-        efMomVol = uieditfield(gMom,'numeric','Value',0, ...
+        efMomVol = uieditfield(gMom,'numeric','Value',0, 'Limits',[0 Inf], ...
             'Tooltip','Sample volume (cm³) — optional, enables magnetization M = m/V output');
         efMomVol.Layout.Row=2; efMomVol.Layout.Column=2;
         uilabel(gMom,'Text','Atoms:','HorizontalAlignment','right');
-        efMomAtoms = uieditfield(gMom,'numeric','Value',0, ...
+        efMomAtoms = uieditfield(gMom,'numeric','Value',0, 'Limits',[0 Inf], ...
             'Tooltip','Number of magnetic atoms — optional, enables μ_B/atom output');
         efMomAtoms.Layout.Row=2; efMomAtoms.Layout.Column=4;
 
@@ -2902,29 +3003,30 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         lblMomDetail.Layout.Row=4; lblMomDetail.Layout.Column=[1 5];
 
         function doMomentConvert()
-            val = efMomVal.Value;
-            scale = ddMomUnit.Value;  % factor to convert input unit to emu
-            emu = val * scale;
-            Am2 = emu * 1e-3;
-            muB = 9.274010078e-21;  % emu
-            desc = sprintf('%.4g emu = %.4g A%sm%s', emu, Am2, char(183), char(178));
+            val   = efMomVal.Value;
+            scale = ddMomUnit.Value;   % factor to convert input unit to emu
+            emu   = val * scale;
+            Am2   = emu * 1e-3;
+            r     = calc.magnetic.bohrMagnetonConvert(emu, 'emu');
+            desc  = sprintf('%.4g emu = %.4g A%sm%s', emu, Am2, char(183), char(178));
             detail = '';
-            vol = efMomVol.Value;
+            vol    = efMomVol.Value;
             nAtoms = efMomAtoms.Value;
             if vol > 0
                 emucc = emu / vol;
-                Am = emucc * 1e3;  % emu/cm³ to A/m
-                desc = [desc sprintf(' | M = %.4g emu/cm%s = %.4g A/m', emucc, char(179), Am)];
+                Am    = emucc * 1e3;  % emu/cm³ to A/m
+                desc  = [desc sprintf(' | M = %.4g emu/cm%s = %.4g A/m', emucc, char(179), Am)];
             end
             if nAtoms > 0
-                muB_per_atom = emu / (nAtoms * muB);
+                muB_per_atom = r.muB / nAtoms;
                 detail = sprintf('%.3f %s<sub>B</sub>/atom', muB_per_atom, char(956));
             end
             lblMomResult.Text = desc;
             lblMomDetail.Text = detail;
-            addHistory(desc, '');
+            addHistory(desc, r.latex);
         end
 
+        % Formula: analytical N values — sphere 1/3, thin film oop 1, cylinder axial 0, transverse 1/2; Ncgs = 4π·N
         % ── Card 2: Demagnetization Factors ─────────────────────────────
         pDemag = uipanel(gl,'Title','Demagnetization Factors','FontWeight','bold');
         pDemag.Layout.Row = 2;
@@ -2949,20 +3051,36 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 
         function doDemagFactor()
             shape = ddDemagShape.Value;
+            % Map GUI dropdown labels to calc.magnetic.demagFactor shape strings
             switch shape
-                case 'Sphere',                          N = 1/3;
-                case 'Thin film (in-plane)',             N = 0;
-                case 'Thin film (out-of-plane)',         N = 1;
-                case 'Long cylinder (axial)',            N = 0;
-                case 'Long cylinder (transverse)',       N = 0.5;
-                otherwise,                               N = 0;
+                case 'Sphere'
+                    r = calc.magnetic.demagFactor('sphere');
+                case 'Thin film (in-plane)'
+                    r = calc.magnetic.demagFactor('thin_film');
+                    % thin_film returns Nz=1 (oop); in-plane is Nxy
+                    r.Nz = r.Nxy; r.Nxy = 1 - r.Nz;
+                case 'Thin film (out-of-plane)'
+                    r = calc.magnetic.demagFactor('thin_film');
+                case 'Long cylinder (axial)'
+                    % Long rod: L >> d → use large L/d ratio via cylinder approx
+                    r = calc.magnetic.demagFactor('prolate', ratio=20);
+                case 'Long cylinder (transverse)'
+                    r = calc.magnetic.demagFactor('prolate', ratio=20);
+                    % Transverse to long axis: use Nxy
+                    tmp = r.Nxy; r.Nxy = r.Nz; r.Nz = tmp;
+                otherwise
+                    r = calc.magnetic.demagFactor('sphere');
             end
-            Ncgs = 4*pi*N;
-            desc = sprintf('N = %.4f (SI) = %.4f (CGS, 4%sN)', N, Ncgs, char(960));
+            Nz   = r.Nz;
+            Nxy  = r.Nxy;
+            Ncgs = 4 * pi * Nz;
+            desc = sprintf('N<sub>z</sub> = %.4f (SI), N<sub>xy</sub> = %.4f | CGS: 4%sN<sub>z</sub> = %.4f', ...
+                Nz, Nxy, char(960), Ncgs);
             lblDemagResult.Text = desc;
-            addHistory(sprintf('%s: %s', shape, desc), '');
+            addHistory(sprintf('%s: Nz=%.4f Nxy=%.4f', shape, Nz, Nxy), r.latex);
         end
 
+        % Formula: χ = C/(T−θ); μ_eff = sqrt(3k_B·C/N_A) / μ_B [μ_B]; θ<0 AFM, θ>0 FM
         % ── Card 3: Curie-Weiss Law ────────────────────────────────────
         pCW = uipanel(gl,'Title','Curie-Weiss Law','FontWeight','bold');
         pCW.Layout.Row = 3;
@@ -2971,7 +3089,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gCW.Padding = [6 4 6 4]; gCW.RowSpacing = 4;
 
         uilabel(gCW,'Text','C (emu K/mol):','HorizontalAlignment','right');
-        efCWC = uieditfield(gCW,'numeric','Value',4.375, ...
+        efCWC = uieditfield(gCW,'numeric','Value',4.375, 'Limits',[0 Inf], ...
             'Tooltip','Curie constant C (emu·K/mol) — from slope of 1/χ vs T');
         efCWC.Layout.Row=1; efCWC.Layout.Column=2;
         uilabel(gCW,'Text',[char(952) ' (K):'],'HorizontalAlignment','right');
@@ -3010,6 +3128,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             addHistory(desc, latex);
         end
 
+        % Formula: L(x) = coth(x) − 1/x where x = μH/(k_B·T); M = n·μ·L(x); SPM blocking if k_BT << K·V
         % ── Card 4: Langevin Function ───────────────────────────────────
         pLang = uipanel(gl,'Title','Langevin / Superparamagnetism','FontWeight','bold');
         pLang.Layout.Row = 4;
@@ -3018,7 +3137,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gLang.Padding = [6 4 6 4]; gLang.RowSpacing = 4;
 
         uilabel(gLang,'Text',[char(956) ' (emu):'],'HorizontalAlignment','right');
-        efLangMu = uieditfield(gLang,'numeric','Value',1e-16, ...
+        efLangMu = uieditfield(gLang,'numeric','Value',1e-16, 'Limits',[0 Inf], ...
             'Tooltip','Single-particle magnetic moment μ (emu) — typical nanoparticle 10⁻¹⁶–10⁻¹⁴');
         efLangMu.Layout.Row=1; efLangMu.Layout.Column=2;
         uilabel(gLang,'Text','H (Oe):','HorizontalAlignment','right');
@@ -3026,7 +3145,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             'Tooltip','Applied field H (Oe) — CGS, 1 T = 10⁴ Oe');
         efLangH.Layout.Row=1; efLangH.Layout.Column=4;
         uilabel(gLang,'Text','T (K):','HorizontalAlignment','right');
-        efLangT = uieditfield(gLang,'numeric','Value',300, ...
+        efLangT = uieditfield(gLang,'numeric','Value',300, 'Limits',[0.001 Inf], ...
             'Tooltip','Temperature T (K) — Langevin parameter x = μH/(k_BT)');
         efLangT.Layout.Row=1; efLangT.Layout.Column=6;
         btnLangCalc = uibutton(gLang,'push','Text','Calculate', ...
@@ -3060,6 +3179,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             addHistory(desc, '');
         end
 
+        % Formula: δ = π·sqrt(A/K) [cm]; E_wall = 4·sqrt(A·K) [erg/cm²]; A exchange stiffness, K uniaxial anisotropy
         % ── Card 5: Domain Wall Width + Anisotropy ─────────────────────
         pDW = uipanel(gl,'Title','Domain Wall & Anisotropy','FontWeight','bold');
         pDW.Layout.Row = 5;
@@ -3068,11 +3188,11 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gDW.Padding = [6 4 6 4]; gDW.RowSpacing = 4;
 
         uilabel(gDW,'Text','A (erg/cm):','HorizontalAlignment','right');
-        efDWA = uieditfield(gDW,'numeric','Value',2e-6, ...
+        efDWA = uieditfield(gDW,'numeric','Value',2e-6, 'Limits',[0 Inf], ...
             'Tooltip','Exchange stiffness A (erg/cm, CGS) — Fe 2e-6, Co 3e-6, Ni 0.9e-6');
         efDWA.Layout.Row=1; efDWA.Layout.Column=2;
         uilabel(gDW,'Text',['K (erg/cm' char(179) '):'],'HorizontalAlignment','right');
-        efDWK = uieditfield(gDW,'numeric','Value',4.8e6, ...
+        efDWK = uieditfield(gDW,'numeric','Value',4.8e6, 'Limits',[0 Inf], ...
             'Tooltip','Anisotropy constant K (erg/cm³, CGS) — Co ~4.5e6, Fe ~0.5e6');
         efDWK.Layout.Row=1; efDWK.Layout.Column=4;
         btnDWCalc = uibutton(gDW,'push','Text','Calculate', ...
@@ -3105,6 +3225,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildOpticsTab(tab)
+        %BUILDOPTICSTAB  Optics: fresnelCoefficients, criticalAngle, brewsterAngle, penetrationDepth, skinDepth (all in +calc.optics).
         outerGL = uigridlayout(tab);
         outerGL.RowHeight   = {'1x'};
         outerGL.ColumnWidth = {'1x'};
@@ -3119,6 +3240,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gl.Padding     = [4 4 4 4];
         gl.RowSpacing  = 8;
 
+        % Formula: rs = (n1·cosθ − n2·cosθt)/(n1·cosθ + n2·cosθt); Rs = |rs|²; Snell: n1·sinθ = n2·sinθt
         % Card 1: Fresnel Coefficients
         pFres = uipanel(gl,'Title','Fresnel Coefficients','FontWeight','bold');
         pFres.Layout.Row = 1; pFres.Layout.Column = 1;
@@ -3127,12 +3249,15 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gFres.Padding = [6 4 6 4]; gFres.RowSpacing = 4;
         uilabel(gFres,'Text','n1:','HorizontalAlignment','right');
         efFN1 = uieditfield(gFres,'numeric','Value',1.0, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Incident medium refractive index n₁ — air ≈ 1.00'); efFN1.Layout.Row=1; efFN1.Layout.Column=2;
         uilabel(gFres,'Text','n2:','HorizontalAlignment','right');
         efFN2 = uieditfield(gFres,'numeric','Value',1.5, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Substrate refractive index n₂ — glass 1.5, Si ~3.9 (visible)'); efFN2.Layout.Row=1; efFN2.Layout.Column=4;
         uilabel(gFres,'Text',[char(952) ' (' char(176) '):'],'HorizontalAlignment','right');
         efFTh = uieditfield(gFres,'numeric','Value',45, ...
+            'Limits',[0 90], ...
             'Tooltip','Angle of incidence θ (deg, from normal) — 0–90'); efFTh.Layout.Row=1; efFTh.Layout.Column=6;
         btnFres = uibutton(gFres,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doFresnel()); btnFres.Layout.Row=1; btnFres.Layout.Column=7;
@@ -3151,6 +3276,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: θ_c = arcsin(n2/n1) [TIR when n1>n2]; θ_B = arctan(n2/n1) [no reflected p-polarization]
         % Card 2: Critical / Brewster Angle
         pAng = uipanel(gl,'Title','Critical / Brewster Angle','FontWeight','bold');
         pAng.Layout.Row = 2; pAng.Layout.Column = 1;
@@ -3159,9 +3285,11 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gAng.Padding = [6 4 6 4]; gAng.RowSpacing = 4;
         uilabel(gAng,'Text','n1:','HorizontalAlignment','right');
         efAN1 = uieditfield(gAng,'numeric','Value',1.5, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Incident (denser) medium n₁ — critical angle requires n₁ > n₂'); efAN1.Layout.Row=1; efAN1.Layout.Column=2;
         uilabel(gAng,'Text','n2:','HorizontalAlignment','right');
         efAN2 = uieditfield(gAng,'numeric','Value',1.0, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Transmitted medium n₂ — e.g. air = 1.0'); efAN2.Layout.Row=1; efAN2.Layout.Column=4;
         btnAng = uibutton(gAng,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doAngles()); btnAng.Layout.Row=1; btnAng.Layout.Column=5;
@@ -3179,6 +3307,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: depth = λ/(4π·k) where k is the extinction coefficient of the complex index ñ = n + ik
         % Card 3: Penetration Depth
         pPen = uipanel(gl,'Title','Penetration Depth','FontWeight','bold');
         pPen.Layout.Row = 3; pPen.Layout.Column = 1;
@@ -3187,12 +3316,15 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gPen.Padding = [6 4 6 4]; gPen.RowSpacing = 4;
         uilabel(gPen,'Text','n:','HorizontalAlignment','right');
         efPN = uieditfield(gPen,'numeric','Value',1.0, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Real part of refractive index n — real material > 1'); efPN.Layout.Row=1; efPN.Layout.Column=2;
         uilabel(gPen,'Text','k:','HorizontalAlignment','right');
         efPK = uieditfield(gPen,'numeric','Value',0.001, ...
+            'Limits',[0 Inf], ...
             'Tooltip','Extinction coefficient k — imaginary part; absorbers 0.1–10, dielectrics ~0'); efPK.Layout.Row=1; efPK.Layout.Column=4;
         uilabel(gPen,'Text',[char(955) ':'],'HorizontalAlignment','right');
         efPLam = uieditfield(gPen,'numeric','Value',1.5406, ...
+            'Limits',[0.01 100], ...
             'Tooltip','Wavelength λ (same unit as output) — penetration depth = λ/(4πk)'); efPLam.Layout.Row=1; efPLam.Layout.Column=6;
         btnPen = uibutton(gPen,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doPenDepth()); btnPen.Layout.Row=1; btnPen.Layout.Column=7;
@@ -3207,6 +3339,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: δ = sqrt(ρ/(π·f·μ_0)) [m]; EM wave decays as e^(−z/δ) into conductor
         % Card 4: Skin Depth
         pSkin = uipanel(gl,'Title','Skin Depth','FontWeight','bold');
         pSkin.Layout.Row = 4; pSkin.Layout.Column = 1;
@@ -3214,10 +3347,10 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gSkin.RowHeight = {24,24}; gSkin.ColumnWidth = {80,'1x',80,'1x',90};
         gSkin.Padding = [6 4 6 4]; gSkin.RowSpacing = 4;
         uilabel(gSkin,'Text',[char(961) ' (' char(937) char(183) 'm):'],'HorizontalAlignment','right');
-        efSRho = uieditfield(gSkin,'numeric','Value',1.7e-8, ...
+        efSRho = uieditfield(gSkin,'numeric','Value',1.7e-8, 'Limits',[0 Inf], ...
             'Tooltip','Resistivity ρ (Ω·m, SI) — Cu 1.7e-8, Au 2.4e-8, Al 2.8e-8'); efSRho.Layout.Row=1; efSRho.Layout.Column=2;
         uilabel(gSkin,'Text','f (Hz):','HorizontalAlignment','right');
-        efSFreq = uieditfield(gSkin,'numeric','Value',1e9, ...
+        efSFreq = uieditfield(gSkin,'numeric','Value',1e9, 'Limits',[0 Inf], ...
             'Tooltip','Frequency f (Hz) — typical RF 10⁶–10¹⁰'); efSFreq.Layout.Row=1; efSFreq.Layout.Column=4;
         btnSkin = uibutton(gSkin,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doSkinDepth()); btnSkin.Layout.Row=1; btnSkin.Layout.Column=5;
@@ -3244,10 +3377,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildVacuumTab(tab)
+        %BUILDVACUUMTAB  Vacuum science: mean free path, monolayerTime, sputterYield, pumpDownTime (all in +calc.vacuum).
         gl = uigridlayout(tab);
         gl.RowHeight = {'2x', '2x', '3x', '2x'}; gl.ColumnWidth = {'1x'};
         gl.Padding = [6 6 6 6]; gl.RowSpacing = 8;
 
+        % Formula: λ = k_B·T / (√2·π·d²·P); d = molecular diameter; units m at SI inputs
         % Card 1: Mean Free Path
         pMFP = uipanel(gl,'Title','Mean Free Path','FontWeight','bold');
         pMFP.Layout.Row = 1; pMFP.Layout.Column = 1;
@@ -3255,10 +3390,10 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gMFP.RowHeight = {24,24}; gMFP.ColumnWidth = {50,'1x',40,'1x',40,'1x',90};
         gMFP.Padding = [6 4 6 4]; gMFP.RowSpacing = 4;
         uilabel(gMFP,'Text','P (Pa):','HorizontalAlignment','right');
-        efMFPP = uieditfield(gMFP,'numeric','Value',1e-4, ...
+        efMFPP = uieditfield(gMFP,'numeric','Value',1e-4, 'Limits',[0 Inf], ...
             'Tooltip','Gas pressure P (Pa, SI) — 1 atm ≈ 10⁵, HV 10⁻⁴, UHV 10⁻⁸'); efMFPP.Layout.Row=1; efMFPP.Layout.Column=2;
         uilabel(gMFP,'Text','T (K):','HorizontalAlignment','right');
-        efMFPT = uieditfield(gMFP,'numeric','Value',300, ...
+        efMFPT = uieditfield(gMFP,'numeric','Value',300, 'Limits',[0.001 Inf], ...
             'Tooltip','Temperature (K) — room temperature = 300'); efMFPT.Layout.Row=1; efMFPT.Layout.Column=4;
         uilabel(gMFP,'Text','Gas:','HorizontalAlignment','right');
         ddMFPGas = uidropdown(gMFP, ...
@@ -3284,6 +3419,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: t_mono = n_s / J where flux J = P/sqrt(2π·m·k_B·T); 1 Langmuir = 10⁻⁶ Torr·s ≈ 1 monolayer
         % Card 2: Monolayer Time
         pMono = uipanel(gl,'Title','Monolayer Formation Time','FontWeight','bold');
         pMono.Layout.Row = 2; pMono.Layout.Column = 1;
@@ -3291,7 +3427,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gMono.RowHeight = {24,24}; gMono.ColumnWidth = {80,'1x',90};
         gMono.Padding = [6 4 6 4]; gMono.RowSpacing = 4;
         uilabel(gMono,'Text','P (Pa):','HorizontalAlignment','right');
-        efMonoP = uieditfield(gMono,'numeric','Value',1.33e-4, ...
+        efMonoP = uieditfield(gMono,'numeric','Value',1.33e-4, 'Limits',[0 Inf], ...
             'Tooltip','Residual gas pressure P (Pa) — 1.33e-4 Pa = 1e-6 Torr; 1 Langmuir ≈ 1 s at this P'); efMonoP.Layout.Row=1; efMonoP.Layout.Column=2;
         btnMono = uibutton(gMono,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doMono()); btnMono.Layout.Row=1; btnMono.Layout.Column=3;
@@ -3306,6 +3442,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: Y = S_n(E)/(U_0·f); tabulated values from Sigmund/Yamamura model; Y atoms/ion depends on E, Z, mass
         % Card 3: Sputter Yield
         pSY = uipanel(gl,'Title','Sputter Yield (Lookup)','FontWeight','bold');
         pSY.Layout.Row = 3; pSY.Layout.Column = 1;
@@ -3319,7 +3456,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         efSYIon = uieditfield(gSY,'text','Value','Ar', ...
             'Tooltip','Incident ion symbol — typically Ar, Xe, or Kr'); efSYIon.Layout.Row=1; efSYIon.Layout.Column=4;
         uilabel(gSY,'Text','E (eV):','HorizontalAlignment','right');
-        efSYE = uieditfield(gSY,'numeric','Value',500, ...
+        efSYE = uieditfield(gSY,'numeric','Value',500, 'Limits',[0 Inf], ...
             'Tooltip','Ion energy E (eV) — typical sputtering 100–2000'); efSYE.Layout.Row=2; efSYE.Layout.Column=2;
         btnSY = uibutton(gSY,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doSputterYield()); btnSY.Layout.Row=2; btnSY.Layout.Column=5;
@@ -3334,6 +3471,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: t = (V/S)·ln(P0/Pf) = τ·ln(P0/Pf); τ = V/S is the pumping time constant
         % Card 4: Pump-Down Time
         pPump = uipanel(gl,'Title','Pump-Down Estimate','FontWeight','bold');
         pPump.Layout.Row = 4; pPump.Layout.Column = 1;
@@ -3341,16 +3479,16 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gPump.RowHeight = {24,24}; gPump.ColumnWidth = {60,'1x',60,'1x',60,'1x',60,'1x',90};
         gPump.Padding = [6 4 6 4]; gPump.RowSpacing = 4;
         uilabel(gPump,'Text','V (L):','HorizontalAlignment','right');
-        efPV = uieditfield(gPump,'numeric','Value',50, ...
+        efPV = uieditfield(gPump,'numeric','Value',50, 'Limits',[0 Inf], ...
             'Tooltip','Chamber volume V (L)'); efPV.Layout.Row=1; efPV.Layout.Column=2;
         uilabel(gPump,'Text','S (L/s):','HorizontalAlignment','right');
-        efPS = uieditfield(gPump,'numeric','Value',100, ...
+        efPS = uieditfield(gPump,'numeric','Value',100, 'Limits',[0 Inf], ...
             'Tooltip','Pump effective pumping speed S (L/s) — turbo ~100–1000'); efPS.Layout.Row=1; efPS.Layout.Column=4;
         uilabel(gPump,'Text','P0 (Pa):','HorizontalAlignment','right');
-        efPP0 = uieditfield(gPump,'numeric','Value',1e5, ...
+        efPP0 = uieditfield(gPump,'numeric','Value',1e5, 'Limits',[0 Inf], ...
             'Tooltip','Starting pressure P₀ (Pa) — atmospheric ≈ 1e5'); efPP0.Layout.Row=1; efPP0.Layout.Column=6;
         uilabel(gPump,'Text','Pf (Pa):','HorizontalAlignment','right');
-        efPPf = uieditfield(gPump,'numeric','Value',1e-4, ...
+        efPPf = uieditfield(gPump,'numeric','Value',1e-4, 'Limits',[0 Inf], ...
             'Tooltip','Target final pressure P_f (Pa) — HV 10⁻⁴, UHV 10⁻⁷'); efPPf.Layout.Row=1; efPPf.Layout.Column=8;
         btnPump = uibutton(gPump,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doPump()); btnPump.Layout.Row=1; btnPump.Layout.Column=9;
@@ -3377,10 +3515,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildElectrochemistryTab(tab)
+        %BUILDELECTROCHEMISTRYTAB  Electrochemistry: nernstPotential, butlerVolmer, tafelSlope, doubleLayerCapacitance (all in +calc.electrochemistry).
         gl = uigridlayout(tab);
         gl.RowHeight = {'3x', '2x', '2x', '2x'}; gl.ColumnWidth = {'1x'};
         gl.Padding = [6 6 6 6]; gl.RowSpacing = 8;
 
+        % Formula: E = E⁰ − (RT/nF)·ln(Q); at 25 °C: E = E⁰ − (0.05916/n)·log₁₀(Q) V
         % Card 1: Nernst Potential
         pNer = uipanel(gl,'Title','Nernst Potential','FontWeight','bold');
         pNer.Layout.Row = 1; pNer.Layout.Column = 1;
@@ -3388,13 +3528,13 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gNer.RowHeight = {24,24,24}; gNer.ColumnWidth = {70,'1x',30,'1x',50,'1x',90};
         gNer.Padding = [6 4 6 4]; gNer.RowSpacing = 4;
         uilabel(gNer,'Text','E0 (V):','HorizontalAlignment','right');
-        efNerE0 = uieditfield(gNer,'numeric','Value',0.77, ...
+        efNerE0 = uieditfield(gNer,'numeric','Value',0.77, 'Limits',[-Inf Inf], ...
             'Tooltip','Standard electrode potential E⁰ (V vs SHE) — Fe³⁺/Fe²⁺ = 0.77'); efNerE0.Layout.Row=1; efNerE0.Layout.Column=2;
         uilabel(gNer,'Text','n:','HorizontalAlignment','right');
-        efNerN = uieditfield(gNer,'numeric','Value',1, ...
+        efNerN = uieditfield(gNer,'numeric','Value',1, 'Limits',[1 Inf], ...
             'Tooltip','Number of electrons transferred n — integer, typically 1–4'); efNerN.Layout.Row=1; efNerN.Layout.Column=4;
         uilabel(gNer,'Text','Q:','HorizontalAlignment','right');
-        efNerQ = uieditfield(gNer,'numeric','Value',0.01, ...
+        efNerQ = uieditfield(gNer,'numeric','Value',0.01, 'Limits',[0 Inf], ...
             'Tooltip','Reaction quotient Q — ratio of product to reactant activities (dimensionless)'); efNerQ.Layout.Row=1; efNerQ.Layout.Column=6;
         btnNer = uibutton(gNer,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doNernst()); btnNer.Layout.Row=1; btnNer.Layout.Column=7;
@@ -3413,6 +3553,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: j = j₀·[exp(αFη/RT) − exp(−(1−α)Fη/RT)]; α=0.5 symmetric, η overpotential
         % Card 2: Butler-Volmer
         pBV = uipanel(gl,'Title','Butler-Volmer','FontWeight','bold');
         pBV.Layout.Row = 2; pBV.Layout.Column = 1;
@@ -3420,13 +3561,13 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gBV.RowHeight = {24,24}; gBV.ColumnWidth = {60,'1x',60,'1x',60,'1x',90};
         gBV.Padding = [6 4 6 4]; gBV.RowSpacing = 4;
         uilabel(gBV,'Text','j0:','HorizontalAlignment','right');
-        efBVJ0 = uieditfield(gBV,'numeric','Value',1e-3, ...
+        efBVJ0 = uieditfield(gBV,'numeric','Value',1e-3, 'Limits',[0 Inf], ...
             'Tooltip','Exchange current density j₀ (A/cm²) — typical 10⁻⁶–10⁻³'); efBVJ0.Layout.Row=1; efBVJ0.Layout.Column=2;
         uilabel(gBV,'Text',[char(951) ' (V):'],'HorizontalAlignment','right');
-        efBVEta = uieditfield(gBV,'numeric','Value',0.1, ...
+        efBVEta = uieditfield(gBV,'numeric','Value',0.1, 'Limits',[-Inf Inf], ...
             'Tooltip','Overpotential η (V) — deviation from equilibrium potential'); efBVEta.Layout.Row=1; efBVEta.Layout.Column=4;
         uilabel(gBV,'Text',[char(945) ':'],'HorizontalAlignment','right');
-        efBVAlpha = uieditfield(gBV,'numeric','Value',0.5, ...
+        efBVAlpha = uieditfield(gBV,'numeric','Value',0.5, 'Limits',[0 1], ...
             'Tooltip','Charge-transfer coefficient α (dimensionless) — typically 0.3–0.7'); efBVAlpha.Layout.Row=1; efBVAlpha.Layout.Column=6;
         btnBV = uibutton(gBV,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doBV()); btnBV.Layout.Row=1; btnBV.Layout.Column=7;
@@ -3441,6 +3582,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: b = (2.303·RT)/(α·F) [V/decade]; at 25 °C b = 59.2/α mV/decade
         % Card 3: Tafel Slope
         pTaf = uipanel(gl,'Title','Tafel Slope','FontWeight','bold');
         pTaf.Layout.Row = 3; pTaf.Layout.Column = 1;
@@ -3448,10 +3590,10 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gTaf.RowHeight = {24,24}; gTaf.ColumnWidth = {60,'1x',60,'1x',90};
         gTaf.Padding = [6 4 6 4]; gTaf.RowSpacing = 4;
         uilabel(gTaf,'Text',[char(945) ':'],'HorizontalAlignment','right');
-        efTafA = uieditfield(gTaf,'numeric','Value',0.5, ...
+        efTafA = uieditfield(gTaf,'numeric','Value',0.5, 'Limits',[0 1], ...
             'Tooltip','Charge-transfer coefficient α (dimensionless)'); efTafA.Layout.Row=1; efTafA.Layout.Column=2;
         uilabel(gTaf,'Text','T (K):','HorizontalAlignment','right');
-        efTafT = uieditfield(gTaf,'numeric','Value',298.15, ...
+        efTafT = uieditfield(gTaf,'numeric','Value',298.15, 'Limits',[0.001 Inf], ...
             'Tooltip','Temperature (K) — 298.15 K = 25 °C, standard conditions'); efTafT.Layout.Row=1; efTafT.Layout.Column=4;
         btnTaf = uibutton(gTaf,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doTafel()); btnTaf.Layout.Row=1; btnTaf.Layout.Column=5;
@@ -3466,6 +3608,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             end
         end
 
+        % Formula: C = ε₀·ε_r·A/d [F]; Helmholtz model of the electrochemical double layer
         % Card 4: Double Layer Capacitance
         pDLC = uipanel(gl,'Title','Double Layer Capacitance','FontWeight','bold');
         pDLC.Layout.Row = 4; pDLC.Layout.Column = 1;
@@ -3473,13 +3616,13 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gDLC.RowHeight = {24,24}; gDLC.ColumnWidth = {60,'1x',60,'1x',60,'1x',90};
         gDLC.Padding = [6 4 6 4]; gDLC.RowSpacing = 4;
         uilabel(gDLC,'Text',[char(949) '_r:'],'HorizontalAlignment','right');
-        efDLCE = uieditfield(gDLC,'numeric','Value',78, ...
+        efDLCE = uieditfield(gDLC,'numeric','Value',78, 'Limits',[1 Inf], ...
             'Tooltip','Electrolyte dielectric constant ε_r — water ~78, organic ~10–40'); efDLCE.Layout.Row=1; efDLCE.Layout.Column=2;
         uilabel(gDLC,'Text','d (nm):','HorizontalAlignment','right');
-        efDLCD = uieditfield(gDLC,'numeric','Value',0.5, ...
+        efDLCD = uieditfield(gDLC,'numeric','Value',0.5, 'Limits',[0 Inf], ...
             'Tooltip','Helmholtz layer thickness d (nm) — typical 0.3–1 nm'); efDLCD.Layout.Row=1; efDLCD.Layout.Column=4;
         uilabel(gDLC,'Text','A (cm2):','HorizontalAlignment','right');
-        efDLCA = uieditfield(gDLC,'numeric','Value',1.0, ...
+        efDLCA = uieditfield(gDLC,'numeric','Value',1.0, 'Limits',[0 Inf], ...
             'Tooltip','Electrode surface area (cm²)'); efDLCA.Layout.Row=1; efDLCA.Layout.Column=6;
         btnDLC = uibutton(gDLC,'push','Text','Calculate','BackgroundColor',BTN_PRIMARY,'FontColor',BTN_FG,...
             'ButtonPushedFcn',@(~,~) doDLC()); btnDLC.Layout.Row=1; btnDLC.Layout.Column=7;
@@ -3506,10 +3649,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildThermalTab(tab)
+        %BUILDTHERMALTAB  Thermal properties: Wiedemann-Franz law, Debye temperature, thermal diffusivity (alpha = kappa/rho/cp).
         gl = uigridlayout(tab);
         gl.RowHeight = {'1x', '1x', '1x'}; gl.ColumnWidth = {'1x'};
         gl.Padding = [6 6 6 6]; gl.RowSpacing = 8;
 
+        % Formula: κ = L₀·σ·T; L₀ = 2.44×10⁻⁸ W·Ω/K² (Lorenz number); links thermal and electrical conductivity
         % ── Card 1: Wiedemann-Franz Law ─────────────────────────────────
         pWF = uipanel(gl,'Title','Wiedemann-Franz Law','FontWeight','bold');
         pWF.Layout.Row = 1;
@@ -3518,11 +3663,11 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gWF.Padding = [6 4 6 4]; gWF.RowSpacing = 4;
 
         uilabel(gWF,'Text',[char(963) ' (S/cm):'],'HorizontalAlignment','right');
-        efWFSigma = uieditfield(gWF,'numeric','Value',6e5, ...
+        efWFSigma = uieditfield(gWF,'numeric','Value',6e5, 'Limits',[0 Inf], ...
             'Tooltip','Electrical conductivity σ (S/cm) — Cu 6e5, Au 4.5e5, Al 3.8e5');
         efWFSigma.Layout.Row=1; efWFSigma.Layout.Column=2;
         uilabel(gWF,'Text','T (K):','HorizontalAlignment','right');
-        efWFT = uieditfield(gWF,'numeric','Value',300, ...
+        efWFT = uieditfield(gWF,'numeric','Value',300, 'Limits',[0.001 Inf], ...
             'Tooltip','Temperature (K) — Wiedemann-Franz κ = L₀σT');
         efWFT.Layout.Row=1; efWFT.Layout.Column=4;
         btnWFCalc = uibutton(gWF,'push','Text','Calculate', ...
@@ -3545,6 +3690,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             addHistory(desc, latex);
         end
 
+        % Formula: Θ_D = (ħ/k_B)·v_s·(6π²·n)^(1/3); v_s = (average) sound speed, n = atomic number density
         % ── Card 2: Debye Temperature ──────────────────────────────────
         pDeb = uipanel(gl,'Title','Debye Temperature','FontWeight','bold');
         pDeb.Layout.Row = 2;
@@ -3553,11 +3699,11 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gDeb.Padding = [6 4 6 4]; gDeb.RowSpacing = 4;
 
         uilabel(gDeb,'Text','v_s (m/s):','HorizontalAlignment','right');
-        efDebVs = uieditfield(gDeb,'numeric','Value',5000, ...
+        efDebVs = uieditfield(gDeb,'numeric','Value',5000, 'Limits',[0 Inf], ...
             'Tooltip','Average sound velocity v_s (m/s) — typical 2000–8000 in solids');
         efDebVs.Layout.Row=1; efDebVs.Layout.Column=2;
         uilabel(gDeb,'Text','n (atoms/m³):','HorizontalAlignment','right');
-        efDebN = uieditfield(gDeb,'numeric','Value',5e28, ...
+        efDebN = uieditfield(gDeb,'numeric','Value',5e28, 'Limits',[0 Inf], ...
             'Tooltip','Atom number density (atoms/m³) — typical metals ~5e28');
         efDebN.Layout.Row=1; efDebN.Layout.Column=4;
         btnDebCalc = uibutton(gDeb,'push','Text','Calculate', ...
@@ -3580,6 +3726,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             addHistory(desc, latex);
         end
 
+        % Formula: α = κ/(ρ·c_p) [m²/s]; governs transient heat conduction — smaller α means slower thermal equilibration
         % ── Card 3: Thermal Diffusivity ─────────────────────────────────
         pDiff = uipanel(gl,'Title','Thermal Diffusivity','FontWeight','bold');
         pDiff.Layout.Row = 3;
@@ -3588,15 +3735,15 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gDiff.Padding = [6 4 6 4]; gDiff.RowSpacing = 4;
 
         uilabel(gDiff,'Text',[char(954) ' (W/mK):'],'HorizontalAlignment','right');
-        efDiffK = uieditfield(gDiff,'numeric','Value',150, ...
+        efDiffK = uieditfield(gDiff,'numeric','Value',150, 'Limits',[0 Inf], ...
             'Tooltip','Thermal conductivity κ (W/m·K) — Si 150, Cu 400, Al₂O₃ 30');
         efDiffK.Layout.Row=1; efDiffK.Layout.Column=2;
         uilabel(gDiff,'Text',[char(961) ' (kg/m³):'],'HorizontalAlignment','right');
-        efDiffRho = uieditfield(gDiff,'numeric','Value',2329, ...
+        efDiffRho = uieditfield(gDiff,'numeric','Value',2329, 'Limits',[0 Inf], ...
             'Tooltip','Mass density ρ (kg/m³) — Si 2329, Cu 8960');
         efDiffRho.Layout.Row=1; efDiffRho.Layout.Column=4;
         uilabel(gDiff,'Text','c_p (J/kgK):','HorizontalAlignment','right');
-        efDiffCp = uieditfield(gDiff,'numeric','Value',700, ...
+        efDiffCp = uieditfield(gDiff,'numeric','Value',700, 'Limits',[0 Inf], ...
             'Tooltip','Specific heat c_p (J/kg·K) — Si 700, Cu 385');
         efDiffCp.Layout.Row=1; efDiffCp.Layout.Column=6;
         btnDiffCalc = uibutton(gDiff,'push','Text','Calculate', ...
@@ -3628,10 +3775,12 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildDiffusionTab(tab)
+        %BUILDDIFFUSIONTAB  Diffusion: Arrhenius D = D0*exp(-Ea/kBT), diffusion length L = sqrt(D*t), Fick first-law flux J = -D*dC/dx.
         gl = uigridlayout(tab);
         gl.RowHeight = {'1x', '1x', '1x'}; gl.ColumnWidth = {'1x'};
         gl.Padding = [6 6 6 6]; gl.RowSpacing = 8;
 
+        % Formula: D = D₀·exp(−E_a/k_B·T) [cm²/s]; E_a in eV, k_B = 8.617×10⁻⁵ eV/K
         % ── Card 1: Arrhenius Diffusion Coefficient ─────────────────────
         pArr = uipanel(gl,'Title','Arrhenius Diffusion Coefficient','FontWeight','bold');
         pArr.Layout.Row = 1;
@@ -3640,15 +3789,15 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gArr.Padding = [6 4 6 4]; gArr.RowSpacing = 4;
 
         uilabel(gArr,'Text','D0 (cm²/s):','HorizontalAlignment','right');
-        efArrD0 = uieditfield(gArr,'numeric','Value',0.1, ...
+        efArrD0 = uieditfield(gArr,'numeric','Value',0.1, 'Limits',[0 Inf], ...
             'Tooltip','Pre-exponential factor D₀ (cm²/s) — typical 1e-4 to 10');
         efArrD0.Layout.Row=1; efArrD0.Layout.Column=2;
         uilabel(gArr,'Text','Ea (eV):','HorizontalAlignment','right');
-        efArrEa = uieditfield(gArr,'numeric','Value',1.0, ...
+        efArrEa = uieditfield(gArr,'numeric','Value',1.0, 'Limits',[0 Inf], ...
             'Tooltip','Activation energy E_a (eV) — typical 0.5–5 for diffusion');
         efArrEa.Layout.Row=1; efArrEa.Layout.Column=4;
         uilabel(gArr,'Text','T (K):','HorizontalAlignment','right');
-        efArrT = uieditfield(gArr,'numeric','Value',1000, ...
+        efArrT = uieditfield(gArr,'numeric','Value',1000, 'Limits',[0.001 Inf], ...
             'Tooltip','Temperature T (K) — e.g. typical Si diffusion 1000–1200');
         efArrT.Layout.Row=1; efArrT.Layout.Column=6;
         btnArrCalc = uibutton(gArr,'push','Text','Calculate', ...
@@ -3671,6 +3820,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             addHistory(desc, latex);
         end
 
+        % Formula: L = sqrt(D·t) [cm]; characteristic distance diffused in time t; RMS displacement in 1D
         % ── Card 2: Diffusion Length ────────────────────────────────────
         pDL = uipanel(gl,'Title','Diffusion Length','FontWeight','bold');
         pDL.Layout.Row = 2;
@@ -3679,11 +3829,11 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gDL.Padding = [6 4 6 4]; gDL.RowSpacing = 4;
 
         uilabel(gDL,'Text','D (cm²/s):','HorizontalAlignment','right');
-        efDLD = uieditfield(gDL,'numeric','Value',1e-12, ...
+        efDLD = uieditfield(gDL,'numeric','Value',1e-12, 'Limits',[0 Inf], ...
             'Tooltip','Diffusion coefficient D (cm²/s) — L = √(D·t)');
         efDLD.Layout.Row=1; efDLD.Layout.Column=2;
         uilabel(gDL,'Text','t (s):','HorizontalAlignment','right');
-        efDLt = uieditfield(gDL,'numeric','Value',3600, ...
+        efDLt = uieditfield(gDL,'numeric','Value',3600, 'Limits',[0 Inf], ...
             'Tooltip','Diffusion time t (s) — e.g. 3600 s = 1 h');
         efDLt.Layout.Row=1; efDLt.Layout.Column=4;
         btnDLCalc = uibutton(gDL,'push','Text','Calculate', ...
@@ -3711,6 +3861,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             addHistory(desc, '');
         end
 
+        % Formula: J = −D·(∂C/∂x) ≈ −D·ΔC/Δx [atoms/(cm²·s)]; steady-state flux across a concentration gradient
         % ── Card 3: Fick's First Law (Steady-State Flux) ───────────────
         pFick = uipanel(gl,'Title',['Fick' char(39) 's First Law (Flux)'],'FontWeight','bold');
         pFick.Layout.Row = 3;
@@ -3719,15 +3870,15 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gFick.Padding = [6 4 6 4]; gFick.RowSpacing = 4;
 
         uilabel(gFick,'Text','D (cm²/s):','HorizontalAlignment','right');
-        efFickD = uieditfield(gFick,'numeric','Value',1e-12, ...
+        efFickD = uieditfield(gFick,'numeric','Value',1e-12, 'Limits',[0 Inf], ...
             'Tooltip','Diffusion coefficient D (cm²/s)');
         efFickD.Layout.Row=1; efFickD.Layout.Column=2;
         uilabel(gFick,'Text',[char(916) 'C (cm' char(8315) char(179) '):'],'HorizontalAlignment','right');
-        efFickDC = uieditfield(gFick,'numeric','Value',1e18, ...
+        efFickDC = uieditfield(gFick,'numeric','Value',1e18, 'Limits',[0 Inf], ...
             'Tooltip','Concentration difference ΔC (cm⁻³)');
         efFickDC.Layout.Row=1; efFickDC.Layout.Column=4;
         uilabel(gFick,'Text',[char(916) 'x (cm):'],'HorizontalAlignment','right');
-        efFickDx = uieditfield(gFick,'numeric','Value',1e-5, ...
+        efFickDx = uieditfield(gFick,'numeric','Value',1e-5, 'Limits',[0 Inf], ...
             'Tooltip','Distance over which ΔC occurs (cm) — J = -D·ΔC/Δx');
         efFickDx.Layout.Row=1; efFickDx.Layout.Column=6;
         btnFickCalc = uibutton(gFick,'push','Text','Calculate', ...
@@ -3757,6 +3908,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildSubstratesTab(tab)
+        %BUILDSUBSTRATESTAB  Substrate reference — dynamic list from calc.substrates.listSubstrates() / getSubstrate().
         gl = uigridlayout(tab);
         gl.RowHeight = {28, '1x'}; gl.ColumnWidth = {'1x'};
         gl.Padding = [6 6 6 6]; gl.RowSpacing = 6;
@@ -3780,108 +3932,62 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             'ColumnEditable', false, 'RowName', {});
         tblSub.Layout.Row = 2;
 
-        % ── Substrate Database ──────────────────────────────────────────
-        subs = struct();
-
-        subs.STO.name = 'SrTiO3'; subs.STO.crystal = 'Cubic (Pm-3m)';
-        subs.STO.a = 3.905; subs.STO.b = 3.905; subs.STO.c = 3.905;
-        subs.STO.alpha_th = 9.4e-6; subs.STO.density = 5.12;
-        subs.STO.eps_r = 300; subs.STO.Tm = 2080; subs.STO.bandgap = 3.2;
-
-        subs.LAO.name = 'LaAlO3'; subs.LAO.crystal = 'Rhombohedral (pseudo-cubic)';
-        subs.LAO.a = 3.789; subs.LAO.b = 3.789; subs.LAO.c = 3.789;
-        subs.LAO.alpha_th = 10e-6; subs.LAO.density = 6.52;
-        subs.LAO.eps_r = 25; subs.LAO.Tm = 2180; subs.LAO.bandgap = 5.6;
-
-        subs.MgO.name = 'MgO'; subs.MgO.crystal = 'Cubic (Fm-3m)';
-        subs.MgO.a = 4.212; subs.MgO.b = 4.212; subs.MgO.c = 4.212;
-        subs.MgO.alpha_th = 10.8e-6; subs.MgO.density = 3.58;
-        subs.MgO.eps_r = 9.7; subs.MgO.Tm = 2852; subs.MgO.bandgap = 7.8;
-
-        subs.Si.name = 'Si'; subs.Si.crystal = 'Diamond cubic (Fd-3m)';
-        subs.Si.a = 5.431; subs.Si.b = 5.431; subs.Si.c = 5.431;
-        subs.Si.alpha_th = 2.6e-6; subs.Si.density = 2.329;
-        subs.Si.eps_r = 11.7; subs.Si.Tm = 1687; subs.Si.bandgap = 1.12;
-
-        subs.Sapphire.name = 'Al2O3 (Sapphire)'; subs.Sapphire.crystal = 'Hexagonal (R-3c)';
-        subs.Sapphire.a = 4.758; subs.Sapphire.b = 4.758; subs.Sapphire.c = 12.991;
-        subs.Sapphire.alpha_th = 5.0e-6; subs.Sapphire.density = 3.98;
-        subs.Sapphire.eps_r = 9.3; subs.Sapphire.Tm = 2050; subs.Sapphire.bandgap = 9.9;
-
-        subs.GaAs.name = 'GaAs'; subs.GaAs.crystal = 'Zincblende (F-43m)';
-        subs.GaAs.a = 5.653; subs.GaAs.b = 5.653; subs.GaAs.c = 5.653;
-        subs.GaAs.alpha_th = 5.73e-6; subs.GaAs.density = 5.317;
-        subs.GaAs.eps_r = 12.9; subs.GaAs.Tm = 1511; subs.GaAs.bandgap = 1.42;
-
-        subs.LSAT.name = '(LaAlO3)0.3(Sr2TaAlO6)0.7'; subs.LSAT.crystal = 'Cubic (Pm-3m)';
-        subs.LSAT.a = 3.868; subs.LSAT.b = 3.868; subs.LSAT.c = 3.868;
-        subs.LSAT.alpha_th = 10e-6; subs.LSAT.density = 6.74;
-        subs.LSAT.eps_r = 22; subs.LSAT.Tm = 2000; subs.LSAT.bandgap = 4.8;
-
-        subs.NGO.name = 'NdGaO3'; subs.NGO.crystal = 'Orthorhombic (Pbnm)';
-        subs.NGO.a = 5.426; subs.NGO.b = 5.502; subs.NGO.c = 7.706;
-        subs.NGO.alpha_th = 7.0e-6; subs.NGO.density = 7.58;
-        subs.NGO.eps_r = 22; subs.NGO.Tm = 1900; subs.NGO.bandgap = 3.8;
-
-        subs.SiO2.name = 'SiO2 (fused quartz)'; subs.SiO2.crystal = 'Amorphous';
-        subs.SiO2.a = 0; subs.SiO2.b = 0; subs.SiO2.c = 0;
-        subs.SiO2.alpha_th = 0.55e-6; subs.SiO2.density = 2.20;
-        subs.SiO2.eps_r = 3.9; subs.SiO2.Tm = 1713; subs.SiO2.bandgap = 9.0;
-
-        subs.YSZ.name = 'Y:ZrO2 (YSZ)'; subs.YSZ.crystal = 'Cubic (Fm-3m)';
-        subs.YSZ.a = 5.125; subs.YSZ.b = 5.125; subs.YSZ.c = 5.125;
-        subs.YSZ.alpha_th = 10.5e-6; subs.YSZ.density = 6.10;
-        subs.YSZ.eps_r = 27; subs.YSZ.Tm = 2715; subs.YSZ.bandgap = 5.8;
-
-        % Populate dropdown
-        subKeys = fieldnames(subs);
-        subNames = cell(1, numel(subKeys));
-        for si = 1:numel(subKeys)
-            subNames{si} = sprintf('%s — %s', subKeys{si}, subs.(subKeys{si}).name);
-        end
-        ddSubstrate.Items = subNames;
-        ddSubstrate.ItemsData = subKeys;
-        ddSubstrate.Value = subKeys{1};
+        % ── Populate dropdown from calc.substrates API ──────────────────
+        subNames = calc.substrates.listSubstrates();
+        ddSubstrate.Items    = subNames;
+        ddSubstrate.ItemsData = subNames;
+        ddSubstrate.Value    = subNames{1};
 
         onSubstrateSelected();
 
         function onSubstrateSelected()
-            key = ddSubstrate.Value;
-            s = subs.(key);
-            data = { ...
-                'Name',         s.name,                     '';
-                'Crystal',      s.crystal,                  '';
-                'a',            sprintf('%.4f', s.a),       char(197);
-                'b',            sprintf('%.4f', s.b),       char(197);
-                'c',            sprintf('%.4f', s.c),       char(197);
-                'Density',      sprintf('%.3f', s.density), ['g/cm' char(179)];
-                [char(945) '_th'], sprintf('%.2g', s.alpha_th), '1/K';
-                [char(949) '_r'], sprintf('%.1f', s.eps_r), '';
-                'Melting pt',   sprintf('%d', s.Tm),        'K';
-                'Bandgap',      sprintf('%.2f', s.bandgap), 'eV';
-            };
-            % Remove rows with 0 lattice params (amorphous)
-            if s.a == 0
-                data(3:5,:) = [];
+            name = ddSubstrate.Value;
+            try
+                s = calc.substrates.getSubstrate(name);
+            catch ME
+                setStatus(ME.message); return;
             end
+            isAmorphous = strcmpi(s.latticeType, 'amorphous');
+            data = { ...
+                'Formula',          s.formula,                              '';
+                'Orientation',      s.orientation,                          '';
+                'Lattice type',     s.latticeType,                          ''};
+            if ~isAmorphous
+                data = [data; ...
+                    {'a',           sprintf('%.4f', s.a),            char(197)};
+                    {'b',           sprintf('%.4f', s.b),            char(197)};
+                    {'c',           sprintf('%.4f', s.c),            char(197)};
+                    {char(945),     sprintf('%.1f', s.alpha),        char(176)};
+                    {char(946),     sprintf('%.1f', s.beta),         char(176)};
+                    {char(947),     sprintf('%.1f', s.gamma),        char(176)}];
+            end
+            data = [data; ...
+                {'Density',         sprintf('%.3f', s.density),     ['g/cm' char(179)]};
+                {'CTE',             sprintf('%.2g', s.thermalExpansion * 1e-6), '1/K'};
+                {[char(949) '_r'],  sprintf('%.1f', s.dielectric),  ''}];
             tblSub.Data = data;
-            setStatus(sprintf('Substrate: %s', s.name));
+            setStatus(sprintf('Substrate: %s %s', s.formula, s.orientation));
         end
 
         function doCopySubstrate()
-            key = ddSubstrate.Value;
-            s = subs.(key);
+            name = ddSubstrate.Value;
+            try
+                s = calc.substrates.getSubstrate(name);
+            catch ME
+                setStatus(ME.message); return;
+            end
             lines = { ...
-                sprintf('Substrate: %s (%s)', s.name, key), ...
-                sprintf('Crystal: %s', s.crystal), ...
-                sprintf('a=%.4f b=%.4f c=%.4f Ang', s.a, s.b, s.c), ...
-                sprintf('Density: %.3f g/cm3', s.density), ...
-                sprintf('alpha_th: %.2g /K', s.alpha_th), ...
-                sprintf('eps_r: %.1f', s.eps_r), ...
-                sprintf('Tm: %d K', s.Tm), ...
-                sprintf('Bandgap: %.2f eV', s.bandgap)};
+                sprintf('Substrate: %s %s', s.formula, s.orientation), ...
+                sprintf('Lattice type: %s', s.latticeType)};
+            if ~strcmpi(s.latticeType,'amorphous')
+                lines{end+1} = sprintf('a=%.4f  b=%.4f  c=%.4f Ang', s.a, s.b, s.c);
+                lines{end+1} = sprintf('alpha=%.1f  beta=%.1f  gamma=%.1f deg', s.alpha, s.beta, s.gamma);
+            end
+            lines{end+1} = sprintf('Density: %.3f g/cm3', s.density);
+            lines{end+1} = sprintf('CTE: %.2g /K', s.thermalExpansion * 1e-6);
+            lines{end+1} = sprintf('eps_r: %.1f', s.dielectric);
             clipboard('copy', strjoin(lines, newline));
-            setStatus(sprintf('Copied %s properties to clipboard', key));
+            setStatus(sprintf('Copied %s properties to clipboard', name));
         end
     end
 
@@ -3890,6 +3996,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildReflectivityTab(tab)
+        %BUILDREFLECTIVITYTAB  Multilayer reflectivity builder: Parratt recursion with Nevot-Croce roughness; SLD profile plot; uses +calc.xrayNeutron.neutronSLD.
         gl = uigridlayout(tab);
         gl.RowHeight = {'3x', 55, '2x'}; gl.ColumnWidth = {'1x'};
         gl.Padding = [6 6 6 6]; gl.RowSpacing = 8;
@@ -4448,6 +4555,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function buildFavoritesTab(tab)
+        %BUILDFAVORITESTAB  Favorites panel: pin calculations via status-bar Save; stored as {name, tab, lastResult, lastLatex} structs in appData.favorites.
         outerGL = uigridlayout(tab);
         outerGL.RowHeight   = {28, '1x'};
         outerGL.ColumnWidth = {'1x'};

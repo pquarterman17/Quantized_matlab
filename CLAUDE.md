@@ -109,6 +109,7 @@ Feature-level docs are in separate files to keep this context compact:
 | BosonPlotter tools, figure builder, curve fitting, digitizer | [docs/gui_bosonplotter.md](docs/gui_bosonplotter.md) |
 | DataWorkspace features, formulas, masking, session management | [docs/gui_dataworkspace.md](docs/gui_dataworkspace.md) |
 | FermiViewer features, EELS, EDS, diffraction | [docs/gui_emviewer.md](docs/gui_emviewer.md) |
+| materialsCalcGUI — 18-panel calculator, reflectivity builder, headless API | [docs/gui_materialscalc.md](docs/gui_materialscalc.md) |
 | Architecture, data flow, state management | [docs/architecture.md](docs/architecture.md) |
 | Parser formats and dispatch | [+parser/README.md](+parser/README.md) |
 | Imaging utilities | [+imaging/README.md](+imaging/README.md) |
@@ -143,6 +144,15 @@ MATLAB silently allows `uigridlayout` clipping: if a parent row allocates 22 px 
 - `createTableWidget` returns `(widget, isSpreadsheet)` — branch on `isSpreadsheet` when setting callbacks that differ between `uispreadsheet` and `uitable`
 - Computed column values are stored as snapshots; call `model.recomputeColumns(dsIdx)` if the underlying dataset changes after a column was added
 - Autosave file path: `fullfile(prefdir, 'dataworkspace_autosave.dwk')`
+
+### materialsCalcGUI
+- **Navigation model:** sidebar is a `uitree` (not `uitabgroup`) — panels are stacked `uipanel` widgets in the same grid cell; visibility is toggled, not tab-switched. Category header clicks are no-ops; only leaf node clicks trigger `selectPanel`.
+- **`errText(msg)`:** shared helper that returns `'<span style="color:#e64040">Error: msg</span>'` for inline error display inside HTML-interpreter labels. All tab builders rely on it — never `error()` or `setStatus` alone for card-level errors.
+- **Cross-tab hooks via `appData.api`:** producer tabs register function handles in `appData.api` during their `buildXxxTab` call; consumer tabs look up those handles to push data across panels. The critical ordering constraint: all tabs are built sequentially at startup so all `appData.api` fields are populated before any consumer reads them. The three active cross-tab flows are: d-Spacing → Q/2θ (`fillQ2TFromD`), Mol. Weight → Cell Vol (`fillVCMolarMass`), Neutron SLD → Reflectivity (`addLayer`).
+- **Scrollable panel pattern:** Electrical, Semiconductor, Thin Film, Crystal, Magnetic, and Optics tabs use `uipanel(..., 'Scrollable', 'on')` as the inner container. The outer grid has `RowHeight = {'1x'}` so the scroll wrapper fills the panel. Do not add `Scrollable` to `uigridlayout` directly — it does not support that property.
+- **`registerPrimaryBtn(key, btn)`:** maps navKey strings to the primary Calculate button for that panel. The global `WindowKeyPressFcn` fires the mapped button on Enter. Each tab builder calls this once with its own key and button. Tabs without a clear primary action (Substrates, Periodic Table, History, Favorites) do not register.
+- **Headless API pattern:** `if nargout > 0` at the end of the top-level function assembles the `api` struct from `appData.api` fields populated by tab builders. Tests call `api = materialsCalcGUI()` to get the struct, then use `api.close()` to tear down. The GUI is fully functional even in headless mode — all buttons and callbacks work normally. See [docs/gui_materialscalc.md](docs/gui_materialscalc.md) for the full API method table.
+- **History entries:** stored as `{timestamp, tabKey, description, latexStr, matlabCall}` (5-element cell). `matlabCall` is empty for tabs that don't generate reproducible single-line calls (Magnetic, Thermal, Diffusion). Consumers must guard with `numel(e) >= 5`.
 
 ### FermiViewer
 - Image pipeline: `rawPixels` → `filteredPixels` → `displayImg`

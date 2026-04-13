@@ -31,6 +31,8 @@ function runAllTests(options)
 %       interp2d  — 2-D interpolation utilities (interpolate2D, regrid2D)
 %       baseline  — baseline estimation: ALS, rolling ball, modified polynomial
 %       errorprop — error propagation utilities (errorProp and wrappers)
+%       magnetic  — magnetometry: Brillouin model, M(T) bg subtraction,
+%                   Curie-Weiss analysis, Stoner-Wohlfarth model
 %       templates — dataset template engine (fingerprint, match, apply, save/load)
 %       workspace — DataWorkspace model (WorkspaceModel add/remove/mask/undo/events)
 %       all      — all of the above, in order
@@ -59,7 +61,7 @@ options.Group = validatestring(options.Group, ...
      "xrayneutron", "superconductor", "cif", "optics", "vacuum", "electrochemistry", ...
      "eels", "eels_adv", "diffindex", "diff_sim", "edsquant", "contour", "fitting", "plotting", ...
      "spectral", "interp2d", "baseline", "errorprop", "utilities", "templates", "workspace", ...
-     "transport"]);
+     "transport", "magnetic"]);
 
 % Build absolute paths to test scripts so `run` works regardless of CWD.
 % Tests are organized into subdirectories: parser/, gui/, imaging/, calc/, batch/
@@ -135,6 +137,7 @@ SUITES = {
     T('calc','test_calc_vacuum'),          'vacuum', 'Vacuum module: MFP, sputter yield, pump-down'
     T('calc','test_calc_electrochemistry'),'electrochemistry', 'Electrochemistry: Nernst, BV, Tafel'
     T('calc','test_transport_analysis'),  'transport', 'VFT model, Hall analysis, Wiedemann-Franz'
+    T('calc','test_magnetic_analysis'),   'magnetic', 'Magnetic analysis: Brillouin, M(T) bg, Curie-Weiss, Stoner-Wohlfarth'
     % ── Fitting tests ────────────────────────────────────────────────────
     T('fitting','test_peak_detection'),   'fitting', 'Robust peak detection, background estimation, prominence'
     T('fitting','test_curve_fitting'),    'fitting', 'Curve fitting engine, models, autoGuess, parseEquation'
