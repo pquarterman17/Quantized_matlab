@@ -222,6 +222,49 @@ else
     failed = failed + 1;
 end
 
+% Edge: all-zero susceptibility → clear error, no crash
+try
+    T_bad = (100:5:400)';
+    chi_bad = zeros(size(T_bad));
+    calc.magnetic.curieWeiss(T_bad, chi_bad);
+    fprintf('  FAIL: curieWeiss all-zero chi — should have errored\n');
+    failed = failed + 1;
+catch ME
+    if contains(ME.identifier, 'curieWeiss') || contains(lower(ME.message), 'positive')
+        fprintf('  PASS: curieWeiss all-zero chi gives clear error\n');
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: curieWeiss all-zero chi — unexpected error: %s\n', ME.message);
+        failed = failed + 1;
+    end
+end
+
+% Edge: all-negative susceptibility → clear error, no crash
+try
+    chi_neg = -abs(4 ./ (T_cw - 80));
+    calc.magnetic.curieWeiss(T_cw, chi_neg);
+    fprintf('  FAIL: curieWeiss all-negative chi — should have errored\n');
+    failed = failed + 1;
+catch ME
+    if contains(ME.identifier, 'curieWeiss') || contains(lower(ME.message), 'positive')
+        fprintf('  PASS: curieWeiss all-negative chi gives clear error\n');
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: curieWeiss all-negative chi — unexpected error: %s\n', ME.message);
+        failed = failed + 1;
+    end
+end
+
+% Edge: single data point → tooFewPoints error
+try
+    calc.magnetic.curieWeiss(200, 0.01);
+    fprintf('  FAIL: curieWeiss single point — should have errored\n');
+    failed = failed + 1;
+catch
+    fprintf('  PASS: curieWeiss single point gives error\n');
+    passed = passed + 1;
+end
+
 % ════════════════════════════════════════════════════════════════════════
 %  7. Stoner-Wohlfarth: correct Hc and saturation
 % ════════════════════════════════════════════════════════════════════════

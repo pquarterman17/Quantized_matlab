@@ -104,6 +104,10 @@ if all(isnan(options.FitRange))
     % In the paramagnetic regime 1/χ increases linearly with T;
     % the maximum of 1/χ in the dataset marks the boundary of the
     % linear regime (for well-behaved data, this is near T_max).
+    if isempty(invChi_v)
+        error('calc:magnetic:curieWeiss:noPositivePoints', ...
+            'All susceptibility values are non-positive. Cannot perform Curie-Weiss fit.');
+    end
     [~, iMax] = max(invChi_v);
     Tthresh   = T_v(iMax);
     fitMask   = T_v >= Tthresh;
@@ -112,6 +116,10 @@ else
 end
 
 if sum(fitMask) < 2
+    if isempty(T_v)
+        error('calc:magnetic:curieWeiss:noPositivePoints', ...
+            'All susceptibility values are non-positive. Cannot perform Curie-Weiss fit.');
+    end
     warning('calc:magnetic:curieWeiss:tooFewFitPoints', ...
         'Fit region has fewer than 2 valid points; using all valid data.');
     fitMask = true(numel(T_v), 1);

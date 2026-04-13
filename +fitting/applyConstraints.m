@@ -64,6 +64,11 @@ end
 freeIdx = find(~isConstrained);
 K = numel(freeIdx);
 
+if K == 0 && ~isempty(pFree)
+    error('fitting:applyConstraints:allConstrained', ...
+        'All %d parameters are constrained — pFree must be empty ([]) when nothing is free.', M);
+end
+
 assert(numel(pFree) == K, ...
     'fitting:applyConstraints:freeCountMismatch', ...
     'pFree has %d elements but %d free parameters found.', numel(pFree), K);
@@ -96,6 +101,24 @@ for k = 1:M
     % Rewrite: replace named references with p<freeLocalIndex>
     % and replace p<globalIndex> with p<freeLocalIndex>
     rewrittenExpr = rewriteConstraintExpr(expr, allParamNames, freeIdx, M, K);
+
+    % Guard: any remaining positional p<N> or named param references in
+    % rewrittenExpr after substitution means the constraint references a
+    % non-free (constrained) parameter — which is not supported.
+    % Check for residual p<digit> tokens that did not get replaced.
+    constrainedNames = allParamNames(isConstrained);
+    for ci = 1:numel(constrainedNames)
+        nm = constrainedNames{ci};
+        if ~isempty(nm)
+            safeName = regexptranslate('escape', nm);
+            if ~isempty(regexp(rewrittenExpr, ...
+                    ['(?<![a-zA-Z0-9_])' safeName '(?![a-zA-Z0-9_])'], 'once'))
+                error('fitting:applyConstraints:constraintRefersToConstrained', ...
+                    'Constraint for "%s" references "%s" which is itself constrained. Only free parameters may appear in constraint expressions.', ...
+                    allParamNames{k}, nm);
+            end
+        end
+    end
 
     % Parse the rewritten expression; 'x' is unused — pass scalar 0
     try

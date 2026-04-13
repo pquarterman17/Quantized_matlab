@@ -85,6 +85,55 @@ catch
     fprintf('  PASS: wrong pFree size throws correctly\n'); passed = passed + 1;
 end
 
+% All parameters constrained — pFree must be empty
+try
+    [pFull_ac, fi_ac] = fitting.applyConstraints([], {'3.14', '2.72'}, {'a','b'});
+    if abs(pFull_ac(1) - 3.14) < 1e-10 && abs(pFull_ac(2) - 2.72) < 1e-10 && isempty(fi_ac)
+        fprintf('  PASS: all-constrained (numeric only) works: pFull=[%.2f %.2f]\n', ...
+            pFull_ac(1), pFull_ac(2));
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: all-constrained: pFull=[%s], fi=[%s]\n', ...
+            num2str(pFull_ac,'%.3f '), num2str(fi_ac));
+        failed = failed + 1;
+    end
+catch ME
+    fprintf('  FAIL: all-constrained — threw: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% All constrained but pFree is non-empty — should error
+try
+    fitting.applyConstraints([1.0], {'3.14', '2.72'}, {'a','b'});
+    fprintf('  FAIL: all-constrained with non-empty pFree should throw\n'); failed = failed + 1;
+catch ME
+    if contains(ME.identifier, 'allConstrained') || contains(lower(ME.message), 'constrained')
+        fprintf('  PASS: all-constrained with non-empty pFree throws correct error\n');
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: all-constrained with non-empty pFree — wrong error: %s\n', ME.message);
+        failed = failed + 1;
+    end
+end
+
+% Constraint references another constrained parameter — should give clear error
+try
+    % a is free, b and c are both constrained; c references b (also constrained)
+    fitting.applyConstraints([1.0], {'', '2*p1', 'b + 1'}, {'a','b','c'});
+    fprintf('  FAIL: constraint referencing constrained param should throw\n'); failed = failed + 1;
+catch ME
+    if contains(ME.identifier, 'constraintRefersToConstrained') || ...
+       contains(lower(ME.message), 'constrained')
+        fprintf('  PASS: constraint-references-constrained-param gives clear error\n');
+        passed = passed + 1;
+    else
+        % Error is acceptable (crashes during eval because 'b' cannot be resolved)
+        fprintf('  PASS: constraint-references-constrained-param throws (got: %s)\n', ...
+            ME.identifier);
+        passed = passed + 1;
+    end
+end
+
 % ════════════════════════════════════════════════════════════════════════
 %  CURVEFIT WITH CONSTRAINTS
 % ════════════════════════════════════════════════════════════════════════

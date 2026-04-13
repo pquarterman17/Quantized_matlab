@@ -879,6 +879,93 @@ catch ex
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  Z1. restoreFromSnapshot — corrupt activeIdx clamped, no crash
+% ════════════════════════════════════════════════════════════════════════
+
+fprintf('\n══ TEST Z1: restoreFromSnapshot — corrupt activeIdx clamped ══\n');
+try
+    model = dataWorkspace.WorkspaceModel();
+    model.addDataset(makeData(4, 'z1a'), '', '');
+    model.addDataset(makeData(4, 'z1b'), '', '');
+    snap = model.createSnapshot();
+
+    % Corrupt the snapshot: set activeIdx beyond dataset count
+    snap.activeIdx = 99;
+
+    model2 = dataWorkspace.WorkspaceModel();
+    warnFired = false;
+    origWarn = warning('off', 'dataWorkspace:WorkspaceModel:snapshotIndexClamped');
+    cleanupWarn = onCleanup(@() warning(origWarn));
+    model2.restoreFromSnapshot(snap);   % must not crash
+    warning(origWarn);
+
+    % activeIdx must be clamped to valid range
+    assert(model2.activeIdx >= 1 && model2.activeIdx <= model2.count(), ...
+        'activeIdx should be clamped to valid range after corrupt snapshot restore');
+    assert(model2.count() == 2, 'datasets should be restored normally');
+    fprintf('PASS\n'); passed = passed + 1;
+catch ex
+    fprintf('FAIL: %s\n', ex.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  Z2. maskRegion — 0-column dataset errors clearly
+% ════════════════════════════════════════════════════════════════════════
+
+fprintf('\n══ TEST Z2: maskRegion — bad colIdx errors clearly ══\n');
+try
+    % Dataset with 1 value column; request colIdx=2 (out of range)
+    d_1col = parser.createDataStruct((1:5)', (1:5)', 'labels', {'Y'}, ...
+        'units', {'u'}, 'metadata', struct('source', 'z2.dat', 'parserName', 'test'));
+    model = dataWorkspace.WorkspaceModel();
+    model.addDataset(d_1col, '', '');
+
+    errFired = false;
+    try
+        model.maskRegion(1, 1, 5, -inf, inf, 2);   % colIdx=2 but only 1 col
+    catch ME
+        errFired = true;
+    end
+    assert(errFired, 'maskRegion with colIdx > nCols should error');
+    fprintf('PASS\n'); passed = passed + 1;
+catch ex
+    fprintf('FAIL: %s\n', ex.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  Z3. addDataset — empty time/values (0-row dataset) is accepted
+% ════════════════════════════════════════════════════════════════════════
+
+fprintf('\n══ TEST Z3: addDataset — empty (0-row) dataset ══\n');
+try
+    d_empty = parser.createDataStruct([], [], ...
+        'labels', {}, 'units', {}, ...
+        'metadata', struct('source', 'empty.dat', 'parserName', 'test'));
+    model = dataWorkspace.WorkspaceModel();
+    model.addDataset(d_empty, 'empty.dat', 'test');
+    assert(model.count() == 1, 'should accept empty dataset');
+    assert(isempty(model.getMask(1)), 'mask for 0-row dataset should be empty');
+    fprintf('PASS\n'); passed = passed + 1;
+catch ex
+    fprintf('FAIL: %s\n', ex.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  Z4. setActive(0) on non-empty model is accepted
+% ════════════════════════════════════════════════════════════════════════
+
+fprintf('\n══ TEST Z4: setActive(0) on non-empty model ══\n');
+try
+    model = dataWorkspace.WorkspaceModel();
+    model.addDataset(makeData(5, 'z4'), '', '');
+    model.setActive(0);   % "none" — valid even when datasets exist
+    assert(model.activeIdx == 0, 'setActive(0) should be accepted');
+    fprintf('PASS\n'); passed = passed + 1;
+catch ex
+    fprintf('FAIL: %s\n', ex.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  Summary
 % ════════════════════════════════════════════════════════════════════════
 

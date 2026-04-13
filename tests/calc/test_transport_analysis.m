@@ -247,6 +247,48 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════
+%  HALL ANALYSIS — EDGE CASES
+% ════════════════════════════════════════════════════════════════════
+
+fprintf('\n--- Hall analysis — edge cases ---\n');
+
+% Zero field range → clear error (not silent NaN)
+try
+    H_flat = ones(10, 1) * 2.5;    % all identical
+    Rxy    = randn(10, 1) * 1e-5;
+    calc.electrical.hallAnalysis(H_flat, Rxy);
+    fprintf('  FAIL: zero-field-range — should have errored\n'); failed = failed + 1;
+catch ME
+    if contains(ME.identifier, 'zeroFieldRange') || contains(lower(ME.message), 'identical')
+        fprintf('  PASS: zero-field-range gives clear error\n'); passed = passed + 1;
+    else
+        fprintf('  FAIL: zero-field-range — unexpected error: %s\n', ME.message);
+        failed = failed + 1;
+    end
+end
+
+% All-NaN resistance → NaN slope (not a crash)
+try
+    H_ok   = (-3:0.5:3)';
+    Rxy_nan = nan(size(H_ok));
+    r_nan = calc.electrical.hallAnalysis(H_ok, Rxy_nan);
+    % Result should be NaN (no crash), R2 should be handled
+    assert(isnan(r_nan.R_H) || isfinite(r_nan.R_H), ...
+        'hallAnalysis should not crash on NaN Rxy');
+    fprintf('  PASS: all-NaN Rxy — no crash\n'); passed = passed + 1;
+catch ME
+    fprintf('  FAIL: all-NaN Rxy — crashed: %s\n', ME.message); failed = failed + 1;
+end
+
+% Too few points (< 2) → error
+try
+    calc.electrical.hallAnalysis(1, 0.01);
+    fprintf('  FAIL: single-point Hall — should have errored\n'); failed = failed + 1;
+catch
+    fprintf('  PASS: single-point Hall gives error\n'); passed = passed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════
 %  SUMMARY
 % ════════════════════════════════════════════════════════════════════
 

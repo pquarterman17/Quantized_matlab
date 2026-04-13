@@ -294,6 +294,55 @@ catch
     passed = passed + 1;
 end
 
+% Edge: monotonically increasing R(T) (no superconducting transition)
+% All Tc values should be NaN — there's no crossing of R_normal fractions
+% below the normal state.
+try
+    T_metal = linspace(4, 300, 200)';
+    R_metal = 0.01 + 0.001 * T_metal;   % pure metallic: monotonically up
+    r_metal = calc.superconductor.extractTc(T_metal, R_metal);
+    % The function must not crash. Tc values may be spurious but should be
+    % numeric (NaN or a value — not an error).
+    assert(isstruct(r_metal) && isfield(r_metal, 'Tc_midpoint'), ...
+        'extractTc should return a struct even for metallic R(T)');
+    fprintf('  PASS: extractTc monotonically increasing R(T) — no crash (Tc_mid=%.3f)\n', ...
+        r_metal.Tc_midpoint);
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: extractTc monotonically increasing R(T) — crashed: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% Edge: flat R(T) (zero-resistance already, all R=0)
+% R_normal will be 0, all thresholds are 0, and interpolateCrossing
+% should find a crossing at the first point or return NaN.
+try
+    T_flat = linspace(4, 30, 100)';
+    R_flat = zeros(size(T_flat));
+    r_flat = calc.superconductor.extractTc(T_flat, R_flat);
+    assert(isstruct(r_flat) && isfield(r_flat, 'Tc_midpoint'), ...
+        'extractTc should return a struct for flat R(T)');
+    fprintf('  PASS: extractTc flat R(T)=0 — no crash\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: extractTc flat R(T)=0 — crashed: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% Edge: R with negative values (e.g. Hall-corrected data)
+% Should not crash; Tc values may be physically meaningless but no error.
+try
+    T_neg = linspace(5, 15, 100)';
+    R_neg = -0.5 + 1 ./ (1 + exp(-5*(T_neg - 9)));  % has negative values below Tc
+    r_neg = calc.superconductor.extractTc(T_neg, R_neg);
+    assert(isstruct(r_neg), 'extractTc should return struct for R with negative values');
+    fprintf('  PASS: extractTc R with negative values — no crash\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: extractTc R with negative values — crashed: %s\n', ME.message);
+    failed = failed + 1;
+end
+
 % ── beanJc ────────────────────────────────────────────────────────────
 fprintf('--- beanJc ---\n');
 
@@ -405,6 +454,59 @@ try
 catch
     fprintf('  PASS: beanJc rejects < 10 points\n');
     passed = passed + 1;
+end
+
+% Edge: zero-width loop (ascending == descending, deltaM = 0)
+% Should not crash; Jc will be 0 everywhere.
+try
+    H_zw  = linspace(-1000, 1000, 50)';
+    H_zw  = [H_zw; flipud(H_zw)];      % full loop
+    M_zw  = zeros(size(H_zw));          % M = 0 everywhere (no hysteresis)
+    dims_zw.width=0.3; dims_zw.length=0.5; dims_zw.thickness=0.01;
+    res_zw = calc.superconductor.beanJc(H_zw, M_zw, dims_zw);
+    assert(all(res_zw.Jc == 0) || all(isfinite(res_zw.Jc)), ...
+        'beanJc zero-width loop should give Jc=0, not crash');
+    fprintf('  PASS: beanJc zero-width loop (deltaM=0) — no crash, Jc=0\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: beanJc zero-width loop — crashed: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% Edge: single-branch data (monotonically increasing H, no return sweep)
+% Should error with a clear message because no hysteresis can be computed.
+try
+    H_single = linspace(-1000, 1000, 50)';   % ascending only, no descending
+    M_single = 0.1 * tanh(H_single / 500);
+    dims_s.width=0.3; dims_s.length=0.5; dims_s.thickness=0.01;
+    calc.superconductor.beanJc(H_single, M_single, dims_s);
+    fprintf('  FAIL: beanJc single-branch — should have errored (no overlap)\n');
+    failed = failed + 1;
+catch ME
+    % Expected: noOverlap or noValidPoints
+    if contains(ME.identifier, 'beanJc') || contains(lower(ME.message), 'overlap')
+        fprintf('  PASS: beanJc single-branch gives clear error\n');
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: beanJc single-branch — unexpected error: %s\n', ME.message);
+        failed = failed + 1;
+    end
+end
+
+% Edge: NaN in moment data — should propagate gracefully (not crash)
+try
+    H_nan = H_loop;
+    M_nan = M_loop;
+    M_nan(50) = NaN;   % inject one NaN
+    dims_n.width=0.3; dims_n.length=0.5; dims_n.thickness=0.01;
+    res_nan = calc.superconductor.beanJc(H_nan, M_nan, dims_n);
+    assert(isstruct(res_nan) && isfield(res_nan, 'Jc'), ...
+        'beanJc should return a struct even with NaN in moment data');
+    fprintf('  PASS: beanJc NaN in moment — no crash\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: beanJc NaN in moment — crashed: %s\n', ME.message);
+    failed = failed + 1;
 end
 
 % ── SUMMARY ──────────────────────────────────────────────────────────

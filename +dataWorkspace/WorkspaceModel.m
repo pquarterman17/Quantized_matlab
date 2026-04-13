@@ -493,6 +493,13 @@ classdef WorkspaceModel < handle
             obj.validateDatasetIndex(dsIdx);
             ds = obj.datasets{dsIdx};
 
+            nCols = size(ds.values, 2);
+            if colIdx > nCols
+                error('dataWorkspace:WorkspaceModel:badColumnIndex', ...
+                    'colIdx %d out of range (dataset has %d value column(s)).', ...
+                    colIdx, nCols);
+            end
+
             xVec = ds.time(:);
             yVec = ds.values(:, colIdx);
 
@@ -660,8 +667,21 @@ classdef WorkspaceModel < handle
             obj.mask            = snap.mask;
             obj.columnRoles     = snap.columnRoles;
             obj.computedColumns = snap.computedColumns;
-            obj.activeIdx       = snap.activeIdx;
             obj.undoStack       = {};  % do not restore undo history
+
+            % Clamp activeIdx to valid range (guards against corrupt snapshots
+            % where the saved index exceeds the number of restored datasets)
+            nDs = numel(snap.datasets);
+            if nDs == 0
+                obj.activeIdx = 0;
+            elseif snap.activeIdx < 0 || snap.activeIdx > nDs
+                warning('dataWorkspace:WorkspaceModel:snapshotIndexClamped', ...
+                    'Snapshot activeIdx %d out of range (1..%d); clamped to %d.', ...
+                    snap.activeIdx, nDs, min(max(snap.activeIdx, 1), nDs));
+                obj.activeIdx = min(max(snap.activeIdx, 1), nDs);
+            else
+                obj.activeIdx = snap.activeIdx;
+            end
 
             notify(obj, 'DataChanged');
             notify(obj, 'SelectionChanged');
