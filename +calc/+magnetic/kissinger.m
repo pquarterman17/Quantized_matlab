@@ -54,10 +54,9 @@ end
 % ════════════════════════════════════════════════════════════════════════
 % Physical constants
 % ════════════════════════════════════════════════════════════════════════
-R_gas   = 8.314;        % J/(mol·K)
-eV_per_J = 6.24151e18;  % eV per joule (= 1/e)
-NA      = 6.02214076e23;
-eV2kJmol = 1.60218e-22 * NA / 1e3;  % eV -> kJ/mol conversion
+R_gas = 8.314;              % J/(mol·K)
+NA    = 6.02214076e23;      % Avogadro number
+e_J   = 1.60218e-19;        % elementary charge (J/eV)
 
 % ════════════════════════════════════════════════════════════════════════
 % Validate
@@ -103,9 +102,9 @@ ssRes = sum((y - yFit).^2);
 R2    = 1 - ssRes / max(ssTot, eps);
 
 % Activation energy
-Ea_Jmol  = -slope * R_gas;          % J/mol (slope is negative for valid data)
-Ea_kJmol = Ea_Jmol / 1e3;           % kJ/mol
-Ea_eV    = Ea_Jmol / (NA * 1.60218e-19); % eV
+Ea_Jmol  = -slope * R_gas;         % J/mol (slope is negative for valid data)
+Ea_kJmol = Ea_Jmol / 1e3;          % kJ/mol
+Ea_eV    = Ea_Jmol / (NA * e_J);   % eV
 
 % ════════════════════════════════════════════════════════════════════════
 % Plot data (conventional: x axis = 1000/Tp)

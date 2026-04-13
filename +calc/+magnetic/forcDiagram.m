@@ -141,11 +141,12 @@ for i = 1:P
         X_loc = [ones(nv,1), ha_v, hb_v, ha_v.*hb_v, ha_v.^2, hb_v.^2];
 
         % Least-squares fit — suppress rank-deficiency warnings for edge windows
-        warnState = warning('off', 'MATLAB:rankDeficientMatrix');
-        warnState2 = warning('off', 'MATLAB:singularMatrix');
+        % (these occur near FORC boundaries where local windows are degenerate)
+        warning('off', 'MATLAB:rankDeficientMatrix');
+        warning('off', 'MATLAB:singularMatrix');
         c = X_loc \ m_v;
-        warning(warnState);
-        warning(warnState2);
+        warning('on', 'MATLAB:rankDeficientMatrix');
+        warning('on', 'MATLAB:singularMatrix');
 
         if ~all(isfinite(c))
             continue;

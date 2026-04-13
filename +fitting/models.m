@@ -288,10 +288,8 @@ function C = debyeEinsteinHeatCapacity(T, p)
 %DEBYEEINSTEINHEATCAPACITY  C = gamma*T + nD*C_D + nE*C_E.
 %
 %   p = [gamma, thetaD, nD, thetaE, nE]
-    pD = [p(1), p(2), p(3)];   % Debye part
-    pE = [p(1), p(4), p(5)];   % Einstein part (shares gamma — not double-counted)
-
     % Combine: gamma*T once + nD * Debye_lattice + nE * Einstein_lattice
+    % (gamma is not double-counted; electronic term appears only once)
     R = 8.314;
     gamma  = p(1);
     thetaD = max(p(2), 1);

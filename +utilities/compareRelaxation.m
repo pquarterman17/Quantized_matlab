@@ -118,9 +118,6 @@ arrhenius.BIC    = arr_metrics.bic;
 % 2. VFT fit — nonlinear in 3 params: [lnTau0, Ea_eV, T0]
 %    ln(tau) = lnTau0 + Ea / (kB * (T - T0))
 % ════════════════════════════════════════════════════════════════════════
-vftModel = @(p, T) p(1) + p(2) ./ (kB .* max(T - p(3), 1));
-% (guard T0 < T with max(...,1) inside optimisation only)
-
 % Initial guess from Arrhenius solution
 T0_init = max(0, min(temperature) * 0.5);
 p0_vft  = [b_arr(1), Ea_arr_eV, T0_init];
