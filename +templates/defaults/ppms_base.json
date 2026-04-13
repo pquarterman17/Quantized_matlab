@@ -1,0 +1,15 @@
+{
+    "_comment": "PPMS base template — common column structure for all PPMS measurement modes. Intended to be extended by instrument-specific templates.",
+    "name": "PPMS — Base",
+    "version": 1,
+    "type": "tabular",
+    "match": {
+        "parserName": "importPPMS",
+        "columnNames": ["Temperature", "Magnetic Field", "Time Stamp"]
+    },
+    "overrides": {
+        "labels": {},
+        "units": {}
+    },
+    "source": "shipped"
+}

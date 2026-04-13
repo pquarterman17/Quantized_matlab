@@ -1,0 +1,22 @@
+{
+    "_comment": "PPMS Hall effect measurement — extends ppms_base, adds Hall resistance and longitudinal resistance column labels.",
+    "name": "PPMS — Hall Effect",
+    "version": 1,
+    "type": "tabular",
+    "extends": "PPMS — Base",
+    "match": {
+        "parserName": "importPPMS",
+        "columnNames": ["Temperature", "Magnetic Field", "Resistance Ch1", "Resistance Ch2"]
+    },
+    "overrides": {
+        "labels": {
+            "x0": "Longitudinal Resistance",
+            "x1": "Hall Resistance"
+        },
+        "units": {
+            "x0": "Ohm",
+            "x1": "Ohm"
+        }
+    },
+    "source": "shipped"
+}

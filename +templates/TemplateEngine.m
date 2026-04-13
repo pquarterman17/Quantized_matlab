@@ -18,6 +18,8 @@ classdef TemplateEngine
 
         function all = loadAll(opts)
         %LOADALL  Scan defaults + user dirs, return cell array of template structs.
+        %   Templates with an "extends" field are resolved via deep-merge after
+        %   all JSON files have been loaded (child overrides win).
             arguments
                 opts.ForceReload (1,1) logical = false
             end
@@ -39,6 +41,10 @@ classdef TemplateEngine
             if isfolder(userDir)
                 all = [all; loadJsonDir(userDir, 'user')];
             end
+
+            % Resolve "extends" inheritance (single pass — circular check included)
+            all = resolveInheritance(all);
+
             cache = all;
         end
 
@@ -212,6 +218,92 @@ end % classdef
 % ════════════════════════════════════════════════════════════════════════
 %  Local helper functions
 % ════════════════════════════════════════════════════════════════════════
+
+function all = resolveInheritance(all)
+%RESOLVEINHERITANCE  Process "extends" fields in the loaded template list.
+%
+%   For every template that has an "extends" field:
+%     1. Find the base template by name.
+%     2. Deep-merge child fields on top of the base (child wins conflicts).
+%     3. Detect circular chains (A extends B extends A) and error.
+%
+%   Templates without "extends" are returned unchanged.  Base templates that
+%   are themselves extended are never mutated — only the child copy is merged.
+
+    % Build name → index map for fast lookup
+    nameMap = containers.Map('KeyType','char','ValueType','double');
+    for k = 1:numel(all)
+        if isfield(all{k}, 'name') && ~isempty(all{k}.name)
+            nameMap(all{k}.name) = k;
+        end
+    end
+
+    % Resolve each child that has "extends"
+    for k = 1:numel(all)
+        t = all{k};
+        if ~isfield(t, 'extends') || isempty(t.extends)
+            continue;
+        end
+
+        % Walk the inheritance chain, collecting ancestor names (cycle check)
+        chain = {t.name};
+        baseName = t.extends;
+        merged = t;
+
+        while ~isempty(baseName)
+            if any(strcmp(chain, baseName))
+                error('templates:TemplateEngine:circularInheritance', ...
+                    'Circular template inheritance detected: %s → %s (already in chain: %s).', ...
+                    chain{end}, baseName, strjoin(chain, ' → '));
+            end
+            if ~isKey(nameMap, baseName)
+                warning('templates:TemplateEngine:missingBase', ...
+                    'Template "%s" extends "%s" but that base template was not found. Skipping inheritance.', ...
+                    t.name, baseName);
+                break;
+            end
+
+            baseIdx  = nameMap(baseName);
+            baseTmpl = all{baseIdx};
+
+            % Merge: base fields first, then child on top (child wins)
+            merged = deepMergeStructs(baseTmpl, merged);
+
+            chain{end+1} = baseName; %#ok<AGROW>
+            if isfield(baseTmpl, 'extends') && ~isempty(baseTmpl.extends)
+                baseName = baseTmpl.extends;
+            else
+                break;
+            end
+        end
+
+        % Remove the "extends" marker from the resolved template
+        if isfield(merged, 'extends')
+            merged = rmfield(merged, 'extends');
+        end
+        all{k} = merged;
+    end
+end
+
+
+function result = deepMergeStructs(base, child)
+%DEEPMERGESTRUCTS  Recursively merge two structs; child fields win on conflict.
+%   Fields present only in base are kept.  Fields present in both are
+%   resolved recursively if both values are structs, otherwise the child
+%   value replaces the base value.
+    result = base;
+    childFields = fieldnames(child);
+    for k = 1:numel(childFields)
+        fn = childFields{k};
+        childVal = child.(fn);
+        if isfield(base, fn) && isstruct(base.(fn)) && isstruct(childVal)
+            result.(fn) = deepMergeStructs(base.(fn), childVal);
+        else
+            result.(fn) = childVal;
+        end
+    end
+end
+
 
 function templates = loadJsonDir(dirPath, source)
 %LOADJSONDIR  Load all .json files from a directory into template structs.

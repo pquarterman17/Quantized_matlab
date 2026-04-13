@@ -466,6 +466,127 @@ function results = test_templateEngine()
         recordError('TEST 16', ME);
     end
 
+    % ────────────────────────────────────────────────────────────────
+    %  Test 17: TemplateAnalytics — log, summary, clear
+    % ────────────────────────────────────────────────────────────────
+    fprintf('\n== TEST 17: TemplateAnalytics log / summary / clear ==\n');
+    try
+        % Start from a clean slate so prior runs don't pollute counts
+        templates.TemplateAnalytics.clearLog();
+
+        templates.TemplateAnalytics.logApplication('QD VSM — M vs H', 0.9, true,  false);
+        templates.TemplateAnalytics.logApplication('QD VSM — M vs H', 0.85, true, true);
+        templates.TemplateAnalytics.logApplication('PPMS — Resistivity', 0.7, false, false);
+
+        rpt = templates.TemplateAnalytics.summary();
+
+        check('summary returns struct array', isstruct(rpt));
+        check('summary has 2 unique templates', numel(rpt) == 2);
+
+        % Find the VSM entry
+        vsmIdx = [];
+        for ri = 1:numel(rpt)
+            if strcmp(rpt(ri).templateName, 'QD VSM — M vs H')
+                vsmIdx = ri;
+            end
+        end
+        check('QD VSM entry present', ~isempty(vsmIdx));
+        if ~isempty(vsmIdx)
+            check('QD VSM count = 2',            rpt(vsmIdx).count == 2);
+            check('QD VSM avgConfidence ~= 0.875', abs(rpt(vsmIdx).avgConfidence - 0.875) < 1e-9);
+            check('QD VSM editRate = 0.5',        abs(rpt(vsmIdx).editRate - 0.5) < 1e-9);
+        end
+
+        % After clear, summary should be empty
+        templates.TemplateAnalytics.clearLog();
+        rpt2 = templates.TemplateAnalytics.summary();
+        check('summary empty after clearLog', isempty(rpt2));
+    catch ME
+        recordError('TEST 17', ME);
+    end
+
+    % ────────────────────────────────────────────────────────────────
+    %  Test 18: Template inheritance — ppms_hall extends ppms_base
+    % ────────────────────────────────────────────────────────────────
+    fprintf('\n== TEST 18: Template inheritance (extends field) ==\n');
+    try
+        templates.TemplateEngine.clearCache();
+        all = templates.TemplateEngine.loadAll(ForceReload=true);
+
+        names = cellfun(@(t) t.name, all, 'UniformOutput', false);
+
+        % Find the Hall template
+        hallIdx = find(strcmp(names, 'PPMS — Hall Effect'), 1);
+        check('ppms_hall.json loaded', ~isempty(hallIdx));
+
+        if ~isempty(hallIdx)
+            hall = all{hallIdx};
+
+            % Child field should be present (from ppms_hall.json)
+            check('Hall: has overrides.labels', isfield(hall, 'overrides') && isfield(hall.overrides, 'labels'));
+
+            % Base field should be merged in (from ppms_base.json)
+            check('Hall: has match.parserName (from base)', ...
+                isfield(hall, 'match') && isfield(hall.match, 'parserName'));
+
+            % "extends" marker should be stripped from resolved template
+            check('Hall: extends field removed after resolution', ~isfield(hall, 'extends'));
+
+            % Verify the child label overrides survived
+            if isfield(hall.overrides, 'labels') && isstruct(hall.overrides.labels)
+                hasLongR = isfield(hall.overrides.labels, 'x0') && ...
+                           strcmp(hall.overrides.labels.x0, 'Longitudinal Resistance');
+                check('Hall: child label override x0 present', hasLongR);
+            else
+                check('Hall: child label override x0 present', false);
+            end
+        end
+    catch ME
+        recordError('TEST 18', ME);
+    end
+
+    % ────────────────────────────────────────────────────────────────
+    %  Test 19: Circular inheritance detection
+    % ────────────────────────────────────────────────────────────────
+    fprintf('\n== TEST 19: Circular inheritance error ==\n');
+    try
+        % Build two fake templates that form a cycle: A extends B, B extends A
+        tA.name    = 'test_circular_A';
+        tA.type    = 'tabular';
+        tA.extends = 'test_circular_B';
+        tA.match   = struct('parserName', 'importCSV');
+        tA.overrides = struct();
+
+        tB.name    = 'test_circular_B';
+        tB.type    = 'tabular';
+        tB.extends = 'test_circular_A';
+        tB.match   = struct('parserName', 'importCSV');
+        tB.overrides = struct();
+
+        raw = {tA; tB};
+        errThrown = false;
+        try
+            % resolveInheritance is a local function in TemplateEngine; we
+            % trigger it via loadAll by saving the templates to user dir
+            templates.TemplateEngine.save(tA);
+            templates.TemplateEngine.save(tB);
+            templates.TemplateEngine.loadAll(ForceReload=true);
+        catch ME2
+            if contains(ME2.identifier, 'circularInheritance') || ...
+               contains(lower(ME2.message), 'circular')
+                errThrown = true;
+            end
+        end
+        check('circular inheritance throws an error', errThrown);
+
+        % Cleanup
+        templates.TemplateEngine.delete('test_circular_A');
+        templates.TemplateEngine.delete('test_circular_B');
+        templates.TemplateEngine.clearCache();
+    catch ME
+        recordError('TEST 19', ME);
+    end
+
     % ════════════════════════════════════════════════════════════════
     %  Summary
     % ════════════════════════════════════════════════════════════════

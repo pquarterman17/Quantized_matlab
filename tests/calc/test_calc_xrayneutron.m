@@ -223,6 +223,127 @@ catch ME
     failed = failed + 1;
 end
 
+% ── williamsonHall ────────────────────────────────────────────────────
+fprintf('--- williamsonHall ---\n');
+
+% Synthetic test: known grain size D = 30 nm, microstrain ε = 0.002
+% Using Cu Kα (λ = 1.5406 Å), K = 0.9
+% β·cos(θ) = Kλ/D + 4ε·sin(θ)
+%
+% We pick 5 peaks at evenly spaced 2θ values and compute exact β from the
+% Williamson-Hall equation, then verify the function recovers D and ε.
+try
+    lambdaA   = 1.5406;
+    K         = 0.9;
+    D_nm      = 30;          % target grain size in nm
+    eps_true  = 0.002;       % target microstrain
+
+    twoThetaDeg = [25, 35, 45, 55, 65]';
+    thetaRad    = twoThetaDeg / 2 * pi / 180;
+
+    % Exact β from Williamson-Hall (no noise)
+    betaRad = (K * lambdaA / (D_nm * 10)) ./ cos(thetaRad) ...
+            + 4 * eps_true * tan(thetaRad);
+    betaDeg = betaRad * 180 / pi;
+
+    r = calc.crystal.williamsonHall(twoThetaDeg, betaDeg, ...
+            Wavelength_A=lambdaA, KFactor=K);
+
+    tolD   = 0.5;   % nm
+    tolEps = 1e-4;
+
+    if abs(r.grainSize_nm - D_nm) < tolD
+        fprintf('  PASS: williamsonHall grainSize_nm = %.2f nm (expected ~%d)\n', ...
+            r.grainSize_nm, D_nm);
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: grainSize_nm = %.4f nm, expected ~%d (tol %.2f)\n', ...
+            r.grainSize_nm, D_nm, tolD);
+        failed = failed + 1;
+    end
+
+    if abs(r.microstrain - eps_true) < tolEps
+        fprintf('  PASS: williamsonHall microstrain = %.5f (expected %.5f)\n', ...
+            r.microstrain, eps_true);
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: microstrain = %.6f, expected %.6f (tol %.6f)\n', ...
+            r.microstrain, eps_true, tolEps);
+        failed = failed + 1;
+    end
+
+    if r.R2 > 0.999
+        fprintf('  PASS: R² = %.6f (expected > 0.999 for noise-free data)\n', r.R2);
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: R² = %.6f — unexpectedly low\n', r.R2);
+        failed = failed + 1;
+    end
+
+    % Verify plotData fields
+    fieldsOk = isfield(r, 'plotData') && isfield(r.plotData, 'x') && ...
+               isfield(r.plotData, 'y') && isfield(r.plotData, 'fitLine');
+    if fieldsOk
+        fprintf('  PASS: plotData fields present (x, y, fitLine)\n');
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: plotData missing expected fields\n');
+        failed = failed + 1;
+    end
+catch ME
+    fprintf('  FAIL: williamsonHall — %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% Instrumental broadening correction
+try
+    lambdaA = 1.5406;
+    K       = 0.9;
+    D_nm    = 50;
+    eps_true = 0.001;
+
+    twoThetaDeg = [30, 42, 54, 66]';
+    thetaRad    = twoThetaDeg / 2 * pi / 180;
+    betaInstDeg = 0.05;  % simulated instrument broadening
+    betaInstRad = betaInstDeg * pi / 180;
+
+    % True structural broadening
+    betaTrueRad = (K * lambdaA / (D_nm * 10)) ./ cos(thetaRad) ...
+                + 4 * eps_true * tan(thetaRad);
+
+    % Measured broadening = quadrature sum
+    betaMeasRad = sqrt(betaTrueRad.^2 + betaInstRad^2);
+    betaMeasDeg = betaMeasRad * 180 / pi;
+
+    r = calc.crystal.williamsonHall(twoThetaDeg, betaMeasDeg, ...
+            Wavelength_A=lambdaA, KFactor=K, ...
+            InstrumentalBroadening=betaInstDeg);
+
+    tolD = 2;  % slightly larger tolerance due to correction numerics
+    if abs(r.grainSize_nm - D_nm) < tolD
+        fprintf('  PASS: williamsonHall with instrumental correction: D=%.1f nm (expected ~%d)\n', ...
+            r.grainSize_nm, D_nm);
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: after correction, grainSize_nm=%.2f, expected ~%d\n', ...
+            r.grainSize_nm, D_nm);
+        failed = failed + 1;
+    end
+catch ME
+    fprintf('  FAIL: williamsonHall instrumental broadening — %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% Error: fewer than 2 peaks
+try
+    calc.crystal.williamsonHall([30]', [0.3]');
+    fprintf('  FAIL: should have errored on single peak\n');
+    failed = failed + 1;
+catch
+    fprintf('  PASS: williamsonHall correctly errors on <2 peaks\n');
+    passed = passed + 1;
+end
+
 % ── SUMMARY ──────────────────────────────────────────────────────────
 fprintf('\n=== Results: %d passed, %d failed ===\n', passed, failed);
 if failed > 0
