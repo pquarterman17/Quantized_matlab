@@ -30,6 +30,8 @@ quantized_matlab/
 ├── +scripts/                 # Batch workflows (see +scripts/README.md)
 ├── +fitting/                 # General curve fitting engine, model library, equation parser
 ├── +bosonPlotter/             # Extracted BosonPlotter subsystems
+├── +dataWorkspace/            # DataWorkspace model, formula engine, autosave (see +dataWorkspace/README.md)
+├── DataWorkspace.m            # Standalone spreadsheet GUI (shares WorkspaceModel with BosonPlotter)
 ├── docs/                     # Detailed feature documentation
 │   ├── gui_bosonplotter.md    # BosonPlotter features, tools, figure builder
 │   ├── gui_emviewer.md       # FermiViewer features, EELS, EDS, diffraction
@@ -60,6 +62,9 @@ data = parser.importQDVSM('f.dat', 'XAxis', 'field', 'YAxis', 'moment');
 data = parser.importXRDML('scan.xrdml', Intensity='cps');
 data = parser.importCSV('data.csv');
 BosonPlotter                                     % interactive GUI
+DataWorkspace                                    % standalone spreadsheet GUI
+DataWorkspace(Model=model)                       % with a shared WorkspaceModel
+api = DataWorkspace(Visible='off')               % headless / scripted use
 scripts.quickPlot('scan.xrdml')                 % one-liner plot
 scripts.batchImport('measurements/', 'Recursive', true);
 ```
@@ -102,6 +107,7 @@ Feature-level docs are in separate files to keep this context compact:
 | Topic | File |
 |-------|------|
 | BosonPlotter tools, figure builder, curve fitting, digitizer | [docs/gui_bosonplotter.md](docs/gui_bosonplotter.md) |
+| DataWorkspace features, formulas, masking, session management | [docs/gui_dataworkspace.md](docs/gui_dataworkspace.md) |
 | FermiViewer features, EELS, EDS, diffraction | [docs/gui_emviewer.md](docs/gui_emviewer.md) |
 | Architecture, data flow, state management | [docs/architecture.md](docs/architecture.md) |
 | Parser formats and dispatch | [+parser/README.md](+parser/README.md) |
@@ -127,6 +133,13 @@ MATLAB silently allows `uigridlayout` clipping: if a parent row allocates 22 px 
 - `cla()` alone does not remove `HandleVisibility='off'` objects — use `delete(ax.Children)` before `cla()`
 - Each dataset stores axis limits in `ds.axLims` (persisted across switches)
 - Peak Analysis window: see [docs/gui_bosonplotter.md](docs/gui_bosonplotter.md)
+
+### DataWorkspace
+- BosonPlotter creates `appData.model` (a `WorkspaceModel`) at startup; both the toolbar "Workspace" button and the "Open in DataWorkspace" button pass `Model=appData.model` so both windows share the same instance
+- All data mutations go through `WorkspaceModel` methods, never by writing `model.datasets{k}` directly (`SetAccess=private`)
+- `createTableWidget` returns `(widget, isSpreadsheet)` — branch on `isSpreadsheet` when setting callbacks that differ between `uispreadsheet` and `uitable`
+- Computed column values are stored as snapshots; call `model.recomputeColumns(dsIdx)` if the underlying dataset changes after a column was added
+- Autosave file path: `fullfile(prefdir, 'dataworkspace_autosave.dwk')`
 
 ### FermiViewer
 - Image pipeline: `rawPixels` → `filteredPixels` → `displayImg`
