@@ -104,12 +104,19 @@ catalog = [ ...
     mdl('Langevin', 'Magnetic', 'y = A·(coth(x/B) - B/x)', ...
         @(x,p) langevinFcn(x, p), ...
         {'A','B'}, [1 1], [0 0], [INF INF])
+    mdl('Brillouin', 'Magnetic', 'M = Ms·B_J(g·μB·J·H/(kB·T))', ...
+        @(x,p) p(1) .* brillouinFcn(p(2), ...
+            p(3) * 5.7884e-5 * p(2) .* x ./ (8.617e-5 * p(4))), ...
+        {'Ms','J','g','T'}, [1 0.5 2 300], [0 0.5 0 0], [INF 7 10 1000])
     mdl('Curie-Weiss', 'Magnetic', 'y = C / (x - θ)', ...
         @(x,p) p(1) ./ (x - p(2)), ...
         {'C','θ'}, [1 0], [0 -INF], [INF INF])
     mdl('Bloch T^3/2', 'Magnetic', 'y = M₀·(1 - B·x^(3/2))', ...
         @(x,p) p(1)*(1 - p(2)*x.^1.5), ...
         {'M₀','B'}, [1 1e-5], [0 0], [INF INF])
+    mdl('Stoner-Wohlfarth', 'Magnetic', 'M = Ms·tanh((H ± Hc)/Hk)', ...
+        @(x,p) stonerWohlfarthFcn(x, p), ...
+        {'Ms','Hc','Hk'}, [1 100 500], [0 0 0], [INF INF INF])
 
     % ── Thermal / Kinetic ──────────────────────────────────────────────
     mdl('Arrhenius', 'Thermal', 'y = A·exp(-Eₐ/(kB·x))', ...
@@ -144,4 +151,54 @@ function y = langevinFcn(x, p)
     y(small) = A * (u(small)/3 - u(small).^3/45);
     % Full expression for large u
     y(~small) = A * (coth(u(~small)) - 1./u(~small));
+end
+
+% ════════════════════════════════════════════════════════════════════════
+% Local helper — Brillouin function B_J(y) with safe y≈0 handling
+% ════════════════════════════════════════════════════════════════════════
+function BJ = brillouinFcn(J, y)
+%BRILLOUINFCN  Brillouin function B_J(y) = a*coth(a*y) - b*coth(b*y).
+%
+%   J=1/2 reduces to tanh(y).  J→Inf approaches the Langevin L(y).
+%
+%   Uses Taylor expansion near y=0 to avoid 0/0:
+%     B_J(y) ≈ (J+1)/3 * y  for small y
+    if J == 0
+        BJ = zeros(size(y));
+        return
+    end
+    a = (2*J + 1) / (2*J);
+    b = 1 / (2*J);
+    BJ = zeros(size(y));
+
+    small = abs(y) < 1e-6;
+    % Taylor expansion: a*coth(a*y) - b*coth(b*y) ≈ (a²-b²)/y * (1/3)*y = (J+1)/(3J) * y
+    % More precisely: each coth(u) ≈ 1/u + u/3 - u³/45, so
+    %   a*coth(a*y) ≈ 1/y + a²*y/3;  b*coth(b*y) ≈ 1/y + b²*y/3
+    %   difference  ≈ (a²-b²)*y/3 = ((2J+1)²-1)/(4J²) * y/3 = (J+1)/(3J) * y
+    BJ(small) = (J + 1) / (3 * J) .* y(small);
+
+    % Standard expression for |y| >= threshold
+    large = ~small;
+    ay = a .* y(large);
+    by = b .* y(large);
+    BJ(large) = a .* coth(ay) - b .* coth(by);
+end
+
+% ════════════════════════════════════════════════════════════════════════
+% Local helper — Stoner-Wohlfarth aligned single-domain switching
+% ════════════════════════════════════════════════════════════════════════
+function M = stonerWohlfarthFcn(H, p)
+%STONERWOHLFARTHFCN  Simplified aligned Stoner-Wohlfarth hysteresis model.
+%
+%   M(H) = Ms * tanh((H - sign(H)*Hc) / Hk)
+%
+%   For H > 0: switching field is +Hc; for H < 0: switching field is -Hc.
+%   Hk is the anisotropy field controlling switching sharpness.
+    Ms = p(1);
+    Hc = p(2);
+    Hk = max(p(3), eps);
+    % Effective field relative to coercive field (sign follows H direction)
+    Heff = H - sign(H) .* Hc;
+    M = Ms .* tanh(Heff ./ Hk);
 end
