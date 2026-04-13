@@ -1,4 +1,3 @@
-% NOTE: Consider using DataWorkspace instead (standalone spreadsheet with shared model).
 function fig = spreadsheetPopup(dataStruct, Options)
 %SPREADSHEETPOPUP  Open a standalone resizable spreadsheet window for a dataset.
 %

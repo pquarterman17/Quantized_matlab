@@ -803,7 +803,14 @@ function varargout = BosonPlotter(options)
     xlabel(ax,'');
     ylabel(ax,'');
 
-    appData.filterMask      = [];     % [N×1] logical — reserved for future filter bar
+    % Table state (UI built later in dataTablePanel after analysisGL is created)
+    appData.tableVisible    = true;   % visible by default in analysis area
+    appData.tableWorkingCopy = [];
+    appData.tableUnits       = {};
+    appData.tableMask       = [];
+    appData.tableEdited     = false;
+    appData.tableRowCap     = 500;    % max rows displayed in uitable (perf cap)
+    appData.filterMask      = [];     % [N×1] logical from filter bar; [] = no filter
     fig.WindowButtonDownFcn   = @onAxesButtonDown;  % normal mode; special modes overwrite this
     fig.WindowButtonMotionFcn = @onMouseHover;      % idle hover; drags overwrite and restore this
 
@@ -1540,27 +1547,154 @@ function varargout = BosonPlotter(options)
         'Scrollable','on');
     axLimPanel.Layout.Row = 1; axLimPanel.Layout.Column = 2;
 
-    % ── Dataset Info panel (row 2, col 2 — compact info bar) ────────────
-    % The full spreadsheet is now available in the standalone DataWorkspace
-    % (toolbar "Workspace" button), which shares the same WorkspaceModel.
-    dataTablePanel = uipanel(analysisGL, 'Title', 'Dataset', 'FontSize', 10);
+    % ── Data Table panel (row 2, col 2 — shares space with Axes above) ──
+    dataTablePanel = uipanel(analysisGL, 'Title', 'Data Table', 'FontSize', 10);
     dataTablePanel.Layout.Row = 2; dataTablePanel.Layout.Column = 2;
 
-    dataTableInnerGL = uigridlayout(dataTablePanel, [1 2], ...
-        'ColumnWidth', {'1x', 120}, 'RowHeight', {'1x'}, ...
-        'Padding', [6 4 6 4], 'ColumnSpacing', 6);
+    % ── Data Table contents (toolbar + filter bar + units + editable table) ──
+    dataTableInnerGL = uigridlayout(dataTablePanel, [5 1], ...
+        'RowHeight', {22, 22, 14, 26, '1x'}, 'Padding', [2 2 2 2], 'RowSpacing', 1);
 
-    lblDatasetInfo = uilabel(dataTableInnerGL, 'Text', 'No dataset loaded', ...
-        'FontSize', 9, 'FontColor', [0.65 0.65 0.65], ...
-        'HorizontalAlignment', 'left', 'WordWrap', 'on');
-    lblDatasetInfo.Layout.Column = 1;
+    % Toolbar row
+    tableBarGL = uigridlayout(dataTableInnerGL, [1 7], ...
+        'ColumnWidth', {70, 70, 55, 50, 50, 50, '1x'}, ...
+        'RowHeight', {'1x'}, ...
+        'Padding', [2 0 2 0], 'ColumnSpacing', 3);
+    tableBarGL.Layout.Row = 1;
 
-    btnOpenWorkspace = uibutton(dataTableInnerGL, 'Text', 'Open in DataWorkspace', ...
-        'ButtonPushedFcn', @(~,~) DataWorkspace(Model=appData.model), ...
+    btnTableSaveAs = uibutton(tableBarGL, 'Text', 'Save As...', ...
+        'ButtonPushedFcn', @onTableSaveAs, ...
+        'BackgroundColor', BTN_EXPORT, 'FontColor', BTN_FG, ...
+        'FontSize', 8, ...
+        'Tooltip', 'Save edited table to a new CSV or Excel file');
+    btnTableSaveAs.Layout.Column = 1;
+
+    btnTableMask = uibutton(tableBarGL, 'Text', 'Mask Sel.', ...
+        'ButtonPushedFcn', @onTableMaskSelected, ...
+        'BackgroundColor', BTN_DANGER, 'FontColor', BTN_FG, ...
+        'FontSize', 8, ...
+        'Tooltip', 'Mask selected rows — excluded from plot and analysis');
+    btnTableMask.Layout.Column = 2;
+
+    btnTableUnmask = uibutton(tableBarGL, 'Text', 'Unmask', ...
+        'ButtonPushedFcn', @onTableUnmaskAll, ...
+        'BackgroundColor', [0.28 0.28 0.28], 'FontColor', [0.8 0.8 0.8], ...
+        'FontSize', 8, ...
+        'Tooltip', 'Remove all row masks');
+    btnTableUnmask.Layout.Column = 3;
+
+    btnTableDescStats = uibutton(tableBarGL, 'Text', 'Stats', ...
+        'ButtonPushedFcn', @onDescriptiveStats, ...
+        'BackgroundColor', [0.28 0.28 0.28], 'FontColor', [0.8 0.8 0.8], ...
+        'FontSize', 8, ...
+        'Tooltip', 'Per-column descriptive statistics');
+    btnTableDescStats.Layout.Column = 4;
+
+    btnSortAsc = uibutton(tableBarGL, 'Text', [char(9650) 'Asc'], ...
+        'ButtonPushedFcn', @(~,~) onTableSort('ascend'), ...
+        'BackgroundColor', [0.28 0.28 0.28], 'FontColor', [0.8 0.8 0.8], ...
+        'FontSize', 8, ...
+        'Tooltip', 'Sort by selected column (ascending)');
+    btnSortAsc.Layout.Column = 5;
+
+    btnSortDesc = uibutton(tableBarGL, 'Text', [char(9660) 'Desc'], ...
+        'ButtonPushedFcn', @(~,~) onTableSort('descend'), ...
+        'BackgroundColor', [0.28 0.28 0.28], 'FontColor', [0.8 0.8 0.8], ...
+        'FontSize', 8, ...
+        'Tooltip', 'Sort by selected column (descending)');
+    btnSortDesc.Layout.Column = 6;
+
+    lblTableStats = uilabel(tableBarGL, 'Text', '', ...
+        'FontSize', 8, 'FontColor', [0.55 0.55 0.55], ...
+        'HorizontalAlignment', 'right');
+    lblTableStats.Layout.Column = 7;
+
+    % ── Filter bar row ────────────────────────────────────────────────────
+    % Layout: [label | edit field (stretch) | Filter btn | Clear btn]
+    filterBarGL = uigridlayout(dataTableInnerGL, [1 4], ...
+        'ColumnWidth', {30, '1x', 44, 40}, ...
+        'RowHeight',   {'1x'}, ...
+        'Padding', [2 0 2 0], 'ColumnSpacing', 3);
+    filterBarGL.Layout.Row = 2;
+
+    lblFilter = uilabel(filterBarGL, 'Text', 'Filter:', ...
+        'FontSize', 8, 'FontColor', [0.75 0.75 0.75], ...
+        'HorizontalAlignment', 'right');
+    lblFilter.Layout.Column = 1; %#ok<NASGU>
+
+    efFilter = uieditfield(filterBarGL, 'text', 'Value', '', ...
+        'Placeholder', 'e.g. Temp > 300  or  between(x, 0, 1)', ...
+        'FontSize', 8, ...
+        'BackgroundColor', [0.17 0.17 0.17], 'FontColor', [0.92 0.92 0.92], ...
+        'Tooltip', ['Filter rows by expression. Column names from labels, ' ...
+                    '''x'' = X axis. Operators: > < >= <= == ~= & | ~. ' ...
+                    'Functions: abs(), between(col,lo,hi). Press Enter to apply.'], ...
+        'ValueChangedFcn', @(~,~) onFilterApply());
+    efFilter.Layout.Column = 2;
+
+    btnFilterApply = uibutton(filterBarGL, 'Text', 'Filter', ...
+        'ButtonPushedFcn', @(~,~) onFilterApply(), ...
         'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
         'FontSize', 8, ...
-        'Tooltip', 'Open full editable spreadsheet with mask, filter, and export tools');
-    btnOpenWorkspace.Layout.Column = 2; %#ok<NASGU>
+        'Tooltip', 'Apply filter expression');
+    btnFilterApply.Layout.Column = 3; %#ok<NASGU>
+
+    btnFilterClear = uibutton(filterBarGL, 'Text', 'Clear', ...
+        'ButtonPushedFcn', @(~,~) onFilterClear(), ...
+        'BackgroundColor', [0.28 0.28 0.28], 'FontColor', [0.8 0.8 0.8], ...
+        'FontSize', 8, ...
+        'Tooltip', 'Clear filter — show all rows');
+    btnFilterClear.Layout.Column = 4; %#ok<NASGU>
+
+    % Units row
+    lblTableUnits = uilabel(dataTableInnerGL, 'Text', '', ...
+        'FontSize', 8, 'FontColor', [0.5 0.7 0.5], ...
+        'BackgroundColor', [0.16 0.16 0.16]);
+    lblTableUnits.Layout.Row = 3;
+
+    % ── Units row (separate 1-row uitable for performance) ────────────
+    % Before the split, the main data table stored row 1 as unit strings
+    % which forced the whole Data property to be a cell array.  Cell-
+    % array uitables render ~10× slower than numeric matrices on scroll,
+    % so we split units into their own tiny table and keep the main data
+    % table pure numeric.  Column widths are kept in sync via an explicit
+    % ColumnWidth array set on both tables.
+    tblUnits = uitable(dataTableInnerGL, ...
+        'Tag', 'BosonUnitsTable', ...
+        'ColumnName', {'(no data)'}, ...
+        'Data', {}, ...
+        'ColumnEditable', true, ...
+        'RowName', {'units'}, ...
+        'CellEditCallback', @onUnitsCellEdit, ...
+        'CellSelectionCallback', @onUnitsCellSelection, ...
+        'FontSize', 9, ...
+        'BackgroundColor', [0.96 0.98 0.93], ...
+        'ForegroundColor', [0.0 0.35 0.0]);
+    tblUnits.Layout.Row = 4;
+
+    % Editable data table (pure numeric data — big scroll-perf win)
+    tblData = uitable(dataTableInnerGL, ...
+        'Tag', 'BosonDataTable', ...
+        'ColumnName', {'(no data)'}, ...
+        'Data', [], ...
+        'ColumnEditable', true, ...
+        'CellEditCallback', @onTableCellEdit, ...
+        'CellSelectionCallback', @onTableSelectionChanged, ...
+        'FontSize', 9);
+
+    % Right-click context menu for row-level masking (replaces the old
+    % "Masked" column).  Selected rows are taken from appData.tableSelection
+    % which onTableSelectionChanged maintains from the CellSelectionCallback.
+    tblCtxMenu = uicontextmenu(fig);
+    uimenu(tblCtxMenu, 'Text', 'Mask selected rows', ...
+        'MenuSelectedFcn', @onTableMaskSelected);
+    uimenu(tblCtxMenu, 'Text', 'Unmask selected rows', ...
+        'MenuSelectedFcn', @onTableUnmaskSelected);
+    uimenu(tblCtxMenu, 'Separator', 'on', 'Text', 'Unmask all', ...
+        'MenuSelectedFcn', @onTableUnmaskAll);
+    tblData.ContextMenu = tblCtxMenu;
+    tblData.Layout.Row = 5;
+    appData.tableSelection = [];  % [Nx2] matrix of [row col] pairs
 
     axLimGL = uigridlayout(axLimPanel,[5 6], ...
         'RowHeight',    {22, 22, 0, 22, 0}, ...
@@ -2285,8 +2419,8 @@ function varargout = BosonPlotter(options)
     ui.lblMap2DInfo     = lblMap2DInfo;
     % Save path (hidden field)
     ui.efSavePath       = efSavePath;
-    % Dataset info label (compact info bar replacing legacy embedded table)
-    ui.lblDatasetInfo   = lblDatasetInfo;
+    % Data table filter
+    ui.efFilter         = efFilter;
     % Axis appearance / label overrides (used by onPlotTemplates)
     ui.efCustomTitle    = efCustomTitle;
     ui.efCustomXLabel   = efCustomXLabel;
@@ -2422,6 +2556,11 @@ function varargout = BosonPlotter(options)
         'advRowHeight',     axLimGL.RowHeight{AXLIM_ADV_ROW}, ...
         'analysisRow1Height', analysisGL.RowHeight{1});
     api.showDecomposition   = @() peakCb.onShowDecomposition([],[]);
+    api.getTableData        = @() struct( ...
+        'data',     {tblData.Data}, ...
+        'colNames', {tblData.ColumnName}, ...
+        'working',  appData.tableWorkingCopy, ...
+        'units',    {appData.tableUnits});
     api.descriptiveStats    = @() onDescriptiveStats([],[]);
 
     % ── Toolbar API (for testing) ──────────────────────────────────────
@@ -9195,9 +9334,9 @@ function varargout = BosonPlotter(options)
 
     function onColumnDragStart(colName)
     %ONCOLUMNDRAGSTART  Record the column name and arm drag-detect callbacks.
-    %  Called by external tools (e.g., DataWorkspace column drag) when a
-    %  column header is clicked.  Actual drag does not begin until the mouse
-    %  has moved > 5 px (hysteresis in onColumnDragMove).
+    %  Called from onTableSelectionChanged when a column header row is clicked.
+    %  Actual drag does not begin until the mouse has moved > 5 px (hysteresis
+    %  in onColumnDragMove).
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
         appData.columnDragPending  = true;
         appData.columnDragActive   = false;
@@ -9970,46 +10109,256 @@ function varargout = BosonPlotter(options)
             'setStatusFn',               @setStatus));
     end
 
-    % ── Dataset Info Bar ────────────────────────────────────────────────
+    % ── Data Table Functions ─────────────────────────────────────────────
+
+    % (Data table is hidden in 2D map mode — see the is2D_active block in
+    %  updateControlsForActiveDataset.)
 
     function refreshDataTable()
-    %REFRESHDATATABLE  Update the compact dataset info label.
-    %   The legacy embedded uitable is replaced by a one-line summary in
-    %   lblDatasetInfo.  Full spreadsheet functionality lives in the
-    %   standalone DataWorkspace (toolbar Workspace button).
-        if appData.activeIdx < 1 || isempty(appData.datasets)
-            lblDatasetInfo.Text = 'No dataset loaded';
-            return;
+    %REFRESHDATATABLE  Delegate to bosonPlotter.refreshDataTable.
+        bosonPlotter.refreshDataTable(appData, tblData, tblUnits, lblTableUnits, lblTableStats, ...
+            struct('getPlotDataFn',            @getPlotData, ...
+                   'is2DDatasetFn',            @is2DDataset, ...
+                   'applyMaskStylingFn',       @applyMaskStyling, ...
+                   'syncUnitsColumnWidthsFn',  @syncUnitsColumnWidths));
+    end
+
+    function applyMaskStyling()
+    %APPLYMASKSTYLING  Highlight masked rows in soft red using uistyle/addStyle.
+    %   Clears any existing row styles (they can accumulate across refreshes)
+    %   and reapplies a single BackgroundColor style to each currently masked
+    %   row.  Data rows are offset by 1 in the display to account for the
+    %   units row at table row 1.  Safe to call on an empty/invalid table.
+        if isempty(tblData) || ~isvalid(tblData), return; end
+        removeStyle(tblData);
+
+        if isempty(appData.tableMask) || ~any(appData.tableMask), return; end
+
+        cap = min(numel(appData.tableMask), appData.tableRowCap);
+        maskedDataRows = find(appData.tableMask(1:cap));
+        if isempty(maskedDataRows), return; end
+
+        % Post-split: tblData rows map 1:1 to data rows — no units row
+        % to offset around.
+        softRed = [1.0 0.88 0.88];
+        s = uistyle('BackgroundColor', softRed);
+        addStyle(tblData, s, 'row', maskedDataRows);
+    end
+
+    function onTableCellEdit(~, evt)
+    %ONTABLECELLEDIT  Handle cell edits in the main data table.
+    %   Post-split: tblData holds only numeric data rows (no units
+    %   row).  Units live in a separate tblUnits uitable handled by
+    %   onUnitsCellEdit below.
+        row = evt.Indices(1);
+        col = evt.Indices(2);
+        nDataCols = size(appData.tableWorkingCopy, 2);
+        if col > nDataCols, return; end
+
+        newVal = evt.NewData;
+        if isnumeric(newVal)
+            appData.tableWorkingCopy(row, col) = newVal;
+            appData.tableEdited = true;
         end
+    end
+
+    function onUnitsCellEdit(~, evt)
+    %ONUNITSCELLEDIT  Handle edits in the 1-row units uitable.
+    %   Stores the new unit string in appData.tableUnits.  Cell edit
+    %   event rows are always 1 for the units table.
+        col = evt.Indices(2);
+        if col < 1 || col > numel(appData.tableUnits), return; end
+        newVal = evt.NewData;
+        if ischar(newVal) || isstring(newVal)
+            appData.tableUnits{col} = char(newVal);
+            appData.tableEdited = true;
+        end
+    end
+
+    function syncUnitsColumnWidths(nCols)
+    %SYNCUNITSCOLUMNWIDTHS  Match tblUnits column widths to tblData.
+    %   MATLAB uitable auto-sizes each column to its own content by
+    %   default — on two separate tables that means the units table
+    %   and data table would diverge.  Use an explicit ColumnWidth
+    %   array on BOTH tables so the columns stay aligned no matter
+    %   what values are in the cells.
+        w = cell(1, nCols);
+        for ci = 1:nCols, w{ci} = 90; end
+        try tblData.ColumnWidth  = w; catch, end
+        try tblUnits.ColumnWidth = w; catch, end
+    end
+
+    function onTableSelectionChanged(~, evt)
+    %ONTABLESELECTIONCHANGED  Track selected cells for mask actions.
+    %   Selected [row col] pairs are cached in appData.tableSelection
+    %   for onTableMaskSelected / onTableUnmaskSelected to read.
+    %   Column drag-to-plot is handled by onUnitsCellSelection below
+    %   (fires when the user clicks a cell in tblUnits, which is
+    %   visually adjacent to tblData's column header).
+        appData.tableSelection = evt.Indices;
+    end
+
+    function onUnitsCellSelection(~, evt)
+    %ONUNITSCELLSELECTION  Arm the column drag-to-plot gesture.
+    %   Replaces the pre-split "click row 1 of the data table"
+    %   pathway.  tblUnits sits directly below the column header and
+    %   is the visual proxy for clicking a column; selecting any cell
+    %   in it arms the drag for that column's channel.
+        if isempty(evt.Indices), return; end
+        col = evt.Indices(1,2);
+        colNames = tblUnits.ColumnName;
+        if col < 1 || col > numel(colNames), return; end
+        rawName = colNames{col};
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
         ds = appData.datasets{appData.activeIdx};
         d  = ds.data;
-        nRows   = numel(d.time);
-        nMasked = sum(~ds.mask);
-        % Resolve display name using same priority as rebuildDatasetList
-        if isfield(ds,'legendName') && ~isempty(ds.legendName)
-            name = ds.legendName;
-        elseif isfield(ds,'displayName') && ~isempty(ds.displayName)
-            name = ds.displayName;
-        else
-            [~, fn, fext] = fileparts(ds.filepath);
-            name = [fn, fext];
+        xName     = guiXName(d.metadata);
+        allLabels = [{xName}, d.labels];
+        matched = allLabels(strcmp(allLabels, rawName));
+        if isempty(matched)
+            cleanName = regexprep(rawName, '\s*\(.*\)\s*$', '');
+            matched = allLabels(strcmp(allLabels, cleanName));
         end
-        lblDatasetInfo.Text = sprintf('%s  —  %d rows, %d masked', ...
-            name, nRows, nMasked);
+        if isempty(matched), return; end
+        onColumnDragStart(matched{1});
+    end
+
+    function onTableMaskSelected(~, ~)
+    %ONTABLEMASKSELECTED  Mask the currently selected rows in the table.
+    %   Post-split: tblData rows map 1:1 to data rows (no units row
+    %   offset).  Applies soft-red row highlighting via applyMaskStyling.
+        sel = appData.tableSelection;
+        if isempty(sel), return; end
+        dataRows = unique(sel(:, 1));
+        dataRows(dataRows < 1) = [];
+        if isempty(dataRows), return; end
+        if max(dataRows) > size(appData.tableWorkingCopy, 1), return; end
+        appData.tableMask(dataRows) = true;
+        applyMaskStyling();
+        nMasked = sum(appData.tableMask);
+        nRows = size(appData.tableWorkingCopy, 1);
+        nCols = size(appData.tableWorkingCopy, 2);
+        lblTableStats.Text = sprintf('%d rows, %d cols, %d masked  ', ...
+            nRows, nCols, nMasked);
+        syncTableMaskToDataset();
+        setStatus(sprintf('Masked %d rows (%d total masked)', numel(dataRows), nMasked));
+    end
+
+    function onTableUnmaskSelected(~, ~)
+    %ONTABLEUNMASKSELECTED  Unmask the currently selected rows (opposite of onTableMaskSelected).
+        sel = appData.tableSelection;
+        if isempty(sel), return; end
+        dataRows = unique(sel(:, 1));
+        dataRows = dataRows(dataRows >= 1 & dataRows <= numel(appData.tableMask));
+        if isempty(dataRows), return; end
+        appData.tableMask(dataRows) = false;
+        applyMaskStyling();
+        nMasked = sum(appData.tableMask);
+        nRows = size(appData.tableWorkingCopy, 1);
+        nCols = size(appData.tableWorkingCopy, 2);
+        lblTableStats.Text = sprintf('%d rows, %d cols, %d masked  ', ...
+            nRows, nCols, nMasked);
+        syncTableMaskToDataset();
+        setStatus(sprintf('Unmasked %d rows (%d total masked)', numel(dataRows), nMasked));
+    end
+
+    function onTableUnmaskAll(~, ~)
+    %ONTABLEUNMASKALL  Clear all row masks.
+        if isempty(appData.tableMask), return; end
+        appData.tableMask(:) = false;
+        refreshDataTable();
+        syncTableMaskToDataset();
+        setStatus('All masks cleared');
+    end
+
+    function onFilterApply()
+    %ONFILTERAPPY  Evaluate filter expression and mask non-passing rows.
+    %   Calls bosonPlotter.filterRows() with the current data struct.
+    %   Rows that fail the filter are added to the mask (excluded from plot).
+    %   An empty expression clears the filter without touching manual masks.
+        if appData.activeIdx < 1 || isempty(appData.datasets), return; end
+        expr = strtrim(efFilter.Value);
+        d    = getPlotData(appData.activeIdx);
+        nRows = numel(d.time);
+
+        if isempty(expr)
+            % Empty expression — clear filter mask only
+            appData.filterMask = [];
+        else
+            try
+                passMask = bosonPlotter.filterRows(d, expr);
+                appData.filterMask = ~passMask(:);  % true = excluded by filter
+                nPass = sum(passMask);
+                setStatus(sprintf('Filter applied: %d / %d rows pass', nPass, nRows));
+            catch ME
+                uialert(fig, ME.message, 'Filter Error');
+                return;
+            end
+        end
+
+        % Merge filter mask into table mask: row is masked if either source says so
+        if isempty(appData.filterMask)
+            appData.tableMask = false(nRows, 1);
+        else
+            if isempty(appData.tableMask) || numel(appData.tableMask) ~= nRows
+                appData.tableMask = appData.filterMask;
+            else
+                appData.tableMask = appData.tableMask | appData.filterMask;
+            end
+        end
+        refreshDataTable();
+        syncTableMaskToDataset();
+    end
+
+    function onFilterClear()
+    %ONFILTERCLEAR  Remove the row filter and restore unfiltered data.
+        efFilter.Value     = '';
+        appData.filterMask = [];
+        nRows = size(appData.tableWorkingCopy, 1);
+        if ~isempty(appData.tableMask) && numel(appData.tableMask) == nRows
+            appData.tableMask(:) = false;
+        end
+        refreshDataTable();
+        syncTableMaskToDataset();
+        setStatus('Filter cleared');
+    end
+
+    function syncTableMaskToDataset()
+    %SYNCTABLEMASKTODATASET  Push table mask into ds.mask and re-plot.
+    %   ds.mask uses inverted convention: true = included, false = excluded.
+    %   appData.tableMask: true = masked (excluded).
+        if appData.activeIdx < 1 || isempty(appData.datasets), return; end
+        ds = appData.datasets{appData.activeIdx};
+        nRaw = numel(ds.data.time);
+
+        if isempty(appData.tableMask)
+            ds.mask = true(nRaw, 1);
+        else
+            % tableMask may be sized to corrData; need to map back to raw
+            if numel(appData.tableMask) == nRaw
+                ds.mask = ~appData.tableMask;  % invert: table true=excluded → mask false=excluded
+            else
+                % Size mismatch (corrections changed row count) — apply to raw
+                ds.mask = true(nRaw, 1);
+                nM = min(numel(appData.tableMask), nRaw);
+                ds.mask(1:nM) = ~appData.tableMask(1:nM);
+            end
+        end
+        appData.datasets{appData.activeIdx} = ds;
+        onPlot([], []);  % redraw with faded masked points
     end
 
     function onDescriptiveStats(~, ~)
     %ONDESCRIPTIVESTATS  Show per-column descriptive statistics popup.
-        if appData.activeIdx < 1 || isempty(appData.datasets)
+        if isempty(appData.tableWorkingCopy)
             uialert(fig, 'No data loaded.', 'Stats');
             return;
         end
-        d  = getPlotData(appData.activeIdx);
-        ds = appData.datasets{appData.activeIdx};
-        xCol = d.time(:);
-        wc   = [xCol, d.values];
-        if isfield(ds, 'mask') && numel(ds.mask) == size(wc, 1)
-            wc = wc(ds.mask, :);  % exclude masked rows (mask true = included)
+        d = getPlotData(appData.activeIdx);
+        wc = appData.tableWorkingCopy;
+        mask = appData.tableMask;
+        if ~isempty(mask) && any(mask)
+            wc = wc(~mask, :);  % exclude masked rows
         end
         colNames = [{'X'}, d.labels];
         nC = size(wc, 2);
@@ -10073,9 +10422,94 @@ function varargout = BosonPlotter(options)
             'VerticalAlignment', 'top', 'Units', 'normalized', ...
             'Interpreter', 'none');
 
-        nMasked = sum(~ds.mask);
         setStatus(sprintf('Stats: %d columns, %d rows (excl. %d masked)', ...
-            nC, size(wc, 1), nMasked));
+            nC, size(wc, 1), sum(appData.tableMask)));
+    end
+
+    function onTableSort(direction)
+    %ONTABLESORT  Sort the data table by the selected column.
+        if isempty(appData.tableWorkingCopy), return; end
+        sel = appData.tableSelection;
+        if isempty(sel)
+            % Default: sort by first column (X)
+            sortCol = 1;
+        else
+            sortCol = sel(1, 2);
+        end
+        nDataCols = size(appData.tableWorkingCopy, 2);
+        if sortCol > nDataCols
+            % Mask column selected — sort by X instead
+            sortCol = 1;
+        end
+        [~, idx] = sort(appData.tableWorkingCopy(:, sortCol), direction);
+        appData.tableWorkingCopy = appData.tableWorkingCopy(idx, :);
+        appData.tableMask = appData.tableMask(idx);
+        refreshDataTable();
+        setStatus(sprintf('Sorted by column %d (%s)', sortCol, direction));
+    end
+
+    function onTableSaveAs(~, ~)
+    %ONTABLESAVEAS  Save the working copy (with edits) to a new file.
+    %   Includes editable units row and column names. Exports with the
+    %   units as row 1, matching what the user sees in the data table.
+        if isempty(appData.tableWorkingCopy)
+            uialert(fig, 'No data to save.', 'Save As');
+            return;
+        end
+
+        [fn, fp] = uiputfile( ...
+            {'*.csv', 'CSV (*.csv)'; '*.xlsx', 'Excel (*.xlsx)'}, ...
+            'Save Table As');
+        if isequal(fn, 0), return; end
+        outPath = fullfile(fp, fn);
+
+        try
+            % Get column names from the table (excluding Masked column)
+            colNames = tblData.ColumnName;
+            if strcmp(colNames{end}, 'Masked')
+                colNames = colNames(1:end-1);
+            end
+
+            % Get working copy, excluding masked rows if desired
+            wc = appData.tableWorkingCopy;
+            mask = appData.tableMask;
+            if any(mask)
+                answer = questdlg('Exclude masked rows from export?', ...
+                    'Masked Rows', 'Exclude', 'Include All', 'Exclude');
+                if strcmp(answer, 'Exclude')
+                    wc = wc(~mask, :);
+                end
+            end
+
+            % Build export: header row + units row + data
+            [~, ~, ext] = fileparts(outPath);
+
+            if strcmpi(ext, '.xlsx')
+                % Excel: write header, units, then data as separate rows
+                headerCell = colNames(:)';
+                unitsCell  = appData.tableUnits(:)';
+                dataCell   = num2cell(wc);
+                allCell    = [headerCell; unitsCell; dataCell];
+                writecell(allCell, outPath);
+            else
+                % CSV: write header + units rows, then bulk-write data
+                fidOut = fopen(outPath, 'w');
+                if fidOut == -1
+                    error('Cannot open file: %s', outPath);
+                end
+                % Header row
+                fprintf(fidOut, '%s\n', strjoin(colNames, ','));
+                % Units row
+                fprintf(fidOut, '%s\n', strjoin(appData.tableUnits, ','));
+                fclose(fidOut);
+                % Data rows — single writematrix call replaces O(N) loop
+                writematrix(wc, outPath, 'Delimiter', ',', ...
+                    'WriteMode', 'append', 'Precision', 10);
+            end
+            setStatus(sprintf('Table saved: %s (%d rows + units)', fn, size(wc, 1)));
+        catch ME
+            uialert(fig, sprintf('Save failed:\n%s', ME.message), 'Error');
+        end
     end
 
     % ── Plot Options Popup Menu ──────────────────────────────────────────
