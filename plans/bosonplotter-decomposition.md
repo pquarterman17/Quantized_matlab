@@ -8,7 +8,7 @@ something first.
 
 **Status:** Active
 **Created:** 2026-04-12
-**Updated:** 2026-04-12 (Tier 1 complete)
+**Updated:** 2026-04-12 (Tier 1 complete, Tier 2 mostly complete, Tier 3 partial)
 
 ---
 
@@ -103,20 +103,16 @@ Target: free 20+ nested function slots.
 Extract medium-widget functions with targeted handle passing. Each function receives
 a small struct of the specific handles it needs.
 
-7. **Extract `draw2DMap`** (171 lines, 11 widgets) — 2D heatmap rendering. Pass
-   handles as a struct: `{ax, ddColormap, dd2DType, ef2DClim*, ...}`.
+7. ~~**Extract `draw2DMap`**~~ (171 lines, 11 widgets) — 2D heatmap rendering. Extracted to `+bosonPlotter/draw2DMap.m`, delegate passes widget struct.
 
-8. **Extract `extract2DBoxIntegral`** (128 lines, 11 widgets) — box integration on
-   2D maps. Similar handle set to `draw2DMap`.
+8. ~~**Extract `extract2DBoxIntegral`**~~ (128 lines, 11 widgets) — box integration on 2D maps. Extracted to `+bosonPlotter/extract2DBoxIntegral.m`.
 
-9. **Extract `extract2DArcIntegral`** (107 lines) — arc/azimuthal integration.
-   Self-contained computation + plot.
+9. ~~**Extract `extract2DArcIntegral`**~~ (107 lines) — arc/azimuthal integration. Extracted to `+bosonPlotter/extract2DArcIntegral.m`.
 
-10. **Extract `onBGMouseUp`** (120 lines) — background fitting mouse-up handler.
-    Needs `ax`, `appData`, and a few correction widgets.
+10. ~~**Extract `onBGMouseUp`**~~ (120 lines) — background fitting mouse-up handler. Extracted to `+bosonPlotter/onBGMouseUp.m`.
 
 11. **Extract `onAutoMagCorrections`** (115 lines) — automatic magnetometry
-    correction logic. Needs correction panel widgets.
+    correction logic. Needs correction panel widgets. Still a nested function.
 
 12. **Rewrite delegate callsites** — after item 1 deletes the delegates, audit
     remaining code for any patterns like `@onXxx` that reference local nested
@@ -128,25 +124,19 @@ a small struct of the specific handles it needs.
 Introduce a `ui` struct to enable extraction of the hardest remaining functions.
 These are the largest nested functions but they touch 20-54 widgets each.
 
-13. **Introduce `ui` widget handle struct** — after all widgets are created, build
-    `ui = struct('efXMin', efXMin, 'efXMax', efXMax, ...)` aggregating all 218
-    handles. Pass `ui` to extracted functions. Individual closure variables continue
-    to work for non-extracted code (handle objects are reference-counted, so both
-    `efXMin` and `ui.efXMin` point to the same widget).
+13. ~~**Introduce `ui` widget handle struct**~~ — `ui = struct()` built after all widgets created, aggregating 60+ handles. Passed to `+bosonPlotter/` helpers (onApplyCorrections, draw2DMap, etc.).
 
 14. **Extract `applyParserAnalysisConfig`** (243 lines, 23 widgets) — sets up
-    corrections panel defaults per parser type. Receives `ui` + `appData`.
+    corrections panel defaults per parser type. Receives `ui` + `appData`. Still a nested function.
 
-15. **Extract `onApplyCorrections`** (209 lines, 25 widgets) — the main corrections
-    pipeline. Receives `ui` + `appData` + callback handles.
+15. ~~**Extract `onApplyCorrections`**~~ (209 lines, 25 widgets) — extracted to `+bosonPlotter/onApplyCorrections.m`. Receives `appData`, `ui`, `callbacks`.
 
 16. **Extract `updateControlsForActiveDataset`** (188 lines, 54 widgets) — syncs
     all panel widgets to the active dataset. The hardest extraction — touches nearly
-    every widget. Receives `ui` + `appData`.
+    every widget. Still a nested function.
 
 17. **Extract `onPlotTemplates`** (163 lines) — plot template save/load dialog with
-    4 nested sub-functions. Heavily references correction and label widgets via its
-    `doSaveTemplate`/`doLoadTemplate` sub-functions.
+    4 nested sub-functions. Still a nested function.
 
 ---
 
@@ -184,5 +174,12 @@ insurance for the long term.
 - ~~**Extract `refreshDataTable`**~~ (2026-04-12) — 177 lines → delegate, tblData/tblUnits/lblTableUnits/lblTableStats passed
 - ~~**Extract `onEstimateBaseline`**~~ (2026-04-12) — 95 lines → delegate, opens own uifigure dialog
 - ~~**Extract `onDatasetAlgebra`**~~ (2026-04-12) — 106 lines → delegate, opens own uifigure dialog
+- ~~**Extract `draw2DMap`**~~ (2026-04-12) — 171 lines → `+bosonPlotter/draw2DMap.m`, widget struct passed
+- ~~**Extract `extract2DBoxIntegral`**~~ (2026-04-12) — 128 lines → `+bosonPlotter/extract2DBoxIntegral.m`
+- ~~**Extract `extract2DArcIntegral`**~~ (2026-04-12) — 107 lines → `+bosonPlotter/extract2DArcIntegral.m`
+- ~~**Extract `onBGMouseUp`**~~ (2026-04-12) — 120 lines → `+bosonPlotter/onBGMouseUp.m`
+- ~~**Introduce `ui` widget handle struct**~~ (2026-04-12) — 60+ widget handles aggregated into `ui` struct after widget creation
+- ~~**Extract `onApplyCorrections`**~~ (2026-04-12) — 209 lines → `+bosonPlotter/onApplyCorrections.m`, receives `appData`, `ui`, `callbacks`
 
-**Result:** 346 → 331 nested functions (−15), 14,349 → 13,737 lines (−612), 40 → 45 extracted modules. 16/16 GUI tests pass.
+**Result (Tier 1):** 346 → 331 nested functions (−15), 14,349 → 13,737 lines (−612), 40 → 45 extracted modules. 16/16 GUI tests pass.
+**Result (Tier 2-3):** Additional 5 extractions (draw2DMap, extract2DBox/Arc, onBGMouseUp, onApplyCorrections) + `ui` struct introduced.

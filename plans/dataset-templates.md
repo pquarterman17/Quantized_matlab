@@ -161,78 +161,80 @@ Winner = max(confidence) across all templates × all steps.
 
 ## Tier 1 — High Impact
 
-1. **TemplateEngine static class** — the core load/save/match/apply engine
-   - [ ] Create `+templates/TemplateEngine.m` as a static-method class
-   - [ ] `loadAll()` — scan `+templates/defaults/` and `prefdir/boson_templates/`, return cell array of template structs
-   - [ ] `save(template)` — write JSON to `prefdir/boson_templates/<name>.json` via `jsonencode`
-   - [ ] `delete(name)` — remove a user template
-   - [ ] `apply(data, template)` — return a new data struct with overrides applied (column reassignment, label/unit replacement); never mutate the input
-   - [ ] `fingerprint(data)` — hash sorted column names + count + parserName into a short hex string (use `mlreportgen.utils.hash` or a simple FNV-1a)
-   - [ ] `match(data)` — run the 5-step cascade, return best template + confidence score
-   - [ ] `normalize(name)` — tokenize and lowercase a column name for fuzzy matching ("Temperature (K)" → {"temperature", "k"})
-   - [ ] `jaccard(setA, setB)` — Jaccard index helper for fuzzy matching
-   - [ ] Unit tests in `tests/templates/test_templateEngine.m`
+1. ~~**TemplateEngine static class**~~ — the core load/save/match/apply engine
+   - [x] Create `+templates/TemplateEngine.m` as a static-method class
+   - [x] `loadAll()` — scan `+templates/defaults/` and `prefdir/boson_templates/`, return cell array of template structs
+   - [x] `save(template)` — write JSON to `prefdir/boson_templates/<name>.json` via `jsonencode`
+   - [x] `delete(name)` — remove a user template
+   - [x] `apply(data, template)` — return a new data struct with overrides applied (column reassignment, label/unit replacement); never mutate the input
+   - [x] `fingerprint(data)` — hash sorted column names + count + parserName into 8-char hex string (FNV-1a)
+   - [x] `match(data)` — run the 5-step cascade, return best template + confidence score
+   - [x] `normalize(name)` — tokenize and lowercase a column name for fuzzy matching
+   - [x] `jaccard(setA, setB)` — Jaccard index helper for fuzzy matching (`jaccardIndex` local function)
+   - [x] Unit tests in `tests/templates/test_templateEngine.m`
 
-2. **Column Mapper dialog** — GUI for overriding tabular data interpretation
-   - [ ] Create `+templates/ColumnMapper.m` — modal `uifigure` dialog
-   - [ ] Input: data struct (from parser) + optional template (pre-populate)
-   - [ ] Left panel: preview table showing first ~20 rows of raw data
-   - [ ] Right panel: column role assignment
-     - [ ] Dropdown per column: X-axis / Y-channel / Skip
-     - [ ] Editable label field per column (pre-filled from parser)
-     - [ ] Editable unit field per column (pre-filled from parser)
-   - [ ] Live preview: mini plot in the dialog showing X vs selected Y columns
-   - [ ] Buttons: [Apply] [Save as Template...] [Cancel]
-   - [ ] "Save as Template" triggers a name dialog, then calls `TemplateEngine.save()`
-   - [ ] Returns the corrected data struct (or empty on Cancel)
+2. ~~**Column Mapper dialog**~~ — GUI for overriding tabular data interpretation
+   - [x] Create `+templates/ColumnMapper.m` — modal `uifigure` dialog
+   - [x] Input: data struct (from parser) + optional template (pre-populate)
+   - [x] Left panel: preview table showing first ~20 rows of raw data
+   - [x] Right panel: column role assignment
+     - [x] Dropdown per column: X-axis / Y-channel / Skip
+     - [x] Editable label field per column (pre-filled from parser)
+     - [x] Editable unit field per column (pre-filled from parser)
+   - [x] Live preview: mini plot in the dialog showing X vs selected Y columns
+   - [x] Buttons: [Apply] [Save as Template...] [Cancel]
+   - [x] "Save as Template" triggers a name dialog, then calls `TemplateEngine.save()`
+   - [x] Returns the corrected data struct (or empty on Cancel)
 
-3. **Metadata Editor dialog** — GUI for overriding image metadata (FermiViewer)
-   - [ ] Create `+templates/MetadataEditor.m` — modal `uifigure` dialog
-   - [ ] Input: data struct from image parser (importTIFF, importDM3/4, importImage)
-   - [ ] Editable fields: sample name, pixel size, pixel unit, voltage, operator, any string field from `metadata.parserSpecific`
-   - [ ] Shows current values (from parser) alongside editable override fields
-   - [ ] Buttons: [Apply] [Save as Template...] [Cancel]
-   - [ ] Returns the corrected data struct
+3. ~~**Metadata Editor dialog**~~ — GUI for overriding image metadata (FermiViewer)
+   - [x] Create `+templates/MetadataEditor.m` — modal `uifigure` dialog
+   - [x] Input: data struct from image parser (importTIFF, importDM3/4, importImage)
+   - [x] Editable fields: sample name, pixel size, pixel unit, voltage, operator, any string field from `metadata.parserSpecific`
+   - [x] Shows current values (from parser) alongside editable override fields
+   - [x] Buttons: [Apply] [Save as Template...] [Cancel]
+   - [x] Returns the corrected data struct
 
 ## Tier 2 — Medium Impact
 
-4. **BosonPlotter integration** — wire Column Mapper into the import flow
-   - [ ] After `guiImport()` returns, call `TemplateEngine.match(data)`
-   - [ ] If confidence ≥ 0.8: auto-apply, show green status bar message "Applied template: <name>"
-   - [ ] If confidence 0.4–0.8: show suggestion banner with [Apply] [Edit] [Ignore]
-   - [ ] If confidence < 0.4 and parser is generic (importCSV, importExcel): auto-open Column Mapper
-   - [ ] If confidence < 0.4 and parser is specific (importQDVSM, etc.): import normally (parser-specific logic is usually right)
+4. ~~**BosonPlotter integration**~~ — wire Column Mapper into the import flow
+   - [x] After `guiImport()` returns, call `TemplateEngine.match(data)`
+   - [x] If confidence ≥ 0.8: auto-apply, show green status bar message "Applied template: <name>"
+   - [x] If confidence 0.4–0.8: show suggestion banner with [Apply] [Edit] [Ignore]
+   - [x] If confidence < 0.4 and parser is generic (importCSV, importExcel): auto-open Column Mapper
+   - [x] If confidence < 0.4 and parser is specific (importQDVSM, etc.): import normally (parser-specific logic is usually right)
    - [ ] Add "Edit Column Mapping..." to dataset context menu (manual trigger)
    - [ ] Add "Save as Template..." to dataset context menu
 
-5. **FermiViewer integration** — wire Metadata Editor into the import flow
-   - [ ] After image load, call `TemplateEngine.match(data)` with type='image_metadata'
-   - [ ] If match found: auto-apply metadata overrides, show status message
-   - [ ] Add "Edit Metadata..." button to the tools panel
+5. ~~**FermiViewer integration**~~ — wire Metadata Editor into the import flow
+   - [x] After image load, call `TemplateEngine.match(data)` with type='image_metadata'
+   - [x] If match found: auto-apply metadata overrides, show status message
+   - [x] Add "Edit Metadata..." button to the tools panel
    - [ ] Add "Save Metadata Template..." to the tools panel or context menu
 
-6. **Shipped default templates** — sensible defaults for common instruments
-   - [ ] `qdvsm_mvsh.json` — M vs H with field/moment columns
-   - [ ] `qdvsm_mvst.json` — M vs T with temp/moment columns
-   - [ ] `ppms_resistivity.json` — standard 4-probe resistivity layout
-   - [ ] `ppms_acms.json` — AC susceptibility columns
-   - [ ] `xrd_bragg.json` — 2theta vs intensity
-   - [ ] `sem_fei.json` — FEI TIFF metadata defaults (pixel size, voltage, sample)
-   - [ ] Templates are overridden by user templates (user templates searched first)
+6. ~~**Shipped default templates**~~ — sensible defaults for common instruments
+   - [x] `qdvsm_mvsh.json` — M vs H with field/moment columns
+   - [x] `qdvsm_mvst.json` — M vs T with temp/moment columns
+   - [x] `ppms_resistivity.json` — standard 4-probe resistivity layout
+   - [x] `ppms_acms.json` — AC susceptibility columns
+   - [x] `xrd_bragg.json` — 2theta vs intensity
+   - [x] `sem_fei.json` — FEI TIFF metadata defaults (pixel size, voltage, sample)
+   - [x] Templates are overridden by user templates (user templates searched first)
+   - [x] `lakeshore_mvst.json` — bonus: Lake Shore M vs T (not originally planned)
+   - [x] `ncnr_reflectometry.json` — bonus: NCNR neutron reflectometry (not originally planned)
 
 ## Tier 3 — Nice-to-Have
 
-7. **Template manager dialog** — browse, edit, delete saved templates
-   - [ ] Standalone dialog listing all templates (shipped + user)
-   - [ ] Preview: show match criteria + overrides
-   - [ ] Edit: open in Column Mapper / Metadata Editor
-   - [ ] Delete: remove user templates (shipped are read-only)
-   - [ ] Import/export: share templates as standalone JSON files
+7. ~~**Template manager dialog**~~ — browse, edit, delete saved templates
+   - [x] Standalone dialog listing all templates (shipped + user) — `+templates/TemplateManager.m`
+   - [x] Preview: show match criteria + overrides
+   - [x] Edit: open in Column Mapper / Metadata Editor
+   - [x] Delete: remove user templates (shipped are read-only)
+   - [x] Import/export: share templates as standalone JSON files
 
-8. **Fuzzy column name normalization** — improve Step 2 matching
-   - [ ] Synonym table: "Temperature" ≈ "Temp" ≈ "T", "Magnetic Field" ≈ "Field" ≈ "H"
-   - [ ] Unit stripping: "Temperature (K)" → "temperature" + unit "K"
-   - [ ] Abbreviation expansion: "Res" → "Resistance", "Mag" → "Magnetic"
+8. ~~**Fuzzy column name normalization**~~ — improve Step 2 matching
+   - [x] Synonym table: `+templates/synonymTable.m` — "Temperature" ≈ "Temp" ≈ "T", "Magnetic Field" ≈ "Field" ≈ "H"
+   - [x] Unit stripping: "Temperature (K)" → "temperature" + unit "K" — enhanced `normalizeNames`
+   - [x] Abbreviation expansion: "Res" → "Resistance", "Mag" → "Magnetic"
 
 9. **Template analytics / feedback** — track which templates get used
    - [ ] Log template applications to `prefdir/boson_template_log.json`
@@ -258,4 +260,11 @@ Winner = max(confidence) across all templates × all steps.
 
 ## Completed
 
-(none yet)
+- ~~**TemplateEngine static class**~~ (2026-04-12) — `+templates/TemplateEngine.m`; loadAll/save/delete/apply/fingerprint/match with 5-step cascade; unit tests in `tests/templates/test_templateEngine.m`
+- ~~**Column Mapper dialog**~~ (2026-04-12) — `+templates/ColumnMapper.m`; modal uifigure with preview table, role dropdowns, live plot, Save as Template
+- ~~**Metadata Editor dialog**~~ (2026-04-12) — `+templates/MetadataEditor.m`; modal uifigure for image metadata overrides
+- ~~**BosonPlotter integration**~~ (2026-04-12) — `guiImport` calls `TemplateEngine.match`; auto-apply at >=0.8, suggest at 0.4-0.8, Column Mapper at <0.4 for generic parsers
+- ~~**FermiViewer integration**~~ (2026-04-12) — "Edit Metadata..." button wired to `templates.MetadataEditor`
+- ~~**Shipped default templates**~~ (2026-04-12) — 8 JSON files: qdvsm_mvsh, qdvsm_mvst, ppms_resistivity, ppms_acms, xrd_bragg, sem_fei, lakeshore_mvst, ncnr_reflectometry
+- ~~**Template manager dialog**~~ (2026-04-12) — `+templates/TemplateManager.m`; browse/preview/edit/delete/import/export
+- ~~**Fuzzy column name normalization**~~ (2026-04-12) — `+templates/synonymTable.m` + enhanced normalizeNames with unit stripping and abbreviation expansion

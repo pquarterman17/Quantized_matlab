@@ -89,7 +89,7 @@ as a reference (all complete).
 
 ## Tier 3 — Nice-to-Have
 
-14. **Column formulas (auto-recalc)** — partially addressed by spreadsheet popup
+14. **Column formulas (auto-recalc)** — MATLAB done (`+dataWorkspace/FormulaEngine.m`), Python pending
     - [ ] Design approach for Python
     - [ ] Implement
 
@@ -125,3 +125,4 @@ quantification, materials property calculator, neutron reflectometry.
 - ~~**ANOVA**~~ (MATLAB) — `+utilities/anova1.m`, 8 tests
 - ~~**PCA**~~ (MATLAB) — `+utilities/pcaAnalysis.m`, 10 tests
 - ~~**ODR**~~ (MATLAB) — `+fitting/odrFit.m`, 10 tests (13x more accurate than OLS)
+- ~~**Column formulas**~~ (MATLAB, 2026-04-12) — `+dataWorkspace/FormulaEngine.m`, col() references, circular ref detection, auto-recalc on data change

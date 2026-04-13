@@ -6,7 +6,7 @@ BosonPlotter, FermiViewer, materialsCalcGUI, xrdConvertGUI, and all `+` packages
 
 **Status:** Active
 **Created:** 2026-04-11
-**Updated:** 2026-04-12 (W1 complete)
+**Updated:** 2026-04-12 (W1-W5 complete except items 18, 20, 63)
 
 ---
 
@@ -193,11 +193,9 @@ Stale docs, missing feature docs, thin package READMEs, and function docstrings.
 
 ### Tier 1 — High Impact
 
-48. **Plot Style Dialog docs** — no user-facing docs for Phase G rollout. Add section to
-    `docs/gui_bosonplotter.md` covering 4-layer precedence cascade, palette picker, scopes
+48. ~~**Plot Style Dialog docs**~~ — done: 4-layer cascade, palette picker, apply-to scopes added to `docs/gui_bosonplotter.md`
 
-49. **Data table split docs** — `docs/gui_bosonplotter.md:58-66` describes old single-table
-    layout. Update for `tblUnits` + `tblData` architecture with ~10x scroll speedup rationale
+49. ~~**Data table split docs**~~ — done: tblUnits + tblData architecture documented in `docs/gui_bosonplotter.md`
 
 50. ~~**Expand `+bosonPlotter/README.md`**~~ — done (Lane C agent): 37 functions in 8 subsections
 
@@ -215,21 +213,20 @@ Stale docs, missing feature docs, thin package READMEs, and function docstrings.
 
 56. ~~**Add 3 entries to `+scripts/README.md`**~~ — done (Lane C agent)
 
-57. **`resolveStyle` usage example** — add 3-line example to docstring showing
-    `resolveStyle → applyDsOverride → applyPostRenderStyle`
+57. ~~**`resolveStyle` usage example**~~ — done: documented in `docs/gui_bosonplotter.md` and function docstring
 
-58. **`convertMagUnits` example** — add to `+utilities/README.md`
+58. ~~**`convertMagUnits` example**~~ — done: usage examples added to `+utilities/README.md`
 
 ### Tier 3 — Nice-to-Have
 
-59. **Thin function docstrings** — add Inputs/Outputs blocks to:
-    - [ ] `multiPanel.m` — document `datasets` cell array and options struct
-    - [ ] `peakCallbacks.m` — document returned `cb` struct of function handles
-    - [ ] `renderPlot.m` — document `ctx` struct required fields
-    - [ ] `filterRows.m` — document expression format with example
-    - [ ] `colorMaps.m` — list supported colormap names
-    - [ ] `computeQSpace.m` — document `map` input/output fields
-    - [ ] `resolveParser.m` — document result struct fields
+59. ~~**Thin function docstrings**~~ — done: Inputs/Outputs blocks added to all 7 + resolveStyle + convertMagUnits
+    - [x] `multiPanel.m` — document `datasets` cell array and options struct
+    - [x] `peakCallbacks.m` — document returned `cb` struct of function handles
+    - [x] `renderPlot.m` — document `ctx` struct required fields
+    - [x] `filterRows.m` — document expression format with example
+    - [x] `colorMaps.m` — list supported colormap names
+    - [x] `computeQSpace.m` — document `map` input/output fields
+    - [x] `resolveParser.m` — document result struct fields
 
 ---
 
