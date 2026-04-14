@@ -3675,10 +3675,23 @@ function varargout = BosonPlotter(options)
         % Sort indices in descending order so removal doesn't affect remaining indices
         indicesToRemove = sort(indicesToRemove, 'descend');
 
-        % Remove selected datasets (also from shared model)
+        % Remove selected datasets (also from shared model). appData.model
+        % and appData.datasets must stay in 1:1 correspondence — if an
+        % earlier silent-catch model.updateDataset failure left them out
+        % of sync we would permanently corrupt the index mapping by
+        % skipping model removals. Warn loudly instead so the divergence
+        % is visible, then remove unconditionally.
+        if appData.model.count() ~= numel(appData.datasets)
+            warning('BosonPlotter:modelDesync', ...
+                ['WorkspaceModel has %d datasets but appData.datasets has %d — ' ...
+                 'they drifted out of sync (silent updateDataset catch?). ' ...
+                 'Removing unconditionally and hoping for the best.'], ...
+                appData.model.count(), numel(appData.datasets));
+        end
         for ri = 1:numel(indicesToRemove)
-            if indicesToRemove(ri) <= appData.model.count()
-                appData.model.removeDataset(indicesToRemove(ri));
+            idx = indicesToRemove(ri);
+            if idx <= appData.model.count()
+                appData.model.removeDataset(idx);
             end
         end
         appData.datasets(indicesToRemove) = [];

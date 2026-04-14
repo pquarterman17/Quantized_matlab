@@ -196,7 +196,16 @@ function onApplyCorrections(appData, ui, callbacks)
             appData.datasets{pki} = pds;
             try
                 appData.model.updateDataset(pki, pds);
-            catch
+            catch ME_sync
+                % Surface the failure — silent catch would leave the
+                % shared WorkspaceModel out of sync with appData.datasets
+                % for this polarization sibling, and DataWorkspace would
+                % then show stale/uncorrected values for the affected
+                % channel. The warning does not abort the outer loop;
+                % it merely makes divergence observable.
+                warning('BosonPlotter:modelSyncFailed', ...
+                    'updateDataset(%d) failed during cross-polarization propagation: %s', ...
+                    pki, ME_sync.message);
             end
         end
     end
