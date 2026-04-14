@@ -269,10 +269,15 @@ end
         appData.lastMatlabCall = matlabCall;
         appData.lastTab       = appData.activeNavKey;
         setStatus(description);
-        % Enable copy/save buttons
+        % Enable copy/save buttons. btnCopyLatex tracks whether the
+        % current entry has a LaTeX string — previously we only flipped
+        % it on; an empty-latex result after a non-empty one left the
+        % button stuck enabled, firing a no-op on click.
         btnCopyResult.Enable = 'on';
         if ~isempty(latexStr)
             btnCopyLatex.Enable = 'on';
+        else
+            btnCopyLatex.Enable = 'off';
         end
         btnSaveFav.Enable = 'on';
         % Refresh history table if it exists
