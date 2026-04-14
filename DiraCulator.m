@@ -45,6 +45,11 @@ fig = uifigure('Name', 'DiraCulator — Thin Film Toolkit', ...
     'Color', FIG_BG);
 fig.CloseRequestFcn = @onFigureClose;
 
+% ── Help menu (Report a Bug) ─────────────────────────────────────────────
+helpMenu = uimenu(fig, 'Text', '&Help');
+uimenu(helpMenu, 'Text', 'Report a Bug...', ...
+    'MenuSelectedFcn', @(~,~) bugReport.reportBug(Source="DiraCulator"));
+
 % Root grid: nav sidebar | content area, plus status bar
 rootGL = uigridlayout(fig);
 rootGL.RowHeight    = {'1x', 22};

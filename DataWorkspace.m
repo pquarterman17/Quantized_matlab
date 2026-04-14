@@ -68,6 +68,11 @@ fig = uifigure( ...
     'KeyPressFcn',     @onKeyPress, ...
     'CloseRequestFcn', @onClose);
 
+% ── Help menu (Report a Bug) ─────────────────────────────────────────────
+helpMenu = uimenu(fig, 'Text', '&Help');
+uimenu(helpMenu, 'Text', 'Report a Bug...', ...
+    'MenuSelectedFcn', @(~,~) onReportBug());
+
 % ════════════════════════════════════════════════════════════════════════
 %  Root grid: [toolbar ; content]
 % ════════════════════════════════════════════════════════════════════════
@@ -1107,6 +1112,16 @@ end
             name = [nm ext];
         else
             name = sprintf('Dataset%d', idx);
+        end
+    end
+
+    function onReportBug()
+    %ONREPORTBUG  Open the Report-a-Bug dialog with the active dataset.
+        if model.activeIdx > 0 && model.activeIdx <= model.count()
+            ds = model.datasets{model.activeIdx};
+            bugReport.reportBug(Source="DataWorkspace", Dataset=ds);
+        else
+            bugReport.reportBug(Source="DataWorkspace");
         end
     end
 

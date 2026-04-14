@@ -62,7 +62,7 @@ options.Group = validatestring(options.Group, ...
      "xrayneutron", "superconductor", "cif", "optics", "vacuum", "electrochemistry", ...
      "eels", "eels_adv", "diffindex", "diff_sim", "edsquant", "contour", "fitting", "plotting", ...
      "spectral", "sigproc", "interp2d", "baseline", "errorprop", "utilities", "templates", ...
-     "workspace", "transport", "magnetic", "physics3"]);
+     "workspace", "transport", "magnetic", "physics3", "bugReport"]);
 
 % Build absolute paths to test scripts so `run` works regardless of CWD.
 % Tests are organized into subdirectories: parser/, gui/, imaging/, calc/, batch/
@@ -192,6 +192,8 @@ SUITES = {
     T('workspace','test_workspaceModel'),  'workspace','WorkspaceModel: add/remove/mask/undo/event firing'
     T('workspace','test_tableWidget'),     'workspace','createTableWidget: version-branched uispreadsheet/uitable factory'
     T('workspace','test_formulaEngine'),   'workspace','FormulaEngine: tokenize, RPN, evaluate, hasCircularRef, WorkspaceModel integration'
+    % ── Bug-report tests ─────────────────────────────────────────────────
+    T('bugReport','test_reportBug'),       'bugReport','Bug report: buildReport, formatReportMarkdown, URL encoding'
 };
 
 % Filter by group

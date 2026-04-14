@@ -363,6 +363,11 @@ function varargout = BosonPlotter(options)
     % Delete key support for removing datasets
     fig.KeyPressFcn = @onFigureKeyPress;
 
+    % ── Help menu (Report a Bug) ─────────────────────────────────────────
+    helpMenu = uimenu(fig, 'Text', '&Help');
+    uimenu(helpMenu, 'Text', 'Report a Bug...', ...
+        'MenuSelectedFcn', @(~,~) onReportBug());
+
     % ── Dataset-colour palette (shared by widget and callbacks) ──────────
     DS_COLOR_NAMES = {'Auto','Blue','Orange','Red','Green', ...
                       'Purple','Teal','Brown','Black','Grey'};
@@ -5082,6 +5087,16 @@ function varargout = BosonPlotter(options)
             ds = appData.datasets{appData.activeIdx};
         else
             ds = [];
+        end
+    end
+
+    function onReportBug()
+        % Open the Report-a-Bug dialog, passing the active dataset for context.
+        ds = getActiveDatasetSafe();
+        if ~isempty(ds) && isstruct(ds) && isfield(ds, 'data') && isstruct(ds.data)
+            bugReport.reportBug(Source="BosonPlotter", Dataset=ds.data);
+        else
+            bugReport.reportBug(Source="BosonPlotter");
         end
     end
 
