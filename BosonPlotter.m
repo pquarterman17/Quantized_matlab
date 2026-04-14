@@ -4256,6 +4256,10 @@ function varargout = BosonPlotter(options)
     function configurePeakWindowForMode(mode)
     %CONFIGUREPEAKWINDOWFORMODE  Show/hide mode-specific buttons in the peak window.
     %  mode: 'xrd', 'reflectometry', or 'none'
+        % Bail if the peak figure was externally deleted — the body reads
+        % and writes .Name / .Visible / child-button .Visible, all of
+        % which error on an invalid handle.
+        if ~isvalid(peakFig), return; end
         switch mode
             case 'xrd'
                 peakFig.Name = 'Peak Analysis';
