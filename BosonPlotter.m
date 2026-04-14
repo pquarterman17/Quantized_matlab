@@ -258,6 +258,18 @@ function varargout = BosonPlotter(options)
     % appData.X references work unchanged (same dot-syntax as struct).
     appData = bosonPlotter.AppState();
 
+    % Log-scale axes emit "Negative data ignored" from the axes layout
+    % manager on every repaint (resize, pan, zoom, hover) when the data
+    % contains zeros / negatives — typical for XRD counts. The transparent
+    % background export from copy/save falls back to the figure color on
+    % renderers that cannot honor alpha and also emits a per-render warning.
+    % Both are pure noise for the expected workflow; suppress for the
+    % session. Users who need them back can run:
+    %   warning('on', 'MATLAB:Axes:NegativeDataInLogAxis')
+    %   warning('on', 'MATLAB:print:ReplacingTransparentBackgroundWithDefaultColor')
+    warning('off', 'MATLAB:Axes:NegativeDataInLogAxis');
+    warning('off', 'MATLAB:print:ReplacingTransparentBackgroundWithDefaultColor');
+
     % ── Shared WorkspaceModel (observed by DataWorkspace if open) ────────
     % Accept an existing model from DataWorkspace (shared-model mode)
     if ~isempty(options.Model) && isa(options.Model, 'dataWorkspace.WorkspaceModel')
