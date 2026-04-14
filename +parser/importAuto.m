@@ -73,8 +73,14 @@ function [data, parserName] = importAuto(filepath, varargin)
     try
         data = parserFunc(filepath, varargin{:});
     catch ME
-        % For .dat files, try fallback parser if primary failed
-        if ~isempty(resolveResult.fallback) && contains(ME.message, '[Data]', 'IgnoreCase', true)
+        % For .dat files, try fallback parser if primary failed because
+        % no [Data] section was found. Dispatch on the specific error
+        % identifier rather than a substring of the message — any other
+        % error whose text happens to contain the word "[Data]" (column
+        % count mismatch, encoding failure, etc.) should propagate
+        % rather than silently retry against an unrelated parser.
+        if ~isempty(resolveResult.fallback) && ...
+                strcmp(ME.identifier, 'parser:importQDVSM:noData')
             parserName = resolveResult.fallback;
             fallbackFunc = str2func(['parser.' parserName]);
             data = fallbackFunc(filepath, varargin{:});
