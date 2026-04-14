@@ -126,13 +126,13 @@ function legendEditor(parentFig, ctx)
         'ColumnSpacing', 8, ...
         'ColumnWidth',   {'1x', 100, 100});
     uilabel(btnRow);  % spacer
-    btnCancel = uibutton(btnRow, 'Text', 'Cancel', ...
+    uibutton(btnRow, 'Text', 'Cancel', ...
         'ButtonPushedFcn', @(~,~) delete(dlg));
-    btnApply = uibutton(btnRow, 'Text', 'Apply', ...
+    uibutton(btnRow, 'Text', 'Apply', ...
         'BackgroundColor', [0.20 0.50 0.85], ...
         'FontColor',       [1 1 1], ...
         'FontWeight',      'bold', ...
-        'ButtonPushedFcn', @(~,~) onApply()); %#ok<NASGU>
+        'ButtonPushedFcn', @(~,~) onApply());
 
     % Dialog theming (matches the main GUI)
     try
@@ -165,8 +165,7 @@ end
 function out = matchOrDefault(choices, value, defaultVal)
 %MATCHORDEFAULT  Return value if it is in choices, otherwise defaultVal.
     if ischar(value) || isstring(value)
-        valueLC = lower(char(value));
-        hit = find(strcmpi(choices, valueLC), 1);
+        hit = find(strcmpi(choices, char(value)), 1);
         if ~isempty(hit)
             out = choices{hit};
             return;
