@@ -90,14 +90,26 @@ switch modelName
         [~, pkI] = max(yData);
         p0(1) = yData(pkI);                            % amplitude
         p0(2) = xData(pkI);                            % center
-        % Estimate width from FWHM
+        % Estimate FWHM from half-max crossings
         hm = yData >= yData(pkI)/2;
         hmIdx = find(hm);
         if numel(hmIdx) >= 2
             fwhm = xData(hmIdx(end)) - xData(hmIdx(1));
-            p0(3) = fwhm / 2.355;                      % σ ≈ FWHM/2.355
         else
-            p0(3) = xRange / 10;
+            % Fallback: roughly 10% of x-range is a FWHM, not a sigma
+            fwhm = xRange / 10;
+        end
+        % The width parameter the solver sees depends on the model:
+        %   Gaussian A*exp(-((x-x0)/σ)²/2): σ  = FWHM / 2.355
+        %   Lorentzian A/(1+((x-x0)/γ)²):   γ  = FWHM / 2
+        %   Pseudo-Voigt (standard form):   w  = FWHM / 2
+        % Using σ for all three systematically seeds Lorentzian / pV
+        % fits with widths ~18% too small, biasing convergence.
+        switch modelName
+            case 'Gaussian'
+                p0(3) = fwhm / 2.355;
+            otherwise
+                p0(3) = fwhm / 2;
         end
         if strcmp(modelName, 'Pseudo-Voigt')
             p0(4) = 0.5;                               % mixing parameter
