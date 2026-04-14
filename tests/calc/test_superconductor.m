@@ -177,6 +177,69 @@ catch ME
     failed = failed + 1;
 end
 
+% Hc1 regression: Abrikosov Hc1 = (Φ₀ / (4π λ²))·(ln κ + 0.5)
+% Reference: Tinkham, "Introduction to Superconductivity" 2nd ed. Eq. 5.11.
+% Explicit lambda + xi bypass material presets and exercise the Hc1 branch.
+% With lambda = 39 nm, xi = 38 nm, kappa = 1.0263:
+%   lam_cm = 39e-7 cm  →  lam² = 1.521e-11 cm²
+%   Φ₀[G·cm²] = 2.0678e-7
+%   Hc1 = 2.0678e-7 · (ln(1.0263) + 0.5) / (4π · 1.521e-11) ≈ 569 Oe
+% The +0.5 constant is essential — dropping it gives ~28 Oe (20× too small).
+try
+    r = calc.superconductor.criticalFields(Hc0=1980, Tc=9.25, T=4.2, ...
+                                           lambda=39, xi=38);
+    Hc1_expected = 569;   % Oe, from textbook formula above
+    if abs(r.Hc1 - Hc1_expected) / Hc1_expected < 0.05
+        fprintf('  PASS: Hc1 (low-κ type-II) = %.1f Oe (expected %.0f)\n', ...
+                r.Hc1, Hc1_expected);
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: Hc1 = %.1f Oe, expected %.0f (within 5%%)\n', ...
+                r.Hc1, Hc1_expected);
+        failed = failed + 1;
+    end
+catch ME
+    fprintf('  FAIL: Hc1 low-κ — %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% Hc1 regression at high κ (YBCO-like): κ=100, λ=200 nm
+% lam² = 4e-10 cm², Hc1 = 2.0678e-7·(ln(100)+0.5)/(4π·4e-10) ≈ 207 Oe
+try
+    r = calc.superconductor.criticalFields(Hc0=11500, Tc=93, T=77, ...
+                                           lambda=200, xi=2);
+    % ln(100)+0.5 = 5.1052; 2.0678e-7·5.1052/(4π·4e-10) = 209.9
+    Hc1_expected = 209.9;
+    if abs(r.Hc1 - Hc1_expected) / Hc1_expected < 0.05
+        fprintf('  PASS: Hc1 (high-κ) = %.1f Oe (expected %.0f)\n', ...
+                r.Hc1, Hc1_expected);
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: Hc1 high-κ = %.1f, expected %.0f\n', r.Hc1, Hc1_expected);
+        failed = failed + 1;
+    end
+catch ME
+    fprintf('  FAIL: Hc1 high-κ — %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% Type-I superconductor: Hc1 must be NaN, not a meaningless value
+% Al-like: lambda=16 nm, xi=1600 nm → kappa=0.01 < 1/sqrt(2)
+try
+    r = calc.superconductor.criticalFields(Hc0=99, Tc=1.18, T=0.5, ...
+                                           lambda=16, xi=1600);
+    if isnan(r.Hc1)
+        fprintf('  PASS: Hc1 returns NaN for type-I (κ=%.3f)\n', 16/1600);
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: Hc1 = %.3g for type-I, expected NaN\n', r.Hc1);
+        failed = failed + 1;
+    end
+catch ME
+    fprintf('  FAIL: type-I Hc1 — %s\n', ME.message);
+    failed = failed + 1;
+end
+
 % ── depairingCurrent ─────────────────────────────────────────────────
 fprintf('--- depairingCurrent ---\n');
 
@@ -346,17 +409,20 @@ end
 % ── beanJc ────────────────────────────────────────────────────────────
 fprintf('--- beanJc ---\n');
 
-% Synthetic M(H) loop: known deltaM = 0.02 emu, rectangular sample
-% a = 0.3 cm, b = 0.5 cm, t = 0.01 cm → vol = 0.0015 cm^3
-% geomFactor = a*(1 - a/(3b)) = 0.3*(1 - 0.3/1.5) = 0.3*0.8 = 0.24
-% Jc = 20 * deltaM * a / (vol * geomFactor)
-%    = 20 * 0.02 * 0.3 / (0.0015 * 0.24) = 0.12 / 3.6e-4 = 333.33 A/cm^2
+% Synthetic M(H) loop: known deltaM = 0.02 emu, rectangular sample.
+% Reference: Gyorgy et al., J. Appl. Phys. 61, 3802 (1987);
+% Chen & Goldfarb, J. Appl. Phys. 66, 2489 (1989). Full-width deltaM.
+%   Jc [A/cm^2] = 20 * ΔM_vol [emu/cm^3] / [a*(1 - a/(3b))]
+% With a = 0.3 cm, b = 0.5 cm, t = 0.01 cm:
+%   vol = 0.0015 cm^3, geomFactor = 0.3*(1 - 0.2) = 0.24
+%   ΔM_vol = 0.02/0.0015 = 13.33 emu/cm^3
+%   Jc = 20 * 13.33 / 0.24 = 1111.1 A/cm^2
 try
     dM_known = 0.02;   % emu (full width)
     a_s = 0.3; b_s = 0.5; t_s = 0.01;
     vol_s = a_s * b_s * t_s;
     gf    = a_s * (1 - a_s/(3*b_s));
-    Jc_expected = 20 * dM_known * a_s / (vol_s * gf);
+    Jc_expected = 20 * dM_known / (vol_s * gf);
 
     % Build synthetic loop: triangle wave, ±1000 Oe
     H_loop = [linspace(-1000, 1000, 100), linspace(1000, -1000, 100)]';
@@ -384,13 +450,14 @@ catch ME
     failed = failed + 1;
 end
 
-% Cylindrical: Jc = (3/(2*r)) * deltaM / vol = (3/(2*r)) * dM / (pi*r^2*t)
+% Cylindrical: Jc [A/cm^2] = 30 * ΔM_vol [emu/cm^3] / R [cm]
 % r = 0.15 cm, t = 0.01 cm → vol = pi*0.0225*0.01 = 7.069e-4 cm^3
-% Jc = 3/(2*0.15) * 0.02 / 7.069e-4 = 10 * 28.28 = 282.8 A/cm^2
+% ΔM_vol = 0.02 / 7.069e-4 = 28.29 emu/cm^3
+% Jc = 30 * 28.29 / 0.15 = 5658 A/cm^2
 try
     r_cyl = 0.15; t_cyl = 0.01;
     vol_cyl = pi * r_cyl^2 * t_cyl;
-    Jc_cyl_exp = (3/(2*r_cyl)) * dM_known / vol_cyl;
+    Jc_cyl_exp = 30 * dM_known / (vol_cyl * r_cyl);
 
     dims_cyl.radius = r_cyl; dims_cyl.thickness = t_cyl;
     res_cyl = calc.superconductor.beanJc(H_loop, M_loop, dims_cyl, ...

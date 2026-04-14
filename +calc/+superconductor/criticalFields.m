@@ -43,9 +43,10 @@ function result = criticalFields(opts)
 %     Hc(T) = Hc0 * (1 - (T/Tc)^2)
 %
 %   Type-II lower/upper critical fields (Gaussian CGS):
-%     Hc1 = (Phi0 * ln(kappa)) / (4*pi * lambda^2)
+%     Hc1 = (Phi0 / (4*pi * lambda^2)) * (ln(kappa) + 0.5)
 %     Hc2 = Phi0 / (2*pi * xi^2)
 %   where Phi0 is converted from Wb to G*cm^2 (1 Wb = 1e8 G*cm^2).
+%   Hc1 returns NaN for type-I (kappa <= 1/sqrt(2)) — no distinct Hc1 exists.
 %
 %   Examples
 %   --------
@@ -101,7 +102,12 @@ Phi0_Gcm2 = C.Phi0 * 1e8;   % G*cm^2  (= 2.0678e-7 G*cm^2)
 Hc1 = NaN;
 Hc2 = NaN;
 
-if strcmp(scType, 'II') || isnan(Hc0) || Hc0 == 0
+% Enter the type-II branch when a preset identifies the material as II,
+% OR when the user supplied enough parameters to compute Hc1/Hc2 directly
+% (either lambda+xi, or an explicit kappa). The prior gate required a
+% Material preset, so callers passing only lambda/xi never saw Hc1/Hc2.
+hasTypeIIParams = (~isnan(opts.lambda) && ~isnan(opts.xi)) || ~isnan(opts.kappa);
+if strcmp(scType, 'II') || isnan(Hc0) || Hc0 == 0 || hasTypeIIParams
     % Determine lambda and xi at T if not supplied
     lambda = opts.lambda;
     xi     = opts.xi;
@@ -126,10 +132,14 @@ if strcmp(scType, 'II') || isnan(Hc0) || Hc0 == 0
         lam_cm = lambda * 1e-7;
         xi_cm  = xi    * 1e-7;
 
-        if kappa > 1   % ln(kappa) is only meaningful for kappa >> 1
-            Hc1 = (Phi0_Gcm2 * log(kappa)) / (4*pi * lam_cm^2);
+        % Abrikosov / Tinkham "Introduction to Superconductivity"
+        % 2nd ed. Eq. 5.11:  Hc1 = (Φ₀/(4πλ²))·(ln κ + 0.5)
+        % Valid for type-II (κ > 1/√2). For type-I there is no distinct
+        % Hc1 — the single thermodynamic transition is at Hc.
+        if kappa > 1/sqrt(2)
+            Hc1 = (Phi0_Gcm2 * (log(kappa) + 0.5)) / (4*pi * lam_cm^2);
         else
-            Hc1 = Phi0_Gcm2 / (4*pi * sqrt(2) * lam_cm^2);
+            Hc1 = NaN;
         end
         Hc2 = Phi0_Gcm2 / (2*pi * xi_cm^2);
 

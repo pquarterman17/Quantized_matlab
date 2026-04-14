@@ -158,17 +158,17 @@ deltaM = abs(M_up - M_down);
 % ... which simplifies to 20 for rectangular when volume = a*b*t.
 % Reference: Gyorgy et al., J. Appl. Phys. 61, 3802 (1987).
 
-% Gyorgy et al., J. Appl. Phys. 61, 3802 (1987):
-%   Rectangular: Jc [A/cm^2] = 20 * dM [emu] * a / (vol [cm^3] * a*(1-a/3b))
-%                             = 20 * dM / (vol/a * (1-a/(3b)))
-%   Cylindrical: Jc [A/cm^2] = 3/(2*r) * dM [emu] / vol [cm^3]
-% The pre-factor 20 encodes c/(4*pi) × unit conversions in Gaussian CGS.
+% Gyorgy et al., J. Appl. Phys. 61, 3802 (1987); Chen & Goldfarb,
+% J. Appl. Phys. 66, 2489 (1989). Full-width convention — deltaM is the
+% complete loop width M_up - M_down (not the half-width).
+%   Rectangular: Jc [A/cm^2] = 20 * ΔM_vol [emu/cm^3] / [a * (1 - a/(3b))]
+%   Cylindrical: Jc [A/cm^2] = 30 * ΔM_vol [emu/cm^3] / R
+% with ΔM_vol = deltaM_total / vol_cm3.
 if strcmp(geom, 'rectangular')
-    geomFactor = a * (1 - a / (3*b));   % a*(1 - a/3b)
-    Jc = 20 .* deltaM .* a ./ (vol_cm3 .* geomFactor);
+    geomFactor = a * (1 - a / (3*b));
+    Jc = 20 .* deltaM ./ (vol_cm3 .* geomFactor);
 else
-    % vol_cm3 = pi * r^2 * t
-    Jc = (3 ./ (2 * r)) .* (deltaM ./ vol_cm3);
+    Jc = 30 .* (deltaM ./ vol_cm3) ./ r;
 end
 
 % Convert back to input field units for output
