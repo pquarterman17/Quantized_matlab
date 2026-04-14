@@ -8253,16 +8253,10 @@ function varargout = BosonPlotter(options)
     end
 
     function onCopyPlotToClipboard()
-    %ONCOPYPLOTTOCLIPBOARD  Render current plot into a temporary figure and copy to clipboard.
-        if isempty(appData.datasets) || appData.activeIdx < 1
-            return;
-        end
-        tmpFig = figure('Visible', 'off', 'Color', 'w', ...
-            'Units', 'pixels', 'Position', [100 100 800 500]);
-        tmpAx = axes(tmpFig);
-        drawToAxes(tmpAx);
-        copygraphics(tmpFig, 'Resolution', 200);
-        delete(tmpFig);
+    %ONCOPYPLOTTOCLIPBOARD  Legacy entry-point kept for toolbar / context-menu
+    %  bindings. Delegates to onCopyToClipboard, which produces a transparent
+    %  background so the pasted image adapts to the target document's colour.
+        onCopyToClipboard([], []);
     end
 
     function applyAxisPrefix(targetAx, whichAxis, prefixInfo)
@@ -9138,26 +9132,30 @@ function varargout = BosonPlotter(options)
             uialert(fig,'Load a file first.','No data'); return;
         end
 
-        % Map dropdown choice to file extension and exportgraphics options
+        % Map dropdown choice to file extension and exportgraphics options.
+        % BackgroundColor='none' gives transparent output for PNG/TIFF,
+        % which paste cleanly into both light and dark documents. PDF/SVG
+        % also honour it. JPEG (not offered here) would ignore it since
+        % JPEG has no alpha channel.
         fmtStr = ddFigFormat.Value;
         isFigFormat = strcmp(fmtStr, 'MATLAB .fig');
         switch fmtStr
             case 'PNG (300 dpi)'
                 ext      = '.png';
                 fmtFilter = {'*.png','PNG image (*.png)'};
-                egOpts   = {'ContentType','image','Resolution',300};
+                egOpts   = {'ContentType','image','Resolution',300, 'BackgroundColor','none'};
             case 'PDF (vector)'
                 ext      = '.pdf';
                 fmtFilter = {'*.pdf','PDF vector (*.pdf)'};
-                egOpts   = {'ContentType','vector'};
+                egOpts   = {'ContentType','vector', 'BackgroundColor','none'};
             case 'SVG (vector)'
                 ext      = '.svg';
                 fmtFilter = {'*.svg','SVG vector (*.svg)'};
-                egOpts   = {'ContentType','vector'};
+                egOpts   = {'ContentType','vector', 'BackgroundColor','none'};
             case 'TIFF (300 dpi)'
                 ext      = '.tif';
                 fmtFilter = {'*.tif','TIFF image (*.tif)'};
-                egOpts   = {'ContentType','image','Resolution',300};
+                egOpts   = {'ContentType','image','Resolution',300, 'BackgroundColor','none'};
             case 'MATLAB .fig'
                 ext      = '.fig';
                 fmtFilter = {'*.fig','MATLAB figure (*.fig)'};
@@ -9165,7 +9163,7 @@ function varargout = BosonPlotter(options)
             otherwise
                 ext      = '.png';
                 fmtFilter = {'*.png','PNG image (*.png)'};
-                egOpts   = {'ContentType','image','Resolution',300};
+                egOpts   = {'ContentType','image','Resolution',300, 'BackgroundColor','none'};
         end
 
         % Suggest a filename based on the active dataset
@@ -9181,11 +9179,14 @@ function varargout = BosonPlotter(options)
         figW = efFigWidth.Value;
         figH = efFigHeight.Value;
 
-        % Render into a hidden figure
+        % Render into a hidden figure with a transparent canvas so the
+        % saved image doesn't carry the GUI's dark-theme background.
         tmpFig = figure('Visible','off','Name','SaveFig','NumberTitle','off', ...
                         'MenuBar','none','ToolBar','none', ...
+                        'Color','none', ...
                         'Units','inches','Position',[0 0 figW figH]);
         tmpAx = axes(tmpFig);
+        set(tmpAx, 'Color','none');
         box(tmpAx,'on');
         grid(tmpAx,'on');
         drawToAxes(tmpAx);
