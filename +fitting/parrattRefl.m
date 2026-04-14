@@ -44,6 +44,17 @@ function R = parrattRefl(Q, layers, options)
 %       Layer M-1: bottom film layer
 %       Layer M: substrate (Si: SLD ≈ 2.07e-6 Å⁻², thickness = 0)
 %
+%   Complex SLD sign convention:
+%       The internal complex SLD is built as  sld = SLD_real + i * SLD_imag
+%       with SLD_imag >= 0 for absorbing materials (e.g. Au, Pt, Cu at
+%       X-ray energies). kz in each layer is then
+%         kz_j = sqrt((Q/2)^2 - 4*pi*sld_j),
+%       the standard Parratt form consistent with the optics convention
+%       n^2 = 1 - (lambda^2/pi) * SLD_complex where SLD_complex carries
+%       the same +i sign. Presets in fitting.reflSLDPresets store
+%       sldImag as a POSITIVE number by this convention — expect
+%       physical (monotonically decaying) R(Q) at high Q.
+%
 %   Examples:
 %       % Bare silicon in air
 %       Q = linspace(0.005, 0.3, 500)';
