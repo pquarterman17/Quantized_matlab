@@ -393,6 +393,13 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 if isvalid(btn) && strcmp(btn.Enable, 'on')
                     btn.ButtonPushedFcn(btn, []);
                 end
+            else
+                % Tabs without a registered primary action (Favorites,
+                % History, Substrates, Periodic Table, ...): surface a
+                % status hint instead of silently no-oping — a pressed
+                % Enter that does nothing feels like the app froze.
+                setStatus(['Enter has no primary action on this tab. ', ...
+                           'Use the mouse or Tab to navigate.']);
             end
         end
     end
