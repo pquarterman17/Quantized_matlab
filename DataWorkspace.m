@@ -335,6 +335,9 @@ lsnMask = addlistener(model, 'MaskChanged',      @onModelMaskChanged);
 
 % Keep listeners alive in the GUI scope (handle objects — MATLAB will
 % auto-delete them when they go out of scope, so we anchor them here).
+% The cell is mutable so callbacks registered later in the session can
+% append via addGuiListener() without getting garbage-collected at the
+% end of the enclosing scope.
 guiListeners = {lsnData, lsnSel, lsnMask};  %#ok<NASGU>
 
 % Bootstrap the UI from any datasets already present in the shared

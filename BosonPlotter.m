@@ -3579,8 +3579,24 @@ function varargout = BosonPlotter(options)
 
             % Evaluate expression safely — no eval(); uses dispatch-based parser
             yResult = bosonPlotter.safeEvalMathExpr(expr, vars);
-            if ~isnumeric(yResult) || numel(yResult) ~= numel(xBase)
-                error('Expression did not produce a vector of the correct length.');
+            if ~isnumeric(yResult)
+                error('Expression did not produce a numeric vector.');
+            end
+            % diff() reduces length by 1. Auto-trim the x-axis by one
+            % element so the result struct stays rectangular. This is
+            % a common user expectation; emit a status message so the
+            % behaviour is visible in the GUI.
+            if numel(yResult) == numel(xBase) - 1
+                xBase = xBase(1:end-1);
+                setStatus(['diff() reduces array length by 1; ' ...
+                    'trimmed x-axis to match (now ' ...
+                    sprintf('%d', numel(xBase)) ' points).']);
+            elseif numel(yResult) ~= numel(xBase)
+                error(['Expression returned %d elements but the base ' ...
+                    'dataset has %d samples. Check your formula — ' ...
+                    'resampling or aggregation inside the expression ' ...
+                    'breaks the x-axis alignment.'], ...
+                    numel(yResult), numel(xBase));
             end
 
             % Build result data struct
