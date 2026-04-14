@@ -143,6 +143,11 @@ function varargout = BosonPlotter(options)
 %   .peaks         — struct array of detected/fitted peaks
 %   .visible       — boolean; false = excluded from plot
 %   .axLims        — per-dataset saved axis limits (restored on switch)
+%   .plotState     — per-dataset plot-view state: xScale/yScale/y2Scale
+%                    ('Linear'|'Log'), gridX/Y ('on'|'off'), xDir/yDir
+%                    ('normal'|'reverse'), and 2D map state (colormap,
+%                    intensity scale, colorbar limits).  Empty strings
+%                    fall back to parser-aware auto defaults.
 %   .annotations   — cell array of {x, y, text} annotation structs
 %   .color         — [R G B] line color assigned from colormap
 %
@@ -1857,7 +1862,9 @@ function varargout = BosonPlotter(options)
 
     btnAutoLimits = uibutton(axLimGL,'Text','Reset', ...
         'ButtonPushedFcn',@onAutoLimits, 'FontSize', 9, ...
-        'Tooltip','Clear all manual axis limits and reset to auto-scale');
+        'Tooltip',['Reset View — clear manual axis limits and per-dataset' newline ...
+                   'plot state (log/linear, grid, direction, 2D cmap/cLim)' newline ...
+                   'so this dataset returns to auto defaults.']);
     btnAutoLimits.Layout.Row = 4; btnAutoLimits.Layout.Column = 2;
 
     ddLegendLoc = uidropdown(axLimGL, ...
@@ -3756,8 +3763,9 @@ function varargout = BosonPlotter(options)
     end
 
     function saveAxisLimsToActiveDataset()
-    %SAVEAXISLIMSTOACTIVEDATASET  Copy current axis limit fields into the active dataset.
-    %  Called before switching datasets so each dataset remembers its own zoom level.
+    %SAVEAXISLIMSTOACTIVEDATASET  Persist axis limits + plot-view state.
+    %  Called before switching datasets so each dataset remembers its own
+    %  zoom, axis scale (linear/log), grid/direction, and 2D map state.
         if appData.activeIdx < 1 || isempty(appData.datasets), return; end
         lims.xMin  = efXMin.Value;
         lims.xMax  = efXMax.Value;
@@ -3769,6 +3777,31 @@ function varargout = BosonPlotter(options)
         lims.y2Max  = efY2Max.Value;
         lims.y2Step = efY2Step.Value;
         appData.datasets{appData.activeIdx}.axLims = lims;
+
+        % Capture plot-view state so log/linear, grid, and axis direction
+        % survive a dataset toggle. Reading from live axes catches user
+        % changes made via context menu (grid/invert) that don't update
+        % a dropdown.
+        ps = struct();
+        ps.xScale  = ddScaleX.Value;
+        ps.yScale  = ddScaleY.Value;
+        ps.y2Scale = ddScaleY2.Value;
+        if ~isempty(ax) && isvalid(ax)
+            ps.gridX = ax.XGrid;
+            ps.gridY = ax.YGrid;
+            ps.xDir  = ax.XDir;
+            ps.yDir  = ax.YDir;
+        end
+        % 2D map state — widgets always exist; values are still read for
+        % non-2D parsers so user overrides persist if they later load a
+        % 2D dataset into the same session.
+        if ~isempty(ddMap2DCmap) && isvalid(ddMap2DCmap)
+            ps.map2DCmap  = ddMap2DCmap.Value;
+            ps.map2DScale = ddMap2DScale.Value;
+            ps.map2DCMin  = efMap2DCMin.Value;
+            ps.map2DCMax  = efMap2DCMax.Value;
+        end
+        appData.datasets{appData.activeIdx}.plotState = ps;
     end
 
     function rebuildDatasetList(keepActiveIdx)
@@ -7415,6 +7448,34 @@ function varargout = BosonPlotter(options)
         y2IsActive = ~all(strcmp(ensureCell(lbY2.Value), '(none)'));
         ctrlGL.RowHeight{3} = guiTernary(y2IsActive, '1x', 0);
         drawToAxes(ax);
+        % Re-apply grid and axis-direction from the active dataset's plot
+        % state — these are axes properties (not dropdowns) and would
+        % otherwise be overwritten by the render's style pass.
+        applyAxesPlotState();
+    end
+
+    function applyAxesPlotState()
+    %APPLYAXESPLOTSTATE  Post-plot pass: restore per-dataset grid/XDir/YDir.
+    %  The scale dropdowns and 2D widgets drive renderPlot via their
+    %  ValueChangedFcn; grid and axis-direction live on the axes object
+    %  directly and need to be re-applied after each draw.
+        if isempty(ax) || ~isvalid(ax), return; end
+        if appData.activeIdx < 1 || isempty(appData.datasets), return; end
+        ds = appData.datasets{appData.activeIdx};
+        if ~isfield(ds, 'plotState') || ~isstruct(ds.plotState), return; end
+        ps = ds.plotState;
+        if isfield(ps, 'gridX') && ~isempty(ps.gridX)
+            ax.XGrid = ps.gridX;
+        end
+        if isfield(ps, 'gridY') && ~isempty(ps.gridY)
+            ax.YGrid = ps.gridY;
+        end
+        if isfield(ps, 'xDir') && ~isempty(ps.xDir)
+            ax.XDir = ps.xDir;
+        end
+        if isfield(ps, 'yDir') && ~isempty(ps.yDir)
+            ax.YDir = ps.yDir;
+        end
     end
 
     function onAdvAsymmetry(~, ~)
@@ -8051,9 +8112,11 @@ function varargout = BosonPlotter(options)
         switch what
             case 'logX'
                 if strcmp(ddScaleX.Value,'Log'), ddScaleX.Value = 'Linear'; else, ddScaleX.Value = 'Log'; end
+                stashPlotStateField('xScale', ddScaleX.Value);
                 onPlot([], []);
             case 'logY'
                 if strcmp(ddScaleY.Value,'Log'), ddScaleY.Value = 'Linear'; else, ddScaleY.Value = 'Log'; end
+                stashPlotStateField('yScale', ddScaleY.Value);
                 onPlot([], []);
             case 'grid'
                 if strcmp(ax.XGrid, 'on')
@@ -8061,13 +8124,28 @@ function varargout = BosonPlotter(options)
                 else
                     grid(ax, 'on');
                 end
+                stashPlotStateField('gridX', ax.XGrid);
+                stashPlotStateField('gridY', ax.YGrid);
             case 'invertX'
                 if strcmp(ax.XDir, 'normal')
                     ax.XDir = 'reverse';
                 else
                     ax.XDir = 'normal';
                 end
+                stashPlotStateField('xDir', ax.XDir);
         end
+    end
+
+    function stashPlotStateField(fieldName, value)
+    %STASHPLOTSTATEFIELD  Persist a single plot-state field on the active
+    %  dataset so it survives a dataset toggle. Safe to call when no
+    %  dataset is active (no-op).
+        if appData.activeIdx < 1 || isempty(appData.datasets), return; end
+        if ~isfield(appData.datasets{appData.activeIdx}, 'plotState') ...
+                || ~isstruct(appData.datasets{appData.activeIdx}.plotState)
+            appData.datasets{appData.activeIdx}.plotState = struct();
+        end
+        appData.datasets{appData.activeIdx}.plotState.(fieldName) = value;
     end
 
     function onToolbarLegendToggle(~,~)
@@ -8243,11 +8321,25 @@ function varargout = BosonPlotter(options)
     end
 
     function onAutoLimits(~,~)
-    %ONAUTOLIMITS  Clear all axis limit fields → return to auto-scale.
+    %ONAUTOLIMITS  Reset View — clear axis limits and per-dataset plot
+    %  state so the active dataset returns to parser-aware auto defaults
+    %  (log/linear, grid, axis direction, 2D map settings).
         efXMin.Value = '';  efXMax.Value = '';  efXStep.Value = '';
         efYMin.Value = '';  efYMax.Value = '';  efYStep.Value = '';
         efY2Min.Value = '';  efY2Max.Value = '';  efY2Step.Value = '';
+        % Clear the persisted plot-state struct so parser defaults win
+        % again. updateControlsForActiveDataset will re-apply those.
+        if appData.activeIdx >= 1 && ~isempty(appData.datasets)
+            appData.datasets{appData.activeIdx}.plotState = struct();
+        end
+        if ~isempty(ax) && isvalid(ax)
+            ax.XGrid = 'off';
+            ax.YGrid = 'off';
+            ax.XDir  = 'normal';
+            ax.YDir  = 'normal';
+        end
         saveAxisLimsToActiveDataset();
+        updateControlsForActiveDataset();   % re-pull parser defaults
         onPlot([],[]);
     end
 
@@ -12004,6 +12096,22 @@ function ds = buildDs(fp, data, parserName)
     ds.axLims      = struct('xMin','','xMax','','xStep','', ...
                             'yMin','','yMax','','yStep','', ...
                             'y2Min','','y2Max','','y2Step','');
+    % Per-dataset plot-view state — empty fields fall back to parser-aware
+    % defaults in updateControlsForActiveDataset. Non-empty fields are
+    % authoritative and override auto-detection, so that switching away
+    % and back to a dataset restores the user's chosen view.
+    ds.plotState   = struct( ...
+        'xScale',      '', ...   '' | 'Linear' | 'Log'
+        'yScale',      '', ...
+        'y2Scale',     '', ...
+        'gridX',       '', ...   '' | 'on' | 'off'
+        'gridY',       '', ...
+        'xDir',        '', ...   '' | 'normal' | 'reverse'
+        'yDir',        '', ...
+        'map2DCmap',   '', ...   2D heatmap colormap name
+        'map2DScale',  '', ...   'Linear' | 'Log₁₀'
+        'map2DCMin',   '', ...   numeric or ''
+        'map2DCMax',   '');      % numeric or ''
     ds.latticeParams  = [];   % struct with refined lattice parameters (set by Refine Lattice)
     ds.filmThickness  = [];   % struct with FFT-derived film thickness (set by FFT Thickness)
     ds.williamsonHall = [];   % struct with W-H analysis results (set by W-H Plot)

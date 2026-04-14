@@ -161,21 +161,26 @@ function updateControlsForActiveDataset(appData, ui, callbacks)
 
     callbacks.applyParserAnalysisConfig(callbacks.resolvedCorrStyle());
 
-    % Auto-configure for neutron data; reset log scale for non-neutron
+    % Pull the per-dataset plot-state struct (may be empty for legacy
+    % sessions loaded from disk before this field existed).
+    hasPS = isfield(ds, 'plotState') && isstruct(ds.plotState);
+    ps    = callbacks.guiTernary(hasPS, ds.plotState, struct());
+
+    % Parser-aware Y-scale default — used only when the user has not
+    % explicitly chosen a scale for this dataset (ps.yScale is '').
     if callbacks.isNeutronParser(ds.parserName)
         rIdx = find(strcmp(d.labels, 'R'), 1);
         if ~isempty(rIdx)
             ui.lbY.Value = d.labels(rIdx);
         end
-        ui.ddScaleY.Value = 'Log';
+        defaultYScale = 'Log';
     elseif isfield(ds, 'parserName') && strcmp(ds.parserName, 'importSIMS')
-        ui.ddScaleY.Value = 'Log';  % SIMS concentrations span many decades
         % Auto-select all elements so each gets its own legend entry
         if numel(d.labels) > 1
             ui.lbY.Value = d.labels;
         end
+        defaultYScale = 'Log';  % SIMS concentrations span many decades
     elseif callbacks.is2DDataset(ds)
-        ui.ddScaleY.Value = 'Log';  % log intensity is standard for XRD reciprocal-space maps
         % Lazy Q-space: compute Qx/Qz on first activation if wavelength available
         map = ds.data.metadata.parserSpecific.map2D;
         map = callbacks.computeQSpace(map);
@@ -193,8 +198,23 @@ function updateControlsForActiveDataset(appData, ui, callbacks)
             ui.cbMap2DQSpace.Value   = false;
             ui.btnArcIntegrate.Enable = 'off';
         end
+        defaultYScale = 'Log';  % log intensity standard for reciprocal-space maps
     else
-        ui.ddScaleY.Value = 'Linear';
+        defaultYScale = 'Linear';
+    end
+
+    % Apply user-specified plot state, else fall back to parser default.
+    ui.ddScaleY.Value  = psGet(ps, 'yScale',  defaultYScale);
+    ui.ddScaleX.Value  = psGet(ps, 'xScale',  'Linear');
+    ui.ddScaleY2.Value = psGet(ps, 'y2Scale', 'Linear');
+
+    % 2D map dropdowns — only meaningful for 2D datasets, but setting the
+    % value for 1D datasets is harmless (panel is hidden).
+    if isfield(ui, 'ddMap2DCmap') && ~isempty(ui.ddMap2DCmap) && isvalid(ui.ddMap2DCmap)
+        ui.ddMap2DCmap.Value  = psGet(ps, 'map2DCmap',  ui.ddMap2DCmap.Value);
+        ui.ddMap2DScale.Value = psGet(ps, 'map2DScale', ui.ddMap2DScale.Value);
+        ui.efMap2DCMin.Value  = psGet(ps, 'map2DCMin',  '');
+        ui.efMap2DCMax.Value  = psGet(ps, 'map2DCMax',  '');
     end
 
     ui.ddX.ValueChangedFcn  = @(src,evt) callbacks.onAxisChanged(src,evt);
@@ -209,4 +229,17 @@ function updateControlsForActiveDataset(appData, ui, callbacks)
     appData.filterMask  = [];  % reset row filter on dataset switch
     ui.efFilter.Value   = '';  % clear filter text field
     callbacks.refreshDataTable();
+    % Grid and axis-direction restoration happens post-draw via
+    % applyAxesPlotState in BosonPlotter, which reads directly from
+    % the active dataset's ds.plotState struct.
+end
+
+function v = psGet(ps, field, defaultVal)
+%PSGET  Read a plotState field, falling back to defaultVal when the
+%  struct lacks the field or stores an empty placeholder.
+    if isfield(ps, field) && ~isempty(ps.(field))
+        v = ps.(field);
+    else
+        v = defaultVal;
+    end
 end
