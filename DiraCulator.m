@@ -4838,13 +4838,63 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             r2 = evt.Indices(1); c2 = evt.Indices(2);
             if r2 > numel(mlStack), return; end
             switch c2
-                case 1, mlStack{r2}.name = evt.NewData;
-                case 2, mlStack{r2}.formula = evt.NewData;
+                case 1
+                    % The top layer represents the semi-infinite ambient
+                    % half-space; letting the user rename it while the
+                    % reflectivity math still treats it as the ambient
+                    % creates a label/role mismatch. Lock the name.
+                    if r2 == 1
+                        refreshMLTable();   % revert the cell display
+                        setStatus('The top (ambient) layer name is locked — it represents the semi-infinite medium above the stack.');
+                        return;
+                    end
+                    mlStack{r2}.name = evt.NewData;
+                case 2
+                    mlStack{r2}.formula = evt.NewData;
+                    % If the new formula is a single element, pre-fill
+                    % density (or SLD, per current mode) from the
+                    % periodic table — the value the user would have
+                    % looked up in elementData anyway.
+                    autofillFromElement(r2);
                 case 3, mlStack{r2}.thickness = evt.NewData;
                 case 4, mlStack{r2}.density = evt.NewData;
                 case 5, mlStack{r2}.roughness = evt.NewData;
             end
             updateMLProperties();
+        end
+
+        function autofillFromElement(rowIdx)
+        %AUTOFILLFROMELEMENT  When the user types a single-element symbol
+        %  in the Formula column, populate the density / SLD cell from
+        %  calc.elementData. Respects the active density mode (SLD vs
+        %  g/cm^3) and silently skips unknown / multi-element formulas.
+            f = strtrim(mlStack{rowIdx}.formula);
+            if isempty(f) || isempty(regexp(f, '^[A-Z][a-z]?$', 'once'))
+                return;
+            end
+            try
+                el = calc.elementData('bySymbol', f);
+            catch
+                return;
+            end
+            if isempty(el) || isnan(el.density) || el.density <= 0
+                return;
+            end
+            if strcmp(densityMode, 'sld')
+                try
+                    sr = calc.xrayNeutron.neutronSLD(f, el.density);
+                    mlStack{rowIdx}.density = sr.SLDe6;
+                    setStatus(sprintf('Auto-filled %s: SLD = %.3f %s10^{-6} %s^{-2} (bulk %.3f g/cm%s)', ...
+                        f, sr.SLDe6, char(215), char(197), el.density, char(179)));
+                catch
+                    return;
+                end
+            else
+                mlStack{rowIdx}.density = el.density;
+                setStatus(sprintf('Auto-filled %s: bulk density = %.3f g/cm%s', ...
+                    f, el.density, char(179)));
+            end
+            refreshMLTable();
         end
 
         function onAddLayer()
@@ -4881,6 +4931,10 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             if idx < 2 || idx > nL-1, return; end
             tmp = mlStack{idx}; mlStack{idx} = mlStack{newIdx}; mlStack{newIdx} = tmp;
             refreshMLTable(); updateMLProperties();
+            % Carry the selection onto the moved row so successive Up/Down
+            % presses keep acting on the same layer — the user no longer
+            % has to re-click the row between each move.
+            try, tblML.Selection = newIdx; catch, end
         end
 
         function sldVal = layerSLD(s)
