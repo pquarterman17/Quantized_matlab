@@ -273,11 +273,11 @@ $$H_c(T) = H_{c,0}\left[1 - \left(\frac{T}{T_c}\right)^2\right]$$
 
 For type-I superconductors, $H_c$ is the field at which superconductivity is destroyed. For type-II superconductors, $H_c$ is a thermodynamic quantity that relates to $H_{c1}$ and $H_{c2}$ but is not directly observable as a sharp transition.
 
-**Lower critical field** $H_{c1}$ (type II only). The field at which it becomes energetically favorable for the first vortex to enter the superconductor:
+**Lower critical field** $H_{c1}$ (type II only). The field at which it becomes energetically favorable for the first vortex to enter the superconductor. The exact expression, derived from the energy of an isolated vortex in the London limit (Tinkham, 2nd ed., Eq. 5.11), is:
 
-$$H_{c1} = \frac{\Phi_0 \ln\kappa}{4\pi \lambda^2}$$
+$$H_{c1} = \frac{\Phi_0}{4\pi \lambda^2}\left(\ln\kappa + 0.5\right)$$
 
-in Gaussian CGS, where $\Phi_0 = 2.068 \times 10^{-7}$ G$\cdot$cm$^2$ is the flux quantum and $\lambda$ is in cm. Below $H_{c1}$, the superconductor is in the complete Meissner state.
+in Gaussian CGS, where $\Phi_0 = 2.068 \times 10^{-7}$ G$\cdot$cm$^2$ is the flux quantum and $\lambda$ is in cm. The additive $0.5$ (sometimes written as $0.497$ from a more precise calculation) corrects for the vortex core energy, which is omitted in the simplest London-limit derivation. Neglecting the $+0.5$ term underestimates $H_{c1}$ by $\sim 20$--$50\%$ for typical superconductors with $\kappa$ of order a few to tens. Below $H_{c1}$, the superconductor is in the complete Meissner state.
 
 **Upper critical field** $H_{c2}$ (type II only). The field at which the vortex cores overlap and bulk superconductivity is destroyed:
 
@@ -289,7 +289,7 @@ $$H_{c2} = \sqrt{2}\,\kappa\,H_c$$
 
 **Relations between critical fields.** For a type-II superconductor:
 
-$$H_c = \frac{H_{c2}}{\sqrt{2}\,\kappa} = \sqrt{H_{c1} \cdot H_{c2}} \cdot \frac{1}{\sqrt{\ln\kappa}} \quad (\text{approximate})$$
+$$H_c = \frac{H_{c2}}{\sqrt{2}\,\kappa} \approx \sqrt{\frac{H_{c1} \cdot H_{c2}}{\ln\kappa + 0.5}} \quad (\text{approximate})$$
 
 The three fields satisfy $H_{c1} < H_c < H_{c2}$ for $\kappa > 1/\sqrt{2}$.
 
@@ -312,11 +312,11 @@ The three fields satisfy $H_{c1} < H_c < H_{c2}$ for $\kappa > 1/\sqrt{2}$.
 
 ### Implementation
 
-`calc.superconductor.criticalFields` computes $H_c(T)$ from the parabolic approximation. For type-II materials, it also computes $H_{c1}$ and $H_{c2}$ using $\lambda(T)$ and $\xi(T)$ from the `londonDepth` and `coherenceLength` modules. The flux quantum uses SI ($\Phi_0$ in Wb) converted to CGS ($\Phi_0$ in G$\cdot$cm$^2$ via $1\;\text{Wb} = 10^8\;\text{G}\cdot\text{cm}^2$).
+`calc.superconductor.criticalFields` computes $H_c(T)$ from the parabolic approximation. For type-II materials, it also computes $H_{c1}$ and $H_{c2}$ using $\lambda(T)$ and $\xi(T)$ from the `londonDepth` and `coherenceLength` modules. The flux quantum uses SI ($\Phi_0$ in Wb) converted to CGS ($\Phi_0$ in G$\cdot$cm$^2$ via $1\;\text{Wb} = 10^8\;\text{G}\cdot\text{cm}^2$). The $H_{c1}$ formula includes the core-energy correction term $+0.5$ (Tinkham Eq. 5.11). The type-II branch is entered whenever a material preset identifies the material as type II, or when the caller supplies explicit $\lambda$ and $\xi$ (or $\kappa$), so that $H_{c1}$ and $H_{c2}$ are accessible without requiring a named preset.
 
 ### References
 
-- Tinkham, M. *Introduction to Superconductivity*, 2nd ed., Dover, 2004, Ch. 4.
+- Tinkham, M. *Introduction to Superconductivity*, 2nd ed., Dover, 2004, Ch. 4 and Eq. 5.11.
 - Orlando, T. P. & Delin, K. A. *Foundations of Applied Superconductivity*, Addison-Wesley, 1991, Ch. 7.
 
 ---
@@ -370,41 +370,86 @@ which decreases from its maximum at $T = 0$ and vanishes at $T = T_c$.
 
 The Bean model (1962, 1964) provides a simple framework for extracting the critical current density $J_c$ from magnetization hysteresis loops $M(H)$ of type-II superconductors. The central assumption is that the current density in the superconductor is everywhere either zero or at the critical value $\pm J_c$, with no intermediate values. This is the critical-state hypothesis.
 
-When an external field is applied to a type-II superconductor in the mixed state ($H > H_{c1}$), flux vortices penetrate from the surface and are pinned by defects. The resulting flux gradient produces a macroscopic current density equal to $J_c$. The magnetization hysteresis $\Delta M = M_{\uparrow} - M_{\downarrow}$ (the difference between the ascending and descending branches of the $M(H)$ loop) is directly proportional to $J_c$.
+#### Physical origin
 
-**Rectangular cross-section** (slab with cross-section $a \times b$, where $a \leq b$, in cm):
+When an external field is applied to a type-II superconductor above $H_{c1}$, magnetic flux enters as quantized Abrikosov vortices. Vortices experience a driving force from the applied-field gradient and are pinned by material defects (grain boundaries, dislocations, precipitates, irradiation-induced columnar tracks). In equilibrium, the Lorentz force on the pinned vortex lattice balances the driving gradient, forcing a flux-density gradient $\partial B / \partial x$ proportional to $J_c$. This is just Ampere's law in magnetostatics,
 
-$$J_c\;[\text{A/cm}^2] = \frac{20\;\Delta M}{a\left(1 - \frac{a}{3b}\right)}$$
+$$\nabla \times \mathbf{H} = \frac{4\pi}{c} \mathbf{J}$$
 
-where $\Delta M$ is in emu and the factor of 20 encodes the CGS Gaussian unit conversion ($c / 4\pi$ in appropriate units). The geometric correction factor $(1 - a/3b)$ accounts for the non-uniform current distribution in a finite-aspect-ratio cross-section. For a square cross-section ($a = b$), this factor is $2/3$; for a thin strip ($a \ll b$), it approaches 1.
+in Gaussian CGS. The Bean hypothesis sets $|\mathbf{J}| = J_c$ everywhere the flux has penetrated. For a slab of half-thickness $a$ with flux entering from both faces, this implies a linear flux profile inside the material, and the macroscopic magnetization then differs between the ascending and descending field sweeps by an amount directly proportional to $J_c$.
 
-**Cylindrical cross-section** (radius $R$ in cm):
+#### Derivation sketch: infinite slab
 
-$$J_c\;[\text{A/cm}^2] = \frac{3\;\Delta M}{2R\;V}$$
+Consider an infinite slab (infinite in $y$ and $z$, thickness $2a$ in $x$, centered at $x = 0$). On the ascending branch, flux enters from $x = \pm a$ inward; the Bean condition gives a linear $B(x)$ profile with slope $\partial B/\partial x = (4\pi/c)\,J_c$. The magnetization (volume-averaged induction minus applied field) during the ascending sweep is
 
-where $V$ is the sample volume in cm$^3$.
+$$M_\uparrow = \frac{1}{V}\int B\,dV - H$$
 
-**Conventions.** The $\Delta M$ used in these formulas is the full-width of the hysteresis loop, i.e., $|M_{\uparrow} - M_{\downarrow}|$ at a given field. Some references use the half-width with correspondingly different prefactors; the implementation here uses the full width with the prefactors shown above.
+and a similar expression holds for the descending sweep. Taking the difference and using the linear profile, the magnetization width becomes
 
-**Field dependence.** The Bean model yields $J_c$ at each field value. The resulting $J_c(H)$ curve is important for applications: a rapid decrease of $J_c$ with $H$ indicates weak pinning, while a slowly decreasing $J_c(H)$ indicates strong pinning (desirable for magnets and cables).
+$$\Delta M = M_\uparrow - M_\downarrow = -\frac{J_c a}{10}$$
+
+in CGS Gaussian units, where the factor 10 combines the geometry and unit conventions. Rearranging and converting to practical units (emu for moment, A/cm$^2$ for current density) gives the standard rectangular Bean formula.
+
+#### Rectangular cross-section (finite aspect ratio)
+
+For a real sample with a rectangular cross-section $a \times b$ (where $a \leq b$, both in cm) and thickness $t$ in cm perpendicular to the applied field, the analysis must account for flux penetration along both transverse directions. Gyorgy et al. (1987) and Chen & Goldfarb (1989) derived the formula that corrects for the finite aspect ratio $a/b$:
+
+$$\boxed{J_c\;[\text{A/cm}^2] = \frac{20\;\Delta M_{\mathrm{vol}}}{a\!\left(1 - \dfrac{a}{3b}\right)}}$$
+
+where $\Delta M_{\mathrm{vol}} = \Delta M_{\mathrm{total}}\;[\text{emu}] / V\;[\text{cm}^3]$ is the volumetric magnetization width (emu/cm$^3$) and $V = a \cdot b \cdot t$. The prefactor 20 is a CGS Gaussian unit conversion factor: $c/(4\pi \times 10^3) = 3\times10^{10}/(4\pi \times 1000) \approx 2.387\times 10^6$ cm/s in abamp units, divided by appropriate powers that reduce to exactly 20 when $J_c$ is in A/cm$^2$, $\Delta M$ in emu/cm$^3$, and dimensions in cm.
+
+The correction factor $\left(1 - a/(3b)\right)$ accounts for the shorter penetration path along the $b$ direction when $a$ is not negligible compared to $b$:
+
+| Aspect ratio $a/b$ | Correction factor | Physical meaning |
+|---|---|---|
+| $a/b \to 0$ (thin strip) | 1.0 | Flux enters only along short axis |
+| $a/b = 0.5$ | 5/6 ≈ 0.833 | Moderate 2D correction |
+| $a/b = 1$ (square) | 2/3 ≈ 0.667 | Equal penetration from both directions |
+
+Neglecting the correction (setting it to 1) overestimates $J_c$ for square cross-sections by 50%.
+
+#### Cylindrical cross-section
+
+For a cylinder of radius $R$ and height $t$ (field applied along the cylinder axis), the Bean model on a circular cross-section gives:
+
+$$\boxed{J_c\;[\text{A/cm}^2] = \frac{30\;\Delta M_{\mathrm{vol}}}{R}}$$
+
+where $\Delta M_{\mathrm{vol}} = \Delta M_{\mathrm{total}}\;[\text{emu}] / V\;[\text{cm}^3]$ with $V = \pi R^2 t$, and $R$ is in cm. The prefactor 30 (= $20 \times 3/2$) comes from the cylindrical geometry factor; the factor of 3/2 relative to the slab reflects that for a disk, the average current path length to the center is $2R/3$ rather than $a/2$ for the slab.
+
+#### Conventions and sign
+
+Both formulas above use the **full-width** convention: $\Delta M = |M_\uparrow - M_\downarrow|$ is the total separation between the ascending and descending branches at a given field. Some older references (including early Bean papers) use the **half-width** $\delta m = \Delta M / 2$ with correspondingly halved prefactors (10 for rectangular, 15 for cylindrical). The implementation here uses the full-width convention consistently with Gyorgy et al. (1987) and Chen & Goldfarb (1989).
+
+**Field dependence.** The Bean model yields $J_c$ at each field value. The resulting $J_c(H)$ curve is important for applications: a rapid decrease of $J_c$ with $H$ indicates weak pinning, while a slowly decreasing $J_c(H)$ curve indicates strong collective pinning (desirable for magnets and cables).
 
 ### When to use
 
-- **DC magnetometry** (SQUID, VSM) on type-II superconducting samples: bulk pellets, single crystals, or films.
-- The sample must exhibit a well-defined hysteresis loop with separated ascending and descending branches.
-- Sample dimensions must be known accurately, as $J_c$ scales inversely with the cross-section dimension.
-- The Bean model assumes field-independent $J_c$, which is only approximately true. For strongly field-dependent $J_c$, the result at each field point should be interpreted as a local average.
-- Low-field data (below $\sim 10\%$ of the maximum applied field) are excluded because the central peak in $\Delta M$ near $H = 0$ is contaminated by flux trapping and surface barrier effects.
+- **DC magnetometry** (SQUID, VSM) on type-II superconducting samples: bulk pellets, single crystals, thin films on substrates, or sintered pellets.
+- The sample must exhibit a well-defined hysteresis loop with clearly separated ascending and descending branches. Single-crystal measurements are most reliable because demagnetization factors are well-defined.
+- Sample dimensions must be known accurately; $J_c$ scales inversely with the cross-section dimension $a$, so a 10% error in $a$ propagates directly into $J_c$.
+- The Bean model assumes a field-independent $J_c$. The result at each field is a local average. For strongly field-dependent pinning (e.g., Kim model $J_c \propto 1/(B + B_0)$), the Bean formula still gives a useful field-by-field estimate.
+- Low-field data (below $\sim 10\%$ of the maximum applied field) are excluded because the central peak in $\Delta M$ near $H = 0$ is contaminated by flux trapping and surface barrier effects that the Bean model does not describe.
+- The sample geometry must be appropriate: the field should be applied perpendicular to the broad face of a platelet (along the $c$-axis for YBCO) to avoid demagnetization corrections.
+- For thin films on substrates, the substrate diamagnetic background must be subtracted before applying the Bean formula.
 
 ### Implementation
 
-`calc.superconductor.beanJc` splits the hysteresis loop into ascending and descending branches at the field extremum, interpolates both onto a common grid, computes $\Delta M(H)$, and applies the appropriate Bean formula. The function accepts both CGS (Oe, emu) and SI (T, A$\cdot$m$^2$) units with automatic conversion.
+`calc.superconductor.beanJc` splits the hysteresis loop into ascending and descending branches at the field extremum, interpolates both branches onto a common field grid (200 points over the overlap region), computes $\Delta M(H)$, and applies the appropriate Bean formula. The function accepts both CGS (Oe, emu) and SI (T, A$\cdot$m$^2$) units with automatic conversion. The volumetric moment is computed internally from the total moment and sample dimensions.
+
+### Common pitfalls
+
+- **Wrong geometry**: using the rectangular formula for a disk punched from a film, or vice versa. Cylinders and disks use the same formula with radius $R$.
+- **Half-width vs. full-width**: some older code computes `dM = (M_up - M_down)/2` and uses prefactors 10 and 15. The implementation here uses full-width with 20 and 30. Mixing conventions gives a factor-of-2 error.
+- **Missing aspect ratio correction**: setting the correction factor to 1 for a square cross-section overestimates $J_c$ by 50%.
+- **Substrate background**: for films, the substrate moment (typically $\sim$pemu/Oe for Si or MgO) can dominate the sample signal. Subtract a linear diamagnetic background from the $M(H)$ loop before calling `beanJc`.
+- **Demagnetization**: for platelet samples, the internal field $H_\mathrm{int} = H_\mathrm{app}(1 - N)$ where $N$ is the demagnetization factor. For thin films ($t \ll a$), $N \to 1$ and the applied field is strongly screened. In this limit the Bean formula still applies but the flux-front geometry changes; the standard formula underestimates $J_c$ for very thin films.
 
 ### References
 
 - Bean, C. P. "Magnetization of Hard Superconductors," *Phys. Rev. Lett.* **8**, 250 (1962). DOI: [10.1103/PhysRevLett.8.250](https://doi.org/10.1103/PhysRevLett.8.250)
 - Bean, C. P. "Magnetization of High-Field Superconductors," *Rev. Mod. Phys.* **36**, 31 (1964). DOI: [10.1103/RevModPhys.36.31](https://doi.org/10.1103/RevModPhys.36.31)
-- Gyorgy, E. M. et al. "Anisotropy of the magnetization in superconducting YBa$_2$Cu$_3$O$_7$," *J. Appl. Phys.* **61**, 3802 (1987).
+- Gyorgy, E. M. et al. "Anisotropy of the magnetization in superconducting YBa$_2$Cu$_3$O$_7$," *J. Appl. Phys.* **61**, 3802 (1987). DOI: [10.1063/1.338638](https://doi.org/10.1063/1.338638)
+- Chen, D.-X. & Goldfarb, R. B. "Kim model for magnetization of type-II superconductors," *J. Appl. Phys.* **66**, 2489 (1989). DOI: [10.1063/1.344261](https://doi.org/10.1063/1.344261) — provides the rectangular and cylindrical formulas with explicit unit derivations and aspect-ratio corrections.
 - Tinkham, M. *Introduction to Superconductivity*, 2nd ed., Dover, 2004, Ch. 5.
 
 ---
@@ -437,16 +482,17 @@ These presets serve as quick references and defaults for calculations. For high-
 Collected bibliography in alphabetical order.
 
 1. Abrikosov, A. A. "On the Magnetic Properties of Superconductors of the Second Group," *Sov. Phys. JETP* **5**, 1174 (1957).
-2. Bardeen, J., Cooper, L. N. & Schrieffer, J. R. "Theory of Superconductivity," *Phys. Rev.* **108**, 1175 (1957).
-3. Bean, C. P. "Magnetization of Hard Superconductors," *Phys. Rev. Lett.* **8**, 250 (1962).
-4. Bean, C. P. "Magnetization of High-Field Superconductors," *Rev. Mod. Phys.* **36**, 31 (1964).
-5. Ekin, J. W. *Experimental Techniques for Low-Temperature Measurements*, Oxford University Press, 2006.
-6. Ginzburg, V. L. & Landau, L. D. "On the Theory of Superconductivity," *Zh. Eksp. Teor. Fiz.* **20**, 1064 (1950).
-7. Gorter, C. J. & Casimir, H. B. G. "On Supraconductivity I," *Physica* **1**, 306 (1934).
-8. Gyorgy, E. M. et al. "Anisotropy of the magnetization in superconducting YBa$_2$Cu$_3$O$_7$," *J. Appl. Phys.* **61**, 3802 (1987).
-9. Kupriyanov, M. Yu. & Lukichev, V. F. "Temperature dependence of pair-breaking current in superconductors," *Sov. J. Low Temp. Phys.* **6**, 210 (1980).
-10. London, F. & London, H. "The Electromagnetic Equations of the Supraconductor," *Proc. R. Soc. Lond. A* **149**, 71 (1935).
-11. Muhlschlegel, B. "Die thermodynamischen Funktionen des Supraleiters," *Z. Phys.* **155**, 313 (1959).
-12. Orlando, T. P. & Delin, K. A. *Foundations of Applied Superconductivity*, Addison-Wesley, 1991.
-13. Pippard, A. B. "An Experimental and Theoretical Study of the Relation between Magnetic Field and Current in a Superconductor," *Proc. R. Soc. Lond. A* **216**, 547 (1953).
-14. Tinkham, M. *Introduction to Superconductivity*, 2nd ed., Dover, 2004.
+2. Bardeen, J., Cooper, L. N. & Schrieffer, J. R. "Theory of Superconductivity," *Phys. Rev.* **108**, 1175 (1957). DOI: [10.1103/PhysRev.108.1175](https://doi.org/10.1103/PhysRev.108.1175)
+3. Bean, C. P. "Magnetization of Hard Superconductors," *Phys. Rev. Lett.* **8**, 250 (1962). DOI: [10.1103/PhysRevLett.8.250](https://doi.org/10.1103/PhysRevLett.8.250)
+4. Bean, C. P. "Magnetization of High-Field Superconductors," *Rev. Mod. Phys.* **36**, 31 (1964). DOI: [10.1103/RevModPhys.36.31](https://doi.org/10.1103/RevModPhys.36.31)
+5. Chen, D.-X. & Goldfarb, R. B. "Kim model for magnetization of type-II superconductors," *J. Appl. Phys.* **66**, 2489 (1989). DOI: [10.1063/1.344261](https://doi.org/10.1063/1.344261)
+6. Ekin, J. W. *Experimental Techniques for Low-Temperature Measurements*, Oxford University Press, 2006.
+7. Ginzburg, V. L. & Landau, L. D. "On the Theory of Superconductivity," *Zh. Eksp. Teor. Fiz.* **20**, 1064 (1950).
+8. Gorter, C. J. & Casimir, H. B. G. "On Supraconductivity I," *Physica* **1**, 306 (1934).
+9. Gyorgy, E. M. et al. "Anisotropy of the magnetization in superconducting YBa$_2$Cu$_3$O$_7$," *J. Appl. Phys.* **61**, 3802 (1987). DOI: [10.1063/1.338638](https://doi.org/10.1063/1.338638)
+10. Kupriyanov, M. Yu. & Lukichev, V. F. "Temperature dependence of pair-breaking current in superconductors," *Sov. J. Low Temp. Phys.* **6**, 210 (1980).
+11. London, F. & London, H. "The Electromagnetic Equations of the Supraconductor," *Proc. R. Soc. Lond. A* **149**, 71 (1935). DOI: [10.1098/rspa.1935.0048](https://doi.org/10.1098/rspa.1935.0048)
+12. Muhlschlegel, B. "Die thermodynamischen Funktionen des Supraleiters," *Z. Phys.* **155**, 313 (1959). DOI: [10.1007/BF01332932](https://doi.org/10.1007/BF01332932)
+13. Orlando, T. P. & Delin, K. A. *Foundations of Applied Superconductivity*, Addison-Wesley, 1991.
+14. Pippard, A. B. "An Experimental and Theoretical Study of the Relation between Magnetic Field and Current in a Superconductor," *Proc. R. Soc. Lond. A* **216**, 547 (1953). DOI: [10.1098/rspa.1953.0040](https://doi.org/10.1098/rspa.1953.0040)
+15. Tinkham, M. *Introduction to Superconductivity*, 2nd ed., Dover, 2004.

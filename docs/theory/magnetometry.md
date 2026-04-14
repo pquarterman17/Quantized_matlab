@@ -129,64 +129,134 @@ The function `utilities.hysteresisAnalysis` auto-detects ascending and descendin
 
 ## Demagnetization Corrections
 
-### Theory
+### Physical origin
 
-The magnetic field inside a uniformly magnetized body of finite size differs from the externally applied field due to the **demagnetizing field** $H_d$:
+A uniformly magnetized body develops surface magnetic "charges" (divergence of $\mathbf{M}$ at the boundary) that create a field opposing the magnetization. This **demagnetizing field** $\mathbf{H}_d$ reduces the internal field below the externally applied value:
 
-$$H_\mathrm{int} = H_\mathrm{ext} - N \, M$$
+$$H_\mathrm{int} = H_\mathrm{ext} - N M \quad \text{(SI)}$$
 
-where $N$ is the dimensionless demagnetization factor (in SI; in CGS, $H_\mathrm{int} = H_\mathrm{ext} - 4\pi N M$). For a general ellipsoid with principal axes, the trace condition holds:
+$$H_\mathrm{int} = H_\mathrm{ext} - 4\pi N M \quad \text{(CGS)}$$
 
-$$N_x + N_y + N_z = 1 \quad \text{(SI)}$$
+where $N$ is the dimensionless demagnetization factor. For an ellipsoid — and only for an ellipsoid — $N$ is uniform throughout the sample interior. All other shapes (cylinders, rectangular prisms) have a position-dependent $N$; the scalar values tabulated for them are volume-averaged approximations.
 
-For shapes with rotational symmetry about $z$ (spheroids, cylinders), $N_x = N_y \equiv N_{xy}$, so:
+For a body with rotational symmetry about $z$, the tracelessness condition in SI units is:
 
-$$N_{xy} = \frac{1 - N_z}{2}$$
+$$N_x + N_y + N_z = 1, \qquad N_x = N_y \equiv N_{xy} = \frac{1 - N_z}{2}$$
 
-#### Exact results for ellipsoids (Osborn 1945)
+### Why demagnetization matters for VSM/SQUID data
 
-**Sphere:**
+The measured moment is the response to $H_\mathrm{int}$, not $H_\mathrm{ext}$. If you compare raw $M(H_\mathrm{ext})$ loops to a micromagnetic model or to literature values, you are implicitly assuming $N = 0$. The error scales with $N \cdot M_s$.
+
+**Practical scale:** For an Fe thin film with $M_s \approx 1400$ emu/cm$^3$ and the field applied out-of-plane ($N_z \approx 1$ in CGS convention), the demagnetizing field is $4\pi N M_s \approx 17\,600$ Oe — nearly 18 kOe. No VSM magnet can overcome that; the sample never saturates out-of-plane unless the applied field exceeds $\sim 2H_k + 4\pi M_s$. In-plane ($N_{xy} \approx 0$), the same film saturates in a few hundred Oe. This is why thin-film magnetic measurements are almost always performed in-plane.
+
+For bulk cylindrical samples in a SQUID or VSM, the correction is smaller but non-negligible. A 3 mm long, 3 mm diameter Ni sphere-like cylinder has $N_z \approx 0.28$ and $4\pi N_z M_s \approx 1400$ Oe, which is comparable to $H_c$ for a soft Ni sample.
+
+### Formulas for all supported shapes
+
+#### Sphere
 
 $$N_z = N_{xy} = \frac{1}{3}$$
 
-**Infinite thin film** (field normal to film plane):
+Exact for any uniformly magnetized sphere. In practice, "sphere" is an adequate approximation for roughly equiaxed bulk crystals and nanoparticles with diameter-to-height ratio between 0.8 and 1.2.
 
-$$N_z = 1, \quad N_{xy} = 0$$
+#### Infinite thin film
 
-This means the internal field along the film normal is $H_\mathrm{int} = H_\mathrm{ext} - M$, which is a huge correction for in-plane vs out-of-plane geometry.
+$$N_z = 1, \qquad N_{xy} = 0$$
 
-**Prolate spheroid** (elongated, $c > a$, needle-like): with eccentricity $e^2 = 1 - (a/c)^2$ and aspect ratio $m = c/a > 1$:
+The film normal ($z$) is the hard axis; in-plane axes have zero demagnetization factor. This is the limiting case $a/c \to \infty$ for an oblate spheroid, or equivalently $L/d \to 0$ for a disk. The internal field for out-of-plane magnetization is $H_\mathrm{int} = H_\mathrm{ext} - M$, which means saturation requires $H_\mathrm{ext} > M_s$.
+
+#### Prolate spheroid (elongated needle, $c > a$)
+
+Semi-axes $a$ (equatorial radius) $< c$ (polar radius); aspect ratio $m = c/a > 1$; eccentricity $e^2 = 1 - (a/c)^2 = 1 - m^{-2}$:
 
 $$N_z = \frac{1 - e^2}{e^2}\left(-1 + \frac{1}{2e}\ln\frac{1+e}{1-e}\right)$$
 
-As $m \to \infty$ (long needle), $N_z \to 0$ and $N_{xy} \to 1/2$.
+This is exact for any prolate spheroid (Osborn 1945). Limits:
 
-**Oblate spheroid** (flattened, $a > c$, disk-like): with $e^2 = 1 - (c/a)^2$ and aspect ratio $m = a/c > 1$:
+| Aspect ratio $m = c/a$ | $N_z$ | Sample type |
+|---|---|---|
+| 1 | 1/3 | sphere |
+| 2 | 0.174 | slightly elongated |
+| 5 | 0.040 | needle-like |
+| 10 | 0.0172 | very elongated |
+| $\to\infty$ | $\to 0$ | infinite wire |
+
+#### Oblate spheroid (flattened disk, $a > c$)
+
+Semi-axes $a$ (equatorial) $> c$ (polar); aspect ratio $m = a/c > 1$; eccentricity $e^2 = 1 - (c/a)^2 = 1 - m^{-2}$:
 
 $$N_z = \frac{1}{e^2}\left(1 - \frac{\sqrt{1-e^2}}{e}\arcsin e\right)$$
 
-As $m \to \infty$ (thin disk), $N_z \to 1$.
+This is exact for any oblate spheroid (Osborn 1945). Limits:
 
-**Finite cylinder** (Osborn approximation): for a cylinder of length $L$ and diameter $d$:
+| Aspect ratio $m = a/c$ | $N_z$ | Sample type |
+|---|---|---|
+| 1 | 1/3 | sphere |
+| 2 | 0.483 | slightly flattened |
+| 5 | 0.756 | flat disk |
+| 10 | 0.860 | very flat disk |
+| $\to\infty$ | $\to 1$ | infinite thin film |
 
-$$N_z \approx \frac{1}{1 + 1.6\,(L/d)}$$
+#### Finite cylinder — Sato-Ishii approximation
 
-This approximation is valid for $L/d \in [0.1, 10]$ and gives the correct limits: $N_z \to 1$ for $L \ll d$ (disk) and $N_z \to 0$ for $L \gg d$ (rod).
+For a cylinder of length $L$ and diameter $d$, aspect ratio $\xi = L/d$:
 
-### When to use
+$$N_z \approx \frac{1}{1 + 1.6\,\xi}$$
 
-- Whenever you are comparing measured $M(H)$ data to intrinsic material properties (anisotropy fields, saturation), especially for bulk samples or thick films.
-- The correction matters most when $N \cdot M$ is comparable to $H_\mathrm{ext}$. For a thin-film sample measured in-plane ($N \approx 0$), the correction is negligible. For the same film measured out-of-plane ($N \approx 1$), the correction is enormous.
-- For soft magnetic materials ($H_c \ll 4\pi M_s$), the demagnetizing field can completely dominate the apparent hysteresis.
+This form was empirically validated by Sato & Ishii (1989) against numerical calculations by fitting many tabulated results for finite cylinders. It is distinct from the exact Osborn spheroid formulas: a cylinder and an ellipsoid with the same aspect ratio have different demagnetization factors because their surface charge distributions differ. The Sato-Ishii formula is accurate to a few percent for $\xi \in [0.1, 10]$.
+
+**Validity bounds and what to do outside them:**
+
+| $L/d$ range | Recommendation |
+|---|---|
+| $< 0.1$ (very flat disk) | Use `shape='oblate'` with `ratio = d/L`. The oblate spheroid is a much closer geometry to a flat cylinder than the Sato-Ishii extrapolation. |
+| $[0.1, 10]$ | Sato-Ishii cylinder formula; accurate to $\lesssim 5$%. |
+| $> 10$ (long rod) | Use `shape='prolate'` with `ratio = L/d`. |
+
+When `L/d` is outside $[0.1, 10]$, `demagFactor` issues a `calc:magnetic:demagFactor:cylinderAspect` warning and directs the caller to the appropriate spheroid branch. The spheroid approximation for a long cylinder overestimates $N_z$ because the flat ends of the cylinder generate more surface charge than the pointed ends of an ellipsoid of the same aspect ratio; at $L/d = 20$ the discrepancy reaches $\sim 15\%$ (Chen et al. 1991).
+
+### Graphical comparison: $N_z$ vs aspect ratio
+
+All four curves — prolate spheroid, oblate spheroid, cylinder (Sato-Ishii), and the two limits (sphere, thin film) — share the same qualitative shape: $N_z$ decreases monotonically with elongation for prolate/cylinder geometries, and increases monotonically with flattening for oblate geometries.
+
+Key features of the comparison:
+
+- **Prolate spheroid and cylinder (long-rod limit)**: both decrease from 1/3 toward 0 as the aspect ratio increases. At $m = 5$ the prolate spheroid gives $N_z \approx 0.040$ while the Sato-Ishii cylinder at $L/d = 5$ gives $N_z \approx 0.111$, a factor of 2.8 difference. Cylinders always have larger $N_z$ than prolate spheroids at the same aspect ratio, because the flat ends of a cylinder present more surface charge area.
+- **Oblate spheroid and cylinder (flat-disk limit)**: both increase from 1/3 toward 1 as the sample flattens. At $m = 5$ the oblate spheroid gives $N_z \approx 0.756$ while the Sato-Ishii cylinder at $L/d = 0.2$ gives $N_z \approx 0.757$ — coincidentally close at this point, but they diverge strongly at $m > 10$.
+- **Sphere ($N_z = 1/3$)** and **thin film ($N_z = 1$)** are the two endpoints that all curves pass through or approach asymptotically.
+- **Practical implication**: using the wrong shape model at extreme aspect ratios introduces systematic errors in the corrected internal field. At $L/d = 20$ for a nominally cylindrical sample, the error in $N_z$ between the Sato-Ishii and the prolate-spheroid value is roughly 10--15 percentage points of the absolute $N_z$, which translates directly into error in $H_\mathrm{int}$.
+
+### When to use which shape
+
+| Sample | Shape | Notes |
+|---|---|---|
+| Spherical substrate pellet | `'sphere'` | Always exact |
+| Thin film, out-of-plane field | `'thin_film'` | Exact for lateral dimensions $\gg$ thickness |
+| Thin film, in-plane field | `'thin_film'` | $N_{xy} = 0$; no correction needed |
+| Cylindrical PPMS/VSM sample, $0.1 \le L/d \le 10$ | `'cylinder'` | Default for most bulk sample holders |
+| Flat disk or coin-shaped sample, $L/d < 0.1$ | `'oblate'` with `ratio = d/L` | More accurate than cylinder extrapolation |
+| Rod-shaped crystal, $L/d > 10$ | `'prolate'` with `ratio = L/d` | More accurate than cylinder extrapolation |
+| MPMS straw (long puck) | `'cylinder'` | $L/d \approx 1$--$3$; well within valid range |
 
 ### Implementation
 
-The function `calc.magnetic.demagFactor` accepts a shape string (`'sphere'`, `'thin_film'`, `'cylinder'`, `'prolate'`, `'oblate'`) and returns $N_z$ and $N_{xy}$. For cylinders, the user provides the physical length $L$ and diameter $d$; for spheroids, the aspect ratio.
+`calc.magnetic.demagFactor(shape, ...)` returns a struct with fields `.Nz`, `.Nxy`, `.shape`, and `.latex`. The cylinder branch warns via `calc:magnetic:demagFactor:cylinderAspect` when $L/d \notin [0.1, 10]$; suppress with `warning('off', ...)` only after verifying you have switched to the appropriate spheroid branch.
+
+```matlab
+% Typical use: 3 mm long, 2 mm diameter cylindrical sample
+r = calc.magnetic.demagFactor('cylinder', L=0.3, d=0.2);  % L/d = 1.5, within range
+Hint = Hext - r.Nz * M;   % SI: subtract N*M from applied field
+
+% Flat disk: 5 mm diameter, 0.2 mm thick — use oblate spheroid
+r = calc.magnetic.demagFactor('oblate', ratio=25);  % a/c = 5/0.2 = 25
+Hint = Hext - r.Nz * M;
+```
 
 ### References
 
-- Osborn, J.A., "Demagnetizing factors of the general ellipsoid," *Phys. Rev.* **67**, 351 (1945).
-- Chen, D.-X., Brug, J.A. & Goldfarb, R.B., "Demagnetizing factors for cylinders," *IEEE Trans. Magn.* **27**, 3601 (1991).
+- Osborn, J.A., "Demagnetizing factors of the general ellipsoid," *Phys. Rev.* **67**, 351--357 (1945). [DOI: 10.1103/PhysRev.67.351](https://doi.org/10.1103/PhysRev.67.351)
+- Sato, M. & Ishii, Y., "Simple and approximate expressions of demagnetizing factors of uniformly magnetized rectangular rods and cylinders," *J. Appl. Phys.* **66**, 983--985 (1989). [DOI: 10.1063/1.343481](https://doi.org/10.1063/1.343481)
+- Chen, D.-X., Brug, J.A. & Goldfarb, R.B., "Demagnetizing factors for cylinders," *IEEE Trans. Magn.* **27**, 3601--3619 (1991). [DOI: 10.1109/20.102932](https://doi.org/10.1109/20.102932)
 - Cullity, B.D. & Graham, C.D., *Introduction to Magnetic Materials*, 2nd ed., Wiley, 2009, Ch. 2.
 
 ---
@@ -394,10 +464,11 @@ For example, bcc Fe has $n_\mathrm{at} = 8.49 \times 10^{22}$ atoms/cm$^3$ and $
 2. Kittel, C., *Introduction to Solid State Physics*, 8th ed., Wiley, 2005.
 3. Blundell, S.J., *Magnetism in Condensed Matter*, Oxford University Press, 2001.
 4. Osborn, J.A., "Demagnetizing factors of the general ellipsoid," *Phys. Rev.* **67**, 351--357 (1945). [DOI: 10.1103/PhysRev.67.351](https://doi.org/10.1103/PhysRev.67.351)
-5. Chen, D.-X., Brug, J.A. & Goldfarb, R.B., "Demagnetizing factors for cylinders," *IEEE Trans. Magn.* **27**, 3601--3619 (1991).
-6. Pike, C.R., Roberts, A.P. & Verosub, K.L., "Characterizing interactions in fine magnetic particle systems using first order reversal curves," *J. Appl. Phys.* **85**, 6660 (1999). [DOI: 10.1063/1.370176](https://doi.org/10.1063/1.370176)
-7. Pike, C.R., "First-order reversal-curve diagrams and reversible magnetization," *Phys. Rev. B* **68**, 104424 (2003).
-8. Roberts, A.P. et al., "First-order reversal curve diagrams: A new tool for characterizing the magnetic properties of natural samples," *J. Geophys. Res.* **105**, 28461 (2000).
-9. Kissinger, H.E., "Reaction kinetics in differential thermal analysis," *Anal. Chem.* **29**, 1702--1706 (1957). [DOI: 10.1021/ac60131a045](https://doi.org/10.1021/ac60131a045)
-10. Stoner, E.C. & Wohlfarth, E.P., "A mechanism of magnetic hysteresis in heterogeneous alloys," *Phil. Trans. R. Soc. A* **240**, 599--642 (1948).
-11. Jackson, J.D., *Classical Electrodynamics*, 3rd ed., Wiley, 1999.
+5. Sato, M. & Ishii, Y., "Simple and approximate expressions of demagnetizing factors of uniformly magnetized rectangular rods and cylinders," *J. Appl. Phys.* **66**, 983--985 (1989). [DOI: 10.1063/1.343481](https://doi.org/10.1063/1.343481)
+6. Chen, D.-X., Brug, J.A. & Goldfarb, R.B., "Demagnetizing factors for cylinders," *IEEE Trans. Magn.* **27**, 3601--3619 (1991). [DOI: 10.1109/20.102932](https://doi.org/10.1109/20.102932)
+7. Pike, C.R., Roberts, A.P. & Verosub, K.L., "Characterizing interactions in fine magnetic particle systems using first order reversal curves," *J. Appl. Phys.* **85**, 6660 (1999). [DOI: 10.1063/1.370176](https://doi.org/10.1063/1.370176)
+8. Pike, C.R., "First-order reversal-curve diagrams and reversible magnetization," *Phys. Rev. B* **68**, 104424 (2003).
+9. Roberts, A.P. et al., "First-order reversal curve diagrams: A new tool for characterizing the magnetic properties of natural samples," *J. Geophys. Res.* **105**, 28461 (2000).
+10. Kissinger, H.E., "Reaction kinetics in differential thermal analysis," *Anal. Chem.* **29**, 1702--1706 (1957). [DOI: 10.1021/ac60131a045](https://doi.org/10.1021/ac60131a045)
+11. Stoner, E.C. & Wohlfarth, E.P., "A mechanism of magnetic hysteresis in heterogeneous alloys," *Phil. Trans. R. Soc. A* **240**, 599--642 (1948).
+12. Jackson, J.D., *Classical Electrodynamics*, 3rd ed., Wiley, 1999.

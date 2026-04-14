@@ -188,6 +188,74 @@ The split Pearson VII has no simple closed-form integral for general $m$; use nu
 
 ---
 
+## Peak-Shape Width Parameter Conventions
+
+The mathematical forms above use FWHM as the natural width coordinate, which is useful for comparing peaks across models. The fitting engine (`+fitting/models.m` and `+fitting/autoGuess.m`) uses a different set of width parameters — one per model — that are more convenient for the optimizer. This section documents the exact correspondence so that fit results can be interpreted correctly.
+
+### Gaussian: $\sigma$ (standard deviation)
+
+The implemented form is:
+
+$$G(x;\, A, \mu, \sigma) = A \exp\!\left(-\frac{(x - \mu)^2}{2\sigma^2}\right)$$
+
+The parameter $\sigma$ is the standard deviation of the normal distribution. The FWHM is:
+
+$$\mathrm{FWHM}_G = 2\sqrt{2\ln 2}\;\sigma \approx 2.3548\,\sigma$$
+
+Rearranging: $\sigma = \mathrm{FWHM}_G / 2.3548$.
+
+The Gaussian shape is appropriate when the peak broadening arises from many independent, additive sources (central limit theorem). In XRD practice, instrumental broadening from a well-aligned modern diffractometer is approximately Gaussian, as is strain broadening arising from a distribution of lattice strains.
+
+### Lorentzian: $\gamma$ (half-width at half-maximum)
+
+The implemented form is:
+
+$$L(x;\, A, x_0, \gamma) = \frac{A}{1 + \left(\dfrac{x - x_0}{\gamma}\right)^{\!2}}$$
+
+The parameter $\gamma$ is the HWHM (half-width at half-maximum). Verify: $L(x_0 \pm \gamma) = A/2$. The FWHM is:
+
+$$\mathrm{FWHM}_L = 2\gamma$$
+
+Rearranging: $\gamma = \mathrm{FWHM}_L / 2$.
+
+The Lorentzian is the natural line shape for size broadening in the kinematical limit. A crystallite of finite size $D$ acts as a slit: the diffracted intensity is proportional to the squared modulus of the shape Fourier transform, which for a parallelepiped is a sinc$^2$ function well approximated by a Lorentzian for the central portion of the peak. It also describes homogeneous (lifetime) broadening in spectroscopy. The heavier tails of the Lorentzian (falling as $1/\Delta x^2$ vs. $\exp(-\Delta x^2)$ for the Gaussian) are the key distinguishing feature.
+
+### Pseudo-Voigt: $w$ (shared half-width)
+
+The implemented form is:
+
+$$\mathrm{pV}(x;\, A, x_0, w, \eta) = \eta\,\frac{A}{1 + \left(\dfrac{x - x_0}{w}\right)^{\!2}} + (1 - \eta)\,A\exp\!\left(-\frac{(x - x_0)^2}{2w^2}\right)$$
+
+Both the Lorentzian and Gaussian sub-expressions share the single width parameter $w$, which equals the HWHM of the Lorentzian component. The Lorentzian sub-expression has FWHM $= 2w$ exactly. The Gaussian sub-expression has FWHM $= 2\sqrt{2\ln 2}\,w \approx 2.355\,w$. For the composite,
+
+$$\mathrm{FWHM}_\mathrm{pV}(\eta) = 2w\left[\eta + (1 - \eta)\sqrt{2\ln 2}\right]$$
+
+which equals $2w$ when $\eta = 1$ (pure Lorentzian) and $2\sqrt{2\ln 2}\,w$ when $\eta = 0$ (pure Gaussian). Because $\sqrt{2\ln 2} \approx 1.177$, the difference between the two limits is at most 18%. The initial seed $w = \mathrm{FWHM}_\mathrm{est}/2$ is therefore a reasonable approximation across the full range of $\eta$.
+
+Note: the Thompson-Cox-Hastings (TCH) pseudo-Voigt parameterization used in Rietveld codes (Thompson et al. 1987) decomposes $w$ into separate Gaussian and Lorentzian FWHM components $(\Gamma_G, \Gamma_L)$ that are functions of $\theta$. The present implementation uses a single shared $w$ (simpler, suitable for single-peak fitting), and $\eta$ is a free parameter rather than computed from $\Gamma_G / \Gamma_L$.
+
+### Summary table
+
+| Model | Width parameter | Physical meaning | FWHM relation | Initial seed |
+|-------|----------------|-----------------|---------------|-------------|
+| Gaussian | $\sigma$ | Standard deviation | $\mathrm{FWHM} = 2\sqrt{2\ln 2}\,\sigma \approx 2.355\,\sigma$ | $\sigma = \mathrm{FWHM}/2.355$ |
+| Lorentzian | $\gamma$ | HWHM | $\mathrm{FWHM} = 2\gamma$ | $\gamma = \mathrm{FWHM}/2$ |
+| Pseudo-Voigt | $w$ | Lorentzian HWHM | $\mathrm{FWHM} \approx 2w$ (exact for $\eta=1$) | $w = \mathrm{FWHM}/2$ |
+
+### Choosing a peak model
+
+The appropriate shape model depends on the dominant broadening mechanism:
+
+- **Lorentzian** ($\gamma$): pure crystallite-size broadening (Scherrer regime). XRD peaks from very small nanocrystals (< 20 nm) or single-domain grains are predominantly Lorentzian. Also appropriate for homogeneous lifetime broadening in spectroscopy.
+
+- **Gaussian** ($\sigma$): pure strain broadening, or dominant instrumental broadening from a modern diffractometer. The Gaussian arises from a random distribution of lattice strains (central limit theorem) or from the convolution of many independent instrumental contributions.
+
+- **Pseudo-Voigt** ($w$, $\eta$): combined size and strain broadening. This is the most general and most widely used choice for laboratory XRD. The mixing fraction $\eta$ adjusts automatically: $\eta \to 1$ selects Lorentzian character (size-dominated), $\eta \to 0$ selects Gaussian (strain/instrumental-dominated). For most powder diffraction data, $\eta$ falls between 0.3 and 0.8.
+
+As a practical guide: start with pseudo-Voigt. If $\eta$ converges to 0 or 1 and the residuals are acceptable, switch to the pure Gaussian or Lorentzian for a more parsimonious model. If the peak is asymmetric, consider the split Pearson VII (see the "Peak Profile Functions" section above).
+
+---
+
 ## Williamson-Hall Analysis
 
 ### Theory

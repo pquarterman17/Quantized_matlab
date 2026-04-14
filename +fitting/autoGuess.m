@@ -16,6 +16,44 @@ function p0 = autoGuess(modelName, xData, yData)
 %
 %   If the model is not recognized, returns the default p0 from the model
 %   library unchanged.
+%
+%   Peak-shape width conventions
+%   ─────────────────────────────
+%   Each peak model stores a physically distinct width parameter p0(3).
+%   The seeding heuristic converts the data-estimated FWHM to the correct
+%   parameter for each model, matching the functional forms in fitting.models():
+%
+%     Gaussian:      y = A * exp( -(x-mu)^2 / (2*sigma^2) )
+%                    FWHM = 2*sqrt(2*ln2) * sigma  ≈  2.3548 * sigma
+%                    => seed:  sigma = FWHM / 2.3548
+%
+%     Lorentzian:    y = A / (1 + ((x-x0)/gamma)^2)
+%                    FWHM = 2 * gamma   (gamma is the HWHM)
+%                    => seed:  gamma = FWHM / 2
+%
+%     Pseudo-Voigt:  y = eta * L(x,w) + (1-eta) * G(x,w)
+%                    where both sub-functions share the single width w,
+%                    defined as the HWHM of the Lorentzian component.
+%                    The composite FWHM equals 2*w (exactly for eta=1,
+%                    approximately for eta in (0,1)).
+%                    => seed:  w = FWHM / 2
+%
+%   Using sigma (Gaussian convention) for all three models would seed
+%   Lorentzian and pseudo-Voigt fits with widths roughly 18% too narrow
+%   (2.3548/2 - 1), which can prevent convergence or bias the result.
+%
+%   Example
+%   ─────────────────────────────
+%     x  = linspace(-5, 5, 200)';
+%     y  = 3 ./ (1 + (x./0.8).^2) + 0.05*randn(200,1);   % Lorentzian, gamma=0.8
+%     p0 = fitting.autoGuess('Lorentzian', x, y);
+%     % p0 ≈ [3, 0, 0.8]  (amplitude, center, gamma)
+%
+%   Reference
+%   ─────────────────────────────
+%   Thompson, P., Cox, D.E. & Hastings, J.B., "Rietveld refinement of
+%   Debye-Scherrer synchrotron X-ray data from Al2O3," J. Appl. Cryst.
+%   20 (1987) 79-83.  (pseudo-Voigt FWHM parameterization)
 
 arguments
     modelName (1,1) string

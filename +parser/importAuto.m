@@ -68,10 +68,14 @@ function [data, parserName] = importAuto(filepath, varargin)
     resolveResult = parser.resolveParser(filepath);
     parserName = resolveResult.name;
 
-    % Dispatch to the primary parser
-    parserFunc = str2func(['parser.' parserName]);
+    % Dispatch to the primary parser via a whitelist switch. Previous
+    % implementation used str2func(['parser.' parserName]) which
+    % satisfies the same contract today (parserName is hard-coded in
+    % resolveParser) but is a latent code-injection vector per
+    % no-eval.md — any future extension that routed user-controlled
+    % strings through resolveParser would execute arbitrary code.
     try
-        data = parserFunc(filepath, varargin{:});
+        data = dispatchParser(parserName, filepath, varargin{:});
     catch ME
         % For .dat files, try fallback parser if primary failed because
         % no [Data] section was found. Dispatch on the specific error
@@ -82,8 +86,7 @@ function [data, parserName] = importAuto(filepath, varargin)
         if ~isempty(resolveResult.fallback) && ...
                 strcmp(ME.identifier, 'parser:importQDVSM:noData')
             parserName = resolveResult.fallback;
-            fallbackFunc = str2func(['parser.' parserName]);
-            data = fallbackFunc(filepath, varargin{:});
+            data = dispatchParser(parserName, filepath, varargin{:});
         else
             rethrow(ME);
         end
@@ -97,6 +100,41 @@ function [data, parserName] = importAuto(filepath, varargin)
     end
 end
 
+
+% ────────────────────────────────────────────────────────────────────
+function data = dispatchParser(parserName, filepath, varargin)
+%DISPATCHPARSER  Whitelist dispatch to a +parser function by name.
+%   Replaces str2func(['parser.' parserName]) which is a latent
+%   code-injection vector (no-eval.md). Only names that appear here
+%   are callable; adding a new parser requires editing this switch.
+    switch parserName
+        case 'importBruker',     data = parser.importBruker(filepath, varargin{:});
+        case 'importRigaku_raw', data = parser.importRigaku_raw(filepath, varargin{:});
+        case 'importXRDML',      data = parser.importXRDML(filepath, varargin{:});
+        case 'importTIFF',       data = parser.importTIFF(filepath, varargin{:});
+        case 'importImage',      data = parser.importImage(filepath, varargin{:});
+        case 'importRawImage',   data = parser.importRawImage(filepath, varargin{:});
+        case 'importBCF',        data = parser.importBCF(filepath, varargin{:});
+        case 'importDM3',        data = parser.importDM3(filepath, varargin{:});
+        case 'importDM4',        data = parser.importDM4(filepath, varargin{:});
+        case 'importSER',        data = parser.importSER(filepath, varargin{:});
+        case 'importMRC',        data = parser.importMRC(filepath, varargin{:});
+        case 'importAFM',        data = parser.importAFM(filepath, varargin{:});
+        case 'importExcel',      data = parser.importExcel(filepath, varargin{:});
+        case 'importCSV',        data = parser.importCSV(filepath, varargin{:});
+        case 'importSIMS',       data = parser.importSIMS(filepath, varargin{:});
+        case 'importNCNRRefl',   data = parser.importNCNRRefl(filepath, varargin{:});
+        case 'importNCNRPNR',    data = parser.importNCNRPNR(filepath, varargin{:});
+        case 'importNCNRDat',    data = parser.importNCNRDat(filepath, varargin{:});
+        case 'importQDVSM',      data = parser.importQDVSM(filepath, varargin{:});
+        case 'importPPMS',       data = parser.importPPMS(filepath, varargin{:});
+        case 'importMPMS',       data = parser.importMPMS(filepath, varargin{:});
+        case 'importLakeShore',  data = parser.importLakeShore(filepath, varargin{:});
+        otherwise
+            error('parser:importAuto:unknownParser', ...
+                'No parser registered with name "%s".', parserName);
+    end
+end
 
 % ────────────────────────────────────────────────────────────────────
 function printSummary(data, parserName, filepath)

@@ -24,6 +24,15 @@ function test_layoutIntegrity
     if ~contains(path, rootDir), addpath(rootDir); end
     if ~contains(path, thisDir), addpath(thisDir); end
 
+    % Force-close any uifigures left over from prior suites. In isolation
+    % this test sees zero zero-size leaves; in the full-suite run
+    % (runAllTests) leftover figures and the groot defaults they may
+    % have mutated can cause BosonPlotter's layout to compute with
+    % stale pixel sizes, reporting spurious zero-size leaves. Resetting
+    % before opening our own instance eliminates that ordering fragility.
+    close('all', 'force');
+    drawnow;
+
     passed = 0;
     failed = 0;
     failures = {};

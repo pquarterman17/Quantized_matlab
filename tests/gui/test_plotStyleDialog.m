@@ -27,6 +27,12 @@ function test_plotStyleDialog
     failed = 0;
     failures = {};
 
+    % Defensive cleanup of any uifigures left by prior suites — prevents
+    % occasional full-suite flakes where BosonPlotter layout computes
+    % against stale pixel state.
+    close('all', 'force');
+    drawnow;
+
     api = BosonPlotter('Visible','off');
     drawnow;
     cleanupApi = onCleanup(@() api.close()); %#ok<NASGU>

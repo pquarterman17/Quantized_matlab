@@ -335,6 +335,9 @@ lsnMask = addlistener(model, 'MaskChanged',      @onModelMaskChanged);
 
 % Keep listeners alive in the GUI scope (handle objects — MATLAB will
 % auto-delete them when they go out of scope, so we anchor them here).
+% The cell is mutable so callbacks registered later in the session can
+% append via addGuiListener() without getting garbage-collected at the
+% end of the enclosing scope.
 guiListeners = {lsnData, lsnSel, lsnMask};  %#ok<NASGU>
 
 % Bootstrap the UI from any datasets already present in the shared
@@ -519,6 +522,7 @@ end
             'Resize',     'off', ...
             'WindowStyle','modal');
         movegui(dlgFig, 'center');
+        % Enter = commit, Escape = cancel (set after onCommit is defined below)
 
         dlgGL = uigridlayout(dlgFig, [6 2], ...
             'RowHeight',    {22, 22, 22, 60, 22, 34}, ...
@@ -608,6 +612,20 @@ end
         % Pre-fill preview if editing
         if isEditMode
             updatePreview(existingExpr);
+        end
+
+        % Enter commits, Escape cancels — matches standard modal-dialog
+        % muscle memory. Wired here (after onCommit is defined as a
+        % nested function) so the handler closures resolve correctly.
+        dlgFig.KeyPressFcn = @(~, evt) dlgKey(evt);
+
+        function dlgKey(evt)
+            switch evt.Key
+                case {'return', 'enter'}
+                    onCommit([], []);
+                case 'escape'
+                    delete(dlgFig);
+            end
         end
 
         function onFormulaEdited(~, ~)
@@ -881,7 +899,8 @@ end
             'Position',    [0 0 300 200], ...
             'Color',       BG, ...
             'Resize',      'off', ...
-            'WindowStyle', 'modal');
+            'WindowStyle', 'modal', ...
+            'KeyPressFcn', @(~, evt) pickerKey(evt));
         movegui(dlg, 'center');
 
         dlgGL = uigridlayout(dlg, [3 2], ...
@@ -913,6 +932,13 @@ end
             sel = find(strcmp(items, lst.Value), 1);
             ok  = true;
             delete(dlg);
+        end
+
+        function pickerKey(evt)
+            switch evt.Key
+                case {'return','enter'}, doOK([], []);
+                case 'escape',           delete(dlg);
+            end
         end
     end
 
@@ -1005,7 +1031,8 @@ end
 
         dlg = uifigure('Name', 'Dataset Math', ...
             'Position', [200 300 360 200], ...
-            'WindowStyle', 'modal');
+            'WindowStyle', 'modal', ...
+            'KeyPressFcn', @(~, evt) mathKey(evt));
         dlgGL = uigridlayout(dlg, [4 3], ...
             'RowHeight',   {30, 30, 30, 36}, ...
             'ColumnWidth', {100, 80, 100}, ...
@@ -1043,7 +1070,16 @@ end
                 setStatusBar(sprintf('Created: %s', result.metadata.source));
                 delete(dlg);
             catch ME
-                uialert(dlg, ME.message, 'Dataset Math Error');
+                uialert(dlg, sprintf('Dataset Math (%s %s %s) failed:\n\n%s', ...
+                    ddA.Value, ddOp.Value, ddB.Value, ME.message), ...
+                    'Dataset Math Error');
+            end
+        end
+
+        function mathKey(evt)
+            switch evt.Key
+                case {'return','enter'}, doCompute([], []);
+                case 'escape',           delete(dlg);
             end
         end
     end
@@ -1067,7 +1103,8 @@ end
 
         dlg = uifigure('Name', 'Merge Columns', ...
             'Position', [200 320 320 160], ...
-            'WindowStyle', 'modal');
+            'WindowStyle', 'modal', ...
+            'KeyPressFcn', @(~, evt) mergeKey(evt));
         dlgGL = uigridlayout(dlg, [3 3], ...
             'RowHeight',   {30, 30, 36}, ...
             'ColumnWidth', {100, 80, 80}, ...
@@ -1098,7 +1135,15 @@ end
                 setStatusBar(sprintf('Created: %s', result.metadata.source));
                 delete(dlg);
             catch ME
-                uialert(dlg, ME.message, 'Merge Error');
+                uialert(dlg, sprintf('Merge (%s + %s) failed:\n\n%s', ...
+                    ddA.Value, ddB.Value, ME.message), 'Merge Error');
+            end
+        end
+
+        function mergeKey(evt)
+            switch evt.Key
+                case {'return','enter'}, doMerge([], []);
+                case 'escape',           delete(dlg);
             end
         end
     end
@@ -1131,8 +1176,33 @@ end
 
     function onKeyPress(~, evt)
     %ONKEYPRESS  Handle figure-level keyboard shortcuts.
-        if strcmp(evt.Key, 'v') && any(strcmp(evt.Modifier, 'control'))
-            onPasteFromClipboard();
+    %   Ctrl+V — paste from clipboard
+    %   Ctrl+S — save workspace session (if the callback exists in this
+    %            build — the helper is only present in builds with the
+    %            save-as-session toolbar action wired up)
+    %   Delete — remove the currently selected dataset, matching the
+    %            BosonPlotter dataset-list convention so the two GUIs
+    %            feel consistent.
+        if any(strcmp(evt.Modifier, 'control'))
+            switch evt.Key
+                case 'v'
+                    onPasteFromClipboard();
+                case 's'
+                    try
+                        onSaveWorkspace([], []);
+                    catch
+                        % No-op if the save callback isn't defined in
+                        % this build — Ctrl+S then silently does nothing.
+                    end
+            end
+            return;
+        end
+        if strcmp(evt.Key, 'delete')
+            try
+                onRemove([], []);
+            catch
+                % onRemove handles the "nothing selected" case itself.
+            end
         end
     end
 

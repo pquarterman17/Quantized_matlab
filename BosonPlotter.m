@@ -2000,8 +2000,12 @@ function varargout = BosonPlotter(options)
     % Rows: [hdrData, dataContent, hdrFig, figContent, hdrSession, sessionContent, hdrTools, toolsContent]
     SAVE_SEC_H = 20;    % header row height
     SAVE_ROW_H = 78;    % content block height (3 rows of 24 + spacing)
+    % Default open state: Data Export (row 2) + Figure Export (row 4).
+    % Save-figure-as is a daily task; hiding it behind an extra click was
+    % a papercut called out in the repo audit (W2 #19). Session and Tools
+    % remain collapsed (rows 6, 8) because they're used far less often.
     saveGL = uigridlayout(savePanel,[8 1], ...
-        'RowHeight', {SAVE_SEC_H, SAVE_ROW_H, SAVE_SEC_H, 0, SAVE_SEC_H, 0, SAVE_SEC_H, 0}, ...
+        'RowHeight', {SAVE_SEC_H, SAVE_ROW_H, SAVE_SEC_H, SAVE_ROW_H, SAVE_SEC_H, 0, SAVE_SEC_H, 0}, ...
         'ColumnWidth', {'1x'}, ...
         'Padding',     [2 2 2 2], ...
         'RowSpacing',  1);
@@ -2069,8 +2073,8 @@ function varargout = BosonPlotter(options)
         'Tooltip','Export to HDF5 (.h5)');
     btnExportHDF5.Layout.Row = 3; btnExportHDF5.Layout.Column = 2;
 
-    % ── Header: Figure Export (collapsed by default) ─────────────────
-    btnSaveHdrFig = uibutton(saveGL,'Text',[char(9654) ' Figure Export'], ...
+    % ── Header: Figure Export (open by default — W2 #19) ─────────────
+    btnSaveHdrFig = uibutton(saveGL,'Text',[char(9660) ' Figure Export'], ...
         'FontSize',9,'FontWeight','bold','HorizontalAlignment','left', ...
         'BackgroundColor',[0.18 0.18 0.18],'FontColor',[0.85 0.85 0.85], ...
         'ButtonPushedFcn', @(~,~) toggleSaveSection('figExport','Figure Export'));
@@ -3579,8 +3583,24 @@ function varargout = BosonPlotter(options)
 
             % Evaluate expression safely — no eval(); uses dispatch-based parser
             yResult = bosonPlotter.safeEvalMathExpr(expr, vars);
-            if ~isnumeric(yResult) || numel(yResult) ~= numel(xBase)
-                error('Expression did not produce a vector of the correct length.');
+            if ~isnumeric(yResult)
+                error('Expression did not produce a numeric vector.');
+            end
+            % diff() reduces length by 1. Auto-trim the x-axis by one
+            % element so the result struct stays rectangular. This is
+            % a common user expectation; emit a status message so the
+            % behaviour is visible in the GUI.
+            if numel(yResult) == numel(xBase) - 1
+                xBase = xBase(1:end-1);
+                setStatus(['diff() reduces array length by 1; ' ...
+                    'trimmed x-axis to match (now ' ...
+                    sprintf('%d', numel(xBase)) ' points).']);
+            elseif numel(yResult) ~= numel(xBase)
+                error(['Expression returned %d elements but the base ' ...
+                    'dataset has %d samples. Check your formula — ' ...
+                    'resampling or aggregation inside the expression ' ...
+                    'breaks the x-axis alignment.'], ...
+                    numel(yResult), numel(xBase));
             end
 
             % Build result data struct
@@ -3675,10 +3695,23 @@ function varargout = BosonPlotter(options)
         % Sort indices in descending order so removal doesn't affect remaining indices
         indicesToRemove = sort(indicesToRemove, 'descend');
 
-        % Remove selected datasets (also from shared model)
+        % Remove selected datasets (also from shared model). appData.model
+        % and appData.datasets must stay in 1:1 correspondence — if an
+        % earlier silent-catch model.updateDataset failure left them out
+        % of sync we would permanently corrupt the index mapping by
+        % skipping model removals. Warn loudly instead so the divergence
+        % is visible, then remove unconditionally.
+        if appData.model.count() ~= numel(appData.datasets)
+            warning('BosonPlotter:modelDesync', ...
+                ['WorkspaceModel has %d datasets but appData.datasets has %d — ' ...
+                 'they drifted out of sync (silent updateDataset catch?). ' ...
+                 'Removing unconditionally and hoping for the best.'], ...
+                appData.model.count(), numel(appData.datasets));
+        end
         for ri = 1:numel(indicesToRemove)
-            if indicesToRemove(ri) <= appData.model.count()
-                appData.model.removeDataset(indicesToRemove(ri));
+            idx = indicesToRemove(ri);
+            if idx <= appData.model.count()
+                appData.model.removeDataset(idx);
             end
         end
         appData.datasets(indicesToRemove) = [];
@@ -12449,6 +12482,20 @@ function [data, parserName] = guiImport(fp)
 
         case 'importPPMS'
             data = parser.importPPMS(fp, 'YAxis', 'all');
+
+        case 'importLakeShore'
+            % Lake Shore magnetometer exports — routed here by
+            % resolveParser's content-sniffer when the .dat header shows
+            % vendor strings or 7400/8600 model numbers. Load all
+            % channels so the GUI Y-axis picker sees every column.
+            data = parser.importLakeShore(fp, 'YAxis', 'all');
+
+        case 'importMPMS'
+            % MPMS SQUID magnetometer — shares the QD [Header]/[Data]
+            % layout, so it's normally reached via importQDVSM dispatch.
+            % This branch exists for users who configure the parser
+            % directly (e.g. from templates or scripts).
+            data = parser.importMPMS(fp, 'YAxis', 'all');
 
         case 'importImage'
             data = parser.importImage(fp);

@@ -1,12 +1,19 @@
 function R = parrattRefl(Q, layers, options)
-%PARRATTREFL  Specular reflectivity via Parratt recursion.
+%PARRATTREFL  Specular reflectivity via Parratt recursion, with optional
+%             instrument Q-resolution smearing.
 %
 %   R = fitting.parrattRefl(Q, layers)
 %   R = fitting.parrattRefl(Q, layers, Roughness=true)
+%   R = fitting.parrattRefl(Q, layers, Resolution=0.03)     % dQ/Q = 3 %%
+%   R = fitting.parrattRefl(Q, layers, Resolution=dQ_vec)   % pointwise
 %
 %   Computes specular reflectivity R(Q) for a multilayer thin-film stack
 %   using the recursive Parratt formalism with optional Névot-Croce
-%   interfacial roughness.
+%   interfacial roughness. When a finite instrument Q-resolution is
+%   supplied the ideal R(Q) is Gaussian-convolved with a kernel of width
+%   dQ(Q) on an oversampled grid — the standard treatment for NCNR and
+%   PANalytical data where dQ/Q ~ 3–6 %% and unsmeared fits bias layer
+%   thickness and roughness.
 %
 %   Inputs:
 %       Q      — [N×1] momentum transfer vector (Å⁻¹), Q = 4π sin(θ)/λ
@@ -17,9 +24,15 @@ function R = parrattRefl(Q, layers, options)
 %                Rows 2..M-1 = thin film layers (top to bottom)
 %
 %   Options:
-%       Roughness — apply Névot-Croce roughness (default: true)
-%       Scale     — overall scale factor (default: 1.0)
-%       Background— constant background added to R (default: 0)
+%       Roughness  — apply Névot-Croce roughness (default: true)
+%       Scale      — overall scale factor (default: 1.0)
+%       Background — constant background added to R (default: 0)
+%       Resolution — instrument Q-resolution kernel width as Gaussian σ_Q:
+%                      [] / 0         no smearing (default, backward-compatible)
+%                      scalar         constant dQ/Q (σ_Q = fractional × Q)
+%                      [N×1] vector   per-point σ_Q (Å⁻¹), one per input Q
+%                    When non-empty the function oversamples each input Q
+%                    point to ±3σ and returns the Gaussian-weighted R.
 %
 %   Output:
 %       R — [N×1] reflectivity (|r|²), same size as Q
@@ -30,6 +43,17 @@ function R = parrattRefl(Q, layers, options)
 %       ...
 %       Layer M-1: bottom film layer
 %       Layer M: substrate (Si: SLD ≈ 2.07e-6 Å⁻², thickness = 0)
+%
+%   Complex SLD sign convention:
+%       The internal complex SLD is built as  sld = SLD_real + i * SLD_imag
+%       with SLD_imag >= 0 for absorbing materials (e.g. Au, Pt, Cu at
+%       X-ray energies). kz in each layer is then
+%         kz_j = sqrt((Q/2)^2 - 4*pi*sld_j),
+%       the standard Parratt form consistent with the optics convention
+%       n^2 = 1 - (lambda^2/pi) * SLD_complex where SLD_complex carries
+%       the same +i sign. Presets in fitting.reflSLDPresets store
+%       sldImag as a POSITIVE number by this convention — expect
+%       physical (monotonically decaying) R(Q) at high Q.
 %
 %   Examples:
 %       % Bare silicon in air
@@ -50,6 +74,7 @@ arguments
     options.Roughness  (1,1) logical = true
     options.Scale      (1,1) double = 1.0
     options.Background (1,1) double = 0
+    options.Resolution      double  = []   % [] | scalar dQ/Q | N-vector dQ
 end
 
 nLayers = size(layers, 1);
@@ -59,6 +84,47 @@ if nLayers < 2
 end
 
 N = numel(Q);
+
+% ════════════════════════════════════════════════════════════════════════
+%  Resolution smearing branch (oversample + Gaussian weight). Recurse
+%  with Resolution=[] so we don't loop forever.
+% ════════════════════════════════════════════════════════════════════════
+if ~isempty(options.Resolution) && any(options.Resolution > 0)
+    res = options.Resolution;
+    if isscalar(res)
+        dQ = Q(:) * res;                     % constant dQ/Q → σ_Q per point
+    elseif numel(res) == N
+        dQ = res(:);                         % per-point σ_Q
+    else
+        error('fitting:parrattRefl:badResolution', ...
+            ['Resolution must be empty, a scalar dQ/Q, or an N-vector ' ...
+             'of σ_Q (got %d elements, expected %d).'], numel(res), N);
+    end
+
+    nOver  = 21;     % samples per point
+    nSigma = 3;      % truncation in σ
+    R      = zeros(N, 1);
+    for iPt = 1:N
+        if dQ(iPt) <= 0
+            % Zero resolution at this point — evaluate a single point
+            R(iPt) = fitting.parrattRefl(Q(iPt), layers, ...
+                Roughness=options.Roughness, ...
+                Scale=options.Scale, ...
+                Background=options.Background);
+            continue;
+        end
+        qSamp = linspace(Q(iPt) - nSigma * dQ(iPt), ...
+                         Q(iPt) + nSigma * dQ(iPt), nOver)';
+        qSamp = max(qSamp, 1e-6);            % avoid non-physical negatives
+        Rsamp = fitting.parrattRefl(qSamp, layers, ...
+            Roughness=options.Roughness, ...
+            Scale=options.Scale, ...
+            Background=options.Background);
+        w     = exp(-0.5 * ((qSamp - Q(iPt)) / dQ(iPt)).^2);
+        R(iPt) = sum(w .* Rsamp) / sum(w);
+    end
+    return;
+end
 
 % Extract layer parameters
 d     = layers(:, 1);   % thickness (Å)

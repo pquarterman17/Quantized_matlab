@@ -141,10 +141,22 @@ function result = resolveParser(filepath)
             result.name = 'importNCNRDat';
 
         case '.dat'
-            % QD VSM/PPMS: try primary (.qd format with [Header]/[Data] markers)
-            % and fallback to legacy PPMS CSV format
-            result.name     = 'importQDVSM';
-            result.fallback = 'importPPMS';
+            % .dat is an overloaded extension. Quantum Design instruments
+            % (VSM, PPMS, MPMS) emit files with a [Header]/[Data] block
+            % marker; Lake Shore magnetometers emit a very different
+            % layout with per-instrument model-number + "Lake Shore" in
+            % the header. Content-sniff to pick the right parser.
+            if looksLikeLakeShore(filepath)
+                result.name = 'importLakeShore';
+            else
+                % Default: try QD VSM primary, fall back to legacy PPMS
+                % CSV format. importMPMS is a wrapper over importQDVSM
+                % so MPMS files also parse cleanly here — users who want
+                % MPMS-specific default columns should call
+                % parser.importMPMS directly.
+                result.name     = 'importQDVSM';
+                result.fallback = 'importPPMS';
+            end
 
         otherwise
             error('parser:resolveParser:unknownExtension', ...
@@ -200,6 +212,48 @@ function tf = looksLikeSIMS(filepath)
             tf = true;
             return;
         end
+    end
+end
+
+
+% ────────────────────────────────────────────────────────────────────
+function tf = looksLikeLakeShore(filepath)
+%LOOKSSLIKELAKESHORE  Quick content scan for a Lake Shore magnetometer file.
+%   Reads the first ~20 lines and looks for Lake Shore vendor signatures
+%   (brand string, classic instrument model numbers 7400-series or
+%   8600-series VSMs). Returns true when any of those appear.
+    tf = false;
+    try
+        fid = fopen(filepath, 'r');
+        if fid == -1, return; end
+        cleanObj = onCleanup(@() fclose(fid));
+        lines = cell(1, 20);
+        for i = 1:20
+            ln = fgetl(fid);
+            if ~ischar(ln), break; end
+            lines{i} = ln;
+        end
+    catch
+        return;
+    end
+
+    % Bail early if the first non-empty line is '[Header]' — that's the
+    % Quantum Design QD-format marker and takes priority regardless of
+    % any later content.
+    for i = 1:numel(lines)
+        ln = strtrim(lines{i});
+        if isempty(ln), continue; end
+        if strcmpi(ln, '[Header]')
+            return;   % QD format; not Lake Shore
+        end
+        break;
+    end
+
+    allLower = lower(strjoin(lines(~cellfun(@isempty, lines)), ' '));
+    if contains(allLower, 'lake shore') || contains(allLower, 'lakeshore') ...
+            || ~isempty(regexp(allLower, 'model\s*7[34]\d\d\b', 'once')) ...
+            || ~isempty(regexp(allLower, 'model\s*86\d\d\b', 'once'))
+        tf = true;
     end
 end
 
