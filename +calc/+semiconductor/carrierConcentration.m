@@ -32,20 +32,25 @@ arguments
     ni (1,1) double {mustBePositive}
 end
 
+% Charge-neutrality + mass-action law, solved exactly:
+%   n - p = Nd - Na      (charge neutrality)
+%   n * p = ni^2          (mass action, non-degenerate limit)
+% ==> n  = ((Nd-Na) + sqrt((Nd-Na)^2 + 4*ni^2)) / 2
+%     p  = ni^2 / n
+% This smoothly interpolates between intrinsic (|Nd-Na| << ni) and
+% extrinsic (|Nd-Na| >> ni) regimes without a discrete branch that
+% discontinuously flips near |net| ≈ ni.  Sze "Physics of Semiconductor
+% Devices" 3rd ed. Ch. 1.5.
 net = Nd - Na;
+n = 0.5 * (net + sqrt(net^2 + 4 * ni^2));
+p = ni^2 / n;
 
-if abs(net) < ni
+if abs(net) < 0.1 * ni
     type = 'intrinsic';
-    n    = ni;
-    p    = ni;
 elseif net > 0
     type = 'n';
-    n    = net;
-    p    = ni^2 / n;
 else
     type = 'p';
-    p    = -net;
-    n    = ni^2 / p;
 end
 
 result.n     = n;
