@@ -195,6 +195,14 @@ function renderPlot(targetAx, ctx)
         appData.smoothPreviewLine = [];
         delete(targetAx.Children);
         cla(targetAx);
+        % Colorbars are parented to the figure (not ax.Children), so cla
+        % leaves them behind. When a previous render drew a 2D heatmap,
+        % the orphan colorbar would persist through the 1D redraw —
+        % delete it explicitly here. draw2DMap creates a fresh one if
+        % the new dataset is 2D.
+        if ~isempty(targetAx.Colorbar) && isvalid(targetAx.Colorbar)
+            delete(targetAx.Colorbar);
+        end
         appData.map2DHandle = [];
         targetAx.XLim = [0 1];  targetAx.YLim = [0 1];
         targetAx.XLimMode = 'auto';
