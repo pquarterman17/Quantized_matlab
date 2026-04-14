@@ -897,6 +897,8 @@ function varargout = BosonPlotter(options)
         % Label editing (via double-click on plot labels or this menu entry)
         uimenu(cmAxes, 'Text', 'Edit Axis Labels...', 'Separator', 'on', ...
             'MenuSelectedFcn', @(~,~) onEditAxisLabelsMenu());
+        uimenu(cmAxes, 'Text', 'Edit Legend...', ...
+            'MenuSelectedFcn', @(~,~) onOpenLegendEditor());
 
         % Actions
         uimenu(cmAxes, 'Text', 'Auto-Scale', 'Separator', 'on', ...
@@ -1870,9 +1872,14 @@ function varargout = BosonPlotter(options)
     ddLegendLoc = uidropdown(axLimGL, ...
         'Items', {'best','NE','NW','SE','SW','EastOutside','off'}, ...
         'Value', 'best', 'FontSize', 9, ...
-        'Tooltip', 'Legend location ("off" hides it)', ...
+        'Tooltip', ['Legend location ("off" hides it).' newline ...
+                    'Right-click for "Edit Legend..." (per-dataset names, style).'], ...
         'ValueChangedFcn', @onToolbarLegendToggle);
     ddLegendLoc.Layout.Row = 4; ddLegendLoc.Layout.Column = 3;
+    cmLegend = uicontextmenu(fig);
+    uimenu(cmLegend, 'Text', 'Edit Legend...', ...
+        'MenuSelectedFcn', @(~,~) onOpenLegendEditor());
+    ddLegendLoc.ContextMenu = cmLegend;
 
     ddDatasetColor = uidropdown(axLimGL, ...
         'Items', DS_COLOR_NAMES, 'ItemsData', DS_COLOR_RGBS, ...
@@ -4978,6 +4985,43 @@ function varargout = BosonPlotter(options)
             uialert(fig, sprintf('Plot Style dialog failed:\n%s', ME.message), ...
                 'Style dialog error');
             logGUIError('onOpenPlotStyleDialog', 'dialog failed', ME);
+        end
+    end
+
+    function onOpenLegendEditor()
+    %ONOPENLEGENDEDITOR  Open the multi-dataset legend editor dialog.
+    %   Lets the user edit every dataset's legend name / visibility at
+    %   once, and adjust shared legend style (location, font, box,
+    %   weight). Persists edits via plotState (for visibility) and
+    %   styleOverrides (for shared style) so changes survive dataset
+    %   toggles and session save/load.
+        if isempty(appData.datasets)
+            uialert(fig, 'Load at least one dataset first.', 'No data');
+            return;
+        end
+        legCtx = struct();
+        legCtx.fig               = fig;
+        legCtx.theme             = appData.theme;
+        legCtx.getDatasets       = @() appData.datasets;
+        legCtx.setDataset        = @(idx, d) assignDataset(idx, d);
+        legCtx.getStyleOverrides = @() appData.styleOverrides;
+        legCtx.setStyleOverrides = @(s) assignStyleOverrides(s);
+        legCtx.getActiveTemplate = @() appData.activeTemplate;
+        legCtx.replot            = @() onPlot([],[]);
+        try
+            bosonPlotter.legendEditor(fig, legCtx);
+        catch ME
+            uialert(fig, sprintf('Legend editor failed:\n%s', ME.message), ...
+                'Legend dialog error');
+            logGUIError('onOpenLegendEditor', 'dialog failed', ME);
+        end
+    end
+
+    function assignDataset(idx, ds)
+    %ASSIGNDATASET  Safe write-back helper for dialog callbacks that
+    %   mutate per-dataset state (legend name, visibility, etc.).
+        if idx >= 1 && idx <= numel(appData.datasets)
+            appData.datasets{idx} = ds;
         end
     end
 
