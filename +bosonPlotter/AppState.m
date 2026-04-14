@@ -82,10 +82,12 @@ classdef AppState < handle
         maskStartPt     double  = []
 
         % ── Box integration (2D map) ─────────────────────────────
-        boxIntStartPt   double  = []
-        boxIntPatch               = []
-        boxIntMode      logical = false
-        boxPreviewPatch           = []
+        boxIntStartPt          double  = []
+        boxIntPatch                      = []
+        boxIntMode             logical = false
+        boxPreviewPatch                  = []
+        boxIntCompletedPatch             = []
+        boxIntCompletedRegion  double  = []   % [xLo xHi yLo yHi] — survives redraw
 
         % ── Y-translate drag ───────────────────────────────────────
         yTranslateY0    double  = 0

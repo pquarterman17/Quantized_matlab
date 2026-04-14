@@ -3931,6 +3931,7 @@ function varargout = BosonPlotter(options)
         appData.boxIntStartPt     = [];
         appData.boxIntMode        = false;
         clearBoxPreview();
+        clearCompletedBoxPatch();
         btnMaskSelect.Text            = 'Mask Selection';
         btnMaskSelect.BackgroundColor = [0.60 0.15 0.15];
         btnMaskSelect.Enable          = 'on';
@@ -7455,27 +7456,29 @@ function varargout = BosonPlotter(options)
     end
 
     function applyAxesPlotState()
-    %APPLYAXESPLOTSTATE  Post-plot pass: restore per-dataset grid/XDir/YDir.
-    %  The scale dropdowns and 2D widgets drive renderPlot via their
-    %  ValueChangedFcn; grid and axis-direction live on the axes object
-    %  directly and need to be re-applied after each draw.
+    %APPLYAXESPLOTSTATE  Post-plot pass: restore per-dataset grid/XDir/
+    %  YDir, and the completed-box integration marker (renderPlot wipes
+    %  all axes children, so overlays that should persist must be
+    %  re-created here).
         if isempty(ax) || ~isvalid(ax), return; end
         if appData.activeIdx < 1 || isempty(appData.datasets), return; end
         ds = appData.datasets{appData.activeIdx};
-        if ~isfield(ds, 'plotState') || ~isstruct(ds.plotState), return; end
-        ps = ds.plotState;
-        if isfield(ps, 'gridX') && ~isempty(ps.gridX)
-            ax.XGrid = ps.gridX;
+        if isfield(ds, 'plotState') && isstruct(ds.plotState)
+            ps = ds.plotState;
+            if isfield(ps, 'gridX') && ~isempty(ps.gridX)
+                ax.XGrid = ps.gridX;
+            end
+            if isfield(ps, 'gridY') && ~isempty(ps.gridY)
+                ax.YGrid = ps.gridY;
+            end
+            if isfield(ps, 'xDir') && ~isempty(ps.xDir)
+                ax.XDir = ps.xDir;
+            end
+            if isfield(ps, 'yDir') && ~isempty(ps.yDir)
+                ax.YDir = ps.yDir;
+            end
         end
-        if isfield(ps, 'gridY') && ~isempty(ps.gridY)
-            ax.YGrid = ps.gridY;
-        end
-        if isfield(ps, 'xDir') && ~isempty(ps.xDir)
-            ax.XDir = ps.xDir;
-        end
-        if isfield(ps, 'yDir') && ~isempty(ps.yDir)
-            ax.YDir = ps.yDir;
-        end
+        redrawCompletedBoxPatch();
     end
 
     function onAdvAsymmetry(~, ~)
@@ -8323,7 +8326,8 @@ function varargout = BosonPlotter(options)
     function onAutoLimits(~,~)
     %ONAUTOLIMITS  Reset View — clear axis limits and per-dataset plot
     %  state so the active dataset returns to parser-aware auto defaults
-    %  (log/linear, grid, axis direction, 2D map settings).
+    %  (log/linear, grid, axis direction, 2D map settings). Also clears
+    %  any persistent box-integration marker from the map.
         efXMin.Value = '';  efXMax.Value = '';  efXStep.Value = '';
         efYMin.Value = '';  efYMax.Value = '';  efYStep.Value = '';
         efY2Min.Value = '';  efY2Max.Value = '';  efY2Step.Value = '';
@@ -8338,6 +8342,7 @@ function varargout = BosonPlotter(options)
             ax.XDir  = 'normal';
             ax.YDir  = 'normal';
         end
+        clearCompletedBoxPatch();
         saveAxisLimsToActiveDataset();
         updateControlsForActiveDataset();   % re-pull parser defaults
         onPlot([],[]);
@@ -8509,9 +8514,18 @@ function varargout = BosonPlotter(options)
                     appData.boxIntMode = false;
                     btnBoxIntegrate.Text = 'Box Integrate...';
                     btnBoxIntegrate.BackgroundColor = [0.20 0.50 0.35];
+                    clearCompletedBoxPatch();   % replace previous marker
                     executeFixedBoxIntegration(x0, y0);
                 else
-                    % Free-draw mode: drag to define box corners
+                    % Free-draw mode: drag to define box corners.
+                    % Defensive cleanup: ensure no stale rubber-band or
+                    % completed marker is lingering from a previous
+                    % attempt that might have exited abnormally.
+                    if ~isempty(appData.boxIntPatch) && isvalid(appData.boxIntPatch)
+                        delete(appData.boxIntPatch);
+                    end
+                    appData.boxIntPatch   = [];
+                    clearCompletedBoxPatch();
                     appData.boxIntStartPt = [x0, y0];
                     fig.WindowButtonMotionFcn = @onBoxIntMove;
                     fig.WindowButtonUpFcn     = @onBoxIntUp;
@@ -8641,6 +8655,14 @@ function varargout = BosonPlotter(options)
 
     function onBoxIntUp(~,~)
     %ONBOXINTUP  Finalise box-integration selection and extract integrated profile.
+    %  On successful integration the rubber-band patch is converted to a
+    %  solid "completed" marker that stays on the map until the next box
+    %  draw, dataset switch, or Reset View — gives visual feedback of
+    %  what region was integrated (previously the patch vanished).
+        % Always restore default motion/up handlers FIRST so later
+        % modal dialogs don't leave callbacks in a half-registered
+        % state. This is a documented uifigure quirk that caused the
+        % second box-draw to register motion incorrectly.
         fig.WindowButtonMotionFcn = @onMouseHover;
         fig.WindowButtonUpFcn     = '';
         if isempty(appData.boxIntStartPt)
@@ -8650,20 +8672,77 @@ function varargout = BosonPlotter(options)
         x1 = cp(1,1);  y1 = cp(1,2);
         x0 = appData.boxIntStartPt(1);
         y0 = appData.boxIntStartPt(2);
-        % Remove rubber-band rectangle
-        if ~isempty(appData.boxIntPatch) && isvalid(appData.boxIntPatch)
-            delete(appData.boxIntPatch);
-        end
+
+        % Detach the rubber-band handle before clearing state; we may
+        % promote it to a completed-box marker below.
+        dragPatch             = appData.boxIntPatch;
         appData.boxIntPatch   = [];
         appData.boxIntStartPt = [];
         appData.boxIntMode    = false;
+
         % Minimum drag threshold (1% of axis span in both directions)
         xDrag = abs(x1 - x0);  xSpan = diff(ax.XLim);
         yDrag = abs(y1 - y0);  ySpan = diff(ax.YLim);
         if xDrag < xSpan * 0.01 || yDrag < ySpan * 0.01
+            % Drag was too small to be a real box — drop the rubber-band
+            if ~isempty(dragPatch) && isvalid(dragPatch)
+                delete(dragPatch);
+            end
             return;
         end
+
+        % Promote the rubber-band to the "completed box" style (solid
+        % green edge) and keep it visible. A previous completed box, if
+        % any, is replaced so only the most-recent integration is marked.
+        clearCompletedBoxPatch();
+        if ~isempty(dragPatch) && isvalid(dragPatch)
+            dragPatch.LineStyle = '-';
+            dragPatch.EdgeColor = [0.15 0.65 0.30];
+            dragPatch.LineWidth = 2.0;
+            dragPatch.Tag       = 'GUIBoxIntCompleted';
+            appData.boxIntCompletedPatch = dragPatch;
+        end
+        % Record the region coords so the marker can be re-drawn after
+        % any plot refresh (renderPlot calls cla which wipes patches).
+        appData.boxIntCompletedRegion = ...
+            [min(x0,x1) max(x0,x1) min(y0,y1) max(y0,y1)];
+
         extract2DBoxIntegral(x0, y0, x1, y1);
+    end
+
+    function clearCompletedBoxPatch()
+    %CLEARCOMPLETEDBOXPATCH  Remove the persistent "last integrated box"
+    %  marker from the axes and forget the saved region coords.
+        if ~isempty(appData.boxIntCompletedPatch) && ...
+                isvalid(appData.boxIntCompletedPatch)
+            delete(appData.boxIntCompletedPatch);
+        end
+        appData.boxIntCompletedPatch  = [];
+        appData.boxIntCompletedRegion = [];
+    end
+
+    function redrawCompletedBoxPatch()
+    %REDRAWCOMPLETEDBOXPATCH  Re-create the completed-box marker from
+    %  the stored region after a plot refresh that wiped the patch.
+    %  No-op when no region is recorded or the axes is invalid.
+        if isempty(appData.boxIntCompletedRegion), return; end
+        if isempty(ax) || ~isvalid(ax), return; end
+        % Only meaningful on the 2D heatmap view
+        if appData.activeIdx < 1 || isempty(appData.datasets), return; end
+        if ~is2DDataset(appData.datasets{appData.activeIdx}), return; end
+        r = appData.boxIntCompletedRegion;
+        xLo = r(1); xHi = r(2); yLo = r(3); yHi = r(4);
+        hold(ax, 'on');
+        appData.boxIntCompletedPatch = patch(ax, ...
+            [xLo xHi xHi xLo xLo], [yLo yLo yHi yHi yLo], ...
+            'k', ...
+            'FaceAlpha',       0, ...
+            'EdgeColor',       [0.15 0.65 0.30], ...
+            'LineStyle',       '-', ...
+            'LineWidth',       2.0, ...
+            'Tag',             'GUIBoxIntCompleted', ...
+            'HandleVisibility','off');
+        hold(ax, 'off');
     end
 
     function onBoxIntButton(~,~)
@@ -8687,10 +8766,34 @@ function varargout = BosonPlotter(options)
     end
 
     function [tf, boxW, boxH] = hasFixedBoxSize()
-    %HASFIXEDBOXSIZE  Return true if both Width and Height fields are valid positive numbers.
-        boxW = str2double(efBoxIntW.Value);
-        boxH = str2double(efBoxIntH.Value);
-        tf = ~isnan(boxW) && ~isnan(boxH) && boxW > 0 && boxH > 0;
+    %HASFIXEDBOXSIZE  Return true if both Width and Height fields hold
+    %  a valid positive number OR the full-range keyword ("all", ":",
+    %  "*"). For keyword fields boxW/boxH is returned as Inf — callers
+    %  must handle that (integration resolves Inf to the map's axis
+    %  extent; preview clamps Inf to the current axes view).
+        [boxW, okW] = parseBoxDim(efBoxIntW.Value);
+        [boxH, okH] = parseBoxDim(efBoxIntH.Value);
+        tf = okW && okH;
+    end
+
+    function [val, ok] = parseBoxDim(s)
+    %PARSEBOXDIM  Interpret a box-dimension text field.
+    %    ''  (empty)      → (0,   false)   — user is in free-draw mode
+    %    'all' | ':' | '*'→ (Inf, true)    — request full axis extent
+    %    positive number  → (num, true)
+    %    anything else    → (0,   false)   — invalid input
+        s = strtrim(char(s));
+        if isempty(s)
+            val = 0; ok = false; return;
+        end
+        if any(strcmpi(s, {'all', ':', '*'}))
+            val = Inf; ok = true; return;
+        end
+        v = str2double(s);
+        if isnan(v) || v <= 0
+            val = 0; ok = false; return;
+        end
+        val = v; ok = true;
     end
 
     function updateBoxPreview()
@@ -8710,6 +8813,10 @@ function varargout = BosonPlotter(options)
         % Centre on the current axes midpoint
         cx = mean(ax.XLim);
         cy = mean(ax.YLim);
+        % "all" dimensions clamp to the current axes span for preview
+        % rendering (true full-extent is applied at integration time).
+        if isinf(boxW), boxW = diff(ax.XLim); end
+        if isinf(boxH), boxH = diff(ax.YLim); end
         hw = boxW / 2;  hh = boxH / 2;
         xLo = cx - hw;  xHi = cx + hw;
         yLo = cy - hh;  yHi = cy + hh;
@@ -8736,32 +8843,46 @@ function varargout = BosonPlotter(options)
 
     function executeFixedBoxIntegration(cx, cy)
     %EXECUTEFIXEDBOXINTEGRATION  Place a fixed-size box centred at (cx,cy) and integrate.
+    %  Inf in boxW/boxH (from an "all"/":"/"*" keyword) is resolved to the
+    %  active map's full axis2/axis1 extent so "full range" means the real
+    %  data span, not just whatever slice the user has zoomed into.
         clearBoxPreview();
         [~, boxW, boxH] = hasFixedBoxSize();
-        hw = boxW / 2;  hh = boxH / 2;
-        xLo = cx - hw;  xHi = cx + hw;
-        yLo = cy - hh;  yHi = cy + hh;
+        if isinf(boxW) || isinf(boxH)
+            map = appData.datasets{appData.activeIdx}.data.metadata.parserSpecific.map2D;
+        end
+        if isinf(boxW)
+            xLo = min(map.axis2(:));  xHi = max(map.axis2(:));
+        else
+            hw = boxW / 2;
+            xLo = cx - hw;  xHi = cx + hw;
+        end
+        if isinf(boxH)
+            yLo = min(map.axis1(:));  yHi = max(map.axis1(:));
+        else
+            hh = boxH / 2;
+            yLo = cy - hh;  yHi = cy + hh;
+        end
 
-        % Draw overlay showing the fixed-size box
+        % Draw overlay showing the fixed-size box and keep it visible as
+        % the "completed box" marker for this integration.
+        clearCompletedBoxPatch();
         hold(ax, 'on');
         hBoxOverlay = patch(ax, ...
             [xLo xHi xHi xLo xLo], [yLo yLo yHi yHi yLo], ...
             'k', ...
             'FaceAlpha',       0, ...
-            'EdgeColor',       [0.65 0.20 0.85], ...
-            'LineStyle',       '--', ...
-            'LineWidth',       2.5, ...
-            'Tag',             'GUIBoxIntFixed', ...
+            'EdgeColor',       [0.15 0.65 0.30], ...
+            'LineStyle',       '-', ...
+            'LineWidth',       2.0, ...
+            'Tag',             'GUIBoxIntCompleted', ...
             'HandleVisibility','off');
         hold(ax, 'off');
         drawnow;
+        appData.boxIntCompletedPatch  = hBoxOverlay;
+        appData.boxIntCompletedRegion = [xLo xHi yLo yHi];
 
         extract2DBoxIntegral(xLo, yLo, xHi, yHi);
-
-        % Clean up overlay
-        if ~isempty(hBoxOverlay) && isvalid(hBoxOverlay)
-            delete(hBoxOverlay);
-        end
     end
 
     function onFigSizeChanged(~,~)

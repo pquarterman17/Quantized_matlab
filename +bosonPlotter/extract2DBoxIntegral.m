@@ -135,7 +135,28 @@ function [newDs, cutLabel] = extract2DBoxIntegral(ds, bx0, by0, bx1, by1, profil
         'units',    {map.intensityUnit}, ...
         'metadata', meta);
 
-    newDs             = wgts.buildDs('[boxIntegral]', intData, 'boxIntegral');
+    % Build a self-documenting filepath that carries the source name,
+    % integration direction, and both-axis ranges. Replaces the opaque
+    % '[boxIntegral]' tag so CSV exports and the dataset list clearly
+    % identify the origin.
+    [srcDir, srcBase, ~] = fileparts(ds.filepath);
+    if isempty(srcDir), srcDir = pwd; end
+    safe = @(s) regexprep(char(s), '[^a-zA-Z0-9]', '');
+    fmtV = @(v) strrep(strrep(sprintf('%.4g', v), '.', 'p'), '-', 'm');
+    ax1Safe = safe(name1);
+    ax2Safe = safe(name2);
+    if strcmp(profileAxis, 'axis1')
+        alongSafe = ax2Safe;     % integrated along axis2 (columns)
+    else
+        alongSafe = ax1Safe;     % integrated along axis1 (rows)
+    end
+    newBase = sprintf('%s_boxInt_along%s_%s%s-%s_%s%s-%s', ...
+        srcBase, alongSafe, ...
+        ax2Safe, fmtV(xLo), fmtV(xHi), ...
+        ax1Safe, fmtV(yLo), fmtV(yHi));
+    newFilepath = fullfile(srcDir, [newBase '.csv']);
+
+    newDs             = wgts.buildDs(newFilepath, intData, 'boxIntegral');
     newDs.displayName = cutLabel;
     newDs.legendName  = cutLabel;
 end
