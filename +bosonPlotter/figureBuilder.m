@@ -815,8 +815,11 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
                     % Fallback: uniform coloring
                     useColorZ = false;
                 else
-                    cmapFcnWF = str2func(wfWidgets.ddColorZCmap.Value);
-                    cmapRGB   = cmapFcnWF(256);
+                    % colorMaps handles both MATLAB built-ins and the
+                    % custom perceptual set (viridis / plasma / inferno);
+                    % str2func(name)(256) would crash on the latter
+                    % because those aren't standalone path functions.
+                    cmapRGB = bosonPlotter.colorMaps(wfWidgets.ddColorZCmap.Value, 256);
                     % Map each zVal to a row in the colormap
                     zNorm = (zVals - zMin) / (zMax - zMin);
                     colors = zeros(numel(dsIdx), 3);
@@ -913,8 +916,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
 
             % Colorbar for Z-coloring
             if useColorZ
-                cmapFcnWF2 = str2func(wfWidgets.ddColorZCmap.Value);
-                colormap(tAx, cmapFcnWF2(256));
+                colormap(tAx, bosonPlotter.colorMaps(wfWidgets.ddColorZCmap.Value, 256));
                 cb = colorbar(tAx);
                 cb.Label.String = wfWidgets.ddColorZChan.Value;
                 cb.Label.FontSize = fmtOpts.fontSize;
@@ -2485,7 +2487,6 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
                 'Units', 'inches', 'Position', [2 2 spBFigW.Value spBFigH.Value]);
             oAx = axes(outFig);
 
-            cmapFcn = str2func(ctWidgets.ddCmap.Value);
             switch ctWidgets.ddStyle.Value
                 case 'Filled contour'
                     contourf(oAx, Xg, Yg, Zg, 20, 'LineStyle', 'none');
@@ -2500,7 +2501,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
                     surf(oAx, Xg, Yg, Zg, 'EdgeColor', 'none'); colorbar(oAx);
                     view(oAx, -37.5, 30); rotate3d(outFig, 'on');
             end
-            colormap(oAx, cmapFcn(256));
+            colormap(oAx, bosonPlotter.colorMaps(ctWidgets.ddCmap.Value, 256));
 
             allCols = [{'X'}, d2.labels];
             xlabel(oAx, allCols{xIdx+1}, 'FontSize', fmtOpts.fontSize, 'Interpreter', 'none');
