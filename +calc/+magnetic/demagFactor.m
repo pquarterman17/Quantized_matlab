@@ -54,10 +54,20 @@ switch shape
     case 'cylinder'
         L = opts.L;
         d = opts.d;
-        % Osborn-type approximation for a finite cylinder:
+        % Sato-Ishii-style finite-cylinder approximation:
         %   Nz = 1 / (1 + 1.6 * (L/d))
-        % Nz -> 1 when L << d (disk), Nz -> 0 when L >> d (rod).
-        Nz = 1 / (1 + 1.6 * (L / d));
+        % Valid roughly for 0.1 < L/d < 10; extreme aspect ratios
+        % (thin disks, long rods) differ from the exact prolate /
+        % oblate spheroid limit by several percent. Warn the caller.
+        aspect = L / d;
+        if aspect < 0.1 || aspect > 10
+            warning('calc:magnetic:demagFactor:cylinderAspect', ...
+                ['Cylinder L/d = %.3g is outside the Sato-Ishii ', ...
+                 'approximation range (0.1 to 10). For better accuracy ', ...
+                 'use shape=''prolate'' (rods) or shape=''oblate'' (disks).'], ...
+                aspect);
+        end
+        Nz = 1 / (1 + 1.6 * aspect);
 
     case 'prolate'
         % Prolate spheroid: semi-axes a (equatorial) < c (polar); ratio = c/a > 1
