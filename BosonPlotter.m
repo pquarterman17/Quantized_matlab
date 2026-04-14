@@ -905,8 +905,10 @@ function varargout = BosonPlotter(options)
             'MenuSelectedFcn', @(~,~) onAutoLimits([], []));
         uimenu(cmAxes, 'Text', 'Set Axis Limits...', ...
             'MenuSelectedFcn', @(~,~) onSetAxisLimitsMenu());
-        uimenu(cmAxes, 'Text', 'Copy Plot to Clipboard', ...
+        uimenu(cmAxes, 'Text', 'Copy Plot (Vector)', ...
             'MenuSelectedFcn', @(~,~) onCopyPlotToClipboard());
+        uimenu(cmAxes, 'Text', 'Copy Plot as PNG (Teams-friendly)', ...
+            'MenuSelectedFcn', @(~,~) onCopyToClipboardAsPNG([], []));
         uimenu(cmAxes, 'Text', 'Copy Data to Clipboard', ...
             'MenuSelectedFcn', @(~,~) onCopyDataToClipboard([], []));
         uimenu(cmAxes, 'Text', 'Export Visible Range...', ...
@@ -9145,9 +9147,27 @@ function varargout = BosonPlotter(options)
     end
 
     function onCopyToClipboard(~,~)
-    %ONCOPYTOCLIPBOARD  Render the current plot into a temporary figure and copy
-    %  it to the system clipboard as a vector EMF with transparent background.
-    %  Falls back to bitmap if copygraphics is unavailable.
+    %ONCOPYTOCLIPBOARD  Copy the current plot to the clipboard as a
+    %  transparent-background vector image. Best for Word, Illustrator,
+    %  Origin, most email clients — pastes crisp at any zoom.
+        copyPlotWithFormat('vector');
+    end
+
+    function onCopyToClipboardAsPNG(~,~)
+    %ONCOPYTOCLIPBOARDASPNG  Copy the current plot to the clipboard as a
+    %  300-dpi transparent PNG. Use this when the target app rejects or
+    %  mangles the vector clipboard format (notably MS Teams, some Slack
+    %  clients, and older OneNote).
+        copyPlotWithFormat('png');
+    end
+
+    function copyPlotWithFormat(mode)
+    %COPYPLOTWITHFORMAT  Shared render + copy pipeline for clipboard export.
+    %   mode = 'vector'  → copygraphics ContentType='vector' (default/best)
+    %        = 'png'     → copygraphics ContentType='image', 300 dpi
+    %  Both strip the dark-theme background (Color='none' on figure and
+    %  axes + BackgroundColor='none') and re-style legend + axes labels
+    %  for readability via styleAxesForExport.
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig,'Load a file first.','No data');
             return;
@@ -9163,7 +9183,24 @@ function varargout = BosonPlotter(options)
         grid(tmpAx,'on');
         drawToAxes(tmpAx);
         styleAxesForExport(tmpAx);
-        copygraphics(tmpAx, 'ContentType','vector', 'BackgroundColor','none');
+        try
+            switch lower(mode)
+                case 'png'
+                    copygraphics(tmpAx, ...
+                        'ContentType','image', ...
+                        'Resolution',300, ...
+                        'BackgroundColor','none');
+                otherwise  % 'vector'
+                    copygraphics(tmpAx, ...
+                        'ContentType','vector', ...
+                        'BackgroundColor','none');
+            end
+        catch ME
+            delete(tmpFig);
+            logGUIError('Copy to clipboard', ME.message, ME);
+            uialert(fig, sprintf('Copy failed:\n%s', ME.message), 'Copy error');
+            return;
+        end
         delete(tmpFig);
     end
 
@@ -9252,7 +9289,9 @@ function varargout = BosonPlotter(options)
 
     function styleAxesForExport(expAx)
     %STYLEAXESFOREXPORT  Make axes readable on white backgrounds.
-    %  Darkens axis lines, ticks, and labels; thickens the bounding box.
+    %  Darkens axis lines, ticks, and labels; thickens the bounding box;
+    %  strips any inherited dark-mode background from the legend so the
+    %  exported image is fully transparent aside from the plot content.
     %  Applied only to temporary export figures (clipboard / save).
         darkColor = [0.15 0.15 0.15];
         expAx.XColor    = darkColor;
@@ -9273,12 +9312,38 @@ function varargout = BosonPlotter(options)
         if isprop(expAx, 'YAxis') && numel(expAx.YAxis) > 1
             expAx.YAxis(2).Color = darkColor;
         end
+        % Legend fill + text — the GUI's dark theme bakes a dark
+        % background and white text into the legend handle; override
+        % so the pasted image has a transparent legend with dark text.
+        lgd = getLegendHandle(expAx);
+        if ~isempty(lgd) && isvalid(lgd)
+            try, lgd.Color     = 'none';   catch, end  % background fill
+            try, lgd.EdgeColor = darkColor; catch, end % border stroke
+            try, lgd.TextColor = darkColor; catch, end % entry labels
+            try, lgd.Title.Color = darkColor; catch, end
+        end
         % Thicken data lines for better visibility
         lines = findobj(expAx, 'Type', 'Line');
         for li = 1:numel(lines)
             if lines(li).LineWidth < 1.2
                 lines(li).LineWidth = 1.2;
             end
+        end
+    end
+
+    function lgd = getLegendHandle(expAx)
+    %GETLEGENDHANDLE  Return the legend object attached to expAx, or [].
+    %  MATLAB exposes the legend via the axes' Legend property from
+    %  R2020a+; fall back to findobj on older releases or edge cases.
+        lgd = [];
+        if isprop(expAx, 'Legend') && ~isempty(expAx.Legend) && isvalid(expAx.Legend)
+            lgd = expAx.Legend;
+            return;
+        end
+        par = ancestor(expAx, 'figure');
+        if ~isempty(par)
+            hits = findobj(par, 'Type', 'Legend');
+            if ~isempty(hits), lgd = hits(1); end
         end
     end
 
