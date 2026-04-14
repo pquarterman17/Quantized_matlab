@@ -14,8 +14,9 @@ function result = beanJc(field, moment, sampleDims, options)
 %                Must be a full hysteresis loop (ascending + descending).
 %   sampleDims — struct describing sample geometry (dimensions in cm):
 %                  Rectangular: .width, .length, .thickness
-%                    (a = min(w,l) is the short cross-section dimension)
-%                  Cylindrical:  .radius
+%                    (a = min(w,l) is the short cross-section dimension,
+%                     b = max(w,l) is the long cross-section dimension)
+%                  Cylindrical:  .radius, .thickness
 %   FieldUnit  — 'Oe' (default) or 'T'
 %   MomentUnit — 'emu' (default) or 'Am2'
 %   Geometry   — 'rectangular' (default) or 'cylindrical'
@@ -25,39 +26,70 @@ function result = beanJc(field, moment, sampleDims, options)
 %   result — struct with fields:
 %     .Jc     — critical current density at each field point (A/cm^2)
 %     .field  — field values for .Jc, in the same units as input
-%     .deltaM — hysteresis loop width |M_up - M_down| at each field (emu or A*m^2)
+%     .deltaM — hysteresis loop width |M_up - M_down| at each field
+%               (emu or A*m^2 depending on MomentUnit; this is the total
+%               moment width, not the volumetric magnetization width)
 %
-%   Bean Model Formulas
-%   -------------------
-%   Rectangular sample (a <= b, cross-section dimensions in cm):
-%     Jc = 20 * deltaM / (a * (1 - a/(3*b)))        [A/cm^2 when M in emu, a,b in cm]
+%   Bean Model Formulas (CGS Gaussian units)
+%   ----------------------------------------
+%   All dimensions in cm, total moment in emu, Jc in A/cm^2.
+%   Let V = sample volume (cm^3), dM_vol = |M_up - M_down| / V (emu/cm^3).
+%
+%   Rectangular sample (a <= b are cross-section dimensions in cm):
+%     Jc = 20 * dM_vol / [a * (1 - a/(3*b))]
+%
+%   The factor 20 is the CGS Gaussian conversion c/(4*pi) in abamp units
+%   divided by 10^3 A/abamp, yielding 20 when moment is in emu, dimensions
+%   in cm, and Jc in A/cm^2.  The correction (1 - a/(3b)) accounts for
+%   flux penetration along both cross-section axes (Gyorgy et al. 1987).
 %
 %   Cylindrical sample (radius R in cm):
-%     Jc = 30 * deltaM / R                           [A/cm^2 when M in emu]
+%     Jc = 30 * dM_vol / R
 %
-%   The pre-factors 20 and 30 arise from the CGS Gaussian unit conversion
-%   (1 emu = 1e-3 A*m^2; V = a*b*t or pi*R^2*t in cm^3).
+%   The factor 30 = 20 * (3/2) reflects the cylindrical geometry factor
+%   (average current path length to the disk center is 2R/3 vs. a/2 for
+%   the slab).  Reference: Chen & Goldfarb, J. Appl. Phys. 66, 2489 (1989).
+%
+%   DeltaM convention: FULL-WIDTH |M_ascending - M_descending| at each
+%   field.  Some references use the half-width with prefactors 10 and 15.
 %
 %   Notes
 %   -----
 %   * The loop is split into ascending and descending branches by finding
 %     the field extremum.  Both branches are interpolated onto a common
-%     field grid (the overlap region).
-%   * DeltaM = |M_ascending - M_descending| / 2 (half-width convention)
-%     consistent with the factor-of-2 in the standard Bean formula.
-%     The formulas above use the full-width deltaM = M_up - M_down, so
-%     the factor is absorbed in the pre-factor coefficients.
+%     field grid (200 points over the overlap region).
 %   * Fields below 10% of max|H| are excluded to avoid the central peak
-%     region which is unreliable in noisy data.
+%     region which is unreliable in noisy data (flux trapping, surface
+%     barriers).
+%   * A monotonic H vector (no field reversal) raises an error — the
+%     function requires a full hysteresis loop.
 %
-%   Examples
-%   --------
-%   dims.width = 0.3; dims.length = 0.5; dims.thickness = 0.01;
+%   Worked Example
+%   --------------
+%   YBCO pellet: w=0.30 cm, l=0.50 cm, t=0.02 cm; field along c-axis.
+%   At H = 10000 Oe, typical YBCO shows |M_up - M_down| ~ 2.0 emu total,
+%   volume V = 0.30*0.50*0.02 = 0.003 cm^3.
+%   dM_vol = 2.0/0.003 = 667 emu/cm^3
+%   a = 0.30, b = 0.50; correction = 1 - 0.30/(3*0.50) = 0.80
+%   Jc = 20 * 667 / (0.30 * 0.80) = 55,600 A/cm^2  (55.6 kA/cm^2)
+%   This is a physically reasonable Jc for bulk YBCO at 77 K, 1 T.
+%
+%   dims.width = 0.30; dims.length = 0.50; dims.thickness = 0.02;
 %   result = calc.superconductor.beanJc(H, M, dims);
-%   plot(result.field, result.Jc);
+%   plot(result.field, result.Jc / 1e3);
+%   xlabel('H (Oe)'); ylabel('J_c (kA/cm^2)');
 %
-%   dims.radius = 0.15;
+%   dims.radius = 0.15; dims.thickness = 0.02;
 %   result = calc.superconductor.beanJc(H, M, dims, Geometry='cylindrical');
+%
+%   References
+%   ----------
+%   Gyorgy, E.M. et al., J. Appl. Phys. 61, 3802 (1987).
+%     DOI: 10.1063/1.338638
+%   Chen, D.-X. & Goldfarb, R.B., J. Appl. Phys. 66, 2489 (1989).
+%     DOI: 10.1063/1.344261
+%   Bean, C.P., Phys. Rev. Lett. 8, 250 (1962). DOI: 10.1103/PhysRevLett.8.250
+%   Tinkham, M., Introduction to Superconductivity, 2nd ed., Ch. 5 (2004).
 
 % ════════════════════════════════════════════════════════════════════
 

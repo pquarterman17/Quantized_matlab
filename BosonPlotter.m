@@ -12450,6 +12450,20 @@ function [data, parserName] = guiImport(fp)
         case 'importPPMS'
             data = parser.importPPMS(fp, 'YAxis', 'all');
 
+        case 'importLakeShore'
+            % Lake Shore magnetometer exports — routed here by
+            % resolveParser's content-sniffer when the .dat header shows
+            % vendor strings or 7400/8600 model numbers. Load all
+            % channels so the GUI Y-axis picker sees every column.
+            data = parser.importLakeShore(fp, 'YAxis', 'all');
+
+        case 'importMPMS'
+            % MPMS SQUID magnetometer — shares the QD [Header]/[Data]
+            % layout, so it's normally reached via importQDVSM dispatch.
+            % This branch exists for users who configure the parser
+            % directly (e.g. from templates or scripts).
+            data = parser.importMPMS(fp, 'YAxis', 'all');
+
         case 'importImage'
             data = parser.importImage(fp);
 
