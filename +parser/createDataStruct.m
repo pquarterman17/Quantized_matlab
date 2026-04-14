@@ -13,8 +13,12 @@ function data = createDataStruct(timeVec, valuesMatrix, varargin)
 %       .units    - {1xM} unit strings
 %       .metadata - struct of import metadata
 
-    assert(isvector(timeVec), ...
-        'parser:createDataStruct:badTime', 'timeVec must be a vector.');
+    % Accept empty [] as a valid "0-row dataset" — required by callers
+    % that construct a placeholder struct before loading (e.g. session
+    % restore, unit-test harnesses). isvector([]) is false in MATLAB,
+    % so an explicit isempty bypass is needed.
+    assert(isempty(timeVec) || isvector(timeVec), ...
+        'parser:createDataStruct:badTime', 'timeVec must be a vector (or empty).');
     assert(ndims(valuesMatrix) <= 2, ...
         'parser:createDataStruct:badValues', 'valuesMatrix must be 2-D.');
     assert(numel(timeVec) == size(valuesMatrix, 1), ...

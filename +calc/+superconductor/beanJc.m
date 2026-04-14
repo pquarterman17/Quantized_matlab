@@ -108,6 +108,19 @@ end
 % But the standard Bean formula is written in terms of total moment —
 % keep M_emu and volume separate for explicit formula application.
 
+% Sanity: require at least one field-direction reversal (a real
+% hysteresis loop has both an ascending and a descending branch). A
+% monotonic H vector slips through splitBranches with both branches
+% resolving to the same sequence — deltaM = 0, Jc = 0 silently. Error
+% explicitly so the caller knows their input wasn't a loop.
+dH = diff(H_oe);
+if all(dH >= 0) || all(dH <= 0)
+    error('calc:superconductor:beanJc:notALoop', ...
+        ['H vector is monotonic (no direction reversal). beanJc ' ...
+         'requires a full hysteresis loop with both ascending and ' ...
+         'descending field sweeps.']);
+end
+
 % ── Split into ascending and descending branches ─────────────────────
 [H_asc, M_asc, H_desc, M_desc] = splitBranches(H_oe, M_emu);
 
