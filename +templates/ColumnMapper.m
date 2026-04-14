@@ -128,7 +128,9 @@ function result = ColumnMapper(data, opts)
         'RowName', 'numbered');
     if isDark
         tblPreview.BackgroundColor = [0.22 0.22 0.24; 0.26 0.26 0.28];
-        tblPreview.FontColor = [0.9 0.9 0.9];
+        % uitable does not expose a direct FontColor property — apply the
+        % text color via a uistyle (R2021a+) which is the supported path.
+        addStyle(tblPreview, uistyle('FontColor', [0.9 0.9 0.9]));
     end
 
     % ── Right panel: column config + mini preview plot ──────────────
@@ -157,7 +159,7 @@ function result = ColumnMapper(data, opts)
         'ColumnWidth', {90, 'auto', 60});
     if isDark
         tblConfig.BackgroundColor = [0.22 0.22 0.24; 0.26 0.26 0.28];
-        tblConfig.FontColor = [0.9 0.9 0.9];
+        addStyle(tblConfig, uistyle('FontColor', [0.9 0.9 0.9]));
     end
 
     % Mini preview plot
