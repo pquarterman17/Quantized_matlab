@@ -141,10 +141,17 @@ function legendEditor(parentFig, ctx)
     end
 
     function onApply()
-        % Commit per-dataset edits
-        tblNow = tbl.Data;
-        for k = 1:size(tblNow, 1)
-            dsK = datasets{k};
+        % Commit per-dataset edits. Re-fetch the dataset list now (do
+        % NOT reuse the snapshot captured at dialog open) — corrections,
+        % renames, or additions made in the main figure while this
+        % dialog was open would otherwise be silently reverted. Only
+        % two fields are patched here (.visible, .legendName), leaving
+        % every other dataset field on the live struct untouched.
+        tblNow       = tbl.Data;
+        liveDatasets = ctx.getDatasets();
+        nRows        = min(size(tblNow, 1), numel(liveDatasets));
+        for k = 1:nRows
+            dsK = liveDatasets{k};
             dsK.visible     = logical(tblNow{k, 1});
             dsK.legendName  = char(tblNow{k, 3});
             ctx.setDataset(k, dsK);
