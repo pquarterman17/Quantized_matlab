@@ -332,6 +332,17 @@ lsnMask = addlistener(model, 'MaskChanged',      @onModelMaskChanged);
 % auto-delete them when they go out of scope, so we anchor them here).
 guiListeners = {lsnData, lsnSel, lsnMask};  %#ok<NASGU>
 
+% Bootstrap the UI from any datasets already present in the shared
+% model. Listeners only fire on NEW changes, so data added by another
+% window (e.g. BosonPlotter's import path) before this workspace was
+% opened must be rendered explicitly. addDataset already sets
+% activeIdx=1 on the first add, so we just need to paint the widgets.
+if model.count() > 0
+    refreshDatasetList();
+    refreshSelectionInList();
+    refreshTable();
+end
+
 % ════════════════════════════════════════════════════════════════════════
 %  API struct (for headless / automated testing)
 % ════════════════════════════════════════════════════════════════════════
