@@ -243,6 +243,85 @@ else
 end
 
 % ════════════════════════════════════════════════════════════════════
+%  Resolution smearing (W3 #30) — Gaussian-convolved R(Q)
+% ════════════════════════════════════════════════════════════════════
+
+fprintf('\n--- Resolution smearing ---\n');
+
+% A 500 Å film on Si has Kiessig fringes spaced ΔQ ≈ 2π/500 ≈ 0.0126 Å⁻¹.
+% At dQ/Q = 5 % near Q = 0.08 Å⁻¹, the resolution Gaussian has σ ≈ 0.004,
+% smaller than the fringe spacing — fringes survive but soften.
+Qtest = linspace(0.01, 0.25, 400)';
+layersTest = [0 0 0 0; 500 3.47e-6 0 5; 0 2.07e-6 0 3];
+
+try
+    R_sharp    = fitting.parrattRefl(Qtest, layersTest);
+    R_smeared  = fitting.parrattRefl(Qtest, layersTest, Resolution=0.05);
+
+    % Smeared curve must: (a) be the same length, (b) reduce fringe
+    % contrast (std of log R), (c) approach the unsmeared curve at low Q
+    % where dQ → 0.
+    if numel(R_smeared) ~= numel(R_sharp)
+        fprintf('  FAIL: smeared length mismatch\n'); failed = failed + 1;
+    else
+        stdSharp   = std(log10(max(R_sharp,   1e-20)));
+        stdSmeared = std(log10(max(R_smeared, 1e-20)));
+        if stdSmeared < stdSharp
+            fprintf('  PASS: smearing reduces log-R std (%.2f → %.2f)\n', ...
+                stdSharp, stdSmeared);
+            passed = passed + 1;
+        else
+            fprintf('  FAIL: smearing did not reduce fringe contrast (%.2f → %.2f)\n', ...
+                stdSharp, stdSmeared);
+            failed = failed + 1;
+        end
+    end
+catch ME
+    fprintf('  FAIL: Resolution kwarg threw: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% Resolution=0 should match the unsmeared path exactly
+try
+    R_res0 = fitting.parrattRefl(Qtest, layersTest, Resolution=0);
+    R_ref  = fitting.parrattRefl(Qtest, layersTest);
+    if max(abs(R_res0 - R_ref)) < 1e-12
+        fprintf('  PASS: Resolution=0 returns identical R as no-kwarg call\n');
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: Resolution=0 diverges by %.3g\n', max(abs(R_res0 - R_ref)));
+        failed = failed + 1;
+    end
+catch ME
+    fprintf('  FAIL: Resolution=0 threw: %s\n', ME.message); failed = failed + 1;
+end
+
+% Per-point dQ vector
+try
+    dQ_vec = 0.002 * ones(size(Qtest));
+    R_vec  = fitting.parrattRefl(Qtest, layersTest, Resolution=dQ_vec);
+    if numel(R_vec) == numel(Qtest) && all(R_vec >= 0)
+        fprintf('  PASS: per-point Resolution vector accepted\n'); passed = passed + 1;
+    else
+        fprintf('  FAIL: per-point vector returned wrong shape\n'); failed = failed + 1;
+    end
+catch ME
+    fprintf('  FAIL: per-point Resolution threw: %s\n', ME.message); failed = failed + 1;
+end
+
+% Bad Resolution vector shape is rejected with a clear error
+try
+    fitting.parrattRefl(Qtest, layersTest, Resolution=[0.01; 0.02]);
+    fprintf('  FAIL: bad Resolution vector not rejected\n'); failed = failed + 1;
+catch ME
+    if contains(ME.identifier, 'badResolution')
+        fprintf('  PASS: bad Resolution vector rejected with clear error\n'); passed = passed + 1;
+    else
+        fprintf('  FAIL: unexpected error id: %s\n', ME.identifier); failed = failed + 1;
+    end
+end
+
+% ════════════════════════════════════════════════════════════════════
 %  SUMMARY
 % ════════════════════════════════════════════════════════════════════
 
