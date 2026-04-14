@@ -613,69 +613,77 @@ end
 fprintf('\n--- calc.crystal.planeSpacings ---\n');
 
 % Primitive cubic: (100) should be present
+% planeSpacings stores one representative per symmetry-equivalent family
+% (currently [0 0 1] for the {100} family), so compare against the sum
+% of |hkl| and the set of distinct |component| values to detect the
+% family without depending on which representative was chosen.
+has100 = @(hklMat) any(sum(abs(hklMat), 2) == 1);
+has111 = @(hklMat) any(all(abs(hklMat) == 1, 2));
+has220 = @(hklMat) any(sortrows(abs(hklMat)) * 0 == 0 & ...
+                         ismember(sortrows(abs(hklMat)), [0 2 2], 'rows'));
+
 r = calc.crystal.planeSpacings(5.431, Centering='P', MaxHKL=3);
-hklStrs = arrayfun(@(i) sprintf('%d%d%d', r.hkl(i,1), r.hkl(i,2), r.hkl(i,3)), ...
-    1:r.nReflections, 'UniformOutput', false);
-if any(strcmp(hklStrs, '100'))
-    fprintf('  PASS: P centering includes (100)\n'); passed = passed + 1;
+if has100(r.hkl)
+    fprintf('  PASS: P centering includes {100}\n'); passed = passed + 1;
 else
-    fprintf('  FAIL: P centering missing (100)\n'); failed = failed + 1;
+    fprintf('  FAIL: P centering missing {100}\n'); failed = failed + 1;
 end
 
-% FCC (F centering): (100) should be absent, (111) present
+% FCC (F centering): {100} family forbidden (mixed-parity), {111} allowed
 r = calc.crystal.planeSpacings(5.431, Centering='F', MaxHKL=3);
-hklStrs = arrayfun(@(i) sprintf('%d%d%d', r.hkl(i,1), r.hkl(i,2), r.hkl(i,3)), ...
-    1:r.nReflections, 'UniformOutput', false);
-if ~any(strcmp(hklStrs, '100'))
-    fprintf('  PASS: F centering excludes (100)\n'); passed = passed + 1;
+if ~has100(r.hkl)
+    fprintf('  PASS: F centering excludes {100}\n'); passed = passed + 1;
 else
-    fprintf('  FAIL: F centering should exclude (100)\n'); failed = failed + 1;
+    fprintf('  FAIL: F centering should exclude {100}\n'); failed = failed + 1;
 end
-if any(strcmp(hklStrs, '111'))
-    fprintf('  PASS: F centering includes (111)\n'); passed = passed + 1;
+if has111(r.hkl)
+    fprintf('  PASS: F centering includes {111}\n'); passed = passed + 1;
 else
-    fprintf('  FAIL: F centering missing (111)\n'); failed = failed + 1;
+    fprintf('  FAIL: F centering missing {111}\n'); failed = failed + 1;
 end
 
-% FCC (220) should be present (all even)
-if any(strcmp(hklStrs, '220'))
-    fprintf('  PASS: F centering includes (220)\n'); passed = passed + 1;
+% FCC {220} family should be present (all even)
+if has220(r.hkl)
+    fprintf('  PASS: F centering includes {220}\n'); passed = passed + 1;
 else
-    fprintf('  FAIL: F centering missing (220)\n'); failed = failed + 1;
+    fprintf('  FAIL: F centering missing {220}\n'); failed = failed + 1;
 end
 
-% BCC (I centering): (100) absent (h+k+l=1 odd), (110) present (h+k+l=2 even)
+% BCC (I centering): {100} family forbidden (h+k+l odd), {110} allowed
 r = calc.crystal.planeSpacings(2.867, Centering='I', MaxHKL=3);
-hklStrs = arrayfun(@(i) sprintf('%d%d%d', r.hkl(i,1), r.hkl(i,2), r.hkl(i,3)), ...
-    1:r.nReflections, 'UniformOutput', false);
-if ~any(strcmp(hklStrs, '100'))
-    fprintf('  PASS: I centering excludes (100)\n'); passed = passed + 1;
+has110 = @(hklMat) any(sum(abs(hklMat), 2) == 2 & ...
+                        any(abs(hklMat) == 1, 2) & any(abs(hklMat) == 0, 2));
+if ~has100(r.hkl)
+    fprintf('  PASS: I centering excludes {100}\n'); passed = passed + 1;
 else
-    fprintf('  FAIL: I centering should exclude (100)\n'); failed = failed + 1;
+    fprintf('  FAIL: I centering should exclude {100}\n'); failed = failed + 1;
 end
-if any(strcmp(hklStrs, '110'))
-    fprintf('  PASS: I centering includes (110)\n'); passed = passed + 1;
+if has110(r.hkl)
+    fprintf('  PASS: I centering includes {110}\n'); passed = passed + 1;
 else
-    fprintf('  FAIL: I centering missing (110)\n'); failed = failed + 1;
+    fprintf('  FAIL: I centering missing {110}\n'); failed = failed + 1;
 end
 
-% d-spacing value check: cubic (100) d = a
+% d-spacing value check: cubic {100} family d = a
+% (family representative may be [1 0 0] or [0 0 1] — match by sum(|hkl|)=1)
 r = calc.crystal.planeSpacings(3.905, Centering='P', MaxHKL=1);
-idx100 = find(r.hkl(:,1)==1 & r.hkl(:,2)==0 & r.hkl(:,3)==0, 1);
+familyMask = sum(abs(r.hkl), 2) == 1;
+idx100 = find(familyMask, 1);
 if ~isempty(idx100) && abs(r.d(idx100) - 3.905) < 1e-4
-    fprintf('  PASS: d(100) = a = 3.905\n'); passed = passed + 1;
+    fprintf('  PASS: d({100}) = a = 3.905\n'); passed = passed + 1;
 else
-    fprintf('  FAIL: d(100) != a\n'); failed = failed + 1;
+    fprintf('  FAIL: d({100}) != a\n'); failed = failed + 1;
 end
 
-% 2theta check: known Cu Ka reflection for Si (111) FCC
+% 2theta check: known Cu Ka reflection for Si {111} FCC
 % d(111) = 5.431/sqrt(3) ~ 3.1356, 2theta ~ 28.44 deg
 r = calc.crystal.planeSpacings(5.431, Centering='F', MaxHKL=3, Lambda=1.5406);
-idx111 = find(r.hkl(:,1)==1 & r.hkl(:,2)==1 & r.hkl(:,3)==1, 1);
+% Family representative may be [1 1 1] or [-1 1 1] etc. — match |hkl|=[1 1 1]
+idx111 = find(all(abs(r.hkl) == 1, 2), 1);
 if ~isempty(idx111) && abs(r.twoTheta(idx111) - 28.44) < 0.1
-    fprintf('  PASS: Si(111) 2theta ~ 28.44\n'); passed = passed + 1;
+    fprintf('  PASS: Si{111} 2theta ~ 28.44\n'); passed = passed + 1;
 else
-    fprintf('  FAIL: Si(111) 2theta\n'); failed = failed + 1;
+    fprintf('  FAIL: Si{111} 2theta\n'); failed = failed + 1;
 end
 
 % Sorted descending by d
@@ -686,16 +694,17 @@ else
     fprintf('  FAIL: d-spacings not sorted\n'); failed = failed + 1;
 end
 
-% Multiplicity check: cubic (100) family should have 6 members
+% Multiplicity check: cubic {100} family should have 6 members
 r = calc.crystal.planeSpacings(5.431, Centering='P', MaxHKL=1);
-idx100 = find(r.hkl(:,1)==1 & r.hkl(:,2)==0 & r.hkl(:,3)==0, 1);
+% {100} family representative (sum(|hkl|)=1, not [1 0 0] literal)
+idx100 = find(sum(abs(r.hkl), 2) == 1, 1);
 if ~isempty(idx100) && r.multiplicity(idx100) == 6
-    fprintf('  PASS: (100) multiplicity = 6\n'); passed = passed + 1;
+    fprintf('  PASS: {100} multiplicity = 6\n'); passed = passed + 1;
 else
     if ~isempty(idx100)
-        fprintf('  FAIL: (100) multiplicity = %d (expected 6)\n', r.multiplicity(idx100));
+        fprintf('  FAIL: {100} multiplicity = %d (expected 6)\n', r.multiplicity(idx100));
     else
-        fprintf('  FAIL: (100) not found\n');
+        fprintf('  FAIL: {100} family not found\n');
     end
     failed = failed + 1;
 end
