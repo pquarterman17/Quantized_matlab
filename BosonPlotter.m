@@ -2737,7 +2737,7 @@ function varargout = BosonPlotter(options)
 
     function onAddFiles(~,~)
     %ONADDFILES  Open a multi-select file dialog; load every chosen file.
-        startDir = guiTernary(isempty(appData.lastDir), pwd, appData.lastDir);
+        startDir = resolveStartDir(appData.lastDir);
         [fnames, fpath] = uigetfile( ...
             {'*.dat;*.csv;*.tsv;*.txt;*.xlsx;*.xls;*.xlsm;*.xlsb;*.ods;*.raw;*.brml;*.xrdml;*.refl;*.pnr;*.datA;*.datB;*.datC;*.datD;*.data;*.datb;*.datc;*.datd;*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.tif;*.tiff;*.bcf;*.dm3;*.dm4;*.mrc;*.mrcs;*.ser;*.spm;*.000;*.001', ...
                 'All supported formats'; ...
@@ -6082,7 +6082,7 @@ function varargout = BosonPlotter(options)
 
     function onLoadBackground(~,~)
     %ONLOADBACKGROUND  Open file dialog and load a background dataset via importAuto.
-        startDir = guiTernary(isempty(appData.lastDir), pwd, appData.lastDir);
+        startDir = resolveStartDir(appData.lastDir);
         [fname, fpath] = uigetfile( ...
             {'*.dat;*.csv;*.tsv;*.txt;*.xlsx;*.xls;*.xlsm;*.xlsb;*.ods;*.raw;*.xrdml', ...
              'Supported data files'; '*.*','All files (*.*)'}, ...
@@ -7172,7 +7172,7 @@ function varargout = BosonPlotter(options)
         end
 
         % Output directory picker (#8): choose folder or use source-adjacent
-        outDir = uigetdir(guiTernary(isempty(appData.lastDir), pwd, appData.lastDir), ...
+        outDir = uigetdir(resolveStartDir(appData.lastDir), ...
             'Choose output folder (Cancel = save next to source files)');
         if isequal(outDir, 0), outDir = ''; end  % empty = source-adjacent
 
@@ -9465,7 +9465,7 @@ function varargout = BosonPlotter(options)
     function onLoadSession(~,~)
     %ONLOADSESSION  Restore a previously saved session from a .mat file.
     %  Delegates deserialisation to bosonPlotter.sessionManager.load().
-        startDir = guiTernary(isempty(appData.lastDir), pwd, appData.lastDir);
+        startDir = resolveStartDir(appData.lastDir);
         [fname, fpath] = uigetfile({'*.mat','MATLAB session (*.mat)'}, ...
             'Load session file...', startDir);
         if isequal(fname, 0), return; end
@@ -12642,6 +12642,18 @@ end
 
 function v = guiTernary(cond, a, b)
     if cond, v = a; else, v = b; end
+end
+
+function d = resolveStartDir(lastDir)
+%RESOLVESTARTDIR  Pick a file-dialog starting folder.
+%   Uses lastDir when it is a valid existing directory; otherwise falls back
+%   to pwd so newly-launched sessions open in the MATLAB working directory.
+    if ~isempty(lastDir) && (ischar(lastDir) || (isstring(lastDir) && isscalar(lastDir))) ...
+            && isfolder(lastDir)
+        d = char(lastDir);
+    else
+        d = pwd;
+    end
 end
 
 function b = bytesPerElem(x)
