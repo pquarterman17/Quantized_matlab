@@ -68,7 +68,10 @@ function violations = checkClippedLayouts(rootHandle, options)
         % Apply only to "leaf" widgets (no Children OR known leaf types).
         % Skip uigridlayout containers themselves — their size is
         % handled by the structural pass.
-        if isLeafWidget(node) && shouldCheck(node, options.IgnoreTags)
+        % Also skip widgets in collapsed sections: any ancestor grid with
+        % a 0-height row is an intentional hide (same exemption as PASS 1).
+        if isLeafWidget(node) && shouldCheck(node, options.IgnoreTags) && ...
+                ~isInCollapsedSection(node)
             pos = getPositionSafe(node);
             if ~isempty(pos)
                 if pos(4) < options.MinLeafHeight
@@ -243,6 +246,30 @@ function tf = shouldCheck(node, ignoreTags)
     if isprop(node, 'Tag')
         t = char(node.Tag);
         if any(strcmp(ignoreTags, t)), tf = false; end
+    end
+end
+
+
+function tf = isInCollapsedSection(node)
+%ISINCOLLAPEDSECTION  True if any ancestor uigridlayout allocates 0 px to node's section.
+%   Mirrors the PASS 1 exemption: RowHeight = 0 is an intentional hide, not a bug.
+    tf = false;
+    cur = node;
+    while ~isempty(cur) && isvalid(cur)
+        parent = cur.Parent;
+        if isempty(parent) || ~isvalid(parent), break; end
+        if isa(parent, 'matlab.ui.container.GridLayout') && isprop(cur, 'Layout')
+            lay = cur.Layout;
+            if ~isempty(lay) && ~isempty(lay.Row)
+                rowRng = lay.Row;
+                rowIdx = rowRng(1):rowRng(end);
+                allocated = sumFixedSlots(parent.RowHeight, rowIdx);
+                if isfinite(allocated) && allocated <= 0
+                    tf = true; return;
+                end
+            end
+        end
+        cur = parent;
     end
 end
 
