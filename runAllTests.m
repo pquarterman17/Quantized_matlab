@@ -115,6 +115,7 @@ SUITES = {
     T('imaging','test_imaging_utils'),      'em',     'Imaging utilities: contrast, filter, FFT, profile, scale bar, thumbnail'
     T('imaging','test_imaging_advanced'),   'em',     'Imaging advanced: bin, unsharp, morph, Otsu, Butterworth, plane level, roughness, lattice, radial, azimuthal, interface fit, stitch, defect count'
     T('imaging','test_tiltCorrection'),     'em',     'SEM/FIB stage tilt: getStageTilt parsing, measureDistance/lineProfile with TiltAngle'
+    T('imaging','test_tiltGeometryCorrection'), 'em', 'Tilt geometry: Surface (1/cos) vs Cross-section (1/sin) correction factors'
     T('imaging','test_particle_clahe'),     'em',     'Imaging: CLAHE + connectedComponents + particleAnalysis (synthetic + real DM3/DM4)'
     T('imaging','test_em_gui_harness'),     'emgui',  'EM Viewer GUI API: load, contrast, filter, FFT, profile, export'
     T('imaging','test_em_gui_phase2'),      'emgui',  'EM Viewer GUI Phase 2: stack nav, session, compare, EDS, EELS, diffraction, annotations'
