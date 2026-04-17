@@ -111,6 +111,7 @@ SUITES = {
     T('gui','test_contour_features'),       'contour','Contour/heatmap: gridding, plot styles, edge cases, export'
     T('gui','test_diraculator'),            'calcgui','DiraCulator GUI API'
     % ── Imaging tests ─────────────────────────────────────────────────
+    T('imaging','test_renderingSharpness'),  'em',     'FermiViewer display pipeline: sharpness/variance preservation regression'
     T('imaging','test_em_parsers'),         'em',     'EM image parsers: importTIFF + importRawImage'
     T('imaging','test_imaging_utils'),      'em',     'Imaging utilities: contrast, filter, FFT, profile, scale bar, thumbnail'
     T('imaging','test_imaging_advanced'),   'em',     'Imaging advanced: bin, unsharp, morph, Otsu, Butterworth, plane level, roughness, lattice, radial, azimuthal, interface fit, stitch, defect count'
