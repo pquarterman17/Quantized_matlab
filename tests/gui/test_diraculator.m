@@ -79,6 +79,46 @@ else
     fprintf('  FAIL: navTree parent is %s (expected uigridlayout or uipanel)\n', class(navParent)); failed = failed + 1;
 end
 
+% REGRESSION GUARD #1: source-level check that nobody reintroduces
+% uitree in DiraCulator.m. uitree inside a uifigure fails to render in
+% recent MATLAB versions (paints a solid black box) — see
+% commit b9e7439 and memory/feedback_uitree_broken.md for history.
+% Headless tests can't see the render failure, so we gate at the source.
+dcPath = which('DiraCulator');
+if exist(dcPath, 'file')
+    src = fileread(dcPath);
+    % Strip block comments (%{ ... %}) and line comments before searching,
+    % so documentation mentioning uitree doesn't trip the guard.
+    srcNoBlockCmt = regexprep(src, '%\{.*?%\}', '', 'dotall');
+    srcLines = strsplit(srcNoBlockCmt, newline);
+    srcLines = regexprep(srcLines, '%.*$', '');      % strip line comments
+    codeOnly = strjoin(srcLines, newline);
+    if ~isempty(regexp(codeOnly, '\<uitree\s*\(', 'once')) || ...
+       ~isempty(regexp(codeOnly, '\<uitreenode\s*\(', 'once'))
+        fprintf('  FAIL: DiraCulator.m contains uitree/uitreenode — this widget does not render in recent MATLAB. Use uilistbox.\n');
+        failed = failed + 1;
+    else
+        fprintf('  PASS: DiraCulator.m has no uitree/uitreenode calls\n'); passed = passed + 1;
+    end
+else
+    fprintf('  SKIP: could not locate DiraCulator.m source for regression check\n');
+end
+
+% REGRESSION GUARD #2: sidebar widget has non-zero pixel size after
+% layout. Catches "widget exists in tree but renders collapsed to zero
+% width/height" class of bugs. Requires drawnow to force layout commit.
+drawnow;
+try
+    pp = getpixelposition(nav, true);
+    if pp(3) >= 50 && pp(4) >= 50
+        fprintf('  PASS: navTree has non-zero pixel size (%dx%d)\n', round(pp(3)), round(pp(4))); passed = passed + 1;
+    else
+        fprintf('  FAIL: navTree pixel size too small (%dx%d) — may be clipped\n', round(pp(3)), round(pp(4))); failed = failed + 1;
+    end
+catch ME
+    fprintf('  SKIP: getpixelposition failed (%s)\n', ME.message);
+end
+
 % Tab switching via tree (all 18 navKeys)
 allNavKeys = {'unitConverter','crystal','electrical','semiconductor', ...
     'thinFilm','xrayNeutron','superconductor','magnetic', ...
