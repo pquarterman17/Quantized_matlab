@@ -67,6 +67,7 @@ DataWorkspace(Model=model)                       % with a shared WorkspaceModel
 api = DataWorkspace(Visible='off')               % headless / scripted use
 scripts.quickPlot('scan.xrdml')                 % one-liner plot
 scripts.batchImport('measurements/', 'Recursive', true);
+devReload DiraCulator                            % close+flush+relaunch after edits
 ```
 
 ## Testing
@@ -124,6 +125,17 @@ Feature-level docs are in separate files to keep this context compact:
 | **Tutorials** (step-by-step workflows) | [docs/tutorials/](docs/tutorials/) |
 
 ## GUI Development Notes
+
+### Reloading a GUI after code edits
+MATLAB caches function definitions in memory once loaded. After editing a GUI file (e.g. `DiraCulator.m`), calling `DiraCulator` again in an open MATLAB session re-runs the *old* cached code unless the function has been flushed. Use `devReload` to do the minimal-sufficient reset in one command:
+
+```matlab
+devReload DiraCulator   % close all figures + clear function cache + relaunch
+devReload               % same, defaults to DiraCulator
+devReload BosonPlotter  % works for any GUI in the toolbox
+```
+
+This is preferred over `clear classes` (which also destroys class state and is slower) and over restarting MATLAB (rarely needed — only for corrupted MEX/Java state). When asking the user to re-test a GUI change, direct them to `devReload <GuiName>` rather than "restart MATLAB".
 
 ### Layout integrity — catch clipped widgets early
 MATLAB silently allows `uigridlayout` clipping: if a parent row allocates 22 px and a nested grid needs 44 px, the widget renders but is partially or fully invisible with no warning.  This has bitten us multiple times (e.g. the Phase A Template dropdown was clipped out of sight).
