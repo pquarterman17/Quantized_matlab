@@ -110,6 +110,8 @@ navTree = uilistbox(navGL, ...
     'Items',           navItems, ...
     'ItemsData',       navItemsData, ...
     'FontSize',        12, ...
+    'FontColor',       [0.95 0.95 0.95], ...
+    'BackgroundColor', [0.10 0.10 0.10], ...
     'Multiselect',     'off', ...
     'ValueChangedFcn', @onNavChanged);
 
@@ -168,6 +170,17 @@ appData.history      = {};
 appData.historyMax   = 100;
 appData.api          = struct();  % tab builders store callable hooks here
 appData.favorites    = {};        % cell array of favorite structs: .name, .tab, .lastResult, .lastLatex
+appData.favoritesFile = fullfile(prefdir, 'diraculator_favorites.mat');
+if exist(appData.favoritesFile, 'file') == 2
+    try
+        S = load(appData.favoritesFile, 'favorites');
+        if isfield(S, 'favorites') && iscell(S.favorites)
+            appData.favorites = S.favorites;
+        end
+    catch
+        % Corrupt or unreadable file — ignore, keep empty list
+    end
+end
 appData.activeNavKey = 'home';  % mirrors current tree selection
 
 % ════════════════════════════════════════════════════════════════════════
@@ -210,6 +223,23 @@ applyDarkPanelTheme(fig, FIG_BG, LABEL_FG);
 % Show the fully-built figure and force layout commit
 fig.Visible = 'on';
 drawnow;
+
+% First-launch hint (shown once per user; flag stored in prefdir)
+hintFlag = fullfile(prefdir, 'diraculator_firstlaunch_seen');
+if exist(hintFlag, 'file') ~= 2 && nargout == 0
+    try
+        uialert(fig, ...
+            ['Welcome to DiraCulator.' newline newline ...
+             '• Pick a panel from the sidebar on the left.' newline ...
+             '• Press Enter to compute the primary action on any panel.' newline ...
+             '• Click ★ Save in the status bar to pin a result to Favorites.' newline ...
+             '• Arrow buttons (→) send results to other panels.'], ...
+            'First time here?', 'Icon', 'info');
+        fid = fopen(hintFlag, 'w'); if fid > 0, fclose(fid); end
+    catch
+        % Figure may be in headless mode — skip silently
+    end
+end
 
 % ════════════════════════════════════════════════════════════════════════
 % API (headless testing)
@@ -1344,6 +1374,31 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         end
         appData.api.getDResult = @() lblDResult.Text;
         appData.api.getMismatchResult = @() lblMMResult.Text;
+        appData.api.fillCrystalFromSubstrate = @(s) apiFillFromSubstrate(s);
+        function apiFillFromSubstrate(s)
+            if strcmpi(s.latticeType, 'amorphous'), return; end
+            ddDSystem.Value = pickSystemFromAngles(s);
+            onCrystalSystemChanged();
+            efDa.Value = s.a; efDb.Value = s.b; efDc.Value = s.c;
+            efDal.Value = s.alpha; efDbe.Value = s.beta; efDga.Value = s.gamma;
+            ddDSub.Value = '(none)';
+        end
+        function sys = pickSystemFromAngles(s)
+            eq = @(x,y) abs(x - y) < 1e-3;
+            if eq(s.a, s.b) && eq(s.b, s.c) && eq(s.alpha, 90) && eq(s.beta, 90) && eq(s.gamma, 90)
+                sys = 'Cubic';
+            elseif eq(s.a, s.b) && eq(s.alpha, 90) && eq(s.beta, 90) && eq(s.gamma, 120)
+                sys = 'Hexagonal';
+            elseif eq(s.a, s.b) && eq(s.alpha, 90) && eq(s.beta, 90) && eq(s.gamma, 90)
+                sys = 'Tetragonal';
+            elseif eq(s.alpha, 90) && eq(s.beta, 90) && eq(s.gamma, 90)
+                sys = 'Orthorhombic';
+            elseif eq(s.alpha, 90) && eq(s.gamma, 90)
+                sys = 'Monoclinic';
+            else
+                sys = 'Triclinic';
+            end
+        end
         appData.api.calcPlaneSpacings = @(aVal, cent) apiPlaneSpacings(aVal, cent);
         function tbl = apiPlaneSpacings(aVal, cent)
             efDa.Value = aVal; efDb.Value = aVal; efDc.Value = aVal;
@@ -4769,18 +4824,23 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         gl.Padding = [6 6 6 6]; gl.RowSpacing = 6;
 
         % Search row
-        searchGL = uigridlayout(gl, [1 3]);
-        searchGL.ColumnWidth = {80, '1x', 100}; searchGL.Layout.Row = 1;
+        searchGL = uigridlayout(gl, [1 4]);
+        searchGL.ColumnWidth = {80, '1x', 110, 100}; searchGL.Layout.Row = 1;
         searchGL.Padding = [0 0 0 0];
         uilabel(searchGL,'Text','Substrate:','HorizontalAlignment','right');
         ddSubstrate = uidropdown(searchGL, ...
             'ValueChangedFcn', @(~,~) onSubstrateSelected(), ...
             'Tooltip','Substrate preset — pick a single-crystal oxide/semiconductor to view its full property card');
         ddSubstrate.Layout.Row = 1; ddSubstrate.Layout.Column = 2;
+        btnSubToCrystal = uibutton(searchGL,'push','Text',[char(8594) ' d-Spacing'], ...
+            'BackgroundColor',BTN_TOOL,'FontColor',BTN_TOOL_FG,'FontSize',9, ...
+            'Tooltip','Send lattice a/b/c/α/β/γ to the Crystal → d-Spacing card', ...
+            'ButtonPushedFcn',@(~,~) sendSubstrateToCrystal());
+        btnSubToCrystal.Layout.Row = 1; btnSubToCrystal.Layout.Column = 3;
         btnCopySub = uibutton(searchGL,'push','Text','Copy All', ...
             'BackgroundColor',BTN_EXPORT,'FontColor',BTN_FG, ...
             'ButtonPushedFcn',@(~,~) doCopySubstrate());
-        btnCopySub.Layout.Row = 1; btnCopySub.Layout.Column = 3;
+        btnCopySub.Layout.Row = 1; btnCopySub.Layout.Column = 4;
 
         % Detail table
         tblSub = uitable(gl, 'ColumnName', {'Property','Value','Unit'}, ...
@@ -4843,6 +4903,25 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             lines{end+1} = sprintf('eps_r: %.1f', s.dielectric);
             clipboard('copy', strjoin(lines, newline));
             setStatus(sprintf('Copied %s properties to clipboard', name));
+        end
+
+        function sendSubstrateToCrystal()
+            name = ddSubstrate.Value;
+            try
+                s = calc.substrates.getSubstrate(name);
+            catch ME
+                setStatus(ME.message); return;
+            end
+            if strcmpi(s.latticeType, 'amorphous')
+                setStatus(sprintf('%s is amorphous — no lattice to send', name));
+                return;
+            end
+            if ~isfield(appData.api, 'fillCrystalFromSubstrate')
+                setStatus('Crystal tab not ready'); return;
+            end
+            appData.api.fillCrystalFromSubstrate(s);
+            selectPanel('crystal');
+            setStatus(sprintf('Sent %s lattice to Crystal d-Spacing', s.formula));
         end
 
         registerPrimaryBtn('substrates', btnCopySub);
@@ -5347,8 +5426,19 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             'ColumnWidth', {60, 100, '1x', 200}, ...
             'RowName',     {}, ...
             'ColumnSortable', [false false false false], ...
-            'Multiselect', 'off');
+            'Multiselect', 'off', ...
+            'CellSelectionCallback', @onHistoryCellSelected);
         tblHistory.Layout.Row = 2;
+
+        function onHistoryCellSelected(~, evt)
+            if isempty(evt.Indices), return; end
+            r = evt.Indices(1);
+            d = tblHistory.Data;
+            if r < 1 || r > size(d,1) || size(d,2) < 3, return; end
+            full = d{r, 3};
+            if isempty(full), return; end
+            setStatus(char(full));
+        end
 
         % Context menu: "Copy as MATLAB code"
         cm = uicontextmenu(fig);
@@ -5543,6 +5633,16 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             appData.favorites(idx) = [];
             refreshFavoritesList();
             refreshNavBadges();
+            persistFavorites();
+        end
+
+        function persistFavorites()
+            try
+                favorites = appData.favorites; %#ok<NASGU>
+                save(appData.favoritesFile, 'favorites');
+            catch
+                % Disk full / locked / prefdir missing — silently skip
+            end
         end
 
         function refreshFavoritesList()
@@ -5576,6 +5676,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                     appData.favorites{fi2}.lastResult = result;
                     appData.favorites{fi2}.lastLatex = latex;
                     refreshFavoritesList();
+                    persistFavorites();
                     return;
                 end
             end
@@ -5586,6 +5687,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             appData.favorites{end+1} = fav;
             refreshFavoritesList();
             refreshNavBadges();
+            persistFavorites();
         end
     end
 
