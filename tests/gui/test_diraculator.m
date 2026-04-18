@@ -35,58 +35,48 @@ end
 
 fprintf('\n--- Navigation Sidebar ---\n');
 
-% Tree widget exists and is valid
-tree = api.navTree;
-if isvalid(tree)
+% Nav widget exists and is valid (uilistbox — uitree regressed in recent
+% MATLAB uifigure versions, rendering a solid black box)
+nav = api.navTree;
+if isvalid(nav)
     fprintf('  PASS: navTree is valid\n'); passed = passed + 1;
 else
     fprintf('  FAIL: navTree is not valid\n'); failed = failed + 1;
 end
 
-% Tree has category nodes (5 categories)
-catNodes = tree.Children;
-if numel(catNodes) >= 5
-    fprintf('  PASS: navTree has %d category nodes\n', numel(catNodes)); passed = passed + 1;
+% It is a uilistbox (not a uitree)
+if isa(nav, 'matlab.ui.control.ListBox')
+    fprintf('  PASS: navTree is a uilistbox\n'); passed = passed + 1;
 else
-    fprintf('  FAIL: navTree has %d category nodes (expected >=5)\n', numel(catNodes)); failed = failed + 1;
+    fprintf('  FAIL: navTree is %s (expected uilistbox)\n', class(nav)); failed = failed + 1;
 end
 
-% Each category has leaf children
-allLeavesOk = true;
-for ci = 1:numel(catNodes)
-    if numel(catNodes(ci).Children) == 0
-        fprintf('  FAIL: category "%s" has no children\n', catNodes(ci).Text);
-        allLeavesOk = false;
-    end
-end
-if allLeavesOk
-    fprintf('  PASS: all categories have leaf nodes\n'); passed = passed + 1;
+% Contains all 18 leaf keys in ItemsData (plus 5 empty header entries)
+expectedKeys = {'unitConverter','crystal','electrical','semiconductor', ...
+    'thinFilm','xrayNeutron','superconductor','magnetic', ...
+    'optics','vacuum','electrochemistry','thermal','diffusion', ...
+    'reflectivity','substrates','periodicTable','favorites','history'};
+missingKeys = setdiff(expectedKeys, nav.ItemsData);
+if isempty(missingKeys)
+    fprintf('  PASS: all 18 navKeys present in listbox\n'); passed = passed + 1;
 else
-    failed = failed + 1;
+    fprintf('  FAIL: missing navKeys: %s\n', strjoin(missingKeys, ', ')); failed = failed + 1;
 end
 
-% Tree text must be visible. We intentionally do NOT set BackgroundColor
-% or FontColor on the uitree (those props cause rendering failures on
-% some MATLAB versions), so the tree renders with its default light
-% theme. Guard: either FontColor is light (if we ever re-enable theming)
-% OR BackgroundColor is the MATLAB default (tree renders its own frame).
-bg = tree.BackgroundColor;
-fc = tree.FontColor;
-isDefaultBg = all(bg > 0.9);   % MATLAB default is near-white
-isLightFg   = all(fc > 0.5);
-if isDefaultBg || isLightFg
-    fprintf('  PASS: navTree text is visible (bg=[%.2f %.2f %.2f] fg=[%.2f %.2f %.2f])\n', bg, fc); passed = passed + 1;
+% Header rows (empty ItemsData) for the 5 categories
+numHeaders = sum(cellfun(@isempty, nav.ItemsData));
+if numHeaders >= 5
+    fprintf('  PASS: listbox has %d category headers\n', numHeaders); passed = passed + 1;
 else
-    fprintf('  FAIL: navTree has dark bg + dark fg — text invisible (bg=[%.2f %.2f %.2f] fg=[%.2f %.2f %.2f])\n', bg, fc); failed = failed + 1;
+    fprintf('  FAIL: listbox has %d category headers (expected >=5)\n', numHeaders); failed = failed + 1;
 end
 
-% Tree parent is a layout container that stretches to fill the sidebar
-% (uigridlayout or uipanel, not the root figure).
-treeParent = tree.Parent;
-if isa(treeParent, 'matlab.ui.container.GridLayout') || isa(treeParent, 'matlab.ui.container.Panel')
-    fprintf('  PASS: navTree inside stretch container (%s)\n', class(treeParent)); passed = passed + 1;
+% Parent is a layout container that stretches to fill the sidebar
+navParent = nav.Parent;
+if isa(navParent, 'matlab.ui.container.GridLayout') || isa(navParent, 'matlab.ui.container.Panel')
+    fprintf('  PASS: navTree inside stretch container (%s)\n', class(navParent)); passed = passed + 1;
 else
-    fprintf('  FAIL: navTree parent is %s (expected uigridlayout or uipanel)\n', class(treeParent)); failed = failed + 1;
+    fprintf('  FAIL: navTree parent is %s (expected uigridlayout or uipanel)\n', class(navParent)); failed = failed + 1;
 end
 
 % Tab switching via tree (all 18 navKeys)

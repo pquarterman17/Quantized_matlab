@@ -60,11 +60,12 @@ rootGL.RowSpacing   = 0;
 rootGL.ColumnSpacing = 0;
 rootGL.BackgroundColor = FIG_BG;
 
-% Navigation tree (categorised sidebar)
-% The uitree needs an inner uigridlayout to fill the sidebar column. A
-% uitree as a direct child of a uipanel uses default Position (tiny, top-
-% left of the panel) rather than filling the parent — so we wrap in a
-% uigridlayout, which stretches the tree to fill the 160 px sidebar.
+% Navigation sidebar — uilistbox (flat list with category header rows)
+% NOTE: we use uilistbox rather than uitree because uitree inside
+% uigridlayout fails to render in recent MATLAB uifigure versions
+% (paints a solid black box with no nodes). uilistbox is a flat list
+% but renders reliably. Category rows are shown as visually distinct,
+% non-selectable separators via empty ItemsData.
 navGL = uigridlayout(rootGL);
 navGL.RowHeight    = {'1x'};
 navGL.ColumnWidth  = {'1x'};
@@ -75,15 +76,7 @@ navGL.BackgroundColor = SIDEBAR_BG;
 navGL.Layout.Row    = 1;
 navGL.Layout.Column = 1;
 
-% NOTE: do NOT set BackgroundColor / FontColor on the uitree itself —
-% on some MATLAB versions these properties cause the uitree to fail to
-% paint entirely (solid black box in uifigure). The surrounding navGL
-% provides the dark frame; the tree uses MATLAB's default light theme.
-navTree = uitree(navGL, ...
-    'SelectionChangedFcn', @onNavChanged, ...
-    'FontSize', 11);
-
-% ── tree category definitions ──────────────────────────────────────────
+% Category + leaf definitions (display label, navKey). Empty navKey = header.
 navCategories = { ...
     'Reference',         {'Unit Converter',  'unitConverter'; ...
                           [char(9660) ' History'],   'history'; ...
@@ -105,38 +98,36 @@ navCategories = { ...
                           'Vacuum',            'vacuum'}; ...
 };
 
-% Category icons (R2023a+ only — uitreenode Icon property)
-hasTreeIcons = ~isMATLABReleaseOlderThan('R2023a');
-catIcons = containers.Map( ...
-    {'Reference','Materials','Electronic','Optics & Scattering','Thermal-Magnetic'}, ...
-    {'exchange',  'grid_3x3','memory',    'light_mode',         'thermostat'});
-
-% Build the tree and collect a navKey → node map for selectPanel
-navNodeMap = containers.Map('KeyType','char','ValueType','any');
+% Flatten to Items / ItemsData. Headers get ItemsData = '' (sentinel).
+navItems     = {};
+navItemsData = {};
 for ci = 1:size(navCategories, 1)
-    catName   = navCategories{ci, 1};
-    leaves    = navCategories{ci, 2};   % Nx2 cell: {displayName, key}
-    catNode   = uitreenode(navTree, 'Text', catName);
-    if hasTreeIcons && catIcons.isKey(catName)
-        try catNode.Icon = catIcons(catName); catch; end
-    end
+    catName = navCategories{ci, 1};
+    leaves  = navCategories{ci, 2};
+    navItems{end+1}     = sprintf('── %s ──', catName); %#ok<AGROW>
+    navItemsData{end+1} = ''; %#ok<AGROW>
     for li = 1:size(leaves, 1)
-        leafNode = uitreenode(catNode, ...
-            'Text',     leaves{li, 1}, ...
-            'NodeData', leaves{li, 2});
-        navNodeMap(leaves{li, 2}) = leafNode;
+        navItems{end+1}     = ['  ' leaves{li, 1}]; %#ok<AGROW>
+        navItemsData{end+1} = leaves{li, 2}; %#ok<AGROW>
     end
-    expand(catNode);
 end
 
-% Also build flat navKeys list for panels loop (order must match navNames order)
+navTree = uilistbox(navGL, ...
+    'Items',           navItems, ...
+    'ItemsData',       navItemsData, ...
+    'FontSize',        11, ...
+    'Multiselect',     'off', ...
+    'ValueChangedFcn', @onNavChanged);
+
+% Flat navKeys list for panels loop (order must match navCategories order)
 navKeys  = {'unitConverter', 'crystal', 'electrical', 'semiconductor', ...
             'thinFilm', 'xrayNeutron', 'superconductor', 'magnetic', ...
             'optics', 'vacuum', 'electrochemistry', 'thermal', 'diffusion', ...
             'reflectivity', 'substrates', 'periodicTable', 'favorites', 'history'};
 
-% Select the first node (activeNavKey is set in APP STATE block below)
-navTree.SelectedNodes = navNodeMap('unitConverter');
+% Select the default leaf (activeNavKey is set in APP STATE block below)
+navTree.Value = 'unitConverter';
+lastNavValue = 'unitConverter';  % fallback when user clicks a header row
 
 % Content area — grid layout so each panel gets proper sizing
 contentGL = uigridlayout(rootGL);
@@ -371,12 +362,15 @@ end
 % NAVIGATION: Switch visible panel
 % ════════════════════════════════════════════════════════════════════════
 
-    function onNavChanged(~, evt)
-        % Only respond to leaf nodes (those with a NodeData key string)
-        if isempty(evt.SelectedNodes), return; end
-        node = evt.SelectedNodes(1);
-        if isempty(node.NodeData), return; end   % category header clicked
-        selectPanel(node.NodeData);
+    function onNavChanged(src, ~)
+        % Listbox header rows have empty ItemsData — ignore and revert.
+        key = src.Value;
+        if isempty(key)
+            navTree.Value = lastNavValue;
+            return;
+        end
+        lastNavValue = key;
+        selectPanel(key);
     end
 
     function selectPanel(key)
@@ -387,9 +381,10 @@ end
         end
         tabs.(key).Visible = 'on';
         appData.activeNavKey = key;
-        % Sync tree selection
-        if navNodeMap.isKey(key)
-            navTree.SelectedNodes = navNodeMap(key);
+        % Sync listbox selection
+        if any(strcmp(navTree.ItemsData, key))
+            navTree.Value = key;
+            lastNavValue  = key;
         end
     end
 
