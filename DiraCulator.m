@@ -42,6 +42,7 @@ STATUSBAR_BG = [0.10 0.10 0.10];  % status bar background
 fig = uifigure('Name', 'DiraCulator — Thin Film Toolkit', ...
     'Position', [80 60 780 640], ...
     'Resize', 'on', ...
+    'Visible', 'off', ...
     'Color', FIG_BG);
 fig.CloseRequestFcn = @onFigureClose;
 
@@ -207,6 +208,10 @@ appData.api.exportReport = @(fp) exportReportToFile(fp);
 % Apply consistent dark theme to all widgets
 applyDarkInputTheme(fig, INPUT_BG, INPUT_FG);
 applyDarkPanelTheme(fig, FIG_BG, LABEL_FG);
+
+% Show the fully-built figure and force layout commit
+fig.Visible = 'on';
+drawnow;
 
 % ════════════════════════════════════════════════════════════════════════
 % API (headless testing)
