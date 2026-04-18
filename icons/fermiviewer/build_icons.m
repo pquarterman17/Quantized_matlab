@@ -14,6 +14,7 @@ function build_icons()
 %       fit.png          reset/fit-to-window (four corner arrows)
 %       reset_all.png    reset all transforms (circular arrow)
 %       crop.png         crop selection (L-brackets)
+%       del_annot.png    delete annotation (circled X)
 %
 %   Run:  run icons/fermiviewer/build_icons
 
@@ -30,8 +31,9 @@ write_icon(outDir, 'zoom.png',      draw_zoom(sz, fg, accent));
 write_icon(outDir, 'fit.png',       draw_fit(sz, fg));
 write_icon(outDir, 'reset_all.png', draw_reset_all(sz, fg));
 write_icon(outDir, 'crop.png',      draw_crop(sz, fg));
+write_icon(outDir, 'del_annot.png', draw_del_annot(sz, fg));
 
-fprintf('Wrote 8 icons to %s\n', outDir);
+fprintf('Wrote 9 icons to %s\n', outDir);
 end
 
 % ────────────────────────────────────────────────────────────────────────
@@ -248,4 +250,19 @@ function rgba = draw_crop(sz, fg)
     rgba = paint(rgba, line_mask(sz, 7, 4, 7, sz-3, th), fg);
     rgba = paint(rgba, line_mask(sz, sz-7, 4, sz-7, sz-3, th), fg);
     rgba = paint(rgba, line_mask(sz, 4, sz-7, sz-3, sz-7, th), fg);
+end
+
+function rgba = draw_del_annot(sz, fg)
+    rgba = blank(sz);
+    cx = sz/2 + 0.5; cy = sz/2 + 0.5;
+    r  = sz*0.36;
+    th = 1.8;
+    % Circle
+    outer = disk_mask(sz, cx, cy, r);
+    inner = disk_mask(sz, cx, cy, r - th);
+    rgba = paint(rgba, max(0, outer - inner), fg);
+    % X mark inside
+    d = sz*0.18;
+    rgba = paint(rgba, line_mask(sz, cx-d, cy-d, cx+d, cy+d, th), fg);
+    rgba = paint(rgba, line_mask(sz, cx+d, cy-d, cx-d, cy+d, th), fg);
 end
