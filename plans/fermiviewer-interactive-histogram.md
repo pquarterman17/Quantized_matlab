@@ -3,9 +3,9 @@
 Transform the histogram panel from a static display into a DM/Photoshop/ImageJ-style
 interactive contrast tool with draggable handles, auto-contrast, and precise numeric entry.
 
-**Status:** Active
+**Status:** Active — Tier 3 items 8-10 remain
 **Created:** 2026-04-15
-**Updated:** 2026-04-15
+**Updated:** 2026-04-17
 
 ---
 
@@ -70,10 +70,8 @@ Contrast is applied to `filteredPixels` (post-filter).
 
 ## Tier 1 — High Impact
 
-1. **Draggable black/white point handles on histogram** — add two vertical line handles
-   on `histAx` that the user can click-drag to set the contrast window, matching DM's
-   interaction model. Real-time image update as the handle moves.
-   - [ ] Add `ButtonDownFcn` on `histAx` to detect clicks near a handle (within ~5px)
+1. **Draggable black/white point handles on histogram** — ~~done~~ (2026-04-17) click histAx to drag nearest handle; cyan=low, magenta=high; shaded band between; `onHistAxesClick` + `startHistDrag` dispatcher
+   - [x] Add `ButtonDownFcn` on `histAx` to detect clicks near a handle (within ~5px)
    - [ ] Implement drag loop via `WindowButtonMotionFcn` / `WindowButtonUpFcn` on `fig`
    - [ ] Sync `sldLow`/`sldHigh` and `efLow`/`efHigh` bidirectionally during drag
    - [ ] Enforce lo < hi constraint with minimum gap (reuse existing logic from `onContrastChanged`)
@@ -82,52 +80,21 @@ Contrast is applied to `filteredPixels` (post-filter).
    - [ ] Ensure handles update position when sliders are moved externally (slider still works)
    - [ ] Use `refreshHistogramMarkers()` as the single codepath for handle visuals (refactor if needed)
 
-2. **Shaded contrast window on histogram** — fill the region between the two handles
-   with a semi-transparent overlay (like DM's bright region) so the "mapped range" is
-   instantly visible.
-   - [ ] Draw a `patch()` or `area()` between lo and hi with low alpha (~0.15)
-   - [ ] Update fill on every handle move or slider change
-   - [ ] Visually indicate clipped regions (pixels below lo or above hi) with subtle tinting
+2. **Shaded contrast window on histogram** — ~~done~~ (2026-04-17, bundled with item 1) green patch at 12% alpha between lo/hi handles; updates on every slider change via `refreshHistogramMarkers()`
 
-3. **Auto-contrast button** — one-click optimal contrast (0.5% tail clip, matching DM's
-   "Auto Survey" behavior).
-   - [ ] Add "Auto" button to the histogram section header or inside the panel
-   - [ ] Compute 0.5th and 99.5th percentiles of `rawPixels` (not filtered — matches histogram reference)
-   - [ ] Set `sldLow`/`sldHigh` to those values and fire `onContrastChanged`
-   - [ ] Button should be small (icon-sized) to fit in the compact panel
+3. **Auto-contrast button** — ~~done~~ (2026-04-17) "Auto" button wired to existing `onAutoContrast` (2%/98% percentile); in histogram panel row 2 col 1
 
-4. **Reset / Full Range button** — snap contrast to full data range (min/max of raw pixels).
-   - [ ] Add "Reset" button next to Auto
-   - [ ] Set sliders to `sldLow.Limits(1)` / `sldHigh.Limits(2)` — the data extremes
+4. **Reset / Full Range button** — ~~done~~ (2026-04-17) "Reset" button wired to existing `onResetContrast`; in histogram panel row 2 col 2
 
 ---
 
 ## Tier 2 — Medium Impact
 
-5. **Gamma / midtone handle** — a third draggable handle between the black and white
-   points that controls the gamma curve (midtone adjustment), matching Photoshop's center
-   triangle. This lets users brighten shadows or darken highlights without moving the
-   endpoints.
-   - [ ] Draw a third handle line (or triangle) constrained between lo and hi
-   - [ ] Map handle position to gamma value: center = 1.0 (linear), left = >1 (brighten), right = <1 (darken)
-   - [ ] Wire to `appData.gamma` which `applyContrastPipeline` already uses (step 3)
-   - [ ] Sync with any future gamma slider/field if added to the contrast section
-   - [ ] Show numeric gamma value as tooltip or small label near the handle
+5. **Gamma / midtone handle** — ~~done~~ (2026-04-17) yellow dashed line at midtone position `lo + (hi - lo) * 0.5^(1/γ)`; click-drag computes `γ = ln(0.5)/ln(t)` where t is normalized position; wired to sldGamma and onGammaChanged
 
-6. **Log-scale histogram toggle** — EM data often has huge dynamic range; a linear
-   histogram shows one tall spike and everything else at zero. A log-scale Y-axis makes
-   the full distribution visible.
-   - [ ] Add a small toggle button (e.g., "Log") in the histogram section
-   - [ ] When active, display `log10(counts + 1)` instead of raw counts
-   - [ ] Persist the toggle state per session (not per image — it's a viewing preference)
-   - [ ] Update Y-axis label or title to indicate log scale
+6. **Log-scale histogram toggle** — ~~done~~ (2026-04-17) "Log" toggle button in histogram panel; displays `log10(counts + 1)`; persists per session
 
-7. **Scroll-wheel zoom on histogram** — narrow or widen the contrast window by scrolling
-   on the histogram (zoom centered on the current midpoint), matching DM's scroll behavior.
-   - [ ] Add `WindowScrollWheelFcn` handler scoped to `histAx` hit test
-   - [ ] Each scroll tick moves lo and hi symmetrically by ~2% of the current window width
-   - [ ] Respect the lo < hi and data-range constraints
-   - [ ] Syncs sliders, fields, and image display
+7. **Scroll-wheel zoom on histogram** — ~~done~~ (2026-04-17) `WindowScrollCountFcn` scoped to histAx hit test; ±2% symmetric per tick; syncs sliders, fields, and display
 
 ---
 
@@ -152,12 +119,17 @@ Contrast is applied to `filteredPixels` (post-filter).
     - [ ] Overlay colored bars or tint the existing bars outside the [lo, hi] window
     - [ ] Update on every contrast change (fast path — just change bar colors, don't recompute)
 
-11. **Delete dead code `updateHistogramLines()`** — this function (lines ~4323–4354) is
-    never called and was superseded by `refreshHistogramMarkers()`. Remove it to reduce
-    confusion.
+11. **Delete dead code `updateHistogramLines()`** — ~~done~~ (2026-04-17, confirmed removed)
 
 ---
 
 ## Completed
 
-_(none yet)_
+- ~~**Draggable black/white point handles**~~ (2026-04-17) — click histAx to drag nearest handle; cyan=low, magenta=high; shaded band
+- ~~**Shaded contrast window**~~ (2026-04-17) — green patch at 12% alpha between lo/hi handles
+- ~~**Auto-contrast button**~~ (2026-04-17) — 2%/98% percentile auto
+- ~~**Reset / Full Range button**~~ (2026-04-17) — wired to onResetContrast
+- ~~**Gamma / midtone handle**~~ (2026-04-17) — yellow dashed line, click-drag gamma via γ = ln(0.5)/ln(t)
+- ~~**Log-scale histogram toggle**~~ (2026-04-17) — log10(counts+1) toggle button
+- ~~**Scroll-wheel zoom on histogram**~~ (2026-04-17) — ±2% symmetric per tick
+- ~~**Delete dead code updateHistogramLines()**~~ (2026-04-17) — confirmed removed

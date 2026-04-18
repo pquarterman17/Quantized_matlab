@@ -84,6 +84,27 @@ runAllTests(Group="fitting")         % curve fitting engine + models + parser
 
 Groups: `parser`, `batch`, `xrd2d`, `gui`, `calcgui`, `sims`, `em`, `emgui`, `eds`, `xrayneutron`, `superconductor`, `cif`, `optics`, `vacuum`, `electrochemistry`, `eels`, `eels_adv`, `diffindex`, `diff_sim`, `edsquant`, `contour`, `fitting`, `plotting`, `spectral`, `interp2d`, `baseline`, `errorprop`, `utilities`, `templates`
 
+## Tracking Work
+
+**`BACKLOG.md`** at the repo root is the single source of truth for what's open
+right now. It aggregates every open top-level item from every active plan in
+`plans/*.md` (grouped by tier, then by plan). It is **tracked in git** and
+survives across machines / parallel terminals.
+
+`plans/*.md` files are **gitignored working documents** — detailed context,
+dependency maps, and sub-task checklists for each workstream. Plans are per-
+machine; BACKLOG.md is shared.
+
+### Workflow
+
+- Before starting work, check `BACKLOG.md` to see what's open.
+- When completing an item:
+  1. Strike it in the source `plans/<plan>.md` (`~~**#5 ...**~~ (YYYY-MM-DD) — outcome`) and move it to that plan's `## Completed` section.
+  2. Remove (or strike) the corresponding line in `BACKLOG.md`.
+- When all items in a plan ship, set the plan's `**Status:** Complete` and move the file to `plans/archive/`.
+- When a plan drifts (items marked done in one, still open in another), reconcile by trusting the code (`git log`, tests) as the source of truth — see memory `feedback_plan_drift`.
+- Regenerate `BACKLOG.md` any time a plan gains or loses items; it's a manually curated aggregation, not a script output.
+
 ## Key Design Decisions
 
 - **Functional approach** — pure functions returning structs; no heavy OOP

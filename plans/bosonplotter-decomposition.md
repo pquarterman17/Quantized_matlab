@@ -8,7 +8,7 @@ something first.
 
 **Status:** Active
 **Created:** 2026-04-12
-**Updated:** 2026-04-12 (Tier 1 complete, Tier 2 mostly complete, Tier 3 partial)
+**Updated:** 2026-04-17 (table callbacks extracted — 298 nested fns, 47 slots headroom)
 
 ---
 
@@ -138,6 +138,12 @@ These are the largest nested functions but they touch 20-54 widgets each.
 17. **Extract `onPlotTemplates`** (163 lines) — plot template save/load dialog with
     4 nested sub-functions. Still a nested function.
 
+18. ~~**Extract table model callbacks**~~ (2026-04-17, commit b0d3804) — tableCallbacks.m, 321→298 fns, 47 slots headroom
+
+19. **Extract neutron sibling propagation** (~45 lines) — self-contained, no widget deps beyond `appData`.
+
+20. **Extract undo state helpers** — `captureUndoState` and related (~3 functions). Zero or near-zero widget deps.
+
 ---
 
 ## Budget
@@ -183,3 +189,4 @@ insurance for the long term.
 
 **Result (Tier 1):** 346 → 331 nested functions (−15), 14,349 → 13,737 lines (−612), 40 → 45 extracted modules. 16/16 GUI tests pass.
 **Result (Tier 2-3):** Additional 5 extractions (draw2DMap, extract2DBox/Arc, onBGMouseUp, onApplyCorrections) + `ui` struct introduced.
+- ~~**Extract analysis callbacks**~~ (2026-04-16) — 19 functions (620 lines) → `+bosonPlotter/analysisCallbacks.m`. Uses ctx/unpack pattern + `anaCb` struct. 4 thin stubs remain for toolbar-wired callbacks. 342 → 321 total (23 slots headroom). 19/19 GUI suites pass.
