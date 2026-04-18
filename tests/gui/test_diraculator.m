@@ -30,6 +30,79 @@ else
 end
 
 % ════════════════════════════════════════════════════════════════════
+%  NAVIGATION SIDEBAR
+% ════════════════════════════════════════════════════════════════════
+
+fprintf('\n--- Navigation Sidebar ---\n');
+
+% Tree widget exists and is valid
+tree = api.navTree;
+if isvalid(tree)
+    fprintf('  PASS: navTree is valid\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: navTree is not valid\n'); failed = failed + 1;
+end
+
+% Tree has category nodes (5 categories)
+catNodes = tree.Children;
+if numel(catNodes) >= 5
+    fprintf('  PASS: navTree has %d category nodes\n', numel(catNodes)); passed = passed + 1;
+else
+    fprintf('  FAIL: navTree has %d category nodes (expected >=5)\n', numel(catNodes)); failed = failed + 1;
+end
+
+% Each category has leaf children
+allLeavesOk = true;
+for ci = 1:numel(catNodes)
+    if numel(catNodes(ci).Children) == 0
+        fprintf('  FAIL: category "%s" has no children\n', catNodes(ci).Text);
+        allLeavesOk = false;
+    end
+end
+if allLeavesOk
+    fprintf('  PASS: all categories have leaf nodes\n'); passed = passed + 1;
+else
+    failed = failed + 1;
+end
+
+% Tree font color is light (not default black on dark bg)
+fc = tree.FontColor;
+if all(fc > 0.5)
+    fprintf('  PASS: navTree FontColor is light [%.2f %.2f %.2f]\n', fc(1), fc(2), fc(3)); passed = passed + 1;
+else
+    fprintf('  FAIL: navTree FontColor is dark [%.2f %.2f %.2f] — invisible on dark bg\n', fc(1), fc(2), fc(3)); failed = failed + 1;
+end
+
+% Tree parent is a uipanel (rendering isolation)
+treeParent = tree.Parent;
+if isa(treeParent, 'matlab.ui.container.Panel')
+    fprintf('  PASS: navTree is inside a uipanel\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: navTree parent is %s (expected uipanel)\n', class(treeParent)); failed = failed + 1;
+end
+
+% Tab switching via tree (all 18 navKeys)
+allNavKeys = {'unitConverter','crystal','electrical','semiconductor', ...
+    'thinFilm','xrayNeutron','superconductor','magnetic', ...
+    'optics','vacuum','electrochemistry','thermal','diffusion', ...
+    'reflectivity','substrates','periodicTable','favorites','history'};
+allTabsOk = true;
+for i = 1:numel(allNavKeys)
+    try
+        api.selectTab(allNavKeys{i});
+    catch ME
+        fprintf('  FAIL: tab "%s" not selectable: %s\n', allNavKeys{i}, ME.message);
+        allTabsOk = false;
+    end
+end
+if allTabsOk
+    fprintf('  PASS: all 18 tabs selectable\n'); passed = passed + 1;
+else
+    failed = failed + 1;
+end
+api.selectTab('unitConverter');
+
+% ════════════════════════════════════════════════════════════════════
 %  UNIT CONVERTER
 % ════════════════════════════════════════════════════════════════════
 
@@ -85,27 +158,6 @@ if ~isempty(st) && ~strcmp(st, 'Ready')
     fprintf('  PASS: status bar updated\n'); passed = passed + 1;
 else
     fprintf('  FAIL: status bar not updated\n'); failed = failed + 1;
-end
-
-% ════════════════════════════════════════════════════════════════════
-%  TAB SWITCHING
-% ════════════════════════════════════════════════════════════════════
-
-fprintf('\n--- Tab Switching ---\n');
-
-tabNames = {'unitConverter', 'crystal', 'electrical', 'semiconductor', 'thinFilm', 'periodicTable'};
-allTabsOk = true;
-for i = 1:numel(tabNames)
-    try
-        api.selectTab(tabNames{i});
-    catch
-        allTabsOk = false;
-    end
-end
-if allTabsOk
-    fprintf('  PASS: all 6 tabs selectable\n'); passed = passed + 1;
-else
-    fprintf('  FAIL: some tabs not selectable\n'); failed = failed + 1;
 end
 
 % ════════════════════════════════════════════════════════════════════

@@ -61,15 +61,18 @@ rootGL.ColumnSpacing = 0;
 rootGL.BackgroundColor = FIG_BG;
 
 % Navigation tree (categorised sidebar)
-% Each category holds leaf nodes whose NodeData is the navKey string.
-navTree = uitree(rootGL, ...
+% Wrap in a uipanel — uitree as a direct child of uigridlayout has
+% rendering issues (blank tree) in some MATLAB versions.
+navPanel = uipanel(rootGL, 'BorderType', 'none', ...
+    'BackgroundColor', SIDEBAR_BG);
+navPanel.Layout.Row    = 1;
+navPanel.Layout.Column = 1;
+
+navTree = uitree(navPanel, ...
     'SelectionChangedFcn', @onNavChanged, ...
     'FontSize', 11, ...
-    'BackgroundColor', SIDEBAR_BG);
-navTree.Layout.Row    = 1;
-navTree.Layout.Column = 1;
-% FontColor was added after R2021b — set defensively
-try; navTree.FontColor = LABEL_FG; catch; end
+    'BackgroundColor', SIDEBAR_BG, ...
+    'FontColor', LABEL_FG);
 
 % ── tree category definitions ──────────────────────────────────────────
 navCategories = { ...
@@ -218,6 +221,7 @@ drawnow;
 % ════════════════════════════════════════════════════════════════════════
 if nargout > 0
     api.fig            = fig;
+    api.navTree        = navTree;
     api.getHistory     = @getHistoryFcn;
     api.selectTab      = @(name) selectPanel(name);
     api.getStatus      = @() lblStatus.Text;
