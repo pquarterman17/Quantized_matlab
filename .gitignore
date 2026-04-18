@@ -15,3 +15,7 @@ claude.md
 .emviewer_recent.mat
 gui_bug_log.txt
 data/crystal_cache.mat
+
+# Test runner logs
+calctest.log
+*.log
