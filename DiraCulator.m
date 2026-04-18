@@ -78,7 +78,8 @@ navGL.Layout.Column = 1;
 
 % Category + leaf definitions (display label, navKey). Empty navKey = header.
 navCategories = { ...
-    'Reference',         {'Unit Converter',  'unitConverter'; ...
+    'Reference',         {'Home',             'home'; ...
+                          'Unit Converter',   'unitConverter'; ...
                           [char(9660) ' History'],   'history'; ...
                           [char(9733) ' Favorites'], 'favorites'}; ...
     'Materials',         {'Crystal',          'crystal'; ...
@@ -98,36 +99,29 @@ navCategories = { ...
                           'Vacuum',            'vacuum'}; ...
 };
 
-% Flatten to Items / ItemsData. Headers get ItemsData = '' (sentinel).
-navItems     = {};
-navItemsData = {};
-for ci = 1:size(navCategories, 1)
-    catName = navCategories{ci, 1};
-    leaves  = navCategories{ci, 2};
-    navItems{end+1}     = sprintf('── %s ──', catName); %#ok<AGROW>
-    navItemsData{end+1} = ''; %#ok<AGROW>
-    for li = 1:size(leaves, 1)
-        navItems{end+1}     = ['  ' leaves{li, 1}]; %#ok<AGROW>
-        navItemsData{end+1} = leaves{li, 2}; %#ok<AGROW>
-    end
-end
+% Build listbox items with a distinct visual hierarchy:
+%   Headers: "▌ REFERENCE" (uppercase, accent bar glyph)
+%   Leaves:  "  › Unit Converter" (indented chevron)
+% Dynamic badges on History / Favorites show non-empty counts, e.g.
+%   "  › Favorites (3)". Rebuilt via refreshNavBadges() on mutation.
+[navItems, navItemsData] = buildNavItems(0, 0);
 
 navTree = uilistbox(navGL, ...
     'Items',           navItems, ...
     'ItemsData',       navItemsData, ...
-    'FontSize',        11, ...
+    'FontSize',        12, ...
     'Multiselect',     'off', ...
     'ValueChangedFcn', @onNavChanged);
 
 % Flat navKeys list for panels loop (order must match navCategories order)
-navKeys  = {'unitConverter', 'crystal', 'electrical', 'semiconductor', ...
+navKeys  = {'home', 'unitConverter', 'crystal', 'electrical', 'semiconductor', ...
             'thinFilm', 'xrayNeutron', 'superconductor', 'magnetic', ...
             'optics', 'vacuum', 'electrochemistry', 'thermal', 'diffusion', ...
             'reflectivity', 'substrates', 'periodicTable', 'favorites', 'history'};
 
 % Select the default leaf (activeNavKey is set in APP STATE block below)
-navTree.Value = 'unitConverter';
-lastNavValue = 'unitConverter';  % fallback when user clicks a header row
+navTree.Value = 'home';
+lastNavValue = 'home';  % fallback when user clicks a header row
 
 % Content area — grid layout so each panel gets proper sizing
 contentGL = uigridlayout(rootGL);
@@ -174,7 +168,7 @@ appData.history      = {};
 appData.historyMax   = 100;
 appData.api          = struct();  % tab builders store callable hooks here
 appData.favorites    = {};        % cell array of favorite structs: .name, .tab, .lastResult, .lastLatex
-appData.activeNavKey = 'unitConverter';  % mirrors current tree selection
+appData.activeNavKey = 'home';  % mirrors current tree selection
 
 % ════════════════════════════════════════════════════════════════════════
 % BUILD PANELS (one per nav entry, all in same grid cell [1,1])
@@ -186,8 +180,9 @@ for nki = 1:numel(navKeys)
     p.Layout.Column = 1;
     tabs.(navKeys{nki}) = p;
 end
-tabs.unitConverter.Visible = 'on';  % show first panel
+tabs.home.Visible = 'on';  % show first panel
 
+buildHomeTab(tabs.home);
 buildUnitConverterTab(tabs.unitConverter);
 buildCrystalTab(tabs.crystal);
 buildElectricalTab(tabs.electrical);
@@ -293,6 +288,7 @@ end
         if isfield(appData.api, 'refreshHistoryTable')
             appData.api.refreshHistoryTable();
         end
+        refreshNavBadges();
     end
 
     function h = getHistoryFcn()
@@ -356,6 +352,7 @@ end
             appData.favorites{end+1} = fav;
         end
         setStatus(['Saved to favorites: ' name]);
+        refreshNavBadges();
     end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -388,6 +385,46 @@ end
         end
     end
 
+    function [items, itemsData] = buildNavItems(histCount, favCount)
+        % Build nav listbox content from navCategories with header styling
+        % and dynamic count badges on History / Favorites leaves.
+        items     = {};
+        itemsData = {};
+        for ci2 = 1:size(navCategories, 1)
+            catName2 = navCategories{ci2, 1};
+            leaves2  = navCategories{ci2, 2};
+            items{end+1}     = sprintf('▌ %s', upper(catName2)); %#ok<AGROW>
+            itemsData{end+1} = ''; %#ok<AGROW>
+            for li2 = 1:size(leaves2, 1)
+                leafName = leaves2{li2, 1};
+                leafKey  = leaves2{li2, 2};
+                % Strip legacy glyph prefixes (▼, ★) from display label
+                cleanName = regexprep(leafName, '^\s*[\x{2605}\x{25BC}]\s*', '');
+                label = sprintf('  › %s', cleanName);
+                if strcmp(leafKey, 'history') && histCount > 0
+                    label = sprintf('%s (%d)', label, histCount);
+                elseif strcmp(leafKey, 'favorites') && favCount > 0
+                    label = sprintf('%s (%d)', label, favCount);
+                end
+                items{end+1}     = label; %#ok<AGROW>
+                itemsData{end+1} = leafKey; %#ok<AGROW>
+            end
+        end
+    end
+
+    function refreshNavBadges()
+        % Rebuild listbox items to reflect current History/Favorites counts
+        % while preserving the active selection.
+        if ~isvalid(navTree), return; end
+        savedKey = navTree.Value;
+        [items, itemsData] = buildNavItems(numel(appData.history), numel(appData.favorites));
+        navTree.Items     = items;
+        navTree.ItemsData = itemsData;
+        if ~isempty(savedKey) && any(strcmp(itemsData, savedKey))
+            navTree.Value = savedKey;
+        end
+    end
+
 % ════════════════════════════════════════════════════════════════════════
 % ENTER KEY: trigger primary Calculate button on active panel
 % ════════════════════════════════════════════════════════════════════════
@@ -413,6 +450,106 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
                 % Enter that does nothing feels like the app froze.
                 setStatus(['Enter has no primary action on this tab. ', ...
                            'Use the mouse or Tab to navigate.']);
+            end
+        end
+    end
+
+% ════════════════════════════════════════════════════════════════════════
+% ════════════════════════════════════════════════════════════════════════
+%  TAB 0: HOME
+% ════════════════════════════════════════════════════════════════════════
+% ════════════════════════════════════════════════════════════════════════
+
+    function buildHomeTab(tab)
+        %BUILDHOMETAB  Landing panel with category cards linking to each calculator tab.
+        gl = uigridlayout(tab);
+        gl.RowHeight   = {40, 20, '1x'};
+        gl.ColumnWidth = {'1x'};
+        gl.Padding     = [16 12 16 12];
+        gl.RowSpacing  = 6;
+
+        % Title row
+        title = uilabel(gl, 'Text', 'DiraCulator', ...
+            'FontSize', 22, 'FontWeight', 'bold', ...
+            'HorizontalAlignment', 'left');
+        title.Layout.Row = 1; title.Layout.Column = 1;
+
+        subtitle = uilabel(gl, 'Text', ...
+            'Materials-science calculator — pick a tool from a card below or the left sidebar. Press Enter on any panel to compute.', ...
+            'FontSize', 11, 'FontColor', [0.65 0.65 0.65]);
+        subtitle.Layout.Row = 2; subtitle.Layout.Column = 1;
+
+        % One-line descriptions for each leaf (keyed by navKey)
+        descriptions = containers.Map( ...
+            {'unitConverter','history','favorites','crystal','thinFilm', ...
+             'substrates','periodicTable','electrical','semiconductor', ...
+             'electrochemistry','optics','xrayNeutron','reflectivity', ...
+             'superconductor','magnetic','thermal','diffusion','vacuum'}, ...
+            {'Convert between units with presets for Oe, eV, Ang, Pa, GPa, K, deg', ...
+             'Reproducible log of recent calculations — copy as MATLAB code', ...
+             'Pinned results for quick recall across sessions', ...
+             'Lattice parameters, d-spacing, cell volume, Miller indices', ...
+             'Film thickness, roughness, density from XRR', ...
+             'Common substrate lattice parameters & properties', ...
+             'Element reference: mass, density, crystal structure, electronegativity', ...
+             'Resistivity, sheet resistance, mobility, Hall effect', ...
+             'Carrier concentration, Fermi level, depletion width, band gap', ...
+             'Electrode potentials, pH, Nernst equation', ...
+             'Refractive index, absorption, Snell, thin-film interference', ...
+             'X-ray/neutron SLD, wavelengths, Q / 2θ, energy conversions', ...
+             'Multilayer reflectivity simulator (Parratt recursion)', ...
+             'Tc, Hc2, Jc, coherence length, penetration depth, BCS', ...
+             'Magnetic moment, anisotropy, demagnetization factors', ...
+             'Debye temperature, specific heat, thermal conductivity', ...
+             'Diffusion coefficients, activation energies, Arrhenius', ...
+             'Pressure/throughput/conductance; gas flow calculators'});
+
+        % Scrollable panel containing the 2-column card grid
+        scrollWrap = uipanel(gl, 'BorderType', 'none', 'Scrollable', 'on');
+        scrollWrap.Layout.Row = 3; scrollWrap.Layout.Column = 1;
+
+        cardsGL = uigridlayout(scrollWrap);
+        cardsGL.RowHeight   = repmat({'fit'}, 1, ceil(size(navCategories,1)/2));
+        cardsGL.ColumnWidth = {'1x', '1x'};
+        cardsGL.Padding     = [0 0 0 0];
+        cardsGL.RowSpacing  = 10;
+        cardsGL.ColumnSpacing = 10;
+
+        for hci = 1:size(navCategories, 1)
+            catName = navCategories{hci, 1};
+            leaves  = navCategories{hci, 2};
+
+            card = uipanel(cardsGL, 'Title', catName, ...
+                'FontSize', 13, 'FontWeight', 'bold', ...
+                'BorderType', 'line', 'BorderColor', [0.3 0.3 0.35]);
+            card.Layout.Row    = ceil(hci/2);
+            card.Layout.Column = mod(hci-1, 2) + 1;
+
+            % Each card: a grid with one row per leaf (button + description label)
+            cardGL = uigridlayout(card);
+            cardGL.RowHeight   = repmat({28}, 1, size(leaves, 1));
+            cardGL.ColumnWidth = {140, '1x'};
+            cardGL.Padding     = [8 8 8 8];
+            cardGL.RowSpacing  = 4;
+
+            for hli = 1:size(leaves, 1)
+                leafLabel = leaves{hli, 1};
+                leafKey   = leaves{hli, 2};
+                % Strip legacy glyphs from button label
+                cleanLabel = regexprep(leafLabel, '^\s*[\x{2605}\x{25BC}]\s*', '');
+                btn = uibutton(cardGL, 'push', 'Text', cleanLabel, ...
+                    'HorizontalAlignment', 'left', ...
+                    'ButtonPushedFcn', @(~,~) selectPanel(leafKey));
+                btn.Layout.Row = hli; btn.Layout.Column = 1;
+
+                descText = '';
+                if descriptions.isKey(leafKey)
+                    descText = descriptions(leafKey);
+                end
+                desc = uilabel(cardGL, 'Text', descText, ...
+                    'FontSize', 10, 'FontColor', [0.65 0.65 0.65], ...
+                    'WordWrap', 'on');
+                desc.Layout.Row = hli; desc.Layout.Column = 2;
             end
         end
     end
@@ -5292,6 +5429,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
         function onClearHistory()
             appData.history = {};
             refreshTable();
+            refreshNavBadges();
             setStatus('History cleared');
         end
 
@@ -5392,6 +5530,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             if idx > numel(appData.favorites), return; end
             appData.favorites(idx) = [];
             refreshFavoritesList();
+            refreshNavBadges();
         end
 
         function refreshFavoritesList()
@@ -5434,6 +5573,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             fav.lastLatex  = latex;
             appData.favorites{end+1} = fav;
             refreshFavoritesList();
+            refreshNavBadges();
         end
     end
 
