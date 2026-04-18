@@ -73,12 +73,13 @@ else
     fprintf('  FAIL: navTree FontColor is dark [%.2f %.2f %.2f] — invisible on dark bg\n', fc(1), fc(2), fc(3)); failed = failed + 1;
 end
 
-% Tree parent is a uipanel (rendering isolation)
+% Tree parent is a layout container that stretches to fill the sidebar
+% (uigridlayout or uipanel, not the root figure).
 treeParent = tree.Parent;
-if isa(treeParent, 'matlab.ui.container.Panel')
-    fprintf('  PASS: navTree is inside a uipanel\n'); passed = passed + 1;
+if isa(treeParent, 'matlab.ui.container.GridLayout') || isa(treeParent, 'matlab.ui.container.Panel')
+    fprintf('  PASS: navTree inside stretch container (%s)\n', class(treeParent)); passed = passed + 1;
 else
-    fprintf('  FAIL: navTree parent is %s (expected uipanel)\n', class(treeParent)); failed = failed + 1;
+    fprintf('  FAIL: navTree parent is %s (expected uigridlayout or uipanel)\n', class(treeParent)); failed = failed + 1;
 end
 
 % Tab switching via tree (all 18 navKeys)

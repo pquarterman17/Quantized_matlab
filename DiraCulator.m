@@ -61,14 +61,21 @@ rootGL.ColumnSpacing = 0;
 rootGL.BackgroundColor = FIG_BG;
 
 % Navigation tree (categorised sidebar)
-% Wrap in a uipanel — uitree as a direct child of uigridlayout has
-% rendering issues (blank tree) in some MATLAB versions.
-navPanel = uipanel(rootGL, 'BorderType', 'none', ...
-    'BackgroundColor', SIDEBAR_BG);
-navPanel.Layout.Row    = 1;
-navPanel.Layout.Column = 1;
+% The uitree needs an inner uigridlayout to fill the sidebar column. A
+% uitree as a direct child of a uipanel uses default Position (tiny, top-
+% left of the panel) rather than filling the parent — so we wrap in a
+% uigridlayout, which stretches the tree to fill the 160 px sidebar.
+navGL = uigridlayout(rootGL);
+navGL.RowHeight    = {'1x'};
+navGL.ColumnWidth  = {'1x'};
+navGL.Padding      = [0 0 0 0];
+navGL.RowSpacing   = 0;
+navGL.ColumnSpacing = 0;
+navGL.BackgroundColor = SIDEBAR_BG;
+navGL.Layout.Row    = 1;
+navGL.Layout.Column = 1;
 
-navTree = uitree(navPanel, ...
+navTree = uitree(navGL, ...
     'SelectionChangedFcn', @onNavChanged, ...
     'FontSize', 11, ...
     'BackgroundColor', SIDEBAR_BG, ...
