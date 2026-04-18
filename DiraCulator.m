@@ -75,11 +75,13 @@ navGL.BackgroundColor = SIDEBAR_BG;
 navGL.Layout.Row    = 1;
 navGL.Layout.Column = 1;
 
+% NOTE: do NOT set BackgroundColor / FontColor on the uitree itself —
+% on some MATLAB versions these properties cause the uitree to fail to
+% paint entirely (solid black box in uifigure). The surrounding navGL
+% provides the dark frame; the tree uses MATLAB's default light theme.
 navTree = uitree(navGL, ...
     'SelectionChangedFcn', @onNavChanged, ...
-    'FontSize', 11, ...
-    'BackgroundColor', SIDEBAR_BG, ...
-    'FontColor', LABEL_FG);
+    'FontSize', 11);
 
 % ── tree category definitions ──────────────────────────────────────────
 navCategories = { ...

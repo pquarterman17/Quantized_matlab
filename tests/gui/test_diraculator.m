@@ -65,12 +65,19 @@ else
     failed = failed + 1;
 end
 
-% Tree font color is light (not default black on dark bg)
+% Tree text must be visible. We intentionally do NOT set BackgroundColor
+% or FontColor on the uitree (those props cause rendering failures on
+% some MATLAB versions), so the tree renders with its default light
+% theme. Guard: either FontColor is light (if we ever re-enable theming)
+% OR BackgroundColor is the MATLAB default (tree renders its own frame).
+bg = tree.BackgroundColor;
 fc = tree.FontColor;
-if all(fc > 0.5)
-    fprintf('  PASS: navTree FontColor is light [%.2f %.2f %.2f]\n', fc(1), fc(2), fc(3)); passed = passed + 1;
+isDefaultBg = all(bg > 0.9);   % MATLAB default is near-white
+isLightFg   = all(fc > 0.5);
+if isDefaultBg || isLightFg
+    fprintf('  PASS: navTree text is visible (bg=[%.2f %.2f %.2f] fg=[%.2f %.2f %.2f])\n', bg, fc); passed = passed + 1;
 else
-    fprintf('  FAIL: navTree FontColor is dark [%.2f %.2f %.2f] — invisible on dark bg\n', fc(1), fc(2), fc(3)); failed = failed + 1;
+    fprintf('  FAIL: navTree has dark bg + dark fg — text invisible (bg=[%.2f %.2f %.2f] fg=[%.2f %.2f %.2f])\n', bg, fc); failed = failed + 1;
 end
 
 % Tree parent is a layout container that stretches to fill the sidebar
