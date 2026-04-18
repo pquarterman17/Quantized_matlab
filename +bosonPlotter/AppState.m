@@ -203,6 +203,11 @@ classdef AppState < handle
         % into rCtx_.appearance by drawToAxes via bosonPlotter.resolveStyle.
         activeTemplate   char   = 'screen'
         styleOverrides   struct = struct()
+
+        % ── Undo/redo callbacks (assigned post-widget-construction) ──
+        % Populated by bosonPlotter.undoCallbacks() after btnUndo/btnRedo
+        % exist.  Exposes .onUndo(s,e), .onRedo(s,e), .updateUndoButtons().
+        undoCb                  = []
     end
 
     methods

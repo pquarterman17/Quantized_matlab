@@ -8,7 +8,7 @@ something first.
 
 **Status:** Active
 **Created:** 2026-04-12
-**Updated:** 2026-04-17 (table callbacks extracted — 298 nested fns, 47 slots headroom)
+**Updated:** 2026-04-17 (undo callbacks extracted + #12/#19 audited — 295 nested fns, 50 slots headroom)
 
 ---
 
@@ -114,10 +114,7 @@ a small struct of the specific handles it needs.
 11. **Extract `onAutoMagCorrections`** (115 lines) — automatic magnetometry
     correction logic. Needs correction panel widgets. Still a nested function.
 
-12. **Rewrite delegate callsites** — after item 1 deletes the delegates, audit
-    remaining code for any patterns like `@onXxx` that reference local nested
-    functions which could be replaced with direct `peakCb.*` or `@(~,~) module.fn()`
-    references.
+12. ~~**Rewrite delegate callsites**~~ (2026-04-17) — audit complete: no residual `@onPeak*` handles; all 6 `refreshPeakTable()` callsites already route through `peakCb.*`; 3 `peakCb.*` wrappers at api-export (lines 2670, 2671, 2720) are legitimate, not delegate clutter.
 
 ## Tier 3 — Nice-to-Have
 
@@ -140,9 +137,9 @@ These are the largest nested functions but they touch 20-54 widgets each.
 
 18. ~~**Extract table model callbacks**~~ (2026-04-17, commit b0d3804) — tableCallbacks.m, 321→298 fns, 47 slots headroom
 
-19. **Extract neutron sibling propagation** (~45 lines) — self-contained, no widget deps beyond `appData`.
+19. ~~**Extract neutron sibling propagation**~~ (2026-04-17) — already out of BosonPlotter.m; the cross-polarization propagation block lives in `+bosonPlotter/onApplyCorrections.m:148-211` (moved as part of the onApplyCorrections extraction 2026-04-12). No nested-fn slots to reclaim.
 
-20. **Extract undo state helpers** — `captureUndoState` and related (~3 functions). Zero or near-zero widget deps.
+20. ~~**Extract undo state helpers**~~ (2026-04-17) — onUndo, onRedo, updateUndoButtons extracted to `+bosonPlotter/undoCallbacks.m`; struct stored on `appData.undoCb` and wired via handle-class reference so anonymous callbacks resolve at call time. 3 slots freed (298→295).
 
 ---
 
@@ -190,3 +187,6 @@ insurance for the long term.
 **Result (Tier 1):** 346 → 331 nested functions (−15), 14,349 → 13,737 lines (−612), 40 → 45 extracted modules. 16/16 GUI tests pass.
 **Result (Tier 2-3):** Additional 5 extractions (draw2DMap, extract2DBox/Arc, onBGMouseUp, onApplyCorrections) + `ui` struct introduced.
 - ~~**Extract analysis callbacks**~~ (2026-04-16) — 19 functions (620 lines) → `+bosonPlotter/analysisCallbacks.m`. Uses ctx/unpack pattern + `anaCb` struct. 4 thin stubs remain for toolbar-wired callbacks. 342 → 321 total (23 slots headroom). 19/19 GUI suites pass.
+- ~~**Extract undo callbacks (item 20)**~~ (2026-04-17) — `onUndo`, `onRedo`, `updateUndoButtons` → `+bosonPlotter/undoCallbacks.m`. `undoCb` struct stored on `appData` (handle class) so anonymous callbacks at toolbar / keyboard handlers resolve at call time. 298 → 295 nested fns.
+- ~~**Neutron sibling propagation already extracted (item 19)**~~ (2026-04-17) — lives in `+bosonPlotter/onApplyCorrections.m:148-211`; moved as part of onApplyCorrections extraction 2026-04-12. No separate extraction needed.
+- ~~**Audit delegate callsites (item 12)**~~ (2026-04-17) — grep confirmed no residual `@onPeak*` handles; all `refreshPeakTable()` callsites use `peakCb.*`; remaining api-export wrappers at lines 2670–2720 are legitimate.

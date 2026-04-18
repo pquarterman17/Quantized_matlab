@@ -831,10 +831,10 @@ function varargout = BosonPlotter(options)
         'callback',@(~,~) openLinkedDataWorkspace());
     tbActions(end+1) = struct('id','undo',        'label',[char(8617) ' Undo'], ...
         'tooltip','Undo last operation  [Ctrl+Z]', ...
-        'callback',@(~,~) onUndo([],[]));
+        'callback',@(s,e) appData.undoCb.onUndo(s,e));
     tbActions(end+1) = struct('id','redo',        'label',[char(8618) ' Redo'], ...
         'tooltip','Redo last undone operation  [Ctrl+Y]', ...
-        'callback',@(~,~) onRedo([],[]));
+        'callback',@(s,e) appData.undoCb.onRedo(s,e));
     tbActions(end+1) = struct('id','watchFile',   'label',[char(9711) ' Watch'], ...
         'tooltip','Toggle live file watch: auto-reload and replot when the source file changes on disk', ...
         'callback',@(~,~) onToggleWatchFile());
@@ -1550,17 +1550,28 @@ function varargout = BosonPlotter(options)
     btnApplyAll.Layout.Row = CROW.ACTIONS; btnApplyAll.Layout.Column = [1 2];
 
     btnUndo = uibutton(corrGL,'Text',[char(8617) ' Undo'], ...
-        'ButtonPushedFcn',@(~,~) onUndo([],[]), ...
+        'ButtonPushedFcn',@(s,e) appData.undoCb.onUndo(s,e), ...
         'Tooltip','Nothing to undo  [Ctrl+Z]', ...
         'FontColor',[0.75 0.75 0.75],'FontSize',9);
     btnUndo.Layout.Row = CROW.ACTIONS; btnUndo.Layout.Column = 3;
 
     btnRedo = uibutton(corrGL,'Text',[char(8618) ' Redo'], ...
-        'ButtonPushedFcn',@(~,~) onRedo([],[]), ...
+        'ButtonPushedFcn',@(s,e) appData.undoCb.onRedo(s,e), ...
         'Tooltip','Nothing to redo  [Ctrl+Y]', ...
         'FontColor',[0.75 0.75 0.75],'FontSize',9, ...
         'Enable','off');
     btnRedo.Layout.Row = CROW.ACTIONS; btnRedo.Layout.Column = 4;
+
+    % Undo/redo callbacks — handle struct stored on appData so anonymous
+    % callbacks at the toolbar (line ~834) and keyboard handler (line ~9180)
+    % resolve at call time via the AppState handle, decoupling construction
+    % order from button creation.
+    appData.undoCb = bosonPlotter.undoCallbacks(struct( ...
+        'appData',   appData, ...
+        'btnUndo',   btnUndo, ...
+        'btnRedo',   btnRedo, ...
+        'setStatus', @setStatus, ...
+        'onPlot',    @(varargin) onPlot([],[])));
 
     % Row REDO (29): Correction presets — dropdown + Save + Delete
     ddPreset = uidropdown(corrGL, ...
@@ -2526,7 +2537,7 @@ function varargout = BosonPlotter(options)
     apacCb_.configurePeakWindowForMode = @configurePeakWindowForMode;
     apacCb_.showMagSection             = @showMagSection;
     apacCb_.is2DDataset                = @is2DDataset;
-    apacCb_.updateUndoButtons          = @updateUndoButtons;
+    apacCb_.updateUndoButtons          = @() appData.undoCb.updateUndoButtons();
 
     % ── Callback struct for onApplyCorrections ────────────────────────────
     corrCb_ = struct();
@@ -2537,7 +2548,7 @@ function varargout = BosonPlotter(options)
     corrCb_.updateApplyButtonStyle  = @updateApplyButtonStyle;
     corrCb_.recordAction            = @recordAction;
     corrCb_.pushUndoCorrectionEntry = @pushUndoCorrectionEntry;
-    corrCb_.updateUndoButtons       = @updateUndoButtons;
+    corrCb_.updateUndoButtons       = @() appData.undoCb.updateUndoButtons();
     corrCb_.magSampleVolume_cm3     = @magSampleVolume_cm3;
     corrCb_.str2num_trim            = @str2num_trim;
     corrCb_.isNeutronParser         = @isNeutronParser;
@@ -2653,8 +2664,8 @@ function varargout = BosonPlotter(options)
     api.applyCorrections    = @() onApplyCorrections([],[]);
     api.applyCorrectionsAll = @() onApplyCorrectionsAll([],[]);
     api.undoCorrections     = @() onUndoCorrections([],[]);
-    api.undo                = @() onUndo([],[]);
-    api.redo                = @() onRedo([],[]);
+    api.undo                = @() appData.undoCb.onUndo([],[]);
+    api.redo                = @() appData.undoCb.onRedo([],[]);
     api.undoMgr             = @() appData.undoMgr;
     api.autoPeaks           = @() peakCb.onAutoPeak([],[]);
     api.fitPeaks            = @() peakCb.onFitPeaks([],[]);
@@ -6022,46 +6033,6 @@ function varargout = BosonPlotter(options)
     %  UNDO / REDO (UndoManager-based)
     % ════════════════════════════════════════════════════════════════════
 
-    function onUndo(~,~)
-    %ONUNDO  Execute the topmost undo entry from the UndoManager.
-        entry = appData.undoMgr.undo();
-        if isempty(entry)
-            setStatus('Nothing to undo.');
-            return;
-        end
-        setStatus(['Undid: ' entry.label]);
-        updateUndoButtons();
-        onPlot([],[]);
-    end
-
-    function onRedo(~,~)
-    %ONREDO  Re-apply the next redo entry from the UndoManager.
-        entry = appData.undoMgr.redo();
-        if isempty(entry)
-            setStatus('Nothing to redo.');
-            return;
-        end
-        setStatus(['Redid: ' entry.label]);
-        updateUndoButtons();
-        onPlot([],[]);
-    end
-
-    function updateUndoButtons()
-    %UPDATEUNDOBUTTONS  Sync undo/redo button enabled state and tooltips.
-        if appData.undoMgr.canUndo()
-            btnUndo.Enable  = 'on';
-        else
-            btnUndo.Enable  = 'off';
-        end
-        if appData.undoMgr.canRedo()
-            btnRedo.Enable  = 'on';
-        else
-            btnRedo.Enable  = 'off';
-        end
-        btnUndo.Tooltip = [appData.undoMgr.undoLabel() '  [Ctrl+Z]'];
-        btnRedo.Tooltip = [appData.undoMgr.redoLabel() '  [Ctrl+Y]'];
-    end
-
     function pushUndoCorrectionEntry(dsIdx, prevState, newState, labelStr)
     %PUSHUNDOCORRECTIONENTRY  Push a correction undo entry for dataset dsIdx.
     %
@@ -6072,7 +6043,7 @@ function varargout = BosonPlotter(options)
             'label', labelStr, ...
             'undo',  @() restoreCorrectionState(dsIdx, prevState), ...
             'redo',  @() restoreCorrectionState(dsIdx, newState)));
-        updateUndoButtons();
+        appData.undoCb.updateUndoButtons();
     end
 
     function restoreCorrectionState(dsIdx, s)
@@ -9177,16 +9148,16 @@ function varargout = BosonPlotter(options)
 
             case 'z'
                 if hasCtrl && hasShift
-                    onRedo([], []);      % Ctrl+Shift+Z = redo
+                    appData.undoCb.onRedo([], []);  % Ctrl+Shift+Z = redo
                 elseif hasCtrl
-                    onUndo([], []);      % Ctrl+Z = undo
+                    appData.undoCb.onUndo([], []);  % Ctrl+Z = undo
                 end
 
             case 'y'
                 if hasCtrl && hasShift
                     focus(lbY);              % Ctrl+Shift+Y → Y channel selector
                 elseif hasCtrl
-                    onRedo([], []);          % Ctrl+Y = redo
+                    appData.undoCb.onRedo([], []);  % Ctrl+Y = redo
                 end
 
             case 'm'

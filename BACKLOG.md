@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-04-17
+**Last regenerated:** 2026-04-17 (reconciled against each plan's `## Completed` section)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -15,30 +15,18 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 ## Tier 1 — High Impact (open)
 
-### Known bugs — `plans/known-bugs.md`
-- [ ] **#1** Pixel3D box-integration ROI broken — rectangle disappears after first integration; drag-hold not tracked
-- [ ] **#2** Per-dataset plot state resets on toggle — log/grid/aspect/colormap/cLim revert on dataset switch
-- [ ] **#3** Copy/Save plot leaks dark-mode background — need transparent PNG export path
-- [ ] **#10** FermiViewer measurement stuck yellow/filled after drag — `deselectMeasurement` not called in `dragRelease` (FermiViewer.m:5806); also `MarkerFaceColor` regression
-- [ ] **#11** `imaging.lineProfile` string dispatch crash — relax `arguments` block to accept `char|string` or convert at call sites
-
 ### BosonPlotter decomposition — `plans/bosonplotter-decomposition.md`
-- [ ] **#1** Delete 13 redundant peak callback delegates
-- [ ] **#2** Extract `saveConsolidatedNeutronCSV` (173 lines)
-- [ ] **#3** Extract `refreshDataTable` (177 lines, 2 widgets)
-- [ ] **#4** Extract `computeAutoWaterfallSpacing` (85 lines, pure)
-- [ ] **#5** Extract `onEstimateBaseline` (95 lines)
-- [ ] **#6** Extract `onDatasetAlgebra` (106 lines, self-contained dialog)
+(Tier 1 items 1–6 all shipped 2026-04-12 — see plan's Completed section.)
 
 ### FermiViewer decomposition — `plans/fermiviewer-decomposition-2026-04-16.md`
-- [ ] **#1** Infrastructure: create `+emViewer/` + ui struct (done for diffraction/annotation/export; not yet for EELS/EDS)
+- [ ] **#1** Infrastructure: `+emViewer/` + ui struct — done for diffraction/annotation/export; NOT yet for EELS/EDS
 - [ ] **#2** Extract EELS subsystem (~14 nested fns freed)
 - [ ] **#3** Extract EDS subsystem (~12 nested fns freed)
 
 ### Codebase — `plans/codebase-roadmap.md`
 - [ ] **#1** Continue `+bosonPlotter/` extraction — drive parent below 8k lines
 
-### Origin parity — `plans/origin-feature-gap.md` (Python port — MATLAB side complete)
+### Origin parity (Python port, MATLAB side complete) — `plans/origin-feature-gap.md`
 - [ ] **#1** AIC/BIC/F-test fit comparison → Python
 - [ ] **#2** Plot templates → Python
 - [ ] **#3** Box/Violin/Bee-Swarm plots → Python
@@ -51,33 +39,30 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#2** ColumnRoles → Python
 - [ ] **#3** FormulaEngine → Python
 
-### Docs (retroactive) — `plans/retroactive-docs.md`
-- [ ] **#6** Spectroscopy theory doc
-- [ ] **#7** Thin films theory doc
-- [ ] **#8** Electrochemistry theory doc
-- [ ] **#9** Fitting theory doc
-- [ ] **#10** Statistics theory doc
+### Repo audit — `plans/repo-audit-2026-04-13.md` (W1 bugs — sampled; see plan for full list of ~46 open items across W1–W4)
+- [ ] **#1** `figureBuilder` colormap crash on perceptual maps (viridis/plasma/inferno)
+- [ ] **#2** Legend editor overwrites concurrent corrections with stale snapshot
+- [ ] **#3** `importMPMS` / `importLakeShore` unreachable from `importAuto` + `guiImport`
+- [ ] **#4** FermiViewer `flickerTimer` leaks across open/close cycles
+- [ ] **#8** `str2func('parser.' + name)` latent code-injection vector (no-eval.md)
+- [ ] **#12** `FermiViewer.m:11299` `str2num` on tilt-angle input (no-eval.md)
+- (See plan for W2 UX, W3 Features, W4 Physics workstreams — 40+ more items)
 
 ### Parsers — `plans/parser-roadmap.md` (Paused: blocked on example files)
 - [ ] **#1** `importRaman` — Horiba LabSpec / Renishaw ASCII
+
+### Porting — `plans/porting_plan.md`
+- Architecture doc; 7 phase-level items — see plan for current Python+Tauri porting status
 
 ---
 
 ## Tier 2 — Medium Impact (open)
 
 ### Known bugs — `plans/known-bugs.md`
-- [ ] **#4** Box-integration file naming `{source}_boxInt_along{dir}_…`
-- [ ] **#5** Accept `all`/`:`/`*`/empty for full-range in box integration
-- [ ] **#6** Legend editor — full editor with inline + dialog entry
-- [ ] **#7** Legend edits persist per-dataset (uses #2's plotState)
-- [ ] **#8** Pre-populate `all` placeholder in box-integration GUI
-- [ ] **#13** `FontColor` warning on `uitable` during template match (noisy)
-- [ ] **#14** Log-scale `Negative data ignored` + `Background transparency not supported` warning flood
-- [ ] **#16** FermiViewer right-side tools panel overcrowded — buttons overlap on standard sizes
+- [ ] **#16** FermiViewer right-side tools panel overcrowded — buttons overlap on standard sizes (tabled)
 
 ### BosonPlotter decomposition — `plans/bosonplotter-decomposition.md`
 - [ ] **#11** Extract `onAutoMagCorrections` (115 lines)
-- [ ] **#12** Rewrite delegate callsites (after #1)
 
 ### FermiViewer measurement polish — `plans/fermiviewer-measurement-polish-2026-04-17.md`
 - [ ] **#4** Expose symbol + color in Measurement panel (optional controls)
@@ -96,14 +81,12 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#13** Drag columns to plot → Python
 
 ### DataWorkspace Python port — `plans/dataworkspace-python-port.md`
-- [ ] **#4** DataWorkspaceView.vue component
+- [ ] **#4** `DataWorkspaceView.vue` component
 - [ ] **#5** WebSocket sync
 - [ ] **#6** Workspace file format
 
 ### Software gaps — `plans/software-feature-gaps.md`
-- [ ] **#11** Analysis provenance log (Mantid-style operation history)
-- [ ] **#12** 2D histogram / density plot
-- [ ] **#13** Smart unit/symbol rendering in axis labels
+(Tier 3 only — see Tier 3 section below)
 
 ### Bug reporting — `plans/bug-reporting.md` (Stage 2 deferred)
 - [ ] **#6** Auto-offer on uncaught errors
@@ -112,10 +95,17 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 ### Parsers — `plans/parser-roadmap.md`
 - [ ] **#2** `importOxford` — Oxford Instruments MagLab CSV
-- [ ] **#3** `importOPUS` — Bruker OPUS FTIR
+- [ ] **#3** `importOpus` — Bruker OPUS FTIR
 
-### Docs — `plans/retroactive-docs.md`
+### Docs (theory) — `plans/retroactive-docs.md` (plan labels as Tier 2)
+- [ ] **#6** Spectroscopy theory doc
+- [ ] **#7** Thin films theory doc
+- [ ] **#8** Electrochemistry theory doc
+- [ ] **#9** Fitting theory doc
+- [ ] **#10** Statistics theory doc
 - [ ] **#11** Imaging theory doc
+
+### Docs (tutorials) — `plans/retroactive-docs.md`
 - [ ] **#12–18** Tutorial walkthroughs (magnetometry, superconductor, xrd, reflectometry, transport, eels, curve-fitting)
 
 ### Codebase — `plans/codebase-roadmap.md`
@@ -124,10 +114,6 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 ---
 
 ## Tier 3 — Nice-to-Have (open)
-
-### Known bugs — `plans/known-bugs.md`
-- [ ] **#9** "Match target application background" clipboard paste (long-term replacement for #3's transparent-PNG)
-- [ ] **#12** FermiViewer window title is stale — says "EM Image Viewer" should be "FermiViewer"
 
 ### FermiViewer histogram — `plans/fermiviewer-interactive-histogram.md`
 - [ ] **#8** Transfer function ramp overlay on histogram
@@ -141,8 +127,6 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#14** Extract `applyParserAnalysisConfig` (243 lines, 23 widgets)
 - [ ] **#16** Extract `updateControlsForActiveDataset` (188 lines, 54 widgets)
 - [ ] **#17** Extract `onPlotTemplates` (163 lines)
-- [ ] **#19** Extract neutron sibling propagation (~45 lines)
-- [ ] **#20** Extract undo state helpers
 
 ### DataWorkspace — `plans/data-workspace.md`
 - [ ] **#13** Multi-dataset operations
@@ -152,16 +136,31 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#12** Python port contract — design document for thin_film_toolkit equivalent
 
 ### DataWorkspace Python port — `plans/dataworkspace-python-port.md`
-- [ ] **#7** Shared template JSON schema (already partially done)
+- [ ] **#7** Shared template JSON schema (partially done)
 - [ ] **#8** Performance benchmarks
 
 ### Origin parity (Python) — `plans/origin-feature-gap.md`
 - [ ] **#14** Column formulas → Python
 
+### Software gaps — `plans/software-feature-gaps.md`
+- [ ] **#11** Analysis provenance log (Mantid-style operation history)
+- [ ] **#12** 2D histogram / density plot
+- [ ] **#13** Smart unit/symbol rendering in axis labels
+
+### Parsers — `plans/parser-roadmap.md`
+- [ ] **#4** `importSPC` — GRAMS/Thermo SPC spectral format
+
 ### Bug reporting — `plans/bug-reporting.md` (Stage 2)
 - [ ] **#9** Cloudflare Worker relay
 - [ ] **#10** "Submit directly" button in dialog
 - [ ] **#11** Rate-limit + spam protection
+
+### Docs — `plans/retroactive-docs.md`
+- [ ] **#19** Docstring upgrade: `+calc/` formulas
+- [ ] **#20** Docstring upgrade: `+fitting/` formulas
+- [ ] **#21** Docstring upgrade: `+utilities/` physics functions
+- [ ] **#22** Docstring upgrade: `+imaging/` physics functions
+- [ ] **#23** Plan hygiene: update physics-analysis-gaps.md
 
 ---
 
@@ -169,23 +168,22 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 | Plan | Status | Open items | Notes |
 |------|--------|------------|-------|
-| known-bugs | Active | 5 T1 / 8 T2 / 2 T3 | Highest-value batch |
-| bosonplotter-decomposition | Active | 6 T1 / 2 T2 / 5 T3 | Drive parent <8k lines |
+| known-bugs | Active (mostly complete) | 0 T1 / 1 T2 / 0 T3 | Only #16 tools panel overcrowded (tabled); 14 items shipped 2026-04-13 |
+| bosonplotter-decomposition | Active | 0 T1 / 1 T2 / 3 T3 | Tier 1 complete; 295 nested fns, 50 slots headroom |
 | fermiviewer-decomposition-2026-04-16 | Active | 3 T1 / 0 T2 / 1 T3 | EELS/EDS extraction next |
 | fermiviewer-interactive-histogram | Active (T3-only) | 0 T1 / 0 T2 / 3 T3 | Tier 1–2 all shipped |
-| fermiviewer-measurement-polish-2026-04-17 | Active | 0 T1 / 2 T2 / 0 T3 | Panel controls + annotation sync |
+| fermiviewer-measurement-polish-2026-04-17 | Active | 0 T1 / 2 T2 / 0 T3 | Panel controls + annotation right-panel sync |
 | data-workspace | Active | 0 T1 / 1 T2 / 2 T3 | Partial migration + cleanup |
 | dataset-templates | Active (T3-only) | 0 T1 / 0 T2 / 1 T3 | Only Python port contract |
 | dataworkspace-python-port | Active | 3 T1 / 3 T2 / 2 T3 | Deferred to Python sprint |
-| retroactive-docs | Active | 5 T1 / 8 T2 / 0 T3 | Tier 1 theory done 2026-04-13 |
+| retroactive-docs | Active | 0 T1 / 13 T2 / 5 T3 | Tier 1 theory done 2026-04-13; theory + tutorials remaining |
 | origin-feature-gap | Active | 6 T1 / 7 T2 / 1 T3 | MATLAB done; Python pending |
-| physics-analysis-gaps | Complete → archive | — | All 15 items shipped |
-| software-feature-gaps | Active | 0 T1 / 3 T2 / 0 T3 | Tier 1 shipped |
-| repo-audit-2026-04-13 | Active | ~10 mixed | Plan drift — needs reconcile |
+| software-feature-gaps | Active (T3-only) | 0 T1 / 0 T2 / 3 T3 | Tier 1–2 shipped |
+| repo-audit-2026-04-13 | Active | ~46 mixed (6 done of 54) | Multi-workstream — see plan for W1/W2/W3/W4 detail |
 | codebase-roadmap | Active | 1 T1 / 1 T2 / 0 T3 | Rolling umbrella |
-| parser-roadmap | Paused | 1 T1 / 2 T2 / 0 T3 | Blocked on example files |
+| parser-roadmap | Paused | 1 T1 / 2 T2 / 1 T3 | Blocked on example files |
 | bug-reporting | Active (Stage 2 deferred) | 0 T1 / 3 T2 / 3 T3 | Stage 1 shipped |
-| porting_plan | Active | 7 items | Thin film toolkit architecture |
+| porting_plan | Active | 7 phase-level items | Thin film toolkit architecture |
 
 ---
 
