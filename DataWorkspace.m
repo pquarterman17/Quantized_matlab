@@ -1023,17 +1023,18 @@ end
         end
 
         dlg = uifigure('Name', 'Dataset Math', ...
-            'Position', [200 300 360 200], ...
+            'Position', [200 300 380 240], ...
             'WindowStyle', 'modal', ...
             'KeyPressFcn', @(~, evt) mathKey(evt));
-        dlgGL = uigridlayout(dlg, [4 3], ...
-            'RowHeight',   {30, 30, 30, 36}, ...
-            'ColumnWidth', {100, 80, 100}, ...
+        dlgGL = uigridlayout(dlg, [5 3], ...
+            'RowHeight',   {30, 30, 30, 40, 36}, ...
+            'ColumnWidth', {100, 80, 120}, ...
             'Padding',     [12 12 12 12], ...
-            'RowSpacing',  8);
+            'RowSpacing',  6);
 
         uilabel(dlgGL, 'Text', 'Dataset A:', 'HorizontalAlignment', 'right');
-        ddA = uidropdown(dlgGL, 'Items', names, 'Value', names{1});
+        ddA = uidropdown(dlgGL, 'Items', names, 'Value', names{1}, ...
+            'ValueChangedFcn', @(~,~) updateCompatPreview());
         ddA.Layout.Column = [2 3];
 
         uilabel(dlgGL, 'Text', 'Operation:', 'HorizontalAlignment', 'right');
@@ -1043,14 +1044,31 @@ end
 
         uilabel(dlgGL, 'Text', 'Dataset B:', 'HorizontalAlignment', 'right');
         idxBDefault = min(2, n);
-        ddB = uidropdown(dlgGL, 'Items', names, 'Value', names{idxBDefault});
+        ddB = uidropdown(dlgGL, 'Items', names, 'Value', names{idxBDefault}, ...
+            'ValueChangedFcn', @(~,~) updateCompatPreview());
         ddB.Layout.Column = [2 3];
+
+        lblCompat = uilabel(dlgGL, ...
+            'Text', '', ...
+            'Interpreter', 'html', ...
+            'VerticalAlignment', 'top', ...
+            'WordWrap', 'on');
+        lblCompat.Layout.Row    = 4;
+        lblCompat.Layout.Column = [1 3];
 
         uibutton(dlgGL, 'Text', 'Cancel', ...
             'ButtonPushedFcn', @(~,~) delete(dlg));
         btnCompute = uibutton(dlgGL, 'Text', 'Compute', ...
             'ButtonPushedFcn', @doCompute);
         btnCompute.Layout.Column = [2 3];
+
+        updateCompatPreview();
+
+        function updateCompatPreview()
+            idxA  = find(strcmp(names, ddA.Value), 1);
+            idxB  = find(strcmp(names, ddB.Value), 1);
+            lblCompat.Text = buildCompatText(idxA, idxB, 'math');
+        end
 
         function doCompute(~, ~)
             idxA  = find(strcmp(names, ddA.Value), 1);
@@ -1095,29 +1113,47 @@ end
         end
 
         dlg = uifigure('Name', 'Merge Columns', ...
-            'Position', [200 320 320 160], ...
+            'Position', [200 320 360 210], ...
             'WindowStyle', 'modal', ...
             'KeyPressFcn', @(~, evt) mergeKey(evt));
-        dlgGL = uigridlayout(dlg, [3 3], ...
-            'RowHeight',   {30, 30, 36}, ...
-            'ColumnWidth', {100, 80, 80}, ...
+        dlgGL = uigridlayout(dlg, [4 3], ...
+            'RowHeight',   {30, 30, 40, 36}, ...
+            'ColumnWidth', {100, 80, 120}, ...
             'Padding',     [12 12 12 12], ...
-            'RowSpacing',  8);
+            'RowSpacing',  6);
 
         uilabel(dlgGL, 'Text', 'Base (A):', 'HorizontalAlignment', 'right');
-        ddA = uidropdown(dlgGL, 'Items', names, 'Value', names{1});
+        ddA = uidropdown(dlgGL, 'Items', names, 'Value', names{1}, ...
+            'ValueChangedFcn', @(~,~) updateCompatPreview());
         ddA.Layout.Column = [2 3];
 
         uilabel(dlgGL, 'Text', 'Append (B):', 'HorizontalAlignment', 'right');
         idxBDefault = min(2, n);
-        ddB = uidropdown(dlgGL, 'Items', names, 'Value', names{idxBDefault});
+        ddB = uidropdown(dlgGL, 'Items', names, 'Value', names{idxBDefault}, ...
+            'ValueChangedFcn', @(~,~) updateCompatPreview());
         ddB.Layout.Column = [2 3];
+
+        lblCompat = uilabel(dlgGL, ...
+            'Text', '', ...
+            'Interpreter', 'html', ...
+            'VerticalAlignment', 'top', ...
+            'WordWrap', 'on');
+        lblCompat.Layout.Row    = 3;
+        lblCompat.Layout.Column = [1 3];
 
         uibutton(dlgGL, 'Text', 'Cancel', ...
             'ButtonPushedFcn', @(~,~) delete(dlg));
         btnMerge = uibutton(dlgGL, 'Text', 'Merge', ...
             'ButtonPushedFcn', @doMerge);
         btnMerge.Layout.Column = [2 3];
+
+        updateCompatPreview();
+
+        function updateCompatPreview()
+            idxA = find(strcmp(names, ddA.Value), 1);
+            idxB = find(strcmp(names, ddB.Value), 1);
+            lblCompat.Text = buildCompatText(idxA, idxB, 'merge');
+        end
 
         function doMerge(~, ~)
             idxA = find(strcmp(names, ddA.Value), 1);
@@ -1150,6 +1186,56 @@ end
             name = [nm ext];
         else
             name = sprintf('Dataset%d', idx);
+        end
+    end
+
+    function html = buildCompatText(idxA, idxB, mode)
+    %BUILDCOMPATTEXT  HTML status line previewing A vs B compatibility.
+    %   mode is 'math' or 'merge' — both interpolate B onto A's X grid.
+        if isempty(idxA) || isempty(idxB)
+            html = ''; return;
+        end
+        dsA = model.datasets{idxA};
+        dsB = model.datasets{idxB};
+        nA  = numel(dsA.time);
+        nB  = numel(dsB.time);
+        xLabA = localFirstLabel(dsA);
+        xLabB = localFirstLabel(dsB);
+        nColA = size(dsA.values, 2);
+        nColB = size(dsB.values, 2);
+
+        warns = {};
+        if ~strcmp(xLabA, xLabB)
+            warns{end+1} = sprintf('X differs (%s vs %s)', xLabA, xLabB);
+        end
+        if nA ~= nB
+            warns{end+1} = sprintf('row counts differ (%d vs %d) — B will be interpolated', nA, nB);
+        end
+        if strcmp(mode, 'math') && nColA ~= nColB
+            warns{end+1} = sprintf('column counts differ (%d vs %d) — will use min(%d)', ...
+                nColA, nColB, min(nColA, nColB));
+        end
+
+        lineA = sprintf('A: %d pts, X=%s', nA, xLabA);
+        lineB = sprintf('B: %d pts, X=%s', nB, xLabB);
+        if isempty(warns)
+            tag = '<span style="color:#2aa84f">compatible</span>';
+        else
+            tag = sprintf('<span style="color:#d48a1f">warning: %s</span>', ...
+                strjoin(warns, '; '));
+        end
+        html = sprintf('%s<br>%s<br>%s', lineA, lineB, tag);
+    end
+
+    function lab = localFirstLabel(ds)
+    %LOCALFIRSTLABEL  Best-effort X-axis label from metadata or first Y column.
+        if isfield(ds, 'metadata') && isfield(ds.metadata, 'xColumnName') ...
+                && ~isempty(ds.metadata.xColumnName)
+            lab = ds.metadata.xColumnName;
+        elseif isfield(ds, 'labels') && ~isempty(ds.labels)
+            lab = ds.labels{1};
+        else
+            lab = '(unlabeled)';
         end
     end
 

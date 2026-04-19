@@ -540,20 +540,15 @@ function varargout = BosonPlotter(options)
         'Tooltip','Remove selected dataset(s) from the current group');
     btnRemoveFromGroup.Layout.Column = 3;
 
-    btnAnimate = uibutton(tbGL,'Text',[char(9654) ' Animate'], ...
-        'ButtonPushedFcn',@onToggleAnimation, ...
-        'BackgroundColor',BTN_ANIMATE, ...
-        'FontColor',[1 1 1], ...
-        'Tooltip','Cycle through datasets as animation frames (2 fps). Click again to stop.');
-    btnAnimate.Layout.Row = 8; btnAnimate.Layout.Column = 1;
-
+    % Animate lives on the axes toolbar (tbActions 'animate'); the
+    % file-list duplicate was removed (repo-audit W2 #23).
     btnShortcuts = uibutton(tbGL,'Text','?  Shortcuts', ...
         'ButtonPushedFcn',@onShowShortcuts, ...
         'BackgroundColor',BTN_TOOL, ...
         'FontColor',[0.75 0.75 0.75], ...
         'FontSize',10, ...
         'Tooltip','Show keyboard shortcuts');
-    btnShortcuts.Layout.Row = 8; btnShortcuts.Layout.Column = 2;
+    btnShortcuts.Layout.Row = 8; btnShortcuts.Layout.Column = [1 2];
 
     btnSettings = uibutton(tbGL,'Text',[char(9881) '  Settings...'], ...
         'ButtonPushedFcn',@(~,~) onOpenSettings(), ...
@@ -3841,13 +3836,19 @@ function varargout = BosonPlotter(options)
     function onToggleAnimation(~,~)
     %ONTOGGLEANIMATION  Start/stop cycling through datasets as animation frames.
     %  Uses a MATLAB timer at ~2 fps to step through each dataset in sequence.
+    %  The animate button lives on the axes toolbar (tag = 'animate'); we
+    %  look it up by tag so the button text/colour can be toggled even
+    %  though the toolbar is rebuilt dynamically.
+        animBtn = findTagInChildren(axToolbarGL, 'animate');
         if isprop(appData, 'animTimer') && ~isempty(appData.animTimer) && isvalid(appData.animTimer)
             % Stop animation
             stop(appData.animTimer);
             delete(appData.animTimer);
             appData.animTimer = [];
-            btnAnimate.Text = [char(9654) ' Animate'];
-            btnAnimate.BackgroundColor = BTN_ANIMATE;
+            if ~isempty(animBtn)
+                animBtn.Text = [char(9654) ' Animate'];
+                animBtn.BackgroundColor = BTN_TOOL;
+            end
             return;
         end
 
@@ -3855,13 +3856,29 @@ function varargout = BosonPlotter(options)
             uialert(fig,'Need at least 2 datasets to animate.','Animate'); return;
         end
 
-        btnAnimate.Text = [char(9724) ' Stop'];
-        btnAnimate.BackgroundColor = BTN_DANGER;
+        if ~isempty(animBtn)
+            animBtn.Text = [char(9724) ' Stop'];
+            animBtn.BackgroundColor = BTN_DANGER;
+        end
 
         appData.animTimer = timer('ExecutionMode', 'fixedRate', ...
             'Period', 0.5, ...
             'TimerFcn', @(~,~) animStep());
         start(appData.animTimer);
+    end
+
+    function h = findTagInChildren(parent, tagStr)
+    %FINDTAGINCHILDREN  Return the first child of parent whose .Tag matches
+    %  tagStr, or [] if none. Used to locate toolbar buttons built
+    %  dynamically from the tbActions registry.
+        h = [];
+        if isempty(parent) || ~isvalid(parent), return; end
+        kids = parent.Children;
+        for kk = 1:numel(kids)
+            if isprop(kids(kk),'Tag') && strcmp(kids(kk).Tag, tagStr)
+                h = kids(kk); return;
+            end
+        end
     end
 
     function animStep()
@@ -5399,6 +5416,7 @@ function varargout = BosonPlotter(options)
                 'FontSize',        9, ...
                 'Tooltip',         act.tooltip, ...
                 'ButtonPushedFcn', act.callback);
+            btn.Tag           = act.id;   % so callbacks can locate this button
             btn.Layout.Column = bi + 1;
         end
     end
