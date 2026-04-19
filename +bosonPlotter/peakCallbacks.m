@@ -399,8 +399,9 @@ cb.onKeyPress            = @onKeyPress;
         FIT_MAX_FWHM_FRAC   = 0.5;    % reject fit if FWHM exceeds this × x-span
         FIT_EXPAND_WIN      = 0.025;  % expanded window fraction when < 5 pts in window
 
-        isPV   = strcmp(ctx.ddFitModel.Value, 'Pseudo-Voigt');
+        isPV    = strcmp(ctx.ddFitModel.Value, 'Pseudo-Voigt');
         isSPVII = strcmp(ctx.ddFitModel.Value, 'Split Pearson VII');
+        isTCH   = strcmp(ctx.ddFitModel.Value, 'TCH-pV');
         switch ctx.ddFitModel.Value
             case 'Gaussian'
                 modelFun = @(p,x) p(1) .* exp(-4.*log(2).*((x-p(2))./p(3)).^2) + p(4);
@@ -411,6 +412,9 @@ cb.onKeyPress            = @onKeyPress;
             case 'Split Pearson VII'
                 % p = [H, center, wL, wR, mL, mR, bg]
                 modelFun = @(p,x) utilities.splitPearsonVII(x, p);
+            case 'TCH-pV'
+                % p = [H, x0, fG, fL, bg]  — Thompson-Cox-Hastings
+                modelFun = @(p,x) utilities.tchPseudoVoigt(x(:), p(:)');
             otherwise  % 'Lorentzian' (default)
                 modelFun = @(p,x) p(1) ./ (1 + 4.*((x - p(2))./p(3)).^2) + p(4);
         end
@@ -462,6 +466,11 @@ cb.onKeyPress            = @onKeyPress;
                 % Split Pearson VII: p = [H, center, wL, wR, mL, mR, bg]
                 hw0 = fw0 / 2;
                 p0 = [H0, x0_0, hw0, hw0, 1.5, 1.5, bg0];
+            elseif isTCH
+                % TCH-pV: p = [H, x0, fG, fL, bg] — split FWHM equally as seed
+                % (yields eta ≈ 0.44, near the center of the mixing range)
+                fw_seed = fw0 / sqrt(2);
+                p0 = [H0, x0_0, fw_seed, fw_seed, bg0];
             else
                 p0 = [H0, x0_0, fw0, bg0];
                 if isPV, p0(end+1) = 0.5; end  %#ok<AGROW> % initial eta guess: 50% Lorentzian
@@ -472,6 +481,18 @@ cb.onKeyPress            = @onKeyPress;
                 if isSPVII
                     fwhmFit = abs(pFit(3)) + abs(pFit(4));  % wL + wR
                     etaFit  = NaN;
+                elseif isTCH
+                    % Combined FWHM via TCH polynomial; eta derived from fL/f
+                    fG = abs(pFit(3));  fL = abs(pFit(4));
+                    f5 = fG^5 + 2.69269*fG^4*fL + 2.42843*fG^3*fL^2 ...
+                       + 4.47163*fG^2*fL^3 + 0.07842*fG*fL^4 + fL^5;
+                    fwhmFit = f5^(1/5);
+                    if fwhmFit > 0
+                        r      = fL / fwhmFit;
+                        etaFit = max(0, min(1, 1.36603*r - 0.47719*r^2 + 0.11116*r^3));
+                    else
+                        etaFit = NaN;
+                    end
                 else
                     fwhmFit = abs(pFit(3));
                     etaFit  = guiTernary(isPV, max(0, min(1, pFit(5))), NaN);
@@ -482,13 +503,22 @@ cb.onKeyPress            = @onKeyPress;
                     ds.peaks(pki).center = pFit(2);
                     ds.peaks(pki).fwhm   = fwhmFit;
                     ds.peaks(pki).height = pFit(1);
-                    ds.peaks(pki).bg     = guiTernary(isSPVII, pFit(7), pFit(4));
+                    if isSPVII
+                        bgFit = pFit(7);
+                    elseif isTCH
+                        bgFit = pFit(5);
+                    else
+                        bgFit = pFit(4);
+                    end
+                    ds.peaks(pki).bg     = bgFit;
                     ds.peaks(pki).eta    = etaFit;
                     ds.peaks(pki).status = 'fitted';
                     ds.peaks(pki).model  = ctx.ddFitModel.Value;
                     if isSPVII
                         ds.peaks(pki).asymmetry = abs(pFit(3)) / abs(pFit(4));  % wL/wR ratio
                         ds.peaks(pki).fitParams = pFit;  % store full [H,c,wL,wR,mL,mR,bg]
+                    elseif isTCH
+                        ds.peaks(pki).fitParams = pFit;  % store full [H,x0,fG,fL,bg]
                     end
                     % Compute area analytically (or numerically for Split Pearson VII)
                     switch ctx.ddFitModel.Value
@@ -504,6 +534,11 @@ cb.onKeyPress            = @onKeyPress;
                             xDense = linspace(xLo, xHi, 500)';
                             yDense = utilities.splitPearsonVII(xDense, pFit) - pFit(7);
                             fittedArea = trapz(xDense, yDense);
+                        case 'TCH-pV'
+                            % Same pseudo-Voigt closed form using combined f, derived eta
+                            A_L = pi / 2;
+                            A_G = sqrt(pi) / (2 * sqrt(log(2)));
+                            fittedArea = pFit(1) * fwhmFit * (etaFit * A_L + (1-etaFit) * A_G);
                         otherwise  % Lorentzian
                             fittedArea = pFit(1) * fwhmFit * pi / 2;
                     end

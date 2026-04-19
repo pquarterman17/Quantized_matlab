@@ -89,6 +89,8 @@ if ~isempty(ds.peaks)
                 yFitPlot = pk.height .* (eta.*L + (1-eta).*G) + pk.bg;
             elseif strcmp(pkModel, 'Split Pearson VII') && isfield(pk,'fitParams') && numel(pk.fitParams) == 7
                 yFitPlot = utilities.splitPearsonVII(xFitPlot(:), pk.fitParams)';
+            elseif strcmp(pkModel, 'TCH-pV') && isfield(pk,'fitParams') && numel(pk.fitParams) == 5
+                yFitPlot = utilities.tchPseudoVoigt(xFitPlot(:), pk.fitParams)';
             else  % Lorentzian (default)
                 yFitPlot = pk.height ./ (1 + 4.*u.^2) + pk.bg;
             end

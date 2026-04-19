@@ -152,7 +152,7 @@ lblFit.Layout.Row = row; lblFit.Layout.Column = [1 2];
 row = row + 1;
 uilabel(ctrlGL, 'Text', 'Peak model:', 'FontColor', [0.8 0.8 0.8], 'FontSize', 11);
 ddModel = uidropdown(ctrlGL, ...
-    'Items', {'Pseudo-Voigt', 'Gaussian', 'Lorentzian', 'Split Pearson VII'}, ...
+    'Items', {'Pseudo-Voigt', 'Gaussian', 'Lorentzian', 'Split Pearson VII', 'TCH-pV'}, ...
     'Value', 'Pseudo-Voigt', ...
     'BackgroundColor', [0.2 0.2 0.22], 'FontColor', [0.9 0.9 0.9]);
 ddModel.Layout.Row = row; ddModel.Layout.Column = 2;
@@ -629,6 +629,14 @@ function y = compositeEval(p, x, nP, nPPerPeak, nBgParams, modelName)
                 % For global fit, use symmetric Pearson VII approximation
                 m = 1.5;
                 y = y + H .* (1 + 4 .* (2^(1/m) - 1) .* ((x - x0) ./ fw).^2).^(-m);
+            case 'TCH-pV'
+                % Global fit uses pseudo-Voigt with eta=0.5 as an
+                % approximation; per-peak fit in peakCallbacks uses the
+                % full TCH formula with separate fG/fL.
+                etaT = 0.5;
+                L = H ./ (1 + 4 .* ((x - x0) ./ fw).^2);
+                G = H .* exp(-4 .* log(2) .* ((x - x0) ./ fw).^2);
+                y = y + etaT .* L + (1 - etaT) .* G;
             otherwise  % Lorentzian
                 y = y + H ./ (1 + 4 .* ((x - x0) ./ fw).^2);
         end
