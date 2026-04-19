@@ -208,6 +208,9 @@ classdef AppState < handle
         % Populated by bosonPlotter.undoCallbacks() after btnUndo/btnRedo
         % exist.  Exposes .onUndo(s,e), .onRedo(s,e), .updateUndoButtons().
         undoCb                  = []
+
+        % ── Advanced Tools popup figure ───────────────────────────────
+        advMenuFig                = []
     end
 
     methods

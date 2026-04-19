@@ -10900,186 +10900,19 @@ function varargout = BosonPlotter(options)
 
     % ── Advanced Analysis & Correction Menu ─────────────────────────────
 
-    advMenuFig = [];  % persistent handle to the popup menu figure
-
-    function closeAdvMenu()
-    %CLOSEADVMENU  Close the advanced tools popup if open.
-        if ~isempty(advMenuFig) && isvalid(advMenuFig)
-            delete(advMenuFig);
-        end
-        advMenuFig = [];
-    end
-
     function onShowAdvancedMenu(~, ~)
-    %ONSHOWADVANCEDMENU  Show a popup menu of advanced analysis tools.
-    %   Opens a 2-column floating figure with sectioned actions. Clicking an
-    %   action closes the popup and launches the corresponding dialog.
-
-        % Bring to front if already open (prevents "lost window" problem)
-        if ~isempty(advMenuFig) && isvalid(advMenuFig)
-            if ~headless, figure(advMenuFig); end
-            return;
-        end
-
-        BTN_BG = [0.15 0.15 0.15];
-        BTN_FC = [0.9 0.9 0.9];
-        HDR_FC = [0.5 0.5 0.5];
-
-        % Position near the Advanced button
-        figPos = fig.Position;
-        advMenuFig = uifigure('Name', 'Advanced Tools', ...
-            'Position', [figPos(1) + figPos(3) - 400, figPos(2) + figPos(4) - 700, 380, 640], ...
-            'Resize', 'on', ...
-            'CloseRequestFcn', @(~,~) closeAdvMenu(), ...
-            'KeyPressFcn', @(~,evt) onAdvMenuKey(evt));
-
-        % ── Top-level grid: filter bar + scrollable button panel ────────
-        advRootGL = uigridlayout(advMenuFig, [2 1], ...
-            'RowHeight', {30, '1x'}, 'Padding', [0 0 0 0], 'RowSpacing', 0);
-        efAdvFilter = uieditfield(advRootGL, 'text', ...
-            'Value', '', ...
-            'Placeholder', 'Filter tools...', ...
-            'FontSize', 10, ...
-            'ValueChangedFcn', @(~,~) onAdvFilterChanged());
-        efAdvFilter.Layout.Row = 1;
-
-        advScrollPanel = uipanel(advRootGL, 'BorderType', 'none', 'Scrollable', 'on');
-        advScrollPanel.Layout.Row = 2;
-
-        % 26 rows x 2 cols: 7 headers, 6 separators, 13 button rows
-        advMenuGL = uigridlayout(advScrollPanel, [26 2], ...
-            'RowHeight', {16, 26,26,26,  5,  16, 26,26,26,  5,  16, 26,  5,  16, 26,  5,  16, 26,  5,  16, 26,26,26,  5,  16, 26}, ...
-            'ColumnWidth', {'1x', '1x'}, ...
-            'Padding', [8 6 8 6], 'RowSpacing', 2, 'ColumnSpacing', 4);
-
-        allAdvBtns = {};  % collect all button handles for filtering (Fix B2)
-
-        % ── Section: ANALYSIS ────────────────────────────────────────
-        hdr = uilabel(advMenuGL, 'Text', 'ANALYSIS', 'FontSize', 9, 'FontWeight', 'bold', 'FontColor', HDR_FC);
-        hdr.Layout.Row = 1; hdr.Layout.Column = [1 2];
-
-        advBtn(advMenuGL, 2, 1, [char(8747) ' Integrate...'], anaCb.onOpenIntegrationDialog, ...
-            'Compute definite integral between two x-range edge points');
-        advBtn(advMenuGL, 2, 2, [char(8776) ' Curve Fit...'], anaCb.onOpenCurveFitDialog, ...
-            'Fit data to built-in models (exponential, power law, polynomial, Gaussian, ...)');
-        advBtn(advMenuGL, 3, 1, [char(916) ' Dataset Math...'], @onDatasetAlgebra, ...
-            'Combine datasets: A+B, A-B, A/B, A*B, asymmetry');
-        advBtn(advMenuGL, 3, 2, [char(8635) ' Hysteresis...'], anaCb.onOpenHysteresisDialog, ...
-            'Analyze M(H) loops: Hc, Mr, Ms, squareness, SFD, background subtraction');
-        advBtn(advMenuGL, 4, 1, 'ROI / Range Stats...', anaCb.onROIAnalysis, ...
-            'Drag cursors on the plot to get live area / mean / std / FWHM over an x-range');
-        advBtn(advMenuGL, 4, 2, 'Confidence Band...', anaCb.onConfidenceBand, ...
-            ['Mean' char(177) 'std or median' char(177) 'IQR shaded bands from repeat measurements']);
-
-        % ── Section: STATISTICS & FITTING ────────────────────────────
-        % Separator row 5
-        hdr2 = uilabel(advMenuGL, 'Text', 'STATISTICS & FITTING', 'FontSize', 9, 'FontWeight', 'bold', 'FontColor', HDR_FC);
-        hdr2.Layout.Row = 6; hdr2.Layout.Column = [1 2];
-
-        advBtn(advMenuGL, 7, 1, 'Descriptive Stats...', tblCb.onDescriptiveStats, ...
-            'Mean, median, std, quartiles, skewness, kurtosis for selected channel');
-        advBtn(advMenuGL, 7, 2, 'Linear Regression...', anaCb.onLinearRegression, ...
-            'Polynomial regression with confidence bands and p-values');
-        advBtn(advMenuGL, 8, 1, 't-Test...', anaCb.onTTest, ...
-            'One-sample, paired, or two-sample t-test');
-        advBtn(advMenuGL, 8, 2, 'Batch Fit...', anaCb.onBatchFit, ...
-            'Fit the same model across all loaded datasets and collect trend results');
-        advBtn(advMenuGL, 9, 1, 'Global Fit...', anaCb.onGlobalFit, ...
-            'Fit multiple datasets simultaneously with shared parameters');
-        advBtn(advMenuGL, 9, 2, 'Track Peak...', anaCb.onTrackPeak, ...
-            'Track peak position/width drift across a dataset series');
-
-        % ── Section: SIGNAL PROCESSING ───────────────────────────────
-        % Separator row 10
-        hdr3 = uilabel(advMenuGL, 'Text', 'SIGNAL PROCESSING', 'FontSize', 9, 'FontWeight', 'bold', 'FontColor', HDR_FC);
-        hdr3.Layout.Row = 11; hdr3.Layout.Column = [1 2];
-
-        advBtn(advMenuGL, 12, 1, 'FFT Filter...', anaCb.onFFTFilter, ...
-            'Frequency-domain lowpass / highpass / bandpass / notch filter');
-
-        % ── Section: PEAK ANALYSIS ───────────────────────────────────
-        % Separator row 13
-        hdr4 = uilabel(advMenuGL, 'Text', 'PEAK ANALYSIS', 'FontSize', 9, 'FontWeight', 'bold', 'FontColor', HDR_FC);
-        hdr4.Layout.Row = 14; hdr4.Layout.Column = [1 2];
-
-        advBtn(advMenuGL, 15, 1, 'Advanced Peak Analysis...', anaCb.onOpenAdvancedPeakAnalysis, ...
-            ['Robust peak detection with adaptive noise, prominence ' ...
-             'filtering, simultaneous multi-peak + polynomial background fitting']);
-
-        % ── Section: CORRECTION ──────────────────────────────────────
-        % Separator row 16
-        hdr5 = uilabel(advMenuGL, 'Text', 'CORRECTION', 'FontSize', 9, 'FontWeight', 'bold', 'FontColor', HDR_FC);
-        hdr5.Layout.Row = 17; hdr5.Layout.Column = [1 2];
-
-        advBtn(advMenuGL, 18, 1, [char(8596) ' Resample...'], @onResampleDataset, ...
-            'Resample data to a uniform x-grid');
-        advBtn(advMenuGL, 18, 2, 'Column Calculator...', @onColumnCalculator, ...
-            'Create new columns from expressions');
-
-        % ── Section: NEUTRON / REFLECTOMETRY ─────────────────────────
-        % Separator row 19
-        hdr6 = uilabel(advMenuGL, 'Text', 'NEUTRON / REFLECTOMETRY', 'FontSize', 9, 'FontWeight', 'bold', 'FontColor', HDR_FC);
-        hdr6.Layout.Row = 20; hdr6.Layout.Column = [1 2];
-
-        advBtn(advMenuGL, 21, 1, 'Spin Asymmetry...', @onAdvAsymmetry, ...
-            ['Toggle spin asymmetry calculation (R++ ' char(8722) ' R--) / (R++ + R--) for polarized neutron data']);
-        advBtn(advMenuGL, 21, 2, 'Reflectivity Fitting...', anaCb.onOpenReflFitDialog, ...
-            'Fit specular reflectivity R(Q) via Parratt recursion with layer stack editor');
-        advBtn(advMenuGL, 22, 1, 'FFT Thickness...', @onFFTThickness, ...
-            'Compute film thickness from Laue / Kiessig fringe periodicity via FFT');
-        advBtn(advMenuGL, 22, 2, 'Reflectivity FFT...', @onReflectivityFFT, ...
-            ['Compute SLD profile from Kiessig fringes via FFT (Q-space). ' ...
-             'Also estimates thickness from fringe spacing.']);
-        advBtn(advMenuGL, 23, 1, ['Fringe ' char(916) 't (2-click)...'], @onArmFringeThickness, ...
-            ['Pick two fringe peaks to estimate thickness via t = 2' char(960) ...
-             '/' char(916) 'Q.  Draggable markers for refinement.']);
-
-        % ── Section: VISUALIZATION & DATA ────────────────────────────
-        % Separator row 24
-        hdr7 = uilabel(advMenuGL, 'Text', 'VISUALIZATION & DATA', 'FontSize', 9, 'FontWeight', 'bold', 'FontColor', HDR_FC);
-        hdr7.Layout.Row = 25; hdr7.Layout.Column = [1 2];
-
-        advBtn(advMenuGL, 26, 1, 'Inset Plot...', @onCreateInset, ...
-            'Create an inset zoom of a selected region');
-        advBtn(advMenuGL, 26, 2, [char(9998) ' Graph Digitizer...'], anaCb.onOpenDigitizer, ...
-            'Extract data points from a graph image (screenshot/PDF figure)');
-
-        function advBtn(gl, row, col, txt, cb, tip)
-        %ADVBTN  Create a styled button in the advanced menu grid.
-            b = uibutton(gl, 'Text', txt, ...
-                'ButtonPushedFcn', @(~,~) advMenuAction(cb), ...
-                'BackgroundColor', BTN_BG, 'FontColor', BTN_FC, ...
-                'HorizontalAlignment', 'left', ...
-                'Tooltip', tip);
-            b.Layout.Row = row; b.Layout.Column = col;
-            allAdvBtns{end+1} = b;  % register for filter (Fix B2)
-        end
-
-        function advMenuAction(callbackFcn)
-        %ADVMENUACTION  Close the popup then execute the callback.
-            closeAdvMenu();
-            callbackFcn([], []);
-        end
-
-        function onAdvMenuKey(evt)
-            if strcmp(evt.Key, 'escape'), closeAdvMenu(); end
-        end
-
-        function onAdvFilterChanged()
-        %ONADVFILTERCHANGED  Show/hide buttons based on filter text (Fix B2).
-            term = lower(strtrim(efAdvFilter.Value));
-            for bi = 1:numel(allAdvBtns)
-                b = allAdvBtns{bi};
-                if ~isvalid(b), continue; end
-                if isempty(term)
-                    b.Visible = 'on';
-                else
-                    matches = contains(lower(b.Text), term) || ...
-                              contains(lower(b.Tooltip), term);
-                    b.Visible = guiTernary(matches, 'on', 'off');
-                end
-            end
-        end
+    %ONSHOWADVANCEDMENU  Delegate — see +bosonPlotter/showAdvancedMenu.m.
+        cb.anaCb                = anaCb;
+        cb.tblCb                = tblCb;
+        cb.onDatasetAlgebra     = @onDatasetAlgebra;
+        cb.onResampleDataset    = @onResampleDataset;
+        cb.onColumnCalculator   = @onColumnCalculator;
+        cb.onAdvAsymmetry       = @onAdvAsymmetry;
+        cb.onFFTThickness       = @onFFTThickness;
+        cb.onReflectivityFFT    = @onReflectivityFFT;
+        cb.onArmFringeThickness = @onArmFringeThickness;
+        cb.onCreateInset        = @onCreateInset;
+        bosonPlotter.showAdvancedMenu(appData, fig, headless, cb);
     end
 
     % ── Shared Data Helper (used by table, peaks, and analysis callbacks) ────
