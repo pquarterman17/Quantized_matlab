@@ -7175,7 +7175,9 @@ function onSendToOrigin(~,~)
     %ONCOPYTOCLIPBOARD  Copy the current plot to the clipboard as a
     %  transparent-background vector image. Best for Word, Illustrator,
     %  Origin, most email clients — pastes crisp at any zoom.
-        copyPlotWithFormat('vector');
+        cpwfCb_.drawToAxes  = @drawToAxes;
+        cpwfCb_.logGUIError = @logGUIError;
+        bosonPlotter.copyPlotWithFormat(appData, fig, 'vector', cpwfCb_);
     end
 
     function onCopyToClipboardAsPNG(~,~)
@@ -7183,50 +7185,9 @@ function onSendToOrigin(~,~)
     %  300-dpi transparent PNG. Use this when the target app rejects or
     %  mangles the vector clipboard format (notably MS Teams, some Slack
     %  clients, and older OneNote).
-        copyPlotWithFormat('png');
-    end
-
-    function copyPlotWithFormat(mode)
-    %COPYPLOTWITHFORMAT  Shared render + copy pipeline for clipboard export.
-    %   mode = 'vector'  → copygraphics ContentType='vector' (default/best)
-    %        = 'png'     → copygraphics ContentType='image', 300 dpi
-    %  Both strip the dark-theme background (Color='none' on figure and
-    %  axes + BackgroundColor='none') and re-style legend + axes labels
-    %  for readability via styleAxesForExport.
-        if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data');
-            return;
-        end
-        % Spin up a lightweight off-screen figure so the GUI is not disturbed
-        tmpFig = figure('Visible','off', ...
-                        'Name','ClipboardCopy','NumberTitle','off', ...
-                        'MenuBar','none','ToolBar','none', ...
-                        'Color','none');
-        tmpAx = axes(tmpFig);
-        set(tmpAx, 'Color','none');
-        box(tmpAx,'on');
-        grid(tmpAx,'on');
-        drawToAxes(tmpAx);
-        bosonPlotter.styleAxesForExport(tmpAx);
-        try
-            switch lower(mode)
-                case 'png'
-                    copygraphics(tmpAx, ...
-                        'ContentType','image', ...
-                        'Resolution',300, ...
-                        'BackgroundColor','none');
-                otherwise  % 'vector'
-                    copygraphics(tmpAx, ...
-                        'ContentType','vector', ...
-                        'BackgroundColor','none');
-            end
-        catch ME
-            delete(tmpFig);
-            logGUIError('Copy to clipboard', ME.message, ME);
-            uialert(fig, sprintf('Copy failed:\n%s', ME.message), 'Copy error');
-            return;
-        end
-        delete(tmpFig);
+        cpwfCb_.drawToAxes  = @drawToAxes;
+        cpwfCb_.logGUIError = @logGUIError;
+        bosonPlotter.copyPlotWithFormat(appData, fig, 'png', cpwfCb_);
     end
 
     function onSaveFigure(~,~)
