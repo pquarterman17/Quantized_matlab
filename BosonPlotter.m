@@ -937,7 +937,7 @@ function varargout = BosonPlotter(options)
         uimenu(cmAxes, 'Text', 'Copy Data to Clipboard', ...
             'MenuSelectedFcn', @(~,~) onCopyDataToClipboard([], []));
         uimenu(cmAxes, 'Text', 'Export Visible Range...', ...
-            'MenuSelectedFcn', @(~,~) onExportVisibleRange());
+            'MenuSelectedFcn', @(~,~) bosonPlotter.onExportVisibleRange(appData, fig, ax));
         uimenu(cmAxes, 'Text', 'Toggle Waterfall Gradient', 'Separator', 'on', ...
             'MenuSelectedFcn', @(~,~) toggleWfGradient());
         uimenu(cmAxes, 'Text', 'Clear Fit Overlays', ...
@@ -6732,61 +6732,8 @@ function onSendToOrigin(~,~)
         onPlot([], []);
     end
 
-    function onExportVisibleRange()
-    %ONEXPORTVISIBLERANGE  Export only the data within the current axis limits to CSV.
-        if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a file first.', 'No data'); return;
-        end
-        ds  = appData.datasets{appData.activeIdx};
-        src = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
-        % Apply display-unit scaling so exported values match the preview
-        src = bosonPlotter.applyDisplayUnits(src, ds, appData);
-        xLims = ax.XLim;
-
-        % Filter data to visible x range (use scaled x values)
-        xVec = double(src.time);
-        mask = xVec >= xLims(1) & xVec <= xLims(2);
-        if ~any(mask)
-            uialert(fig, 'No data points in the visible range.', 'Empty'); return;
-        end
-
-        % Build output table
-        xVisible = xVec(mask);
-        yVisible = src.values(mask, :);
-
-        % File dialog
-        [~, fn, ~] = fileparts(ds.filepath);
-        defaultName = [fn '_visible.csv'];
-        [outFile, outDir] = uiputfile({'*.csv','CSV (*.csv)'}, ...
-            'Export Visible Range', defaultName);
-        if isequal(outFile, 0), return; end
-        outPath = fullfile(outDir, outFile);
-
-        % Write CSV with headers (labels already updated by applyDisplayUnits)
-        fid = fopen(outPath, 'w');
-        if fid == -1
-            uialert(fig, 'Cannot open file for writing.', 'Error'); return;
-        end
-        xHdr = guiLabel(guiXName(src.metadata), guiXUnit(src.metadata));
-        headers = [{xHdr}, cellfun(@(l,u) guiLabel(l,u), ...
-            src.labels(:)', src.units(:)', 'UniformOutput', false)];
-        fprintf(fid, '%s', headers{1});
-        for hi = 2:numel(headers)
-            fprintf(fid, ',%s', headers{hi});
-        end
-        fprintf(fid, '\n');
-        % Data rows
-        for ri = 1:numel(xVisible)
-            fprintf(fid, '%.10g', xVisible(ri));
-            for ci = 1:size(yVisible, 2)
-                fprintf(fid, ',%.10g', yVisible(ri, ci));
-            end
-            fprintf(fid, '\n');
-        end
-        fclose(fid);
-        uialert(fig, sprintf('Exported %d points to:\n%s', sum(mask), outPath), ...
-            'Export Complete');
-    end
+    % (onExportVisibleRange extracted to +bosonPlotter/onExportVisibleRange.m;
+    %  wired directly at the uimenu callback site, no nested delegate needed)
 
     function onClearFitOverlays(~, ~)
     %ONCLEARFITOVERLAYS  Remove curve fit and peak decomposition overlays.
