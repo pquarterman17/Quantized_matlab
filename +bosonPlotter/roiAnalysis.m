@@ -11,12 +11,13 @@ function roiAnalysis(datasets, activeIdx, mainAx, options)
 %   ROI bounds change.
 %
 %   Workflow:
-%     1. Click "Set Region" then click two points on the main axes
-%        to define the x-range
+%     1. Drag the blue (left) or red (right) dashed cursor on the
+%        main axes, or click "Set Region" to define the x-range by
+%        clicking two points, or type bounds directly in the X min /
+%        X max fields
 %     2. Statistics appear in the panel and are overlaid on the plot
-%     3. Adjust bounds via numeric fields or click "Set Region" again
-%     4. "Copy Stats" copies the results to clipboard
-%     5. "Export Region" extracts the ROI data as a new dataset
+%     3. "Copy Stats" copies the results to clipboard
+%     4. "Export Region" extracts the ROI data as a new dataset
 %
 %   Inputs:
 %       datasets    — cell array of dataset structs
@@ -99,7 +100,7 @@ ddCh.Layout.Row = 2; ddCh.Layout.Column = 2;
 uibutton(topGL, 'Text', 'Set Region', ...
     'BackgroundColor', BTN_PRIMARY, 'FontColor', [1 1 1], ...
     'FontSize', 10, ...
-    'Tooltip', 'Click two points on the plot to set region', ...
+    'Tooltip', 'Click two points on the plot to set region (or drag the dashed cursors)', ...
     'ButtonPushedFcn', @(~,~) startRegionPick());
 % Position in row 2, columns 3-4
 topGL.Children(end).Layout.Row = 2;
@@ -142,11 +143,16 @@ lblStatus.Layout.Row = 5;
 
 % State
 roiPatch  = [];    % patch handle on main axes
-roiLines  = [];    % boundary line handles
+roiLines  = [];    % boundary line handles (unused when draggable cursors active)
+cursors   = [];    % draggable cursor bundle from bosonPlotter.fitCursors
+suppressCursorCb = false;   % guard against setRange-induced callback loops
 roiStats  = struct();  % last computed stats
 clickMode = false;
 clickCount = 0;
 oldBDF = [];
+
+% Ensure figure cleans up draggable cursors too
+roiFig.CloseRequestFcn = @(~,~) cleanup();
 
 % Initial computation if bounds are valid
 updateROI();
@@ -270,30 +276,46 @@ updateROI();
         end
     end
 
-    function drawOverlay(xMin, xMax, ySeg)
-    %DRAWOVERLAY  Draw/update the shaded ROI region on main axes.
-        % Remove old overlay
-        clearOverlay();
-
+    function drawOverlay(xMin, xMax, ~)
+    %DRAWOVERLAY  Draw/update the shaded ROI region and draggable cursors.
         yLims = mainAx.YLim;
 
-        % Translucent patch
-        roiPatch = patch(mainAx, ...
-            [xMin xMax xMax xMin], ...
-            [yLims(1) yLims(1) yLims(2) yLims(2)], ...
-            [0.3 0.6 1.0], ...
-            'FaceAlpha', 0.12, 'EdgeColor', 'none', ...
-            'HandleVisibility', 'off', 'Tag', 'roiPatch');
+        % Translucent patch — create or update
+        if ~isempty(roiPatch) && isvalid(roiPatch)
+            roiPatch.XData = [xMin xMax xMax xMin];
+            roiPatch.YData = [yLims(1) yLims(1) yLims(2) yLims(2)];
+        else
+            roiPatch = patch(mainAx, ...
+                [xMin xMax xMax xMin], ...
+                [yLims(1) yLims(1) yLims(2) yLims(2)], ...
+                [0.3 0.6 1.0], ...
+                'FaceAlpha', 0.12, 'EdgeColor', 'none', ...
+                'HandleVisibility', 'off', 'Tag', 'roiPatch');
+            % Keep the patch behind data so cursor lines sit on top
+            uistack(roiPatch, 'bottom');
+        end
 
-        % Boundary lines
-        roiLines(1) = xline(mainAx, xMin, '--', 'Color', [0.3 0.5 0.8], ...
-            'LineWidth', 1, 'HandleVisibility', 'off', 'Tag', 'roiLine');
-        roiLines(2) = xline(mainAx, xMax, '--', 'Color', [0.3 0.5 0.8], ...
-            'LineWidth', 1, 'HandleVisibility', 'off', 'Tag', 'roiLine');
+        % Draggable cursor pair — create once, reuse across updates
+        if isempty(cursors) || ~isstruct(cursors) || ...
+                ~isfield(cursors, 'lineL') || ~isvalid(cursors.lineL)
+            cursors = bosonPlotter.fitCursors(mainAx, xMin, xMax, @onCursorDragged);
+        else
+            suppressCursorCb = true;
+            cursors.setRange(xMin, xMax);
+            suppressCursorCb = false;
+        end
+    end
+
+    function onCursorDragged(xL, xR)
+    %ONCURSORDRAGGED  Push new cursor range into edit fields + stats.
+        if suppressCursorCb, return; end
+        efXmin.Value = xL;
+        efXmax.Value = xR;
+        updateROI();
     end
 
     function clearOverlay()
-    %CLEAROVERLAY  Remove ROI overlay graphics.
+    %CLEAROVERLAY  Remove ROI overlay graphics and draggable cursors.
         if ~isempty(roiPatch) && isvalid(roiPatch)
             delete(roiPatch);
         end
@@ -302,8 +324,15 @@ updateROI();
                 delete(roiLines(li));
             end
         end
+        if ~isempty(cursors) && isstruct(cursors) && isfield(cursors, 'remove')
+            try
+                cursors.remove();
+            catch
+            end
+        end
         roiPatch = [];
         roiLines = [];
+        cursors  = [];
     end
 
     function copyStats()
