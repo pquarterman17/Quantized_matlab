@@ -2446,6 +2446,7 @@ function varargout = BosonPlotter(options)
     ui.ddX              = ddX;
     ui.lbY              = lbY;
     ui.lbY2             = lbY2;
+    ui.lbDatasets       = lbDatasets;
     % Scale / display
     ui.ddScaleX         = ddScaleX;
     ui.ddScaleY         = ddScaleY;
@@ -3346,87 +3347,13 @@ function varargout = BosonPlotter(options)
     end
 
     function onMergeDatasets(~,~)
-    %ONMERGEDATASETS  Concatenate the selected datasets into one new dataset.
-    %  Requires ≥ 2 datasets selected in lbDatasets (multi-select).
-    %  Uses corrData if available, otherwise raw data.
-    %  The merged x-vector is sorted ascending; y columns are concatenated
-    %  to match the first dataset's label/unit layout.
-        if isempty(appData.datasets)
-            uialert(fig,'Load files first.','No data'); return;
-        end
-
-        % Collect selected indices from multi-select listbox
-        rawVal = lbDatasets.Value;
-        if ~iscell(rawVal), rawVal = {rawVal}; end
-        selIdxList = cell2mat(rawVal);   % numeric vector of dataset indices
-        selIdxList = selIdxList(selIdxList >= 1 & selIdxList <= numel(appData.datasets));
-
-        if numel(selIdxList) < 2
-            uialert(fig, ...
-                sprintf(['Select at least 2 datasets in the list ' ...
-                         '(Ctrl+click or Shift+click).\n' ...
-                         'Currently selected: %d dataset(s).'], numel(selIdxList)), ...
-                'Merge: need ≥2 datasets');
-            return;
-        end
-
-        % Use corrData if available, else raw data
-        d1 = appData.datasets{selIdxList(1)};
-        baseData = guiTernary(~isempty(d1.corrData), d1.corrData, d1.data);
-
-        mergedTime   = double(baseData.time);
-        mergedValues = baseData.values;
-
-        ok = true;
-        for mi = 2:numel(selIdxList)
-            dsi  = appData.datasets{selIdxList(mi)};
-            di   = guiTernary(~isempty(dsi.corrData), dsi.corrData, dsi.data);
-
-            % Check column count compatibility
-            if size(di.values, 2) ~= size(baseData.values, 2)
-                uialert(fig, ...
-                    sprintf(['Dataset #%d has %d Y columns but dataset #%d has %d.\n' ...
-                             'All selected datasets must have the same number of channels.'], ...
-                             selIdxList(mi), size(di.values,2), ...
-                             selIdxList(1),  size(baseData.values,2)), ...
-                    'Merge: column mismatch');
-                ok = false;  break;
-            end
-
-            mergedTime   = [mergedTime;   double(di.time)];   %#ok<AGROW>
-            mergedValues = [mergedValues; di.values];           %#ok<AGROW>
-        end
-        if ~ok, return; end
-
-        % Sort by x (ascending)
-        [mergedTime, sortOrder] = sort(mergedTime, 'ascend');
-        mergedValues = mergedValues(sortOrder, :);
-
-        % Build merged data struct from the first dataset's metadata
-        mergedData          = baseData;
-        mergedData.time     = mergedTime;
-        mergedData.values   = mergedValues;
-
-        % Build display name from constituent filenames
-        nameStrs = cell(1, numel(selIdxList));
-        for mi = 1:numel(selIdxList)
-            [~, fn, ~] = fileparts(appData.datasets{selIdxList(mi)}.filepath);
-            nameStrs{mi} = fn;
-        end
-        mergedName = ['[merged] ', strjoin(nameStrs, ' + ')];
-
-        ds = buildDs(appData.datasets{selIdxList(1)}.filepath, mergedData, ...
-                     appData.datasets{selIdxList(1)}.parserName);
-        ds.displayName = mergedName;
-
-        appData.datasets{end+1} = ds;
-        appData.model.addDataset(ds.data, ds.filepath, ds.parserName);
-        appData.activeIdx       = numel(appData.datasets);
-
-        cancelInteractions();
-        rebuildDatasetList(true);
-        updateControlsForActiveDataset();
-        onPlot([],[]);
+    %ONMERGEDATASETS  Delegate — see +bosonPlotter/mergeDatasets.m.
+        cb.buildDs                        = @buildDs;
+        cb.cancelInteractions             = @cancelInteractions;
+        cb.rebuildDatasetList              = @(keep) rebuildDatasetList(keep);
+        cb.updateControlsForActiveDataset = @updateControlsForActiveDataset;
+        cb.onPlot                         = @() onPlot([],[]);
+        bosonPlotter.mergeDatasets(appData, fig, ui, cb);
     end
 
     function onDatasetMath(~,~)
@@ -3477,85 +3404,12 @@ function varargout = BosonPlotter(options)
     end
 
     function onRemoveDataset(~,~)
-    %ONREMOVEDATASET  Remove selected dataset(s) from the list.
-    %  Supports removing multiple selected datasets when multi-select is enabled.
-        if isempty(appData.datasets) || isempty(lbDatasets.Value), return; end
-
-        cancelInteractions();
-
-        % lbDatasets.ItemsData contains numeric indices, so Value returns
-        % the selected indices directly (not display strings).
-        sel = lbDatasets.Value;
-        if iscell(sel)
-            indicesToRemove = [sel{:}];
-        else
-            indicesToRemove = sel;
-        end
-
-        % Filter out invalid indices (e.g. the placeholder 0)
-        indicesToRemove(indicesToRemove < 1 | indicesToRemove > numel(appData.datasets)) = [];
-        if isempty(indicesToRemove), return; end
-
-        % Confirm when removing multiple datasets
-        if numel(indicesToRemove) > 1 && ~headless
-            answer = uiconfirm(fig, ...
-                sprintf('Remove %d selected datasets?', numel(indicesToRemove)), ...
-                'Confirm Remove', 'Options', {'Remove', 'Cancel'}, ...
-                'DefaultOption', 'Remove', 'CancelOption', 'Cancel');
-            if strcmp(answer, 'Cancel'), return; end
-        end
-
-        % Sort indices in descending order so removal doesn't affect remaining indices
-        indicesToRemove = sort(indicesToRemove, 'descend');
-
-        % Remove selected datasets (also from shared model). appData.model
-        % and appData.datasets must stay in 1:1 correspondence — if an
-        % earlier silent-catch model.updateDataset failure left them out
-        % of sync we would permanently corrupt the index mapping by
-        % skipping model removals. Warn loudly instead so the divergence
-        % is visible, then remove unconditionally.
-        if appData.model.count() ~= numel(appData.datasets)
-            warning('BosonPlotter:modelDesync', ...
-                ['WorkspaceModel has %d datasets but appData.datasets has %d — ' ...
-                 'they drifted out of sync (silent updateDataset catch?). ' ...
-                 'Removing unconditionally and hoping for the best.'], ...
-                appData.model.count(), numel(appData.datasets));
-        end
-        for ri = 1:numel(indicesToRemove)
-            idx = indicesToRemove(ri);
-            if idx <= appData.model.count()
-                appData.model.removeDataset(idx);
-            end
-        end
-        appData.datasets(indicesToRemove) = [];
-
-        if isempty(appData.datasets)
-            appData.activeIdx = 0;
-            lbDatasets.Items     = {'(no files loaded — click  Add File(s)...  to begin)'};
-            lbDatasets.ItemsData = {0};
-            lbDatasets.Value     = {0};
-            % Reset all controls to blank state
-            ctrlPanel.Title = 'Controls';
-            ddX.Items = {'(load file first)'};  ddX.Value = ddX.Items{1};
-            lbY.Items = {'(load file first)'};  lbY.Value = lbY.Items(1);
-            efXOffset.Value = 0;  efYOffset.Value = 0;
-            efBGSlope.Value = 0;  efBGIntercept.Value = 0;
-            efSavePath.Value = '';
-            analysisPanel.Title = 'Analysis & Corrections';
-            ddDatasetColor.Enable = 'off';
-            ddDatasetColor.Value  = [];
-            efLegendName.Enable   = 'off';
-            efLegendName.Value    = '';
-            cla(ax);
-            ax.XLim = [0 1];  ax.YLim = [0 1];
-            ax.XLimMode = 'auto';  ax.YLimMode = 'auto';
-            title(ax,'Load a file to preview data','Interpreter','none');
-        else
-            appData.activeIdx = min(appData.activeIdx, numel(appData.datasets));
-            rebuildDatasetList(true);
-            updateControlsForActiveDataset();
-            onPlot([],[]);
-        end
+    %ONREMOVEDATASET  Delegate — see +bosonPlotter/removeDataset.m.
+        cb.cancelInteractions             = @cancelInteractions;
+        cb.rebuildDatasetList              = @(keep) rebuildDatasetList(keep);
+        cb.updateControlsForActiveDataset = @updateControlsForActiveDataset;
+        cb.onPlot                         = @() onPlot([],[]);
+        bosonPlotter.removeDataset(appData, fig, ax, ui, headless, cb);
     end
 
     function onToggleAnimation(~,~)

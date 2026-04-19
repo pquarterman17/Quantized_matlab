@@ -126,3 +126,11 @@ function datasetMetaEdit(appData, fig, ui, mode, callbacks)
             end
     end
 end
+
+% ════════════════════════════════════════════════════════════════════════
+% Local helpers (duplicated from BosonPlotter.m nested function scope)
+% ════════════════════════════════════════════════════════════════════════
+
+function v = guiTernary(cond, a, b)
+    if cond, v = a; else, v = b; end
+end

@@ -117,3 +117,11 @@ function datasetMath(appData, fig, callbacks)
         uialert(fig, sprintf('Expression error:\n\n%s', ME.message), 'Dataset Math Error');
     end
 end
+
+% ════════════════════════════════════════════════════════════════════════
+% Local helpers (duplicated from BosonPlotter.m nested function scope)
+% ════════════════════════════════════════════════════════════════════════
+
+function v = guiTernary(cond, a, b)
+    if cond, v = a; else, v = b; end
+end

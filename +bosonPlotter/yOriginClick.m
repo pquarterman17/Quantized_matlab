@@ -131,3 +131,31 @@ function yOriginClick(appData, fig, ax, ui, callbacks)
         callbacks.onApplyCorrections([], []);
     end
 end
+
+% ════════════════════════════════════════════════════════════════════════
+% Local helpers (duplicated from BosonPlotter.m nested function scope)
+% ════════════════════════════════════════════════════════════════════════
+
+function v = guiTernary(cond, a, b)
+    if cond, v = a; else, v = b; end
+end
+
+function tf = isNeutronParser(pName)
+    tf = ismember(pName, {'importNCNRDat', 'importNCNRRefl', 'importNCNRPNR'});
+end
+
+function name = guiXName(meta)
+    if isfield(meta,'xColumnName') && ~isempty(meta.xColumnName)
+        name = meta.xColumnName;
+    else
+        name = 'X';
+    end
+end
+
+function c = ensureCell(v)
+    if ischar(v) || isstring(v)
+        c = cellstr(v);
+    else
+        c = v;
+    end
+end
