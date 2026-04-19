@@ -6026,84 +6026,11 @@ function onLoadBackground(~,~)
     end
 
     function onBatchExportCSV(~,~)
-    %ONBATCHEXPORTCSV  Export all loaded datasets to separate CSV files.
-    %   Non-neutron datasets: individual CSV (corrected+raw or raw-only).
-    %   Neutron datasets: one consolidated CSV per measurement base name.
-        if isempty(appData.datasets)
-            uialert(fig,'Load a file first.','No data');
-            return;
-        end
-
-        % Output directory picker (#8): choose folder or use source-adjacent
-        outDir = uigetdir(resolveStartDir(appData.lastDir), ...
-            'Choose output folder (Cancel = save next to source files)');
-        if isequal(outDir, 0), outDir = ''; end  % empty = source-adjacent
-
-        setStatus('Exporting CSV files...');
-        fig.Pointer = 'watch';
-        drawnow;
-
-        fmt = resolvedExportFormat();
-        nDS = numel(appData.datasets);
-        nExported = 0;
-        failedFiles = {};
-        neutronDone = {};  % base names already exported
-
-        for di = 1:nDS
-            ds = appData.datasets{di};
-
-            % ── Neutron: consolidated export (once per measurement) ────
-            if isfield(ds, 'parserName') && isNeutronParser(ds.parserName)
-                bn = neutronBaseName(ds.filepath);
-                if any(strcmp(neutronDone, bn)), continue; end
-                [fpath, ~, ~] = fileparts(ds.filepath);
-                if ~isempty(outDir), fpath = outDir; end
-                outFile = fullfile(fpath, [bn, '_neutron.csv']);
-                try
-                    saveConsolidatedNeutronCSV(ds, outFile, fmt);
-                    nExported = nExported + 1;
-                    neutronDone{end+1} = bn; %#ok<AGROW>
-                catch ME
-                    failedFiles{end+1} = sprintf('%s: %s', bn, ME.message); %#ok<AGROW>
-                end
-                continue;
-            end
-
-            % ── Non-neutron: individual export ─────────────────────────
-            hasCorrected = ~isempty(ds.corrData);
-            exportData   = guiTernary(hasCorrected, ds.corrData, ds.data);
-            exportData   = bosonPlotter.applyDisplayUnits(exportData, ds, appData);
-            suffix       = guiTernary(hasCorrected, '_corrected.csv', '_export.csv');
-
-            [fpath, fname, ~] = fileparts(ds.filepath);
-            if ~isempty(outDir), fpath = outDir; end
-            outFile = fullfile(fpath, [fname, suffix]);
-
-            try
-                % Include raw data alongside corrected; skip duplication if uncorrected
-                rawRef = guiTernary(hasCorrected, ds.data, []);
-                guiSaveCSV(exportData, outFile, rawRef, [], fmt);
-                nExported = nExported + 1;
-            catch ME
-                failedFiles{end+1} = sprintf('%s: %s', fname, ME.message); %#ok<AGROW>
-            end
-        end
-
-        % Show result
-        fig.Pointer = 'arrow';
-        if nExported == 0
-            setStatus('Batch export: no datasets exported.');
-            uialert(fig, 'No datasets to export.', 'Batch Export');
-        elseif isempty(failedFiles)
-            setStatus(sprintf('Batch export complete: %d file(s) saved.', nExported));
-            uialert(fig, sprintf('Successfully exported %d file(s) to CSV.', nExported), ...
-                'Batch Export Complete');
-        else
-            setStatus(sprintf('Batch export partial: %d exported, %d failed.', nExported, numel(failedFiles)));
-            msg = sprintf('Exported: %d\nFailed: %d\n\n', nExported, numel(failedFiles));
-            msg = [msg, strjoin(failedFiles, '\n')];
-            uialert(fig, msg, 'Batch Export Partial');
-        end
+    %ONBATCHEXPORTCSV  Delegate — see +bosonPlotter/onBatchExportCSV.m.
+        obeCb_.setStatus              = @setStatus;
+        obeCb_.resolvedExportFormat   = @resolvedExportFormat;
+        obeCb_.guiSaveCSV             = @guiSaveCSV;
+        bosonPlotter.onBatchExportCSV(appData, fig, obeCb_);
     end
 
     function onCopyDataToClipboard(~,~)
