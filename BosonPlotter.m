@@ -6249,7 +6249,7 @@ function varargout = BosonPlotter(options)
         if isempty(sel), return; end
 
         try
-            clipStr = buildClipboardString(sel);
+            clipStr = bosonPlotter.buildClipboardString(appData, sel);
             clipboard('copy', clipStr);
             uialert(fig, sprintf('Copied %d dataset(s) to clipboard.\nPaste into Origin or Excel.', ...
                 numel(sel)), 'Copied');
@@ -6259,69 +6259,7 @@ function varargout = BosonPlotter(options)
         end
     end
 
-    function s = buildClipboardString(dsIndices)
-    %BUILDCLIPBOARDSTRING  Build tab-delimited text with Origin-style headers.
-    %   Returns a string ready for clipboard('copy', s) and Origin paste.
-        allLongNames = {};
-        allUnits     = {};
-        allDesig     = {};
-        allCols      = {};
-        multiDS      = numel(dsIndices) > 1;
-
-        for ii = 1:numel(dsIndices)
-            di = dsIndices(ii);
-            dsi = appData.datasets{di};
-            src = guiTernary(~isempty(dsi.corrData), dsi.corrData, dsi.data);
-            src = bosonPlotter.applyDisplayUnits(src, dsi, appData);
-            [~, fn, ~] = fileparts(dsi.filepath);
-            prefix = guiTernary(multiDS, [fn, '_'], '');
-
-            % X column
-            allLongNames{end+1} = [prefix, 'X']; %#ok<AGROW>
-            allUnits{end+1}     = extractXUnitFromStruct(src); %#ok<AGROW>
-            allDesig{end+1}     = 'X'; %#ok<AGROW>
-            allCols{end+1}      = src.time(:); %#ok<AGROW>
-
-            % Y columns
-            for k = 1:size(src.values, 2)
-                allLongNames{end+1} = [prefix, src.labels{k}]; %#ok<AGROW>
-                allUnits{end+1}     = src.units{k}; %#ok<AGROW>
-                lbl = lower(src.labels{k});
-                if contains(lbl, {'err', 'dr', 'std', 'sigma'})
-                    allDesig{end+1} = 'yEr'; %#ok<AGROW>
-                else
-                    allDesig{end+1} = 'Y'; %#ok<AGROW>
-                end
-                allCols{end+1} = src.values(:, k); %#ok<AGROW>
-            end
-        end
-
-        % Determine max rows across all datasets
-        maxR = max(cellfun(@numel, allCols));
-        nC   = numel(allCols);
-
-        % Build string: Long Name / Units / Comments header rows, then data
-        lines = cell(1, maxR + 3);
-        lines{1} = strjoin(allLongNames, sprintf('\t'));
-        lines{2} = strjoin(allUnits, sprintf('\t'));
-        lines{3} = strjoin(allDesig, sprintf('\t'));
-
-        for r = 1:maxR
-            vals = cell(1, nC);
-            for c = 1:nC
-                if r <= numel(allCols{c})
-                    vals{c} = sprintf('%.10g', allCols{c}(r));
-                else
-                    vals{c} = '';
-                end
-            end
-            lines{r + 3} = strjoin(vals, sprintf('\t'));
-        end
-
-        s = strjoin(lines, newline);
-    end
-
-    function onSendToOrigin(~,~)
+function onSendToOrigin(~,~)
     %ONSENDTOORIGIN  Send active dataset to OriginPro via COM; fall back to clipboard.
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig, 'Load a file first.', 'No data');
@@ -6354,7 +6292,7 @@ function varargout = BosonPlotter(options)
                 'Origin Export');
         else
             % Fallback: copy to clipboard in Origin-ready format
-            clipStr = buildClipboardString(appData.activeIdx);
+            clipStr = bosonPlotter.buildClipboardString(appData, appData.activeIdx);
             clipboard('copy', clipStr);
             uialert(fig, ...
                 ['Origin not available — data copied to clipboard instead.' newline ...
