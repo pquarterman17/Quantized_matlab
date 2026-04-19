@@ -8577,48 +8577,13 @@ function onSendToOrigin(~,~)
     % ── Batch Import callback ─────────────────────────────────────────────
 
     function onBatchImportDir(~, ~)
-    %ONBATCHIMPORTDIR  Import all supported files from a directory.
-        dirPath = uigetdir(pwd, 'Select directory to import');
-        if isequal(dirPath, 0), return; end
-        answer = uiconfirm(fig, 'Scan subdirectories recursively?', ...
-            'Batch Import', 'Options', {'Yes', 'No', 'Cancel'}, ...
-            'DefaultOption', 1, 'CancelOption', 3);
-        if strcmp(answer, 'Cancel'), return; end
-        recursive = strcmp(answer, 'Yes');
-        setStatus('Batch importing...');
-        drawnow;
-        try
-            results = scripts.batchImport(dirPath, 'Recursive', recursive);
-            if isempty(results)
-                uialert(fig, 'No supported files found in the selected directory.', 'Batch Import');
-                setStatus('Batch import: no files found');
-                return;
-            end
-            % Add each result as a dataset via standard buildDs path
-            nAdded = 0;
-            for bi = 1:numel(results)
-                if isempty(results(bi).data), continue; end
-                try
-                    fp_i = results(bi).filepath;
-                    ds_i = buildDs(fp_i, results(bi).data, 'importAuto');
-                    appData.datasets{end+1} = ds_i;
-                    appData.model.addDataset(results(bi).data, fp_i, 'importAuto');
-                    nAdded = nAdded + 1;
-                catch
-                    % Skip files that fail to build dataset struct
-                end
-            end
-            if nAdded > 0
-                rebuildDatasetList(false);
-                appData.activeIdx = numel(appData.datasets);
-                onSelectDataset([], []);
-            end
-            setStatus(sprintf('Batch import: %d files loaded from %s', nAdded, dirPath));
-        catch ME
-            uialert(fig, sprintf('Batch import failed:\n%s', ME.message), 'Error');
-            setStatus('Batch import failed');
-        end
-        recordAction(sprintf("%% Batch import: '%s' (recursive=%d)", dirPath, recursive));
+    %ONBATCHIMPORTDIR  Delegate to extracted +bosonPlotter module.
+        obidCb_.buildDs             = @buildDs;
+        obidCb_.rebuildDatasetList  = @rebuildDatasetList;
+        obidCb_.onSelectDataset     = @() onSelectDataset([],[]);
+        obidCb_.setStatus           = @setStatus;
+        obidCb_.recordAction        = @recordAction;
+        bosonPlotter.onBatchImportDir(appData, fig, obidCb_);
     end
 
     % ── Dataset Groups callbacks ──────────────────────────────────────────
