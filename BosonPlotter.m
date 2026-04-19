@@ -6002,63 +6002,13 @@ function onLoadBackground(~,~)
     end
 
     function onSaveCSV(~,~)
-        if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data');
-            return;
-        end
-        ds = appData.datasets{appData.activeIdx};
-        fp = strtrim(efSavePath.Value);
-        if isempty(fp)
-            uialert(fig,'Set an output file path first.','No output path');
-            return;
-        end
-        fmt = resolvedExportFormat();
-        try
-            if isfield(ds, 'parserName') && isNeutronParser(ds.parserName)
-                saveConsolidatedNeutronCSV(ds, fp, fmt);
-            else
-                hasCorrected = ~isempty(ds.corrData);
-                exportData   = guiTernary(hasCorrected, ds.corrData, ds.data);
-                % Apply mask (exclude masked points from export)
-                if isfield(ds, 'mask') && ~isempty(ds.mask) && any(~ds.mask)
-                    if hasCorrected
-                        % Map raw mask through trim to match exportData rows
-                        nRawE = numel(ds.data.time);
-                        keepE = true(nRawE, 1);
-                        if ~isdatetime(ds.data.time)
-                            tVE = double(ds.data.time);
-                            if ~isnan(ds.xTrimMin), keepE = keepE & tVE >= ds.xTrimMin; end
-                            if ~isnan(ds.xTrimMax), keepE = keepE & tVE <= ds.xTrimMax; end
-                        end
-                        exportMask = ds.mask(keepE);
-                    else
-                        exportMask = ds.mask;
-                    end
-                    exportData.time   = exportData.time(exportMask);
-                    exportData.values = exportData.values(exportMask, :);
-                end
-                % Apply display-unit scaling (SI prefix + mag unit labels)
-                exportData = bosonPlotter.applyDisplayUnits(exportData, ds, appData);
-                if hasCorrected
-                    cafeCb_ = struct('findPolarizationPairs', @findPolarizationPairs);
-                    asymData = bosonPlotter.computeAsymmetryForExport(ds, appData, cafeCb_);
-                    % Include original raw data alongside display-scaled corrected
-                    guiSaveCSV(exportData, fp, ds.data, asymData, fmt);
-                else
-                    % No corrections — export in display units, no duplication
-                    guiSaveCSV(exportData, fp, [], [], fmt);
-                end
-            end
-            recordAction(sprintf("%% Exported CSV: %s", fp));
-            uialert(fig, sprintf('Saved:\n%s', fp), 'Saved');
-        catch ME
-            fprintf(2, '\n[BosonPlotter] Save error: %s\n', ME.message);
-            for si = 1:numel(ME.stack)
-                fprintf(2, '  at %s  (line %d)\n', ME.stack(si).name, ME.stack(si).line);
-            end
-            logGUIError('Save error', ME.message, ME);
-            uialert(fig, ME.message, 'Save error');
-        end
+    %ONSAVECSV  Delegate — see +bosonPlotter/onSaveCSV.m.
+        oscsvCb_.resolvedExportFormat    = @resolvedExportFormat;
+        oscsvCb_.findPolarizationPairs   = @findPolarizationPairs;
+        oscsvCb_.recordAction            = @recordAction;
+        oscsvCb_.logGUIError             = @logGUIError;
+        oscsvCb_.guiSaveCSV              = @guiSaveCSV;
+        bosonPlotter.onSaveCSV(appData, fig, ui, oscsvCb_);
     end
 
     function fmt = resolvedExportFormat()
