@@ -3326,7 +3326,7 @@ function varargout = BosonPlotter(options)
         ds       = appData.datasets{appData.activeIdx};
         ds.color = ddDatasetColor.Value;   % [] = Auto; [r g b] = named colour
         appData.datasets{appData.activeIdx} = ds;
-        softUpdateLines();  % Fast path: update only colors/visibility
+        bosonPlotter.softUpdateLines(appData, struct('onPlot', @onPlot));  % Fast path: update only colors/visibility
     end
 
     function onLegendNameChanged(~,~)
@@ -5000,7 +5000,7 @@ function onLoadBackground(~,~)
         end
 
         % Refresh plot — use soft-update for instant visibility toggle
-        softUpdateLines();
+        bosonPlotter.softUpdateLines(appData, struct('onPlot', @onPlot));
     end
 
     function onSmoothingChanged(~,~)
@@ -5740,78 +5740,6 @@ function onSendToOrigin(~,~)
 
     % ── Plot callbacks ────────────────────────────────────────────────────
 
-    function softUpdateLines()
-    % SOFTUPDATELINES  Update line colors and visibility without full redraw.
-    %   Fast path for color/visibility changes that only need property updates
-    %   on existing line handles. Falls back to full redraw if cache is invalid.
-        if ~appData.lineCache.valid
-            % Cache stale — fall back to full redraw
-            onPlot([],[]);
-            return;
-        end
-
-        nDS = numel(appData.datasets);
-
-        % Update left-axis lines (color and visibility)
-        for di = 1:nDS
-            ds = appData.datasets{di};
-            vis = 'on';
-            if isfield(ds, 'visible') && ~ds.visible
-                vis = 'off';
-            end
-            col = ds.color;  % per-dataset color override ([] = Auto)
-
-            % Iterate over cached left-axis lines for this dataset
-            for k = 1:size(appData.lineCache.left, 2)
-                if di <= size(appData.lineCache.left, 1)
-                    h = appData.lineCache.left{di, k};
-                    if isvalid(h)
-                        h.Visible = vis;
-                        % Color: use override if present, otherwise keep current
-                        if ~isempty(col)
-                            h.Color = col;
-                        end
-                    else
-                        % Line handle is invalid — cache is stale
-                        appData.lineCache.valid = false;
-                        onPlot([],[]);
-                        return;
-                    end
-                end
-            end
-        end
-
-        % Update right-axis lines (color and visibility)
-        for di = 1:nDS
-            ds = appData.datasets{di};
-            vis = 'on';
-            if isfield(ds, 'visible') && ~ds.visible
-                vis = 'off';
-            end
-            colR = ds.colorR;  % per-dataset right-axis color override ([] = Auto)
-
-            % Iterate over cached right-axis lines for this dataset
-            for k = 1:size(appData.lineCache.right, 2)
-                if di <= size(appData.lineCache.right, 1)
-                    h = appData.lineCache.right{di, k};
-                    if isvalid(h)
-                        h.Visible = vis;
-                        % Color: use override if present
-                        if ~isempty(colR)
-                            h.Color = colR;
-                        end
-                    else
-                        % Line handle is invalid — cache is stale
-                        appData.lineCache.valid = false;
-                        onPlot([],[]);
-                        return;
-                    end
-                end
-            end
-        end
-
-        drawnow limitrate;  % lightweight update
-    end
 
     function onPlot(~,~)
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
