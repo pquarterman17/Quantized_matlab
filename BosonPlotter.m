@@ -9372,24 +9372,6 @@ end  % BosonPlotter
 %  Module-level helpers  (stateless — no access to GUI handles)
 % ════════════════════════════════════════════════════════════════════════
 
-function filterGridButtons(gl, query)
-%FILTERGRIDBUTTONS  Show/hide buttons in a uigridlayout by text match.
-%   Hides rows containing buttons whose Text doesn't match the query.
-%   Empty query shows all. Used by the Advanced Tools filter bar.
-    allBtns = findall(gl, 'Type', 'uibutton');
-    q = lower(strtrim(query));
-    for bi = 1:numel(allBtns)
-        b = allBtns(bi);
-        if isempty(q)
-            b.Visible = 'on';
-        elseif contains(lower(b.Text), q) || contains(lower(b.Tooltip), q)
-            b.Visible = 'on';
-        else
-            b.Visible = 'off';
-        end
-    end
-end
-
 function baseUnit = stripSIPrefix(unitStr)
 %STRIPSIPREFIX  Remove a leading SI prefix from a unit string.
 %   'um' → 'm', 'nm' → 'm', 'kOe' → 'Oe', 'mV' → 'V', 'MeV' → 'eV'
@@ -10014,95 +9996,6 @@ function unit = extractXUnitFromStruct(d)
 end
 
 
-function out = guiMetaLines(d, parserName, fp)
-%GUIMETALINES Build metadata summary lines using the unified metadata schema.
-    [~,fn,ex] = fileparts(fp);
-    m   = d.metadata;
-    out = {};
-
-    % ── Core fields ────────────────────────────────────────────────────
-    out{end+1} = sprintf('File:    %s%s', fn, ex);
-    out{end+1} = sprintf('Parser:  %s  [%s]', guiParserLabel(parserName), parserName);
-
-    xName = guiXName(m);
-    xUnit = guiXUnit(m);
-    if ~isempty(xUnit)
-        out{end+1} = sprintf('X axis:  %s (%s)', xName, xUnit);
-    else
-        out{end+1} = sprintf('X axis:  %s', xName);
-    end
-
-    % ── Parser-specific fields ─────────────────────────────────────────
-    if isfield(m, 'parserSpecific')
-        ps = m.parserSpecific;
-        out{end+1} = '---';
-        psFields = fieldnames(ps);
-        for fi = 1:numel(psFields)
-            fname = psFields{fi};
-            val   = ps.(fname);
-            % Scalar numeric or short char
-            if isnumeric(val) && isscalar(val)
-                out{end+1} = sprintf('%-14s %g', [fname ':'], val); %#ok<AGROW>
-            elseif (ischar(val) || (isstring(val) && isscalar(val))) && ~isempty(val)
-                out{end+1} = sprintf('%-14s %s', [fname ':'], char(val)); %#ok<AGROW>
-            elseif iscell(val) && ~isempty(val) && numel(val) <= 4
-                out{end+1} = sprintf('%-14s %s', [fname ':'], strjoin(val, ', ')); %#ok<AGROW>
-            elseif isstruct(val)
-                % Sub-struct: show up to 4 scalar fields
-                subFn = fieldnames(val);
-                out{end+1} = sprintf('%s:', fname); %#ok<AGROW>
-                shown = 0;
-                for sfi = 1:numel(subFn)
-                    sv = val.(subFn{sfi});
-                    if (ischar(sv) || (isnumeric(sv) && isscalar(sv))) && shown < 4
-                        out{end+1} = sprintf('  %-12s %s', [subFn{sfi} ':'], num2str(sv)); %#ok<AGROW>
-                        shown = shown + 1;
-                    end
-                end
-            elseif iscell(val) && ~isempty(val)
-                % Cell array (allColumnNames etc.) — list items
-                out{end+1} = sprintf('%s  (%d):', fname, numel(val)); %#ok<AGROW>
-                for ci = 1:numel(val)
-                    out{end+1} = sprintf('  %s', val{ci}); %#ok<AGROW>
-                end
-            end
-        end
-    end
-
-    % ── Summary counts ────────────────────────────────────────────────
-    out{end+1} = '---';
-    out{end+1} = sprintf('Rows:    %d', numel(d.time));
-    out{end+1} = sprintf('Chan:    %d', size(d.values,2));
-
-    % ── X-axis range ─────────────────────────────────────────────────
-    out{end+1} = '---';
-    xLbl = guiLabel(xName, xUnit);
-    if isdatetime(d.time)
-        out{end+1} = sprintf('X: %s  (datetime)', xLbl);
-    else
-        t = d.time(~isnan(d.time));
-        if ~isempty(t)
-            out{end+1} = sprintf('X: %s', xLbl);
-            out{end+1} = sprintf('   [%.4g, %.4g]', min(t), max(t));
-        end
-    end
-
-    % ── Loaded Y channel ranges ───────────────────────────────────────
-    out{end+1} = '';
-    out{end+1} = 'Loaded channels:';
-    for k = 1:size(d.values,2)
-        col = d.values(~isnan(d.values(:,k)), k);
-        lbl = guiLabel(d.labels{k}, d.units{k});
-        if isempty(col)
-            out{end+1} = sprintf('  Y%d: %s  (all NaN)', k, lbl); %#ok<AGROW>
-        else
-            out{end+1} = sprintf('  Y%d: %s', k, lbl); %#ok<AGROW>
-            out{end+1} = sprintf('       [%.4g, %.4g]', min(col), max(col)); %#ok<AGROW>
-        end
-    end
-end
-
-
 function lbl = guiParserLabel(parserName)
 %GUIPARSERLABEL Human-readable description for each parser function.
     switch parserName
@@ -10192,18 +10085,6 @@ function col = neutronPolarizationColor(polarization)
             col = [0.58 0.40 0.74];
         otherwise
             col = [0.40 0.40 0.40];
-    end
-end
-
-
-function s = delimLabel(d)
-%DELIMLABEL Human-readable delimiter name.
-    switch d
-        case ',',          s = 'comma (,)';
-        case sprintf('\t'),s = 'tab';
-        case ';',          s = 'semicolon (;)';
-        case ' ',          s = 'space';
-        otherwise,         s = sprintf('"%s"', d);
     end
 end
 
