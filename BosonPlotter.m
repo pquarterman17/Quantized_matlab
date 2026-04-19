@@ -3564,88 +3564,25 @@ function varargout = BosonPlotter(options)
     end
 
     function cancelInteractions()
-    %CANCELINTERACTIONS  Abort any in-progress interaction (BG-fit, zoom, etc.).
-        fig.WindowButtonDownFcn   = @onAxesButtonDown;
-        fig.WindowButtonMotionFcn = @onMouseHover;
-        fig.WindowButtonUpFcn     = '';
-        fig.Pointer               = 'arrow';
-        appData.panelResizeDir    = '';
-        appData.panelResizeStart  = [];
-        appData.panelResizeOrig   = [];
-        appData.listDragSrcIdx    = 0;
-        appData.listDragActive    = false;
-        appData.listDragStartPt   = [];
-        if ~isempty(appData.bgRectPatch) && isvalid(appData.bgRectPatch)
-            delete(appData.bgRectPatch);
-        end
-        appData.bgRectPatch       = [];
-        appData.bgStartPt         = [];
-        lblRegionStats.Text       = '';  % Clear region statistics display
-        % Abort any in-progress drag-zoom
-        if ~isempty(appData.zoomRectPatch) && isvalid(appData.zoomRectPatch)
-            delete(appData.zoomRectPatch);
-        end
-        appData.zoomRectPatch     = [];
-        appData.zoomStartPt       = [];
-        % Abort any in-progress mask selection
-        if ~isempty(appData.maskRectPatch) && isvalid(appData.maskRectPatch)
-            delete(appData.maskRectPatch);
-        end
-        appData.maskRectPatch     = [];
-        appData.maskStartPt       = [];
-        % Abort any in-progress box integration selection
-        if ~isempty(appData.boxIntPatch) && isvalid(appData.boxIntPatch)
-            delete(appData.boxIntPatch);
-        end
-        appData.boxIntPatch       = [];
-        appData.boxIntStartPt     = [];
-        appData.boxIntMode        = false;
-        clearBoxPreview();
-        clearCompletedBoxPatch();
-        btnMaskSelect.Text            = 'Mask Selection';
-        btnMaskSelect.BackgroundColor = [0.60 0.15 0.15];
-        btnMaskSelect.Enable          = 'on';
-        % Reset fringe thickness pick mode (but keep existing markers)
-        if appData.fringeClickCount > 0 && appData.fringeClickCount < 2
-            clearFringeMarkers();
-        end
-        appData.fringeDragIdx     = 0;
-        btnFringeThick.Text            = ['Fringe ' char(916) 't (2-click)'];
-        btnFringeThick.BackgroundColor = BTN_ACCENT;
-        btnFringeThick.Enable          = 'on';
-        appData.lastClickTic      = uint64(0);
-        if ~isempty(appData.yOriginMarker) && isvalid(appData.yOriginMarker)
-            delete(appData.yOriginMarker);
-        end
-        appData.yOriginMarker     = [];
-        appData.yOriginClickCount = 0;
-        appData.yOriginPt1        = [];
-        btnFitBG.Text            = 'Fit Linear BG from Box';
-        btnFitBG.BackgroundColor = BTN_INTERACT;
-        btnFitBG.Enable          = 'on';
-        btnPickY.Text   = 'Est. Y Offset  (2 pts)';
-        btnPickY.Enable = 'on';
-        % Reset Y-translate state
-        appData.yTranslateY0   = [];
-        appData.yTranslateOff0 = 0;
-        btnYTranslate.Text            = 'Y Translate (drag)';
-        btnYTranslate.BackgroundColor = BTN_ACCENT;
-        btnYTranslate.Enable          = 'on';
-        btnAutoPeak.Enable            = 'on';
-        % Reset manual peak-pick mode
-        if appData.peakPickMode
-            appData.peakPickMode = false;
-            btnManualPeak.Text            = 'Add Peak';
-            btnManualPeak.BackgroundColor = [0.45 0.20 0.55];
-        end
-        btnManualPeak.Enable = 'on';
-        % Reset peak-remove click mode
-        if appData.peakRemoveMode
-            appData.peakRemoveMode = false;
-            btnRemovePeakClick.Text            = 'Click-Rm';
-            btnRemovePeakClick.BackgroundColor = BTN_DANGER;
-        end
-        btnRemovePeakClick.Enable = 'on';
+    %CANCELINTERACTIONS  Delegate to extracted +bosonPlotter module.
+        ciWidgets_.btnMaskSelect      = btnMaskSelect;
+        ciWidgets_.btnFringeThick     = btnFringeThick;
+        ciWidgets_.btnFitBG           = btnFitBG;
+        ciWidgets_.btnPickY           = btnPickY;
+        ciWidgets_.btnYTranslate      = btnYTranslate;
+        ciWidgets_.btnAutoPeak        = btnAutoPeak;
+        ciWidgets_.btnManualPeak      = btnManualPeak;
+        ciWidgets_.btnRemovePeakClick = btnRemovePeakClick;
+        ciWidgets_.lblRegionStats     = lblRegionStats;
+        ciCb_.onAxesButtonDown        = @onAxesButtonDown;
+        ciCb_.onMouseHover            = @onMouseHover;
+        ciCb_.clearBoxPreview         = @clearBoxPreview;
+        ciCb_.clearCompletedBoxPatch  = @clearCompletedBoxPatch;
+        ciCb_.clearFringeMarkers      = @clearFringeMarkers;
+        ciCb_.BTN_ACCENT              = BTN_ACCENT;
+        ciCb_.BTN_DANGER              = BTN_DANGER;
+        ciCb_.BTN_INTERACT            = BTN_INTERACT;
+        bosonPlotter.cancelInteractions(appData, fig, ciWidgets_, ciCb_);
     end
 
     function updateControlsForActiveDataset()
@@ -7679,117 +7616,25 @@ function onSendToOrigin(~,~)
     end
 
     function onFigureKeyPress(~, e)
-    %ONFIGUREKEYPRES  Handle keyboard shortcuts.
-    %  Delete          — remove selected dataset(s)
-    %  Ctrl+S          — save session
-    %  Ctrl+Z          — undo last operation
-    %  Ctrl+Y / Ctrl+Shift+Z — redo last undone operation
-    %  Ctrl+E          — export CSV
-    %  Ctrl+C          — copy plot to clipboard
-    %  Left/Right      — switch active dataset
-    %  Space           — toggle dataset visibility
-    %  Ctrl+Up         — move dataset up
-    %  Ctrl+Down       — move dataset down
-    %  Alt+Up/Down     — cycle SI prefix on Y (Alt+Shift = X)
-    %  F5              — refresh state (flush caches, re-sync widgets, redraw)
-        hasMod   = ~isempty(e.Modifier);
-        hasCtrl  = hasMod && any(strcmp(e.Modifier, 'control'));
-        hasShift = hasMod && any(strcmp(e.Modifier, 'shift'));
-        hasAlt   = hasMod && any(strcmp(e.Modifier, 'alt'));
-
-        switch e.Key
-            case 'f5'
-                refreshState();
-                return;
-            case 'delete'
-                if ~isempty(lbDatasets.Value) && ~isempty(appData.datasets)
-                    onRemoveDataset([], []);
-                end
-
-            case 's'
-                if hasCtrl, onSaveSession([], []); end
-
-            case 'z'
-                if hasCtrl && hasShift
-                    appData.undoCb.onRedo([], []);  % Ctrl+Shift+Z = redo
-                elseif hasCtrl
-                    appData.undoCb.onUndo([], []);  % Ctrl+Z = undo
-                end
-
-            case 'y'
-                if hasCtrl && hasShift
-                    focus(lbY);              % Ctrl+Shift+Y → Y channel selector
-                elseif hasCtrl
-                    appData.undoCb.onRedo([], []);  % Ctrl+Y = redo
-                end
-
-            case 'm'
-                if hasCtrl, onUnmaskAll([], []); end
-
-            case 'e'
-                if hasCtrl, onSaveCSV([], []); end
-
-            case 'c'
-                if hasCtrl, onCopyToClipboard([], []); end
-
-            case 'l'
-                if hasCtrl, focus(lbDatasets); end  % Ctrl+L → dataset list
-
-            case 'leftarrow'
-                if ~hasCtrl && appData.activeIdx > 1
-                    appData.activeIdx = appData.activeIdx - 1;
-                    rebuildDatasetList(true);
-                    updateControlsForActiveDataset();
-                    onPlot([],[]);
-                end
-
-            case 'rightarrow'
-                if ~hasCtrl && appData.activeIdx < numel(appData.datasets)
-                    appData.activeIdx = appData.activeIdx + 1;
-                    rebuildDatasetList(true);
-                    updateControlsForActiveDataset();
-                    onPlot([],[]);
-                end
-
-            case 'space'
-                if ~isempty(appData.datasets) && appData.activeIdx > 0
-                    onToggleDatasetVisibility([], []);
-                end
-
-            case 'uparrow'
-                if hasAlt
-                    % Alt+Up = cycle Y prefix toward larger units; +Shift = X
-                    isX = hasShift;
-                    if isX, curSym = appData.axisPrefixX.symbol;
-                    else,   curSym = appData.axisPrefixY.symbol;
-                    end
-                    ci = find(strcmp(appData.prefixSymbols, curSym), 1);
-                    if isempty(ci), ci = 1; end
-                    ni = max(1, ci - 1);
-                    pf = struct('symbol', appData.prefixSymbols{ni}, 'factor', appData.prefixFactors(ni));
-                    if isX, appData.axisPrefixX = pf; else, appData.axisPrefixY = pf; end
-                    onPlot([],[]); setStatus(sprintf('%s prefix: %s', guiTernary(isX,'X','Y'), appData.prefixNames{ni}));
-                elseif hasCtrl
-                    onMoveDatasetUp([], []);
-                end
-
-            case 'downarrow'
-                if hasAlt
-                    % Alt+Down = cycle Y prefix toward smaller units; +Shift = X
-                    isX = hasShift;
-                    if isX, curSym = appData.axisPrefixX.symbol;
-                    else,   curSym = appData.axisPrefixY.symbol;
-                    end
-                    ci = find(strcmp(appData.prefixSymbols, curSym), 1);
-                    if isempty(ci), ci = 1; end
-                    ni = min(numel(appData.prefixSymbols), ci + 1);
-                    pf = struct('symbol', appData.prefixSymbols{ni}, 'factor', appData.prefixFactors(ni));
-                    if isX, appData.axisPrefixX = pf; else, appData.axisPrefixY = pf; end
-                    onPlot([],[]); setStatus(sprintf('%s prefix: %s', guiTernary(isX,'X','Y'), appData.prefixNames{ni}));
-                elseif hasCtrl
-                    onMoveDatasetDown([], []);
-                end
-        end
+    %ONFIGUREKEYPRES  Delegate to extracted +bosonPlotter module.
+        ofkpWidgets_.lbY         = lbY;
+        ofkpWidgets_.lbDatasets  = lbDatasets;
+        ofkpCb_.refreshState              = @refreshState;
+        ofkpCb_.onRemoveDataset           = @onRemoveDataset;
+        ofkpCb_.onSaveSession             = @onSaveSession;
+        ofkpCb_.onUndo                    = appData.undoCb.onUndo;
+        ofkpCb_.onRedo                    = appData.undoCb.onRedo;
+        ofkpCb_.onUnmaskAll               = @onUnmaskAll;
+        ofkpCb_.onSaveCSV                 = @onSaveCSV;
+        ofkpCb_.onCopyToClipboard         = @onCopyToClipboard;
+        ofkpCb_.onToggleDatasetVisibility = @onToggleDatasetVisibility;
+        ofkpCb_.onMoveDatasetUp           = @onMoveDatasetUp;
+        ofkpCb_.onMoveDatasetDown         = @onMoveDatasetDown;
+        ofkpCb_.rebuildDatasetList        = @rebuildDatasetList;
+        ofkpCb_.updateControlsForActiveDataset = @updateControlsForActiveDataset;
+        ofkpCb_.onPlot                    = @() onPlot([],[]);
+        ofkpCb_.setStatus                 = @setStatus;
+        bosonPlotter.onFigureKeyPress(appData, ofkpWidgets_, ofkpCb_, e);
     end
 
     function onExportFigure(~,~)
@@ -7922,85 +7767,20 @@ function onSendToOrigin(~,~)
     end
 
     function onLoadSession(~,~)
-    %ONLOADSESSION  Restore a previously saved session from a .mat file.
-    %  Delegates deserialisation to bosonPlotter.sessionManager.load().
-        startDir = resolveStartDir(appData.lastDir);
-        [fname, fpath] = uigetfile({'*.mat','MATLAB session (*.mat)'}, ...
-            'Load session file...', startDir);
-        if isequal(fname, 0), return; end
-        matPath = fullfile(fpath, fname);
-
-        setStatus('Loading session...');
-        fig.Pointer = 'watch';
-        drawnow;
-
-        try
-            [datasets, restored] = bosonPlotter.sessionManager.load(matPath);
-        catch ME
-            fig.Pointer = 'arrow';
-            setStatus('Session load failed.');
-            logGUIError('Load Error', ME.message, ME);
-            uialert(fig, sprintf('Could not load session:\n%s', ME.message), 'Load Error');
-            return;
-        end
-
-        cancelInteractions();
-
-        % Restore core data into appData
-        appData.datasets  = datasets;
-        appData.activeIdx = restored.activeIdx;
-        appData.bgFile    = restored.bgFile;
-        appData.bgDataset = restored.bgDataset;
-        appData.style     = restored.style;
-        appData.lastDir   = restored.lastDir;
-        % Phase A/B visual state
-        if isfield(restored, 'activeTemplate') && ~isempty(restored.activeTemplate)
-            appData.activeTemplate = restored.activeTemplate;
-        end
-        if isfield(restored, 'styleOverrides') && isstruct(restored.styleOverrides)
-            appData.styleOverrides = restored.styleOverrides;
-        end
-        % Sync the Template dropdown so the UI reflects the restored state
-        refreshTemplateDropdown();
-        if ~isempty(ddTemplate) && isvalid(ddTemplate)
-            if any(strcmp(ddTemplate.Items, appData.activeTemplate))
-                ddTemplate.Value = appData.activeTemplate;
-            end
-        end
-
-        if isempty(appData.datasets)
-            rebuildDatasetList(false);
-            fig.Pointer = 'arrow';
-            return;
-        end
-
-        % Restore dropdown/scale widget values (colormap, scale, BG interp)
-        widgets = buildSessionWidgets_();
-        bosonPlotter.sessionManager.applyGuiState(restored.guiState, widgets);
-
-        % Restore plot style button appearance
-        onStylePick(appData.style);
-
-        % Restore BG file display
-        if ~isempty(appData.bgFile)
-            efBGFile.Value = appData.bgFile;
-        end
-
-        % Clear search filter so all datasets are visible on load
-        appData.searchFilter = '';
-        efDatasetSearch.Value = '';
-
-        rebuildDatasetList(true);
-        updateControlsForActiveDataset();
-
-        % Restore axis channel selections after listbox items are populated
-        bosonPlotter.sessionManager.applyAxisSelections(restored.guiState, widgets);
-
-        onPlot([],[]);
-        fig.Pointer = 'arrow';
-        setStatus(sprintf('Session loaded: %d dataset(s)', numel(appData.datasets)));
-        uialert(fig, sprintf('Session loaded: %d dataset(s)', numel(appData.datasets)), ...
-            'Session Loaded');
+    %ONLOADSESSION  Delegate to extracted +bosonPlotter module.
+        olsWidgets_.ddTemplate      = ddTemplate;
+        olsWidgets_.efBGFile        = efBGFile;
+        olsWidgets_.efDatasetSearch = efDatasetSearch;
+        olsCb_.cancelInteractions          = @cancelInteractions;
+        olsCb_.refreshTemplateDropdown     = @refreshTemplateDropdown;
+        olsCb_.onStylePick                 = @onStylePick;
+        olsCb_.rebuildDatasetList          = @rebuildDatasetList;
+        olsCb_.updateControlsForActiveDataset = @updateControlsForActiveDataset;
+        olsCb_.onPlot                      = @() onPlot([],[]);
+        olsCb_.setStatus                   = @setStatus;
+        olsCb_.logGUIError                 = @logGUIError;
+        olsCb_.buildSessionWidgets         = @buildSessionWidgets_;
+        bosonPlotter.onLoadSession(appData, fig, olsWidgets_, olsCb_);
     end
 
     % ── Panel drag-resize ────────────────────────────────────────────────
