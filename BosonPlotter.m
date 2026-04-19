@@ -6396,48 +6396,9 @@ function onSendToOrigin(~,~)
     end
 
     function onPoleFigure(~,~)
-    %ONPOLEFIGURE  Generate a polar plot of intensity vs scan angle at a chosen 2θ.
-    %  For 2D area-detector data: extracts a column (fixed 2θ) and plots
-    %  intensity vs omega/chi/phi as a polar projection.
-        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
-        ds = appData.datasets{appData.activeIdx};
-        if ~is2DDataset(ds)
-            uialert(fig,'Active dataset is not a 2D area-detector scan.','Pole Figure'); return;
-        end
-
-        map = ds.data.metadata.parserSpecific.map2D;
-        I   = map.intensity;   % [N × M]
-        x2  = map.axis2(:)';  % 2Theta [1×M]
-        x1  = map.axis1(:);   % Omega/Chi [N×1]
-
-        % Ask user for the 2θ position to extract
-        [~, peakCol] = max(sum(I, 1));  % default: column with highest total intensity
-        answer = inputdlg( ...
-            sprintf('Enter 2%s position to extract (range: %.2f to %.2f):', ...
-                    char(952), x2(1), x2(end)), ...
-            'Pole Figure', [1 50], {sprintf('%.3f', x2(peakCol))});
-        if isempty(answer), return; end
-        target2th = str2double(answer{1});
-        if isnan(target2th), return; end
-
-        % Find nearest column
-        [~, col] = min(abs(x2 - target2th));
-        intensitySlice = I(:, col);
-
-        % Create polar figure
-        poleFig = figure('Name', sprintf('Pole Figure — 2%s = %.3f%s', ...
-            char(952), x2(col), char(176)), ...
-            'NumberTitle', 'off');
-        pax = polaraxes(poleFig);
-
-        % Convert omega/chi to radians for polar plot
-        thetaRad = deg2rad(x1);
-        polarplot(pax, thetaRad, intensitySlice, '-', 'LineWidth', 1.5);
-        title(pax, sprintf('Intensity at 2%s = %.3f%s', char(952), x2(col), char(176)));
-        pax.ThetaZeroLocation = 'top';
-        pax.ThetaDir = 'clockwise';
-
-        figure(poleFig);
+    %ONPOLEFIGURE  Delegate to extracted +bosonPlotter module.
+        opfCb_.is2DDataset = @is2DDataset;
+        bosonPlotter.onPoleFigure(appData, fig, opfCb_);
     end
 
     function draw2DMap(targetAx, ds)
