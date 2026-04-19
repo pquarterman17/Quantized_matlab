@@ -5280,78 +5280,12 @@ function varargout = BosonPlotter(options)
         appData.undoMgr.push(struct( ...
             'type',  'correction', ...
             'label', labelStr, ...
-            'undo',  @() restoreCorrectionState(dsIdx, prevState), ...
-            'redo',  @() restoreCorrectionState(dsIdx, newState)));
+            'undo',  @() bosonPlotter.restoreCorrectionState(appData, ui, dsIdx, prevState), ...
+            'redo',  @() bosonPlotter.restoreCorrectionState(appData, ui, dsIdx, newState)));
         appData.undoCb.updateUndoButtons();
     end
 
-    function restoreCorrectionState(dsIdx, s)
-    %RESTORECORRECTIONSTATE  Apply a saved correction state struct back to a dataset.
-        if dsIdx < 1 || dsIdx > numel(appData.datasets)
-            return;
-        end
-        ds = appData.datasets{dsIdx};
-        ds.corrData      = s.corrData;
-        if isfield(s,'mask'),          ds.mask          = s.mask;          end
-        ds.xOff          = s.xOff;
-        ds.yOff          = s.yOff;
-        ds.bgSlope       = s.bgSlope;
-        ds.bgInt         = s.bgInt;
-        if isfield(s,'bgPoly'),        ds.bgPoly        = s.bgPoly;        end
-        ds.smoothEnabled = s.smoothEnabled;
-        ds.smoothWindow  = s.smoothWindow;
-        ds.smoothMethod  = s.smoothMethod;
-        if isfield(s,'xTrimMin'),      ds.xTrimMin      = s.xTrimMin;      end
-        if isfield(s,'xTrimMax'),      ds.xTrimMax      = s.xTrimMax;      end
-        if isfield(s,'normMethod'),    ds.normMethod    = s.normMethod;    end
-        if isfield(s,'derivativeMode'),ds.derivativeMode= s.derivativeMode;end
-        if isfield(s,'sampleMass'),    ds.sampleMass    = s.sampleMass;    end
-        if isfield(s,'sampleWidth'),   ds.sampleWidth   = s.sampleWidth;   end
-        if isfield(s,'sampleHeight'),  ds.sampleHeight  = s.sampleHeight;  end
-        if isfield(s,'dimUnit'),       ds.dimUnit       = s.dimUnit;       end
-        if isfield(s,'sampleThick'),   ds.sampleThick   = s.sampleThick;   end
-        if isfield(s,'thickUnit'),     ds.thickUnit     = s.thickUnit;     end
-        if isfield(s,'momentUnit'),    ds.momentUnit    = s.momentUnit;    end
-        if isfield(s,'fieldUnit'),     ds.fieldUnit     = s.fieldUnit;     end
-        if isfield(s,'unitSystem'),    ds.unitSystem    = s.unitSystem;    end
-        % Migration: old sessions used 'Oe (raw)' / 'emu (raw)' as the
-        % un-converted state; the "(raw)" suffix was dropped in 2026-04.
-        if isfield(ds,'fieldUnit')  && strcmp(ds.fieldUnit,  'Oe (raw)'),  ds.fieldUnit  = 'Oe';  end
-        if isfield(ds,'momentUnit') && strcmp(ds.momentUnit, 'emu (raw)'), ds.momentUnit = 'emu'; end
-        appData.datasets{dsIdx} = ds;
-        try
-            appData.model.updateDataset(dsIdx, ds);
-        catch
-        end
-
-        % Sync UI widgets only when this is the active dataset
-        if dsIdx == appData.activeIdx
-            efXOffset.Value      = ds.xOff;
-            efYOffset.Value      = ds.yOff;
-            efBGSlope.Value      = ds.bgSlope;
-            efBGIntercept.Value  = ds.bgInt;
-            cbSmooth.Value       = ds.smoothEnabled;
-            efSmoothWin.Value    = ds.smoothWindow;
-            ddSmoothMethod.Value = ds.smoothMethod;
-            efXTrimMin.Value     = nan2str(ds.xTrimMin);
-            efXTrimMax.Value     = nan2str(ds.xTrimMax);
-            ddNormalize.Value    = ds.normMethod;
-            if isfield(ds,'derivativeMode')
-                ddDerivative.Value = ds.derivativeMode;
-            end
-            efSampleMass.Value   = guiTernary(isfield(ds,'sampleMass'),   ds.sampleMass,   0);
-            efSampleWidth.Value  = guiTernary(isfield(ds,'sampleWidth'),  ds.sampleWidth,  0);
-            efSampleHeight.Value = guiTernary(isfield(ds,'sampleHeight'), ds.sampleHeight, 0);
-            ddDimUnit.Value      = guiTernary(isfield(ds,'dimUnit'),      ds.dimUnit,      'mm');
-            efSampleThick.Value  = guiTernary(isfield(ds,'sampleThick'),  ds.sampleThick,  0);
-            ddThickUnit.Value    = guiTernary(isfield(ds,'thickUnit'),    ds.thickUnit,    'nm');
-            ddMomentUnit.Value   = guiTernary(isfield(ds,'momentUnit'),   ds.momentUnit,   'emu');
-            ddFieldUnit.Value    = guiTernary(isfield(ds,'fieldUnit'),    ds.fieldUnit,    'Oe');
-            ddUnitSystem.Value   = guiTernary(isfield(ds,'unitSystem'),   ds.unitSystem,   'CGS');
-        end
-    end
-
-    function onLoadBackground(~,~)
+function onLoadBackground(~,~)
     %ONLOADBACKGROUND  Open file dialog and load a background dataset via importAuto.
         startDir = resolveStartDir(appData.lastDir);
         [fname, fpath] = uigetfile( ...
