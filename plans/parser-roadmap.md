@@ -4,7 +4,7 @@ New parser support for the `+parser/` package — all blocked on acquiring examp
 
 **Status:** Paused
 **Created:** 2026-03
-**Updated:** 2026-04-11
+**Updated:** 2026-04-19
 
 ---
 
@@ -25,14 +25,6 @@ File on disk → resolveParser(ext) → importXxx(filepath) → createDataStruct
 All four parsers are independent — each can be implemented as soon as its example file arrives.
 
 ---
-
-## Tier 1 — High Impact
-
-1. **importRaman** — Horiba LabSpec / Renishaw ASCII (wavenumber + intensity)
-   - [ ] Verify if `importCSV` already handles the format
-   - [ ] Add extension dispatch in `resolveParser.m` if so
-   - [ ] Register in `guiImport` + `uigetfile` filter
-   - [ ] Add test in `tests/parser/`
 
 ## Tier 2 — Medium Impact
 
@@ -72,4 +64,4 @@ Each new parser must:
 
 ## Completed
 
-(none yet)
+- ~~**#1 importRaman**~~ (2026-04-19) — removed from roadmap per user; no plans to implement.

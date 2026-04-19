@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-04-19 (W2 finish shipped — #17/#23/#24/#27 via `00bdf0e`; #22 deferred; repo-audit down to 13 open items)
+**Last regenerated:** 2026-04-19 (W2 finish shipped via `00bdf0e`; #22 deferred; Raman parser removed from scope; W4 #44 + #46 reconciled)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -40,10 +40,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#3** FormulaEngine → Python
 
 ### Repo audit — `plans/repo-audit-2026-04-13.md` (W1 all Tier 1/2 bugs + all W2 UX shipped or deferred — remaining is W3 Features, W4 Physics)
-- (See plan for W3 Features, W4 Physics workstreams — W2 #22 toolbar-metrics deferred; 13 items open)
-
-### Parsers — `plans/parser-roadmap.md` (Paused: blocked on example files)
-- [ ] **#1** `importRaman` — Horiba LabSpec / Renishaw ASCII
+- (See plan for W3 Features, W4 Physics workstreams — W2 #22 toolbar-metrics deferred; 11 items open)
 
 ### Porting — `plans/porting_plan.md`
 - Architecture doc; 7 phase-level items — see plan for current Python+Tauri porting status
@@ -173,9 +170,9 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 | retroactive-docs | Active | 0 T1 / 13 T2 / 5 T3 | Tier 1 theory done 2026-04-13; theory + tutorials remaining |
 | origin-feature-gap | Active | 6 T1 / 7 T2 / 1 T3 | MATLAB done; Python pending |
 | software-feature-gaps | Active (T3-only) | 0 T1 / 0 T2 / 3 T3 | Tier 1–2 shipped |
-| repo-audit-2026-04-13 | Active | ~13 mixed (27 done of 54, 1 deferred) | W1 + W2 UX complete; remaining work is W3 Features, W4 Physics; #22 toolbar-metrics deferred |
+| repo-audit-2026-04-13 | Active | ~11 mixed (29 done of 54, 1 deferred) | W1 + W2 UX complete; remaining work is W3 Features, W4 Physics; #22 toolbar-metrics deferred |
 | codebase-roadmap | Active | 1 T1 / 1 T2 / 0 T3 | Rolling umbrella |
-| parser-roadmap | Paused | 1 T1 / 2 T2 / 1 T3 | Blocked on example files |
+| parser-roadmap | Paused | 0 T1 / 2 T2 / 1 T3 | Blocked on example files; #1 Raman removed 2026-04-19 |
 | bug-reporting | Active (Stage 2 deferred) | 0 T1 / 3 T2 / 3 T3 | Stage 1 shipped |
 | porting_plan | Active | 7 phase-level items | Thin film toolkit architecture |
 
