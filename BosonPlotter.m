@@ -5564,87 +5564,9 @@ function varargout = BosonPlotter(options)
     end
 
     function onUndoCorrections(~,~)
-    %ONUNDOCORRECTIONS  Restore the previous correction state from the undo stack.
-    %  Supports multi-level undo (up to 5 levels, #13).
-        if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data');
-            return;
-        end
-
-        ds = appData.datasets{appData.activeIdx};
-
-        % Pop from multi-level stack if available, else fall back to single undoState
-        hasStack = isfield(ds, 'undoStack') && iscell(ds.undoStack) && ~isempty(ds.undoStack);
-        hasSingle = isfield(ds, 'undoState') && isstruct(ds.undoState) && ~isempty(fieldnames(ds.undoState));
-        if ~hasStack && ~hasSingle
-            uialert(fig, 'No previous correction state to restore.', 'Undo unavailable');
-            return;
-        end
-
-        if hasStack
-            undoState = ds.undoStack{end};
-            ds.undoStack(end) = [];  % pop
-        else
-            undoState = ds.undoState;
-            ds.undoState = struct();
-        end
-
-        % Restore all correction state from the saved undo state
-        ds.corrData      = undoState.corrData;
-        if isfield(undoState, 'mask'), ds.mask = undoState.mask; end
-        ds.xOff          = undoState.xOff;
-        ds.yOff          = undoState.yOff;
-        ds.bgSlope       = undoState.bgSlope;
-        ds.bgInt         = undoState.bgInt;
-        ds.smoothEnabled = undoState.smoothEnabled;
-        ds.smoothWindow  = undoState.smoothWindow;
-        ds.smoothMethod  = undoState.smoothMethod;
-        if isfield(undoState, 'xTrimMin'), ds.xTrimMin = undoState.xTrimMin; end
-        if isfield(undoState, 'xTrimMax'), ds.xTrimMax = undoState.xTrimMax; end
-        if isfield(undoState, 'normMethod'), ds.normMethod = undoState.normMethod; end
-        if isfield(undoState, 'bgPoly'), ds.bgPoly = undoState.bgPoly; end
-        if isfield(undoState, 'derivativeMode'), ds.derivativeMode = undoState.derivativeMode; end
-        % Magnetometry undo restore
-        if isfield(undoState, 'sampleMass'),  ds.sampleMass  = undoState.sampleMass;  end
-        if isfield(undoState, 'sampleWidth'), ds.sampleWidth = undoState.sampleWidth; end
-        if isfield(undoState, 'sampleHeight'),ds.sampleHeight= undoState.sampleHeight;end
-        if isfield(undoState, 'dimUnit'),     ds.dimUnit     = undoState.dimUnit;     end
-        if isfield(undoState, 'sampleThick'), ds.sampleThick = undoState.sampleThick; end
-        if isfield(undoState, 'thickUnit'),   ds.thickUnit   = undoState.thickUnit;   end
-        if isfield(undoState, 'momentUnit'),  ds.momentUnit  = undoState.momentUnit;  end
-        if isfield(undoState, 'fieldUnit'),   ds.fieldUnit   = undoState.fieldUnit;   end
-        if isfield(undoState, 'unitSystem'),  ds.unitSystem  = undoState.unitSystem;  end
-
-        % Update appData
-        appData.datasets{appData.activeIdx} = ds;
-
-        % Sync UI fields to the restored state
-        efXOffset.Value      = ds.xOff;
-        efYOffset.Value      = ds.yOff;
-        efBGSlope.Value      = ds.bgSlope;
-        efBGIntercept.Value  = ds.bgInt;
-        cbSmooth.Value       = ds.smoothEnabled;
-        efSmoothWin.Value    = ds.smoothWindow;
-        ddSmoothMethod.Value = ds.smoothMethod;
-        efXTrimMin.Value     = nan2str(ds.xTrimMin);
-        efXTrimMax.Value     = nan2str(ds.xTrimMax);
-        ddNormalize.Value    = ds.normMethod;
-        if isfield(ds, 'derivativeMode')
-            ddDerivative.Value = ds.derivativeMode;
-        end
-        % Magnetometry UI sync
-        efSampleMass.Value   = guiTernary(isfield(ds,'sampleMass'),   ds.sampleMass,   0);
-        efSampleWidth.Value  = guiTernary(isfield(ds,'sampleWidth'),  ds.sampleWidth,  0);
-        efSampleHeight.Value = guiTernary(isfield(ds,'sampleHeight'), ds.sampleHeight, 0);
-        ddDimUnit.Value      = guiTernary(isfield(ds,'dimUnit'),      ds.dimUnit,      'mm');
-        efSampleThick.Value  = guiTernary(isfield(ds,'sampleThick'),  ds.sampleThick,  0);
-        ddThickUnit.Value    = guiTernary(isfield(ds,'thickUnit'),    ds.thickUnit,    'nm');
-        ddMomentUnit.Value   = guiTernary(isfield(ds,'momentUnit'),   ds.momentUnit,   'emu');
-        ddFieldUnit.Value    = guiTernary(isfield(ds,'fieldUnit'),    ds.fieldUnit,    'Oe');
-        ddUnitSystem.Value   = guiTernary(isfield(ds,'unitSystem'),   ds.unitSystem,   'CGS');
-
-        % Refresh the plot
-        onPlot([],[]);
+    %ONUNDOCORRECTIONS  Delegate — see +bosonPlotter/undoCorrections.m.
+        cb.onPlot = @() onPlot([],[]);
+        bosonPlotter.undoCorrections(appData, fig, ui, cb);
     end
 
     % ════════════════════════════════════════════════════════════════════
