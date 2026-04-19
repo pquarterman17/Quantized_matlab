@@ -2463,6 +2463,7 @@ function varargout = BosonPlotter(options)
     ui.ddBGOrder        = ddBGOrder;
     ui.ddBGInterp       = ddBGInterp;
     ui.cbSubtractBG     = cbSubtractBG;
+    ui.ddPreset         = ddPreset;
     % Smoothing
     ui.cbSmooth         = cbSmooth;
     ui.efSmoothWin      = efSmoothWin;
@@ -9933,107 +9934,14 @@ function varargout = BosonPlotter(options)
     end
 
     function onDatasetMetaEdit(mode)
-    %ONDATASETMETAEDIT  Dataset operations and correction preset management.
-    %   mode: 'notes', 'rename', 'reload', 'save-preset', 'load-preset', 'delete-preset'
-
-        % Preset operations don't require a loaded dataset
-        if startsWith(mode, 'save-preset') || startsWith(mode, 'load-preset') || startsWith(mode, 'delete-preset')
-            switch mode
-                case 'save-preset'
-                    answer = inputdlg('Preset name:', 'Save Correction Preset', [1 40]);
-                    if isempty(answer) || isempty(strtrim(answer{1})), return; end
-                    pName = strtrim(answer{1});
-                    p = struct('xOff', efXOffset.Value, 'yOff', efYOffset.Value, ...
-                        'bgSlope', efBGSlope.Value, 'bgInt', efBGIntercept.Value, ...
-                        'smoothEnabled', cbSmooth.Value, 'smoothWindow', efSmoothWin.Value, ...
-                        'smoothMethod', ddSmoothMethod.Value, 'normMethod', ddNormalize.Value, ...
-                        'derivativeMode', ddDerivative.Value, ...
-                        'xTrimMin', efXTrimMin.Value, 'xTrimMax', efXTrimMax.Value);
-                    bosonPlotter.correctionPresets.save(pName, p);
-                    ddPreset.Items = [{'(presets)'}, bosonPlotter.correctionPresets.list()];
-                    ddPreset.Value = '(presets)';
-                    setStatus(sprintf('Preset "%s" saved.', pName));
-                case 'load-preset'
-                    selName = ddPreset.Value;
-                    if strcmp(selName, '(presets)'), return; end
-                    try
-                        p = bosonPlotter.correctionPresets.load(selName);
-                    catch
-                        uialert(fig, sprintf('Preset "%s" not found.', selName), 'Load Error');
-                        return;
-                    end
-                    if isfield(p,'xOff'),    efXOffset.Value = p.xOff; end
-                    if isfield(p,'yOff'),    efYOffset.Value = p.yOff; end
-                    if isfield(p,'bgSlope'), efBGSlope.Value = p.bgSlope; end
-                    if isfield(p,'bgInt'),   efBGIntercept.Value = p.bgInt; end
-                    if isfield(p,'smoothEnabled'), cbSmooth.Value = p.smoothEnabled; end
-                    if isfield(p,'smoothWindow'),  efSmoothWin.Value = p.smoothWindow; end
-                    if isfield(p,'smoothMethod'),   ddSmoothMethod.Value = p.smoothMethod; end
-                    if isfield(p,'normMethod'),     ddNormalize.Value = p.normMethod; end
-                    if isfield(p,'derivativeMode'), ddDerivative.Value = p.derivativeMode; end
-                    if isfield(p,'xTrimMin'), efXTrimMin.Value = p.xTrimMin; end
-                    if isfield(p,'xTrimMax'), efXTrimMax.Value = p.xTrimMax; end
-                    setStatus(sprintf('Loaded preset "%s" — click Apply to use.', selName));
-                case 'delete-preset'
-                    selName = ddPreset.Value;
-                    if strcmp(selName, '(presets)'), return; end
-                    bosonPlotter.correctionPresets.delete(selName);
-                    ddPreset.Items = [{'(presets)'}, bosonPlotter.correctionPresets.list()];
-                    ddPreset.Value = '(presets)';
-                    setStatus(sprintf('Preset "%s" deleted.', selName));
-            end
-            return;
-        end
-
-        if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a file first.', 'No data'); return;
-        end
-        ds = appData.datasets{appData.activeIdx};
-        switch mode
-            case 'notes'
-                currentNotes = '';
-                if isfield(ds, 'notes'), currentNotes = ds.notes; end
-                answer = inputdlg('Dataset notes:', 'Notes', [5 60], {currentNotes});
-                if isempty(answer), return; end
-                appData.datasets{appData.activeIdx}.notes = strtrim(answer{1});
-                rebuildDatasetList(true);
-                onSelectDataset([], []);
-                setStatus(guiTernary(isempty(strtrim(answer{1})), 'Note cleared.', 'Note saved.'));
-            case 'rename'
-                current = ds.displayName;
-                if isempty(current)
-                    [~, fn, fext] = fileparts(ds.filepath);
-                    current = [fn fext];
-                end
-                answer = inputdlg('Display name:', 'Rename Dataset', [1 60], {current});
-                if isempty(answer), return; end
-                newName = strtrim(answer{1});
-                if isempty(newName), return; end
-                appData.datasets{appData.activeIdx}.displayName = newName;
-                appData.datasets{appData.activeIdx}.legendName  = newName;
-                rebuildDatasetList(true);
-                onPlot([], []);
-                setStatus(sprintf('Renamed to: %s', newName));
-            case 'reload'
-                fp = ds.filepath;
-                if ~isfile(fp)
-                    uialert(fig, sprintf('File not found:\n%s', fp), 'Reload Failed');
-                    return;
-                end
-                try
-                    [newData, pName] = guiImport(fp);
-                    appData.datasets{appData.activeIdx}.data = newData;
-                    appData.datasets{appData.activeIdx}.corrData = [];
-                    appData.datasets{appData.activeIdx}.parserName = pName;
-                    appData.datasets{appData.activeIdx}.mask = true(size(newData.time));
-                    updateControlsForActiveDataset();
-                    onPlot([], []);
-                    [~, fn, fext] = fileparts(fp);
-                    setStatus(sprintf('Reloaded %s%s from disk.', fn, fext));
-                catch ME
-                    uialert(fig, sprintf('Reload failed:\n%s', ME.message), 'Reload Error');
-                end
-        end
+    %ONDATASETMETAEDIT  Delegate — see +bosonPlotter/datasetMetaEdit.m.
+        cb.setStatus                     = @setStatus;
+        cb.guiImport                     = @guiImport;
+        cb.rebuildDatasetList             = @(keep) rebuildDatasetList(keep);
+        cb.onSelectDataset               = @onSelectDataset;
+        cb.onPlot                        = @() onPlot([],[]);
+        cb.updateControlsForActiveDataset = @updateControlsForActiveDataset;
+        bosonPlotter.datasetMetaEdit(appData, fig, ui, mode, cb);
     end
 
     function onEditColumnMapping()
