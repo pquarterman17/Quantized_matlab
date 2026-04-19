@@ -88,12 +88,12 @@ ctrlPanel = uipanel(topGL, 'Title', '', 'BorderType', 'none', ...
     'BackgroundColor', BG_PANEL);
 ctrlPanel.Layout.Column = 1;
 
-ctrlGL = uigridlayout(ctrlPanel, [24 2], ...
-    'RowHeight', {18, 26, 26, 8, ...       % Background section
-                  18, 26, 26, 26, 8, ...    % Detection section
-                  18, 26, 26, 26, 8, ...    % Fitting section
-                  18, 26, 26, 8, ...        % Quality section
-                  34, 34, 8, ...            % Actions
+ctrlGL = uigridlayout(ctrlPanel, [25 2], ...
+    'RowHeight', {18, 26, 26, 8, ...         % Background section
+                  18, 26, 26, 26, 8, ...      % Detection section
+                  18, 26, 26, 26, 26, 8, ...  % Fitting section (+ linked-params row)
+                  18, 26, 26, 8, ...          % Quality section
+                  34, 34, 8, ...              % Actions
                   34, 34, 'fit'}, ...
     'ColumnWidth', {100, '1x'}, ...
     'Padding', [8 6 8 6], 'RowSpacing', 2, ...
@@ -170,8 +170,18 @@ cbConstrain = uicheckbox(ctrlGL, 'Text', 'Constrain centers', ...
     'Value', true, 'FontColor', [0.8 0.8 0.8], 'FontSize', 11);
 cbConstrain.Layout.Row = row; cbConstrain.Layout.Column = [1 2];
 
+row = row + 1;
+uilabel(ctrlGL, 'Text', 'Linked params:', 'FontColor', [0.8 0.8 0.8], 'FontSize', 11);
+ddLinked = uidropdown(ctrlGL, ...
+    'Items', {'None', 'Shared FWHM', 'Shared FWHM + eta'}, ...
+    'Value', 'None', ...
+    'BackgroundColor', [0.2 0.2 0.22], 'FontColor', [0.9 0.9 0.9], ...
+    'Tooltip', ['Force selected parameters to be identical across all peaks. ' ...
+                'Useful when peaks share instrumental broadening (Rietveld).']);
+ddLinked.Layout.Row = row; ddLinked.Layout.Column = 2;
+
 % ── Section: Quality ───────────────────────────────────────────────────
-row = 15;
+row = 16;
 lblQ = uilabel(ctrlGL, 'Text', 'FIT QUALITY', ...
     'FontSize', 9, 'FontWeight', 'bold', 'FontColor', [0.5 0.5 0.5]);
 lblQ.Layout.Row = row; lblQ.Layout.Column = [1 2];
@@ -187,7 +197,7 @@ lblRMSE = uilabel(ctrlGL, 'Text', 'RMSE = —', ...
 lblRMSE.Layout.Row = row; lblRMSE.Layout.Column = [1 2];
 
 % ── Action buttons ─────────────────────────────────────────────────────
-row = 19;
+row = 20;
 btnDetect = uibutton(ctrlGL, 'Text', 'Detect Peaks', ...
     'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
     'FontWeight', 'bold', ...
@@ -201,9 +211,9 @@ btnFitAll = uibutton(ctrlGL, 'Text', 'Fit All (simultaneous)', ...
     'ButtonPushedFcn', @(~,~) onFitSimultaneous());
 btnFitAll.Layout.Row = row; btnFitAll.Layout.Column = [1 2];
 
-% Spacer row 21
+% Spacer row 22
 
-row = 22;
+row = 23;
 btnApply = uibutton(ctrlGL, 'Text', 'Apply to BosonPlotter', ...
     'BackgroundColor', [0.65 0.45 0.15], 'FontColor', BTN_FG, ...
     'ButtonPushedFcn', @(~,~) onApply());
@@ -319,13 +329,23 @@ plotData();
         modelName = ddModel.Value;
         bgDeg     = getBgDegree();
         constrain = cbConstrain.Value;
+        linkMode  = ddLinked.Value;
         xSpan     = max(xv) - min(xv);
 
         % Build composite model function and parameter vector
         [modelFun, p0, nPPerPeak, centerIndices, seedCenters] = ...
             buildCompositeModel(xv, yv, detectedPeaks, modelName, bgDeg);
 
-        % Objective with optional center constraints
+        % Expand pFree -> pFull based on linked-parameter mode.  For
+        % Shared FWHM the first peak's FWHM slot is the master; for
+        % Shared FWHM + eta the first peak's FWHM *and* eta slots are
+        % the masters.  freeToFull is identity when linkMode is None.
+        nBgParams = bgDeg + 1;
+        [pFree0, freeToFull, freeCenterIdx] = bosonPlotter.buildLinkedPacker( ...
+            p0, nP, nPPerPeak, nBgParams, linkMode, centerIndices);
+
+        % Objective with optional center constraints, evaluated on the
+        % expanded full parameter vector.
         if constrain && nP > 1
             centerBnd = zeros(1, nP);
             for k = 1:nP
@@ -333,16 +353,17 @@ plotData();
                 centerBnd(k) = max(3 * fwInit, xSpan * 0.02);
             end
             penaltyWt = sum((yv - mean(yv)).^2) * 10;
-            objFun = @(p) sum((modelFun(p, xv) - yv).^2) + ...
-                penaltyWt * sum(max(0, ((p(centerIndices) - seedCenters) ./ centerBnd).^2 - 1));
+            objFun = @(pFree) sum((modelFun(freeToFull(pFree), xv) - yv).^2) + ...
+                penaltyWt * sum(max(0, ((pFree(freeCenterIdx) - seedCenters) ./ centerBnd).^2 - 1));
         else
-            objFun = @(p) sum((modelFun(p, xv) - yv).^2);
+            objFun = @(pFree) sum((modelFun(freeToFull(pFree), xv) - yv).^2);
         end
 
         opts = optimset('Display', 'off', 'MaxIter', 30000, ...
             'TolX', 1e-10, 'TolFun', 1e-14);
         try
-            pFit = fminsearch(objFun, p0, opts);
+            pFreeFit = fminsearch(objFun, pFree0, opts);
+            pFit     = freeToFull(pFreeFit);
         catch me
             setStatusLocal(['Fit failed: ' me.message]);
             return;

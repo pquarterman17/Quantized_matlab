@@ -172,6 +172,8 @@ SUITES = {
     T('fitting','test_cursor_anchor'),       'fitting', 'Cursor fit region + anchor spline background (pure-computation layer)'
     T('fitting','test_mcmcSample'),          'fitting', 'MCMC sampler scaffold (random-walk Metropolis; affine-invariant ensemble TODO)'
     T('fitting','test_pawleyRefine'),        'fitting', 'Pawley whole-pattern XRD refinement scaffold (grid-search cell; Levenberg-Marquardt TODO)'
+    T('fitting','test_tchPseudoVoigt'),      'fitting', 'TCH Thompson-Cox-Hastings pseudo-Voigt profile (Rietveld-style)'
+    T('fitting','test_peakLinkedParams'),    'fitting', 'Multi-peak linked parameter packer: Shared FWHM, Shared FWHM + eta'
     % ── Plotting tests ───────────────────────────────────────────────────
     T('plotting','test_boxViolinSwarm'),    'plotting', 'Box/violin/swarm plots — objects, KDE, swarm, edge cases'
     T('plotting','test_colorScatterZ'),     'plotting', 'colorScatterZ — scatter, CData, colormaps, colorbar, edge cases'
