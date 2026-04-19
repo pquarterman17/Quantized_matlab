@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-04-19 (W1 + W2-drift reconcile — W2 #13/14/15/18/19/21/24-part/26/28/55/56 closed against earlier commits; 20 open repo-audit items remaining)
+**Last regenerated:** 2026-04-19 (W1 + W2 batch shipped — W2 #16/#20/#25 added via `e9a0108`; repo-audit down to 17 open items)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -39,8 +39,8 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#2** ColumnRoles → Python
 - [ ] **#3** FormulaEngine → Python
 
-### Repo audit — `plans/repo-audit-2026-04-13.md` (W1 all Tier 1/2 bugs shipped — remaining items are W2 UX, W3 Features, W4 Physics)
-- (See plan for W2 UX, W3 Features, W4 Physics workstreams — 40 items)
+### Repo audit — `plans/repo-audit-2026-04-13.md` (W1 all Tier 1/2 bugs + most of W2 shipped — remaining items are W2 polish, W3 Features, W4 Physics)
+- (See plan for W2 UX polish #17/22/23/24/27, W3 Features, W4 Physics workstreams — 31 items)
 
 ### Parsers — `plans/parser-roadmap.md` (Paused: blocked on example files)
 - [ ] **#1** `importRaman` — Horiba LabSpec / Renishaw ASCII
@@ -173,7 +173,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 | retroactive-docs | Active | 0 T1 / 13 T2 / 5 T3 | Tier 1 theory done 2026-04-13; theory + tutorials remaining |
 | origin-feature-gap | Active | 6 T1 / 7 T2 / 1 T3 | MATLAB done; Python pending |
 | software-feature-gaps | Active (T3-only) | 0 T1 / 0 T2 / 3 T3 | Tier 1–2 shipped |
-| repo-audit-2026-04-13 | Active | ~34 mixed (20 done of 54) | W1 bugs + much of W2 shipped; remaining work is W2 polish, W3 Features, W4 Physics |
+| repo-audit-2026-04-13 | Active | ~31 mixed (23 done of 54) | W1 + most of W2 shipped; remaining work is W2 polish (#17/22/23/24/27), W3 Features, W4 Physics |
 | codebase-roadmap | Active | 1 T1 / 1 T2 / 0 T3 | Rolling umbrella |
 | parser-roadmap | Paused | 1 T1 / 2 T2 / 1 T3 | Blocked on example files |
 | bug-reporting | Active (Stage 2 deferred) | 0 T1 / 3 T2 / 3 T3 | Stage 1 shipped |
