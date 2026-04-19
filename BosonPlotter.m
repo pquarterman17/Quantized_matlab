@@ -6866,63 +6866,17 @@ function onSendToOrigin(~,~)
     end
 
     function onFigSizeChanged(~,~)
-    %ONFIGSIZECHANGED  Enforce minimum size and adapt layout for small screens.
+    %ONFIGSIZECHANGED  Delegate to extracted +bosonPlotter module.
         fig.SizeChangedFcn = '';          % disable to avoid recursion
-        pos = fig.Position;
-        changed = false;
-        if pos(4) < MIN_FIG_H
-            pos(4) = MIN_FIG_H;
-            changed = true;
-        end
-        if pos(3) < 600
-            pos(3) = 600;
-            changed = true;
-        end
-        if changed
-            fig.Position = pos;
-        end
-        % On very short windows protect the preview; otherwise let analysis flex.
-        if pos(4) < 700
-            rootGL.RowHeight = {'3x', '2x', 16};
-        else
-            rootGL.RowHeight = {'1x', '1x', 16};
-        end
-
-        % ── Adapt content columns for narrow windows ──
-        % On narrow screens, shrink file list and controls so preview is not crushed.
-        % On wide screens, respect persisted or default widths.
-        figW = pos(3);
-        defFileW = LAYOUT_DEFAULTS.fileListW;
-        defCtrlW = LAYOUT_DEFAULTS.ctrlPanelW;
-        if figW < 800
-            contentGL.ColumnWidth = {min(140, defFileW), min(160, defCtrlW), '1x'};
-        elseif figW < 1000
-            contentGL.ColumnWidth = {min(160, defFileW), min(175, defCtrlW), '1x'};
-        end
-        % (Wide windows keep whatever width the user or prefs last set.)
-
-        % ── Adapt analysis columns for narrow windows ──
-        % Col 3 = 2D map panel (visible only for 2D data), col 4 = save/export (always).
-        is2D_now = appData.activeIdx >= 1 && ~isempty(appData.datasets) && ...
-                   is2DDataset(appData.datasets{appData.activeIdx});
-        col3W = guiTernary(is2D_now, '2x', 0);
-        defCorrW = LAYOUT_DEFAULTS.corrPanelW;
-        if figW < 900
-            col4W = guiTernary(is2D_now, 140, 0);
-            analysisGL.ColumnWidth = {min(260, defCorrW), '1x', col3W, col4W};
-        elseif figW < 1100
-            analysisGL.ColumnWidth = {min(280, defCorrW), '1x', col3W, 180};
-        end
-
-        % ── Keep data table hidden in 2D mode during resize ──
-        if is2D_now
-            dataTablePanel.Visible = 'off';
-            axLimPanel.Layout.Row  = [1 2];
-        else
-            dataTablePanel.Visible = 'on';
-            axLimPanel.Layout.Row  = 1;
-        end
-
+        ofscWidgets_.rootGL         = rootGL;
+        ofscWidgets_.contentGL      = contentGL;
+        ofscWidgets_.analysisGL     = analysisGL;
+        ofscWidgets_.dataTablePanel = dataTablePanel;
+        ofscWidgets_.axLimPanel     = axLimPanel;
+        ofscConst_.MIN_FIG_H        = MIN_FIG_H;
+        ofscConst_.LAYOUT_DEFAULTS  = LAYOUT_DEFAULTS;
+        ofscCb_.is2DDataset         = @is2DDataset;
+        bosonPlotter.onFigSizeChanged(appData, fig, ofscWidgets_, ofscConst_, ofscCb_);
         fig.SizeChangedFcn = @onFigSizeChanged;
     end
 
