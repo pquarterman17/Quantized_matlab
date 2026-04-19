@@ -7164,136 +7164,18 @@ function onSendToOrigin(~,~)
     end
 
     function startPanelResize()
-    %STARTPANELRESIZE  Arm motion/up handlers to begin dragging the detected border.
-        mp = fig.CurrentPoint;
-        appData.panelResizeStart = mp;
-        switch appData.panelResizeDir
-            case 'h_row12'
-                % Snapshot the current analysis panel height (px)
-                try
-                    aPos = getpixelposition(analysisPanel, true);
-                    appData.panelResizeOrig = aPos(4);
-                catch
-                    rh = rootGL.RowHeight;
-                    appData.panelResizeOrig = guiTernary(isnumeric(rh{2}), rh{2}, 300);
-                end
-            case 'v_col12'
-                % Snapshot the current corrections panel width (px)
-                try
-                    cPos = getpixelposition(corrPanel, true);
-                    appData.panelResizeOrig = cPos(3);
-                catch
-                    appData.panelResizeOrig = appData.corrPanelWidth;
-                end
-            case 'h_axdata'
-                % Snapshot the axLimPanel row height (row 1 of analysisGL)
-                rh = analysisGL.RowHeight;
-                try
-                    alPos = getpixelposition(axLimPanel, true);
-                    appData.panelResizeOrig = alPos(4);
-                catch
-                    appData.panelResizeOrig = guiTernary(isnumeric(rh{1}), rh{1}, 110);
-                end
-            case 'v_col23'
-                % Snapshot the save/export panel width (col 4 of analysisGL)
-                try
-                    sPos = getpixelposition(savePanel, true);
-                    appData.panelResizeOrig = sPos(3);
-                catch
-                    cw = analysisGL.ColumnWidth;
-                    appData.panelResizeOrig = guiTernary(isnumeric(cw{4}), cw{4}, 210);
-                end
-            case 'v_content12'
-                % Snapshot the file list panel width (col 1 of contentGL)
-                try
-                    flPos = getpixelposition(fileListPanel, true);
-                    appData.panelResizeOrig = flPos(3);
-                catch
-                    cw = contentGL.ColumnWidth;
-                    appData.panelResizeOrig = guiTernary(isnumeric(cw{1}), cw{1}, 180);
-                end
-            case 'v_content23'
-                % Snapshot the controls panel width (col 2 of contentGL)
-                try
-                    cpPos = getpixelposition(ctrlPanel, true);
-                    appData.panelResizeOrig = cpPos(3);
-                catch
-                    cw = contentGL.ColumnWidth;
-                    appData.panelResizeOrig = guiTernary(isnumeric(cw{2}), cw{2}, 190);
-                end
-        end
-        fig.WindowButtonMotionFcn = @onPanelResizeMove;
-        fig.WindowButtonUpFcn     = @onPanelResizeUp;
-    end
-
-    function onPanelResizeMove(~,~)
-    %ONPANELRESIZEMOVE  Live-update layout while dragging a panel border.
-        if isempty(appData.panelResizeStart), return; end
-        mp = fig.CurrentPoint;
-
-        switch appData.panelResizeDir
-            case 'h_row12'
-                % Mouse moves up → analysis panel gets taller
-                delta_y = mp(2) - appData.panelResizeStart(2);
-                figH    = fig.Position(4);
-                availH  = figH - 12 - 8 - 16;
-                newH    = round(appData.panelResizeOrig + delta_y);
-                newH    = max(appData.MIN_ANALYSIS_H, min(newH, availH - appData.MIN_PREVIEW_H));
-                rootGL.RowHeight = {'1x', newH, 16};
-
-            case 'v_col12'
-                % Mouse moves right → corrections panel gets wider
-                delta_x = mp(1) - appData.panelResizeStart(1);
-                newW    = round(appData.panelResizeOrig + delta_x);
-                newW    = max(appData.MIN_CORR_W, min(newW, 600));
-                appData.corrPanelWidth = newW;
-                cw    = analysisGL.ColumnWidth;
-                cw{1} = newW;
-                analysisGL.ColumnWidth = cw;
-
-            case 'h_axdata'
-                % Mouse moves up → axLimPanel (row 1) gets taller, dataTable shrinks
-                delta_y = mp(2) - appData.panelResizeStart(2);
-                newH    = round(appData.panelResizeOrig + delta_y);
-                newH    = max(60, min(newH, 400));  % min 60px for axes, max 400px
-                analysisGL.RowHeight = {newH, '1x'};
-
-            case 'v_col23'
-                % Mouse moves right → save panel (col 4) gets narrower
-                delta_x = mp(1) - appData.panelResizeStart(1);
-                newW    = round(appData.panelResizeOrig - delta_x);
-                newW    = max(140, min(newW, 400));  % min 140px, max 400px
-                cw    = analysisGL.ColumnWidth;
-                cw{4} = newW;
-                analysisGL.ColumnWidth = cw;
-
-            case 'v_content12'
-                % Mouse moves right → file list gets wider
-                delta_x = mp(1) - appData.panelResizeStart(1);
-                newW    = round(appData.panelResizeOrig + delta_x);
-                newW    = max(120, min(newW, 350));  % min 120px, max 350px
-                cw    = contentGL.ColumnWidth;
-                cw{1} = newW;
-                contentGL.ColumnWidth = cw;
-
-            case 'v_content23'
-                % Mouse moves right → controls panel gets wider
-                delta_x = mp(1) - appData.panelResizeStart(1);
-                newW    = round(appData.panelResizeOrig + delta_x);
-                newW    = max(140, min(newW, 350));  % min 140px, max 350px
-                cw    = contentGL.ColumnWidth;
-                cw{2} = newW;
-                contentGL.ColumnWidth = cw;
-        end
-    end
-
-    function onPanelResizeUp(~,~)
-    %ONPANELRESIZEUP  Finish a panel border drag and restore normal idle handlers.
-        fig.WindowButtonMotionFcn = @onMouseHover;
-        fig.WindowButtonUpFcn     = '';
-        appData.panelResizeStart  = [];
-        appData.panelResizeOrig   = [];
-        % panelResizeDir and Pointer are left for onMouseHover to update on next move
+    %STARTPANELRESIZE  Delegate to extracted +bosonPlotter module.
+        sprWidgets_.rootGL         = rootGL;
+        sprWidgets_.analysisGL     = analysisGL;
+        sprWidgets_.contentGL      = contentGL;
+        sprWidgets_.analysisPanel  = analysisPanel;
+        sprWidgets_.corrPanel      = corrPanel;
+        sprWidgets_.axLimPanel     = axLimPanel;
+        sprWidgets_.savePanel      = savePanel;
+        sprWidgets_.fileListPanel  = fileListPanel;
+        sprWidgets_.ctrlPanel      = ctrlPanel;
+        sprCb_.onMouseHover        = @onMouseHover;
+        bosonPlotter.startPanelResize(appData, fig, sprWidgets_, sprCb_);
     end
 
     % ── Waterfall helpers ────────────────────────────────────────────────
