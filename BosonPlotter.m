@@ -2850,62 +2850,9 @@ function varargout = BosonPlotter(options)
     end
 
     function onDropFiles(~, e)
-    %ONDROPFILES  Handle files dragged from Explorer onto the figure (R2023a+).
-    %  e.Data may be a string array, a char vector (newline-separated), or a
-    %  cell array of char vectors — normalise to a cell array before processing.
-        try
-            d = e.Data;
-            if isstring(d)
-                % String scalar: may be newline-separated list; string array: one path per element.
-                if isscalar(d)
-                    fpaths = cellstr(strsplit(strtrim(d), newline));
-                else
-                    fpaths = cellstr(d);   % multi-element string array → cell of chars
-                end
-            elseif ischar(d)
-                % Char vector — may be newline-separated (legacy format)
-                fpaths = cellstr(strsplit(strtrim(d), newline));
-            elseif iscell(d)
-                fpaths = d;
-            else
-                return;   % unrecognised format; nothing to do
-            end
-            fpaths = fpaths(~cellfun(@isempty, fpaths));
-            if isempty(fpaths), return; end
-
-            supported = {'.dat','.csv','.tsv','.txt', ...
-                         '.xlsx','.xls','.xlsm','.xlsb','.ods', ...
-                         '.raw','.brml','.xrdml', ...
-                         '.refl','.pnr', ...
-                         '.datA','.datB','.datC','.datD', ...
-                         '.data','.datb','.datc','.datd', ...
-                         '.jpg','.jpeg','.png','.bmp','.gif', ...
-                         '.tif','.tiff','.bcf','.dm3','.dm4', ...
-                         '.mrc','.mrcs','.ser','.spm', ...
-                         '.000','.001'};
-            valid = {};
-            for k = 1:numel(fpaths)
-                p = strtrim(char(fpaths{k}));
-                [~, ~, ext] = fileparts(p);
-                if isfile(p) && any(strcmpi(ext, supported))
-                    valid{end+1} = p; %#ok<AGROW>
-                end
-            end
-
-            if isempty(valid)
-                uialert(fig, ...
-                    'None of the dropped items are supported data files.', ...
-                    'Unsupported file type');
-                return;
-            end
-            loadFilePaths(valid);
-
-        catch ME
-            fprintf(2, '[BosonPlotter] DropFcn error: %s\n', ME.message);
-            for si = 1:numel(ME.stack)
-                fprintf(2, '  at %s (line %d)\n', ME.stack(si).name, ME.stack(si).line);
-            end
-        end
+    %ONDROPFILES  Delegate to extracted +bosonPlotter module.
+        odfCb_.loadFilePaths = @loadFilePaths;
+        bosonPlotter.onDropFiles(fig, e, odfCb_);
     end
 
     function loadFilePaths(fpaths)
