@@ -6920,78 +6920,11 @@ function varargout = BosonPlotter(options)
     end
 
     function extract2DLineCut(clickX, clickY, isHorizontal)
-    %EXTRACT2DLINECUT  Extract a 1D slice from the active 2D intensity map.
-    %   isHorizontal == true  (Shift+click): row cut — fixed Omega → I vs 2Theta
-    %   isHorizontal == false (Ctrl+click):  col cut — fixed 2Theta → I vs Omega
-    %   The extracted profile is added as a new dataset in appData.datasets.
-        if appData.activeIdx < 1 || isempty(appData.datasets), return; end
-        ds = appData.datasets{appData.activeIdx};
-        if ~is2DDataset(ds), return; end
-
-        map = ds.data.metadata.parserSpecific.map2D;
-        [~, fn, fext] = fileparts(ds.filepath);
-
-        % Determine whether the axes are currently displaying Q-space coordinates
-        useQSpace = cbMap2DQSpace.Value && isfield(map, 'Qx');
-
-        if isHorizontal
-            if useQSpace
-                % Shift+click in Q-space: find row whose mean Qz is closest to clickY
-                meanQz = mean(map.Qz, 2);   % [N×1]
-                [~, rowIdx] = min(abs(meanQz - clickY));
-                xVec = map.Qx(rowIdx, :)';
-                xColName = 'Q_x (Ang^-1)';
-                cutLabel = sprintf('H-cut  Qz\x2248%.4g \x212B\x207B\xB9', meanQz(rowIdx));
-            else
-                [~, rowIdx] = min(abs(map.axis1 - clickY));
-                xVec = map.axis2(:);
-                xColName = [map.axis2Name ' (' map.axis2Unit ')'];
-                cutLabel = sprintf('H-cut  %s=%.4g %s', ...
-                    map.axis1Name, map.axis1(rowIdx), map.axis1Unit);
-            end
-            yVec = map.intensity(rowIdx, :)';
-        else
-            if useQSpace
-                % Ctrl+click in Q-space: find col whose mean Qx is closest to clickX
-                meanQx = mean(map.Qx, 1);   % [1×M]
-                [~, colIdx] = min(abs(meanQx - clickX));
-                xVec = map.Qz(:, colIdx);
-                xColName = 'Q_z (Ang^-1)';
-                cutLabel = sprintf('V-cut  Qx\x2248%.4g \x212B\x207B\xB9', meanQx(colIdx));
-            else
-                [~, colIdx] = min(abs(map.axis2 - clickX));
-                xVec = map.axis1(:);
-                xColName = [map.axis1Name ' (' map.axis1Unit ')'];
-                cutLabel = sprintf('V-cut  %s=%.4g %s', ...
-                    map.axis2Name, map.axis2(colIdx), map.axis2Unit);
-            end
-            yVec = map.intensity(:, colIdx);
-        end
-
-        % Minimal metadata for the line-cut
-        meta.source      = ds.filepath;
-        meta.importDate  = datetime('now');
-        meta.parserName  = 'lineCut';
-        meta.xColumnName = xColName;
-        meta.xColumnUnit = '';
-        meta.parserSpecific = struct('is2D', false, ...
-            'originFile', ds.filepath, 'cutLabel', cutLabel);
-        cutData = parser.createDataStruct(xVec, yVec, ...
-            'labels',   {['I (' map.intensityUnit ')']}, ...
-            'units',    {map.intensityUnit}, ...
-            'metadata', meta);
-
-        newDs             = buildDs('[lineCut]', cutData, 'lineCut');
-        newDs.displayName = cutLabel;
-        newDs.legendName  = cutLabel;
-        appData.datasets{end+1} = newDs;
-        try
-            appData.model.addDataset(newDs.data, newDs.filepath, newDs.parserName);
-        catch
-        end
-        rebuildDatasetList(numel(appData.datasets));
-        updateControlsForActiveDataset();
-        fprintf('[BosonPlotter] Line-cut added: %s — %s\n', [fn fext], cutLabel);
+    %EXTRACT2DLINECUT  Delegate — see +bosonPlotter/extract2DLineCut.m.
+        e2lcCb_.buildDs                        = @buildDs;
+        e2lcCb_.rebuildDatasetList             = @rebuildDatasetList;
+        e2lcCb_.updateControlsForActiveDataset = @updateControlsForActiveDataset;
+        bosonPlotter.extract2DLineCut(appData, ui, e2lcCb_, clickX, clickY, isHorizontal);
     end
 
     function extract2DBoxIntegral(bx0, by0, bx1, by1, profileAxis)
