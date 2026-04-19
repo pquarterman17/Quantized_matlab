@@ -5256,86 +5256,9 @@ function onLoadBackground(~,~)
     end
 
     function onAnnotationClick(~,~)
-    %ONANNOTATIONCLICK  Handle clicks in annotation mode: add or delete annotations.
-        if isempty(appData.datasets) || appData.activeIdx < 1
-            return;
-        end
-
-        % Get click position in axes coordinates
-        cp = ax.CurrentPoint;
-        x = cp(1,1);
-        y = cp(1,2);
-
-        % Ignore clicks outside the axes plot area
-        if x < ax.XLim(1) || x > ax.XLim(2) || ...
-           y < ax.YLim(1) || y > ax.YLim(2)
-            return;
-        end
-
-        % Right-click: delete annotation if near cursor
-        if strcmp(fig.SelectionType, 'alt')
-            deleteNearestAnnotation(x, y);
-            onPlot([],[]);
-            return;
-        end
-
-        % Left-click: add new annotation
-        % Prompt user for annotation text
-        answer = inputdlg('Enter annotation text:', 'Add Annotation', [1 40]);
-        if isempty(answer) || isempty(strtrim(answer{1}))
-            return;  % User cancelled
-        end
-
-        annotText = strtrim(answer{1});
-
-        % Add annotation to current dataset
-        ds = appData.datasets{appData.activeIdx};
-        if ~isfield(ds, 'annotations') || isempty(ds.annotations)
-            ds.annotations = {};
-        end
-
-        % Create annotation struct
-        annot = struct('x', x, 'y', y, 'text', annotText);
-        ds.annotations{end+1} = annot;
-
-        appData.datasets{appData.activeIdx} = ds;
-
-        % Refresh plot
-        onPlot([],[]);
-    end
-
-    function deleteNearestAnnotation(x, y)
-    %DELETENEARESTANNOTATION  Remove the annotation closest to (x, y).
-        ds = appData.datasets{appData.activeIdx};
-        if isempty(ds.annotations)
-            return;
-        end
-
-        % Find the closest annotation (within 5% of axes range)
-        xRange = ax.XLim(2) - ax.XLim(1);
-        yRange = ax.YLim(2) - ax.YLim(1);
-        thresh = 0.05;  % 5% of range
-
-        minDist = inf;
-        minIdx = -1;
-
-        for ai = 1:numel(ds.annotations)
-            annot = ds.annotations{ai};
-            dx = abs(annot.x - x) / xRange;
-            dy = abs(annot.y - y) / yRange;
-            dist = sqrt(dx^2 + dy^2);
-
-            if dist < thresh && dist < minDist
-                minDist = dist;
-                minIdx = ai;
-            end
-        end
-
-        % Delete if found
-        if minIdx > 0
-            ds.annotations(minIdx) = [];
-            appData.datasets{appData.activeIdx} = ds;
-        end
+    %ONANNOTATIONCLICK  Delegate to extracted +bosonPlotter module.
+        oacCb_.onPlot = @() onPlot([],[]);
+        bosonPlotter.onAnnotationClick(appData, fig, ax, oacCb_);
     end
 
     % ── BG rubber-band fit ────────────────────────────────────────────────
