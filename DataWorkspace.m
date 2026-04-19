@@ -393,17 +393,13 @@ end
     function onRemove(~, ~)
     %ONREMOVE  Remove the dataset(s) selected in the list box.
         if model.count() == 0, return; end
-        selItems = listDatasets.Value;
-        if isempty(selItems), return; end
-
-        % Map display names → indices.  Remove in reverse order to keep
-        % remaining indices valid.
-        allItems = listDatasets.Items;
-        idxToRemove = zeros(1, numel(selItems));
-        for k = 1:numel(selItems)
-            idxToRemove(k) = find(strcmp(allItems, selItems{k}), 1);
+        idxToRemove = listDatasets.Value;   % integers from ItemsData
+        if isempty(idxToRemove), return; end
+        if ~isnumeric(idxToRemove)
+            idxToRemove = cell2mat(idxToRemove);
         end
-        idxToRemove = sort(idxToRemove, 'descend');
+        % Remove in reverse order to keep remaining indices valid.
+        idxToRemove = sort(idxToRemove(:).', 'descend');
         for k = 1:numel(idxToRemove)
             if idxToRemove(k) >= 1 && idxToRemove(k) <= model.count()
                 model.removeDataset(idxToRemove(k));
@@ -691,16 +687,13 @@ end
 
     function onDatasetSelected(~, evt)
     %ONDATASETSELECTED  Switch the active dataset when the list selection changes.
-        allItems = listDatasets.Items;
-        if isempty(allItems) || model.count() == 0, return; end
-        selVal = evt.Value;
-        if isempty(selVal), return; end
-        % Use the first selected item as the active dataset
-        if iscell(selVal)
-            selVal = selVal{1};
-        end
-        idx = find(strcmp(allItems, selVal), 1);
-        if ~isempty(idx)
+        if model.count() == 0, return; end
+        idx = evt.Value;   % integer from ItemsData
+        if isempty(idx), return; end
+        if iscell(idx),   idx = idx{1}; end       % multi-select — use first
+        if ~isnumeric(idx), return; end
+        idx = idx(1);
+        if idx >= 1 && idx <= model.count()
             model.setActive(idx);
         end
     end
@@ -1388,7 +1381,8 @@ end
                 items{k} = sprintf('Dataset %d', k);
             end
         end
-        listDatasets.Items = items;
+        listDatasets.Items     = items;
+        listDatasets.ItemsData = 1:n;   % integer indices — avoids display-name collisions
         % Update the status label
         if n == 0
             lblStatus.Text = 'No datasets loaded';
@@ -1467,7 +1461,7 @@ end
             return;
         end
         if model.activeIdx <= numel(listDatasets.Items)
-            listDatasets.Value = listDatasets.Items(model.activeIdx);
+            listDatasets.Value = model.activeIdx;   % integer from ItemsData
         end
     end
 

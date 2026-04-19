@@ -469,11 +469,24 @@ function varargout = BosonPlotter(options)
         'Tooltip','Remove the highlighted dataset from the list (also: right-click or press Delete)');
     btnRemoveDS.Layout.Row = 3; btnRemoveDS.Layout.Column = [1 2];
 
-    efDatasetSearch = uieditfield(tbGL,'text','Value','', ...
+    % Row 4: filter field + ✕ clear button (sub-grid so the button doesn't
+    % squeeze the text field — matches the grpGL row-7 pattern).
+    searchGL = uigridlayout(tbGL,[1 2], ...
+        'Padding',[0 0 0 0],'ColumnSpacing',2, ...
+        'ColumnWidth',{'1x', 20});
+    searchGL.Layout.Row = 4; searchGL.Layout.Column = [1 2];
+
+    efDatasetSearch = uieditfield(searchGL,'text','Value','', ...
         'Placeholder','Filter datasets...', ...
         'Tooltip','Filter the dataset list by name (case-insensitive substring match)', ...
         'ValueChangedFcn',@onSearchChanged);
-    efDatasetSearch.Layout.Row = 4; efDatasetSearch.Layout.Column = [1 2];
+    efDatasetSearch.Layout.Column = 1;
+
+    btnClearSearch = uibutton(searchGL,'Text',char(10005), ...
+        'ButtonPushedFcn',@(~,~) clearDatasetSearch(), ...
+        'FontSize',9, ...
+        'Tooltip','Clear the dataset filter');
+    btnClearSearch.Layout.Column = 2; %#ok<NASGU>
 
     btnMerge = uibutton(tbGL,'Text','Merge Selected', ...
         'ButtonPushedFcn',@onMergeDatasets, ...
@@ -1784,8 +1797,10 @@ function varargout = BosonPlotter(options)
     tblData.Layout.Row = 5;
     appData.tableSelection = [];  % [Nx2] matrix of [row col] pairs
 
-    axLimGL = uigridlayout(axLimPanel,[5 6], ...
-        'RowHeight',    {22, 22, 0, 22, 0}, ...
+    % Rows: 1=X lim, 2=Y lim, 3=Y2 lim (hidden), 4=Auto/Reset/Legend/Color,
+    %       5=Appearance section header, 6=Appearance extras (collapsible)
+    axLimGL = uigridlayout(axLimPanel,[6 6], ...
+        'RowHeight',    {22, 22, 0, 22, 20, 0}, ...
         'ColumnWidth',  {24,'1x','1x','1x', 24, '1x'}, ...
         'Padding',      [4 2 4 2], ...
         'RowSpacing',   2, ...
@@ -1925,9 +1940,9 @@ function varargout = BosonPlotter(options)
         'ValueChangedFcn', @onDatasetColorRChanged);
     ddDatasetColorR.Layout.Row = 4; ddDatasetColorR.Layout.Column = 6;
 
-    % ── Row 5: Appearance extras (collapsible — default hidden) ──────
+    % ── Row 6: Appearance extras (collapsible — default hidden) ──────
     % Contains: title, labels, legend name, ref lines — all in a nested grid
-    AXLIM_ADV_ROW = 5;
+    AXLIM_ADV_ROW = 6;
     AXLIM_ADV_HEIGHT = 90;
     appData.sectionCollapsed.axAppearance = true;
 
@@ -1935,7 +1950,7 @@ function varargout = BosonPlotter(options)
         'RowHeight', {20, 20, 20, 20}, ...
         'ColumnWidth', {32, '1x', 32, '1x', '1x', '1x'}, ...
         'Padding', [0 0 0 0], 'RowSpacing', 2, 'ColumnSpacing', 2);
-    axAdvGL.Layout.Row = 5; axAdvGL.Layout.Column = [1 6];
+    axAdvGL.Layout.Row = 6; axAdvGL.Layout.Column = [1 6];
 
     % Adv row 1: Title field + legend name
     lblApTitle = uilabel(axAdvGL,'Text','Title:','FontSize',9,'HorizontalAlignment','right');
@@ -1990,17 +2005,17 @@ function varargout = BosonPlotter(options)
         'Tooltip', 'Remove all reference lines');
     btnClearRefLines.Layout.Row = 3; btnClearRefLines.Layout.Column = [5 6];
 
-    % Adv row 4: More... toggle to show/hide this section (placed last)
-
-
-    % "More..." toggle in row 4 to expand/collapse appearance extras (row 5)
-    btnAxMore = uibutton(axLimGL, 'Text', [char(9654) ' More'], ...
-        'FontSize', 8, 'FontColor', [0.55 0.55 0.55], ...
-        'BackgroundColor', axLimGL.BackgroundColor, ...
+    % Row 5: visible "Appearance" section header toggling row 6 (axAdvGL).
+    % Matches the corrGL / saveGL collapsible-header pattern so the
+    % title / labels / legend-name / ref-line controls are discoverable
+    % (repo-audit W2 #16).
+    btnAxMore = uibutton(axLimGL, 'Text', [char(9654) ' Appearance'], ...
+        'FontSize', 9, 'FontWeight', 'bold', 'FontColor', [0.75 0.75 0.75], ...
+        'BackgroundColor', [0.18 0.18 0.18], ...
         'HorizontalAlignment', 'left', ...
-        'Tooltip', 'Toggle advanced appearance options (title, labels, legend name, reference lines)', ...
+        'Tooltip', 'Title, axis labels, legend name, and reference lines', ...
         'ButtonPushedFcn', @(~,~) onToggleAxAppearance());
-    btnAxMore.Layout.Row = 4; btnAxMore.Layout.Column = [5 6];
+    btnAxMore.Layout.Row = 5; btnAxMore.Layout.Column = [1 6];
 
     % ── Save / Export panel (analysisGL col 3 — vertical, collapsible) ─────
     savePanel = uipanel(analysisGL,'Title','Save / Export','FontSize',10, ...
@@ -3514,6 +3529,12 @@ function varargout = BosonPlotter(options)
         rebuildDatasetList(true);
     end
 
+    function clearDatasetSearch()
+    %CLEARDATASETSEARCH  Empty the filter field and refresh the dataset list.
+        efDatasetSearch.Value = '';
+        onSearchChanged();
+    end
+
     function onMergeDatasets(~,~)
     %ONMERGEDATASETS  Concatenate the selected datasets into one new dataset.
     %  Requires ≥ 2 datasets selected in lbDatasets (multi-select).
@@ -4216,11 +4237,11 @@ function varargout = BosonPlotter(options)
         appData.sectionCollapsed.axAppearance = collapsed;
         AXLIM_BASE_H = 110;   % matches analysisGL RowHeight{1}
         if collapsed
-            btnAxMore.Text = [char(9654) ' More'];  % ▶
+            btnAxMore.Text = [char(9654) ' Appearance'];  % ▶
             axLimGL.RowHeight{AXLIM_ADV_ROW} = 0;
             analysisGL.RowHeight{1} = AXLIM_BASE_H;
         else
-            btnAxMore.Text = [char(9660) ' More'];  % ▼
+            btnAxMore.Text = [char(9660) ' Appearance'];  % ▼
             axLimGL.RowHeight{AXLIM_ADV_ROW} = AXLIM_ADV_HEIGHT;
             analysisGL.RowHeight{1} = AXLIM_BASE_H + AXLIM_ADV_HEIGHT;
         end
