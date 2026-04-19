@@ -4065,59 +4065,11 @@ function varargout = BosonPlotter(options)
     function onFringeMarkerDown(markerIdx)
     %ONFRINGEMARKERDOWN  Begin dragging a fringe marker along the data curve.
         appData.fringeDragIdx = markerIdx;
-        fig.WindowButtonMotionFcn = @onFringeMarkerMove;
-        fig.WindowButtonUpFcn     = @onFringeMarkerUp;
+        ofmmCb_.updateFringeThickness = @updateFringeThickness;
+        ofmuCb_.onMouseHover          = @onMouseHover;
+        fig.WindowButtonMotionFcn = @(~,~) bosonPlotter.onFringeMarkerMove(appData, ax, lbY, ofmmCb_);
+        fig.WindowButtonUpFcn     = @(~,~) bosonPlotter.onFringeMarkerUp(appData, fig, ofmuCb_);
         fig.Pointer               = 'hand';
-    end
-
-    function onFringeMarkerMove(~,~)
-    %ONFRINGEMARKERMOVE  Update marker position as user drags.
-        idx = appData.fringeDragIdx;
-        if idx < 1 || idx > 2, return; end
-
-        cp = ax.CurrentPoint;
-        xDrag = cp(1,1);
-
-        % Snap to nearest data point in x
-        ds = appData.datasets{appData.activeIdx};
-        primaryD = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
-        xVec = double(primaryD.time);
-        ySel2 = ensureCell(lbY.Value);
-
-        bestX = xDrag;
-        bestY = cp(1,2);
-        bestDx = Inf;
-        for k = 1:numel(ySel2)
-            yIdx = find(strcmp(primaryD.labels, ySel2{k}), 1);
-            if isempty(yIdx), continue; end
-            yVec = primaryD.values(:, yIdx);
-            valid = ~isnan(xVec) & ~isnan(yVec);
-            [mDx, mI] = min(abs(xVec(valid) - xDrag));
-            if mDx < bestDx
-                bestDx = mDx;
-                validIdx = find(valid);
-                bestX = xVec(validIdx(mI));
-                bestY = yVec(validIdx(mI));
-            end
-        end
-
-        appData.fringeQ(idx) = bestX;
-        hm = appData.fringeMarkers(idx);
-        if isvalid(hm)
-            hm.XData = bestX;
-            hm.YData = bestY;
-        end
-
-        updateFringeThickness();
-        drawnow limitrate;
-    end
-
-    function onFringeMarkerUp(~,~)
-    %ONFRINGEMARKERUP  Finish dragging a fringe marker.
-        fig.WindowButtonMotionFcn = @onMouseHover;
-        fig.WindowButtonUpFcn     = '';
-        fig.Pointer               = 'arrow';
-        appData.fringeDragIdx     = 0;
     end
 
     function updateFringeThickness()
