@@ -6736,50 +6736,11 @@ function onSendToOrigin(~,~)
     end
 
     function onZoomMouseUp(~,~)
-    %ONZOOMMOUSEUP  Apply zoom to the drawn rectangle, then clean up.
-        fig.WindowButtonMotionFcn = @onMouseHover;
-        fig.WindowButtonUpFcn     = '';
-        if isempty(appData.zoomStartPt)
-            return;
-        end
-        cp = ax.CurrentPoint;
-        x1 = cp(1,1);  y1 = cp(1,2);
-        x0 = appData.zoomStartPt(1);
-        y0 = appData.zoomStartPt(2);
-        % Remove rubber-band rectangle
-        if ~isempty(appData.zoomRectPatch) && isvalid(appData.zoomRectPatch)
-            delete(appData.zoomRectPatch);
-        end
-        appData.zoomRectPatch = [];
-        appData.zoomStartPt   = [];
-        % Only zoom if drag is at least 1% of the current axis span in both axes.
-        % For log-scale axes, compare in log space so that zooming across
-        % a few decades (visually large) isn't rejected as "too small."
-        if strcmp(ax.XScale, 'log') && x0 > 0 && x1 > 0
-            xDrag = abs(log10(x1) - log10(x0));
-            xSpan = abs(log10(ax.XLim(2)) - log10(ax.XLim(1)));
-        else
-            xDrag = abs(x1 - x0);
-            xSpan = diff(ax.XLim);
-        end
-        if strcmp(ax.YScale, 'log') && y0 > 0 && y1 > 0
-            yDrag = abs(log10(y1) - log10(y0));
-            ySpan = abs(log10(ax.YLim(2)) - log10(ax.YLim(1)));
-        else
-            yDrag = abs(y1 - y0);
-            ySpan = diff(ax.YLim);
-        end
-        if xDrag < xSpan * 0.01 || yDrag < ySpan * 0.01
-            return;
-        end
-        xLo = min(x0,x1);  xHi = max(x0,x1);
-        yLo = min(y0,y1);  yHi = max(y0,y1);
-        efXMin.Value = sprintf('%.6g', xLo);
-        efXMax.Value = sprintf('%.6g', xHi);
-        efYMin.Value = sprintf('%.6g', yLo);
-        efYMax.Value = sprintf('%.6g', yHi);
-        saveAxisLimsToActiveDataset();
-        onPlot([],[]);
+    %ONZOOMMOUSEUP  Delegate to extracted +bosonPlotter module.
+        ozmuCb_.onMouseHover                 = @onMouseHover;
+        ozmuCb_.saveAxisLimsToActiveDataset  = @saveAxisLimsToActiveDataset;
+        ozmuCb_.onPlot                       = @() onPlot([],[]);
+        bosonPlotter.onZoomMouseUp(appData, fig, ax, ui, ozmuCb_);
     end
 
     function onBoxIntMove(~,~)
