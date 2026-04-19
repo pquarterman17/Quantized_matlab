@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-04-19 (W2 finish shipped via `00bdf0e`; #22 deferred; Raman parser removed from scope; W4 #44 + #46 reconciled)
+**Last regenerated:** 2026-04-19 (W2 finish shipped via `00bdf0e`; #22 deferred; Raman parser removed from scope; W4 #44/#46/#49/#50 + FermiViewer decomp #1/#2/#3 reconciled as already shipped)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -17,11 +17,6 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 ### BosonPlotter decomposition — `plans/bosonplotter-decomposition.md`
 (Tier 1 items 1–6 all shipped 2026-04-12 — see plan's Completed section.)
-
-### FermiViewer decomposition — `plans/fermiviewer-decomposition-2026-04-16.md`
-- [ ] **#1** Infrastructure: `+emViewer/` + ui struct — done for diffraction/annotation/export; NOT yet for EELS/EDS
-- [ ] **#2** Extract EELS subsystem (~14 nested fns freed)
-- [ ] **#3** Extract EDS subsystem (~12 nested fns freed)
 
 ### Codebase — `plans/codebase-roadmap.md`
 - [ ] **#1** Continue `+bosonPlotter/` extraction — drive parent below 8k lines
@@ -40,7 +35,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#3** FormulaEngine → Python
 
 ### Repo audit — `plans/repo-audit-2026-04-13.md` (W1 all Tier 1/2 bugs + all W2 UX shipped or deferred — remaining is W3 Features, W4 Physics)
-- (See plan for W3 Features, W4 Physics workstreams — W2 #22 toolbar-metrics deferred; 11 items open)
+- (See plan for W3 Features, W4 Physics workstreams — W2 #22 toolbar-metrics deferred; 9 items open)
 
 ### Porting — `plans/porting_plan.md`
 - Architecture doc; 7 phase-level items — see plan for current Python+Tauri porting status
@@ -161,7 +156,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 |------|--------|------------|-------|
 | known-bugs | Active (mostly complete) | 0 T1 / 1 T2 / 0 T3 | Only #16 tools panel overcrowded (tabled); 14 items shipped 2026-04-13 |
 | bosonplotter-decomposition | Active | 0 T1 / 1 T2 / 3 T3 | Tier 1 complete; 295 nested fns, 50 slots headroom |
-| fermiviewer-decomposition-2026-04-16 | Active | 3 T1 / 0 T2 / 1 T3 | EELS/EDS extraction next |
+| fermiviewer-decomposition-2026-04-16 | Active (T3-only) | 0 T1 / 0 T2 / 1 T3 | All Tier 1–2 extractions shipped 2026-04-17; only measurement subsystem remains |
 | fermiviewer-interactive-histogram | Active (T3-only) | 0 T1 / 0 T2 / 3 T3 | Tier 1–2 all shipped |
 | fermiviewer-measurement-polish-2026-04-17 | Active | 0 T1 / 2 T2 / 0 T3 | Panel controls + annotation right-panel sync |
 | data-workspace | Active | 0 T1 / 1 T2 / 2 T3 | Partial migration + cleanup |
@@ -170,7 +165,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 | retroactive-docs | Active | 0 T1 / 13 T2 / 5 T3 | Tier 1 theory done 2026-04-13; theory + tutorials remaining |
 | origin-feature-gap | Active | 6 T1 / 7 T2 / 1 T3 | MATLAB done; Python pending |
 | software-feature-gaps | Active (T3-only) | 0 T1 / 0 T2 / 3 T3 | Tier 1–2 shipped |
-| repo-audit-2026-04-13 | Active | ~11 mixed (29 done of 54, 1 deferred) | W1 + W2 UX complete; remaining work is W3 Features, W4 Physics; #22 toolbar-metrics deferred |
+| repo-audit-2026-04-13 | Active | ~9 mixed (31 done of 54, 1 deferred) | W1 + W2 UX complete; remaining work is W3 Features, W4 Physics; #22 toolbar-metrics deferred |
 | codebase-roadmap | Active | 1 T1 / 1 T2 / 0 T3 | Rolling umbrella |
 | parser-roadmap | Paused | 0 T1 / 2 T2 / 1 T3 | Blocked on example files; #1 Raman removed 2026-04-19 |
 | bug-reporting | Active (Stage 2 deferred) | 0 T1 / 3 T2 / 3 T3 | Stage 1 shipped |
