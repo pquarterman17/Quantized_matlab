@@ -6684,7 +6684,7 @@ function onSendToOrigin(~,~)
                     appData.boxIntPatch   = [];
                     clearCompletedBoxPatch();
                     appData.boxIntStartPt = [x0, y0];
-                    fig.WindowButtonMotionFcn = @onBoxIntMove;
+                    fig.WindowButtonMotionFcn = @(~,~) bosonPlotter.onBoxIntMove(appData, ax);
                     fig.WindowButtonUpFcn     = @onBoxIntUp;
                 end
                 return;
@@ -6714,34 +6714,6 @@ function onSendToOrigin(~,~)
         ozmuCb_.saveAxisLimsToActiveDataset  = @saveAxisLimsToActiveDataset;
         ozmuCb_.onPlot                       = @() onPlot([],[]);
         bosonPlotter.onZoomMouseUp(appData, fig, ax, ui, ozmuCb_);
-    end
-
-    function onBoxIntMove(~,~)
-    %ONBOXINTMOVE  Update the box-integration rubber-band rectangle while dragging.
-        if isempty(appData.boxIntStartPt), return; end
-        cp = ax.CurrentPoint;
-        x1 = cp(1,1);  y1 = cp(1,2);
-        x0 = appData.boxIntStartPt(1);
-        y0 = appData.boxIntStartPt(2);
-        xLo = min(x0,x1);  xHi = max(x0,x1);
-        yLo = min(y0,y1);  yHi = max(y0,y1);
-        if ~isempty(appData.boxIntPatch) && isvalid(appData.boxIntPatch)
-            set(appData.boxIntPatch, ...
-                'XData', [xLo xHi xHi xLo xLo], ...
-                'YData', [yLo yLo yHi yHi yLo]);
-        else
-            hold(ax,'on');
-            appData.boxIntPatch = patch(ax, ...
-                [xLo xHi xHi xLo xLo], [yLo yLo yHi yHi yLo], ...
-                'k', ...
-                'FaceAlpha',       0, ...
-                'EdgeColor',       [0.65 0.20 0.85], ...
-                'LineStyle',       '--', ...
-                'LineWidth',       2.5, ...
-                'Tag',             'GUIBoxIntBox', ...
-                'HandleVisibility','off');
-            hold(ax,'off');
-        end
     end
 
     function onBoxIntUp(~,~)
