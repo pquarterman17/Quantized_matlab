@@ -65,15 +65,31 @@ ni = niResult.ni;
 
 net = opts.Nd - opts.Na;
 
-if abs(net) < ni
+% Smooth closed-form from charge-neutrality + mass-action:
+%   n - p = net,  n*p = ni^2  ==>  n = ((net + sqrt(net^2 + 4 ni^2))/2
+% and EF - Ei = kT * log(n/ni) = kT * asinh(net / (2*ni)) exactly.
+% This replaces a discrete intrinsic/extrinsic branch that discontinuously
+% flipped at |net| ≈ ni, which was non-physical and blew up the derivative
+% there. Sze, "Physics of Semiconductor Devices" 3rd ed. §1.5.
+EF = kT * asinh(net / (2 * ni));
+
+if abs(net) < 0.1 * ni
     type = 'intrinsic';
-    EF   = 0;
 elseif net > 0
     type = 'n';
-    EF   =  kT * log(net / ni);
 else
     type = 'p';
-    EF   = -kT * log(-net / ni);
+end
+
+% Warn when the Fermi level approaches a band edge — the Boltzmann
+% (non-degenerate) approximation `n = Nc·exp(-(Ec-EF)/kT)` breaks down
+% within ~3kT of Ec/Ev and Fermi-Dirac integrals are required instead.
+if abs(EF) > opts.Eg/2 - 3*kT
+    warning('calc:semiconductor:fermiLevel:boltzmannLimit', ...
+        ['|EF - Ei| = %.3g eV is within 3kT of a band edge ' ...
+         '(Eg/2 = %.3g eV); Boltzmann limit breaks down. ' ...
+         'Use a Fermi-Dirac integral solver for degenerate doping.'], ...
+        abs(EF), opts.Eg/2);
 end
 
 result.EF    = EF;

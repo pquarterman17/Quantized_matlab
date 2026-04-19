@@ -258,6 +258,33 @@ else
     fprintf('  FAIL: fermiLevel p-type negative\n'); failed = failed + 1;
 end
 
+% fermiLevel: smooth transition through intrinsic (W4 #48)
+% The smooth closed-form EF = kT·asinh(net/(2·ni)) should be continuous
+% (and odd-symmetric in net) across |net| ≈ ni; the old discrete-branch
+% implementation was discontinuous there.
+netSweep = logspace(7, 14, 60);  % spans ni ≈ 10^10 (Si)
+netSweep = [-fliplr(netSweep), 0, netSweep];
+warning('off', 'calc:semiconductor:fermiLevel:boltzmannLimit');
+EFSweep  = arrayfun(@(nn) ...
+    calc.semiconductor.fermiLevel(Material='Si', ...
+        Nd=max(nn,0), Na=max(-nn,0)).EF, netSweep);
+warning('on',  'calc:semiconductor:fermiLevel:boltzmannLimit');
+% Antisymmetry: EF(-net) = -EF(net); check middle 10 points
+midIdx = floor(numel(netSweep)/2) + 1;
+antiErr = max(abs(EFSweep(midIdx-5:midIdx-1) + ...
+                  fliplr(EFSweep(midIdx+1:midIdx+5))));
+if antiErr < 1e-12
+    fprintf('  PASS: fermiLevel antisymmetric (err %.1e)\n', antiErr); passed = passed + 1;
+else
+    fprintf('  FAIL: fermiLevel antisymmetric (err %.1e)\n', antiErr); failed = failed + 1;
+end
+% Monotone: EF increases with net
+if all(diff(EFSweep) >= 0)
+    fprintf('  PASS: fermiLevel monotone in net\n'); passed = passed + 1;
+else
+    fprintf('  FAIL: fermiLevel not monotone in net\n'); failed = failed + 1;
+end
+
 % debyeLength: reasonable value
 r = calc.semiconductor.debyeLength(epsilon_r=11.7, n=1e16, T=300);
 if r.LD > 0 && r.LD < 1000
