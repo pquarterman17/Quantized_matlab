@@ -2532,6 +2532,10 @@ function varargout = BosonPlotter(options)
     ui.lblMap2DInfo     = lblMap2DInfo;
     % Save path (hidden field)
     ui.efSavePath       = efSavePath;
+    % Figure export dimensions + format
+    ui.ddFigFormat      = ddFigFormat;
+    ui.efFigWidth       = efFigWidth;
+    ui.efFigHeight      = efFigHeight;
     % Data table filter
     ui.efFilter         = efFilter;
     % Axis appearance / label overrides (used by onPlotTemplates)
@@ -8296,7 +8300,7 @@ function varargout = BosonPlotter(options)
         box(tmpAx,'on');
         grid(tmpAx,'on');
         drawToAxes(tmpAx);
-        styleAxesForExport(tmpAx);
+        bosonPlotter.styleAxesForExport(tmpAx);
         try
             switch lower(mode)
                 case 'png'
@@ -8319,146 +8323,10 @@ function varargout = BosonPlotter(options)
     end
 
     function onSaveFigure(~,~)
-    %ONSAVEFIGURE  Export the current plot to a file using exportgraphics.
-    %  The format and resolution are determined by the ddFigFormat dropdown.
-    %  Renders into a temporary hidden figure (like onCopyToClipboard) so the
-    %  GUI uiaxes is not disturbed.
-        if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data'); return;
-        end
-
-        % Map dropdown choice to file extension and exportgraphics options.
-        % BackgroundColor='none' gives transparent output for PNG/TIFF,
-        % which paste cleanly into both light and dark documents. PDF/SVG
-        % also honour it. JPEG (not offered here) would ignore it since
-        % JPEG has no alpha channel.
-        fmtStr = ddFigFormat.Value;
-        isFigFormat = strcmp(fmtStr, 'MATLAB .fig');
-        switch fmtStr
-            case 'PNG (300 dpi)'
-                ext      = '.png';
-                fmtFilter = {'*.png','PNG image (*.png)'};
-                egOpts   = {'ContentType','image','Resolution',300, 'BackgroundColor','none'};
-            case 'PDF (vector)'
-                ext      = '.pdf';
-                fmtFilter = {'*.pdf','PDF vector (*.pdf)'};
-                egOpts   = {'ContentType','vector', 'BackgroundColor','none'};
-            case 'SVG (vector)'
-                ext      = '.svg';
-                fmtFilter = {'*.svg','SVG vector (*.svg)'};
-                egOpts   = {'ContentType','vector', 'BackgroundColor','none'};
-            case 'TIFF (300 dpi)'
-                ext      = '.tif';
-                fmtFilter = {'*.tif','TIFF image (*.tif)'};
-                egOpts   = {'ContentType','image','Resolution',300, 'BackgroundColor','none'};
-            case 'MATLAB .fig'
-                ext      = '.fig';
-                fmtFilter = {'*.fig','MATLAB figure (*.fig)'};
-                egOpts   = {};
-            otherwise
-                ext      = '.png';
-                fmtFilter = {'*.png','PNG image (*.png)'};
-                egOpts   = {'ContentType','image','Resolution',300, 'BackgroundColor','none'};
-        end
-
-        % Suggest a filename based on the active dataset
-        ds = appData.datasets{appData.activeIdx};
-        [dPath, dName, ~] = fileparts(ds.filepath);
-        defPath = fullfile(dPath, [dName, ext]);
-
-        [fname, fpath] = uiputfile(fmtFilter, 'Save figure as...', defPath);
-        if isequal(fname, 0), return; end
-        outPath = fullfile(fpath, fname);
-
-        % Use custom figure dimensions from efFigWidth/efFigHeight (#7)
-        figW = efFigWidth.Value;
-        figH = efFigHeight.Value;
-
-        % Render into a hidden figure with a transparent canvas so the
-        % saved image doesn't carry the GUI's dark-theme background.
-        tmpFig = figure('Visible','off','Name','SaveFig','NumberTitle','off', ...
-                        'MenuBar','none','ToolBar','none', ...
-                        'Color','none', ...
-                        'Units','inches','Position',[0 0 figW figH]);
-        tmpAx = axes(tmpFig);
-        set(tmpAx, 'Color','none');
-        box(tmpAx,'on');
-        grid(tmpAx,'on');
-        drawToAxes(tmpAx);
-        styleAxesForExport(tmpAx);
-        try
-            if isFigFormat
-                savefig(tmpFig, outPath);  % #20: MATLAB .fig format
-            else
-                exportgraphics(tmpFig, outPath, egOpts{:});
-            end
-            delete(tmpFig);
-            uialert(fig, sprintf('Saved:\n%s', outPath), 'Figure Saved');
-        catch ME
-            delete(tmpFig);
-            logGUIError('Save error (exportgraphics)', ME.message, ME);
-            uialert(fig, sprintf('Export failed:\n%s', ME.message), 'Save error');
-        end
-    end
-
-    function styleAxesForExport(expAx)
-    %STYLEAXESFOREXPORT  Make axes readable on white backgrounds.
-    %  Darkens axis lines, ticks, and labels; thickens the bounding box;
-    %  strips any inherited dark-mode background from the legend so the
-    %  exported image is fully transparent aside from the plot content.
-    %  Applied only to temporary export figures (clipboard / save).
-        darkColor = [0.15 0.15 0.15];
-        expAx.XColor    = darkColor;
-        expAx.YColor    = darkColor;
-        expAx.LineWidth = 1.2;
-        expAx.FontSize  = 13;
-        % Darken axis labels
-        if ~isempty(expAx.XLabel.String)
-            expAx.XLabel.Color = darkColor;
-        end
-        if ~isempty(expAx.YLabel.String)
-            expAx.YLabel.Color = darkColor;
-        end
-        if ~isempty(expAx.Title.String)
-            expAx.Title.Color = darkColor;
-        end
-        % Style right Y-axis if it exists
-        if isprop(expAx, 'YAxis') && numel(expAx.YAxis) > 1
-            expAx.YAxis(2).Color = darkColor;
-        end
-        % Legend fill + text — the GUI's dark theme bakes a dark
-        % background and white text into the legend handle; override
-        % so the pasted image has a transparent legend with dark text.
-        lgd = getLegendHandle(expAx);
-        if ~isempty(lgd) && isvalid(lgd)
-            try, lgd.Color     = 'none';   catch, end  % background fill
-            try, lgd.EdgeColor = darkColor; catch, end % border stroke
-            try, lgd.TextColor = darkColor; catch, end % entry labels
-            try, lgd.Title.Color = darkColor; catch, end
-        end
-        % Thicken data lines for better visibility
-        lines = findobj(expAx, 'Type', 'Line');
-        for li = 1:numel(lines)
-            if lines(li).LineWidth < 1.2
-                lines(li).LineWidth = 1.2;
-            end
-        end
-    end
-
-    function lgd = getLegendHandle(expAx)
-    %GETLEGENDHANDLE  Return the legend object attached to expAx, or [].
-    %  MATLAB exposes the legend via the axes' Legend property from
-    %  R2020a+; fall back to findobj on older releases or edge cases.
-        lgd = [];
-        if isprop(expAx, 'Legend') && ~isempty(expAx.Legend) && isvalid(expAx.Legend)
-            lgd = expAx.Legend;
-            return;
-        end
-        par = ancestor(expAx, 'figure');
-        if ~isempty(par)
-            hits = findobj(par, 'Type', 'Legend');
-            if ~isempty(hits), lgd = hits(1); end
-        end
+    %ONSAVEFIGURE  Delegate — see +bosonPlotter/saveFigure.m.
+        cb.drawToAxes  = @drawToAxes;
+        cb.logGUIError = @logGUIError;
+        bosonPlotter.saveFigure(appData, fig, ui, cb);
     end
 
     % ── Session save / load ───────────────────────────────────────────────
