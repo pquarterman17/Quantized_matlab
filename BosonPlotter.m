@@ -8278,60 +8278,12 @@ function onSendToOrigin(~,~)
     end
 
     function onColumnCalculator(~,~)
-    %ONCOLUMNCALCULATOR  Per-dataset column math dialog (#16).
-    %  Creates a new Y column from an expression using existing column names.
-        if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data'); return;
-        end
-        ds = appData.datasets{appData.activeIdx};
-        d = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
-        colInfo = cell(1, numel(d.labels));
-        for ci = 1:numel(d.labels)
-            colInfo{ci} = sprintf('  C%d = %s', ci, d.labels{ci});
-        end
-        prompt = sprintf(['Create a new column from existing columns.\n\n' ...
-                          'Available columns:\n%s\n\n' ...
-                          'Use C1, C2, ... to reference columns.\n' ...
-                          'Examples: C1./C2,  log10(C1),  C1*1e3'], ...
-                          strjoin(colInfo, '\n'));
-        answer = inputdlg({prompt, 'New column name:'}, ...
-            'Column Calculator', [1 60; 1 40], {'C1 ./ C2', 'Derived'});
-        if isempty(answer), return; end
-        expr = strtrim(answer{1});
-        colName = strtrim(answer{2});
-        if isempty(expr) || isempty(colName), return; end
-        try
-            % Build column variables
-            colVars = struct();
-            for ci = 1:numel(d.labels)
-                colVars.(sprintf('C%d', ci)) = d.values(:, ci);
-            end
-            % Evaluate via safe recursive-descent parser (no eval)
-            yResult = bosonPlotter.safeEvalMathExpr(expr, colVars);
-            if ~isnumeric(yResult) || numel(yResult) ~= size(d.values, 1)
-                error('Result must be a vector with %d elements.', size(d.values, 1));
-            end
-            % Append new column
-            d.values = [d.values, yResult(:)];
-            d.labels{end+1} = colName;
-            d.units{end+1}  = '';
-            if ~isempty(ds.corrData)
-                ds.corrData = d;
-            else
-                ds.data = d;
-            end
-            appData.datasets{appData.activeIdx} = ds;
-            try
-                appData.model.updateDataset(appData.activeIdx, ds);
-            catch
-            end
-            updateControlsForActiveDataset();
-            onPlot([],[]);
-            setStatus(sprintf('Added column "%s".', colName));
-            recordAction(sprintf('%% Column calculator: %s = %s', colName, expr));
-        catch ME
-            uialert(fig, sprintf('Expression error:\n%s', ME.message), 'Column Calculator Error');
-        end
+    %ONCOLUMNCALCULATOR  Delegate to extracted +bosonPlotter module.
+        occCb_.updateControlsForActiveDataset = @updateControlsForActiveDataset;
+        occCb_.onPlot        = @() onPlot([],[]);
+        occCb_.setStatus     = @setStatus;
+        occCb_.recordAction  = @recordAction;
+        bosonPlotter.onColumnCalculator(appData, fig, occCb_);
     end
 
     function onCreateInset(~,~)
