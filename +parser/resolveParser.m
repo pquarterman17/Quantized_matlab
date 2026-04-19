@@ -148,12 +148,16 @@ function result = resolveParser(filepath)
             % the header. Content-sniff to pick the right parser.
             if looksLikeLakeShore(filepath)
                 result.name = 'importLakeShore';
+            elseif looksLikeMPMS(filepath)
+                % MPMS SQUID header marker ("BYAPP,SQUID" in recent
+                % software versions, or "SQUID" / "MPMS" vendor strings).
+                % Route to importMPMS so the MPMS-specific defaults
+                % (temperature x-axis, DC moment y-axis) apply; fall
+                % back to PPMS legacy CSV if the QD block is malformed.
+                result.name     = 'importMPMS';
+                result.fallback = 'importPPMS';
             else
-                % Default: try QD VSM primary, fall back to legacy PPMS
-                % CSV format. importMPMS is a wrapper over importQDVSM
-                % so MPMS files also parse cleanly here — users who want
-                % MPMS-specific default columns should call
-                % parser.importMPMS directly.
+                % Default: QD VSM primary, fall back to legacy PPMS CSV.
                 result.name     = 'importQDVSM';
                 result.fallback = 'importPPMS';
             end
@@ -253,6 +257,46 @@ function tf = looksLikeLakeShore(filepath)
     if contains(allLower, 'lake shore') || contains(allLower, 'lakeshore') ...
             || ~isempty(regexp(allLower, 'model\s*7[34]\d\d\b', 'once')) ...
             || ~isempty(regexp(allLower, 'model\s*86\d\d\b', 'once'))
+        tf = true;
+    end
+end
+
+
+% ────────────────────────────────────────────────────────────────────
+function tf = looksLikeMPMS(filepath)
+%LOOKSSLIKEMPMS  Quick content scan for a Quantum Design MPMS SQUID file.
+%   MPMS .dat files share the QD [Header]/[Data] layout with VSM/PPMS
+%   but are disambiguated by vendor strings naming the SQUID software
+%   in the header block. The marker observed on recent MPMS firmware is
+%   "BYAPP,SQUID" (e.g. "BYAPP,SQUID AC,0.9.1.0"); we also match bare
+%   "SQUID" or "MPMS" anywhere in the first ~40 header lines. QDVSM and
+%   PPMS files do not contain these markers.
+    tf = false;
+    try
+        fid = fopen(filepath, 'r');
+        if fid == -1, return; end
+        cleanObj = onCleanup(@() fclose(fid));
+        lines = cell(1, 40);
+        for i = 1:40
+            ln = fgetl(fid);
+            if ~ischar(ln), break; end
+            lines{i} = ln;
+            % Stop scanning once we reach the data block — MPMS markers
+            % only appear in the header, and comma-separated data rows
+            % can legitimately contain the substring "MPMS" as part of
+            % a user-chosen sample ID.
+            if ~isempty(strtrim(ln)) && strcmpi(strtrim(ln), '[Data]')
+                break;
+            end
+        end
+    catch
+        return;
+    end
+
+    headerText = lower(strjoin(lines(~cellfun(@isempty, lines)), ' '));
+    if contains(headerText, 'byapp,squid') ...
+            || ~isempty(regexp(headerText, '\bsquid\b', 'once')) ...
+            || ~isempty(regexp(headerText, '\bmpms\b', 'once'))
         tf = true;
     end
 end

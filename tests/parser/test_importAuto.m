@@ -15,6 +15,7 @@ end
 ROOT = rootDir;
 DAT1 = fullfile(ROOT, '+test_datasets', 'QuantumDesign', 'EDP136_Perp_StrawNew.dat');
 RAW1 = fullfile(ROOT, '+test_datasets', 'rigaku_sample.raw');
+MPMS1 = fullfile(ROOT, '+test_datasets', 'QuantumDesign', 'MPMS_MvsH_ErBAT.dat');
 
 passed = 0; failed = 0;
 
@@ -106,5 +107,21 @@ catch ME
         fprintf('FAIL (wrong error): %s\n', ME.message); failed = failed+1;
     end
 end
+
+% ── MPMS .dat dispatch via content-sniffer ───────────────────────
+fprintf('=== 7. MPMS .dat routes through importMPMS ===\n');
+try
+    if isfile(MPMS1)
+        [d, parserName] = parser.importAuto(MPMS1);
+        assert(strcmp(parserName, 'importMPMS'), ...
+            sprintf('expected importMPMS dispatch, got %s', parserName));
+        assert(strcmp(d.metadata.parserName, 'importMPMS'), ...
+            'data.metadata.parserName should be importMPMS');
+        fprintf('  parser=%s  rows=%d\n', parserName, numel(d.time));
+        passed = passed + 1;
+    else
+        fprintf('  SKIP (MPMS fixture not found)\n');
+    end
+catch ME; fprintf('FAIL: %s\n', ME.message); failed = failed+1; end
 
 fprintf('\n--- Results: %d passed, %d failed ---\n', passed, failed);
