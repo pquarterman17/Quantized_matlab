@@ -211,6 +211,9 @@ classdef AppState < handle
 
         % ── Advanced Tools popup figure ───────────────────────────────
         advMenuFig                = []
+
+        % ── Plot Options popup figure ────────────────────────────────
+        plotOptFig                = []
     end
 
     methods

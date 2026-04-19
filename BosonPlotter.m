@@ -7738,91 +7738,14 @@ function onSendToOrigin(~,~)
 
     % ── Plot Options Popup Menu ──────────────────────────────────────────
 
-    plotOptFig = [];  % persistent handle to the plot options popup
-
-    function closePlotOptMenu()
-    %CLOSEPLOTOPTMENU  Close the plot options popup if open.
-        if ~isempty(plotOptFig) && isvalid(plotOptFig)
-            delete(plotOptFig);
-        end
-        plotOptFig = [];
-    end
-
     function onShowPlotOptionsMenu(~, ~)
-    %ONSHOWPLOTOPTIONSMENU  Show a popup menu of plot types and visualization tools.
-
-        % Bring to front if already open
-        if ~isempty(plotOptFig) && isvalid(plotOptFig)
-            if ~headless, figure(plotOptFig); end
-            return;
-        end
-
-        BTN_BG = [0.15 0.15 0.15];
-        BTN_FC = [0.9 0.9 0.9];
-        HDR_FC = [0.5 0.5 0.5];
-
-        figPos = fig.Position;
-        plotOptFig = uifigure('Name', 'Plot Options', ...
-            'Position', [figPos(1) + 200, figPos(2) + figPos(4) - 300, 220, 260], ...
-            'Resize', 'off', ...
-            'CloseRequestFcn', @(~,~) closePlotOptMenu(), ...
-            'KeyPressFcn', @(~,evt) onPlotOptKey(evt));
-
-        poGL = uigridlayout(plotOptFig, [10 1], ...
-            'RowHeight', {16, 26, 26, 26, 5, 16, 26, 26, 5, 26}, ...
-            'ColumnWidth', {'1x'}, ...
-            'Padding', [8 6 8 6], 'RowSpacing', 2);
-
-        % Section: PLOT TYPES
-        lblPT = uilabel(poGL, 'Text', 'PLOT TYPES', 'FontSize', 9, ...
-            'FontWeight', 'bold', 'FontColor', HDR_FC);
-        lblPT.Layout.Row = 1;
-
-        poBtn(poGL, 2, 'Compose Figure...', @onComposeFigure, ...
-            'Multi-panel composite figure with subplot labels and annotations');
-        poBtn(poGL, 3, '3D Surface / Mesh...', @on3DSurface, ...
-            'Surface, mesh, or contour plot from gridded 2D data (e.g. area detector XRDML)');
-        poBtn(poGL, 4, 'Polar Plot...', @onPolarPlot, ...
-            'Polar plot for phi scans, pole figures, and angular measurements');
-
-        % Separator row 5
-
-        % Section: CONVERT
-        lblCv = uilabel(poGL, 'Text', 'CONVERT', 'FontSize', 9, ...
-            'FontWeight', 'bold', 'FontColor', HDR_FC);
-        lblCv.Layout.Row = 6;
-
-        poBtn(poGL, 7, ['Convert Units (' char(8596) ')...'], @onConvertUnits, ...
-            ['Convert axis units: Oe' char(8596) 'T, emu' char(8596) ...
-             'A' char(183) 'm' char(178) ', K' char(8596) char(176) 'C, etc.']);
-        poBtn(poGL, 8, 'XRD CSV Export...', @onWriteXRDcsv, ...
-            'Export XRD data as CSV with metadata header (standard or Origin ASCII format)');
-
-        % Separator row 9
-
-        % Close
-        btnCloseP = uibutton(poGL, 'Text', 'Close', ...
-            'ButtonPushedFcn', @(~,~) closePlotOptMenu(), ...
-            'BackgroundColor', [0.25 0.25 0.25], 'FontColor', [0.7 0.7 0.7]);
-        btnCloseP.Layout.Row = 10;
-
-        function poBtn(gl, row, txt, cb, tip)
-            b = uibutton(gl, 'Text', txt, ...
-                'ButtonPushedFcn', @(~,~) plotOptAction(cb), ...
-                'BackgroundColor', BTN_BG, 'FontColor', BTN_FC, ...
-                'HorizontalAlignment', 'left', ...
-                'Tooltip', tip);
-            b.Layout.Row = row;
-        end
-
-        function plotOptAction(callbackFcn)
-            closePlotOptMenu();
-            callbackFcn([], []);
-        end
-
-        function onPlotOptKey(evt)
-            if strcmp(evt.Key, 'escape'), closePlotOptMenu(); end
-        end
+    %ONSHOWPLOTOPTIONSMENU  Delegate to extracted +bosonPlotter module.
+        ospomCb_.onComposeFigure = @onComposeFigure;
+        ospomCb_.on3DSurface     = @on3DSurface;
+        ospomCb_.onPolarPlot     = @onPolarPlot;
+        ospomCb_.onConvertUnits  = @onConvertUnits;
+        ospomCb_.onWriteXRDcsv   = @onWriteXRDcsv;
+        bosonPlotter.showPlotOptionsMenu(appData, fig, headless, ospomCb_);
     end
 
     % ── Plot Options callbacks ────────────────────────────────────────────
