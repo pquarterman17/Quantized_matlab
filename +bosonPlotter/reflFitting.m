@@ -62,8 +62,8 @@ rfRoot = uigridlayout(rfFig, [4 2], ...
     'Padding', [8 6 8 6], 'RowSpacing', 6, 'ColumnSpacing', 6);
 
 % ── Row 1: Controls ──────────────────────────────────────────────────
-ctrlGL = uigridlayout(rfRoot, [1 7], ...
-    'ColumnWidth', {80, 80, 80, 80, 80, 80, '1x'}, ...
+ctrlGL = uigridlayout(rfRoot, [1 8], ...
+    'ColumnWidth', {80, 80, 80, 80, 80, 80, 80, '1x'}, ...
     'Padding', [0 0 0 0], 'ColumnSpacing', 4);
 ctrlGL.Layout.Row = 1; ctrlGL.Layout.Column = [1 2];
 
@@ -79,6 +79,12 @@ uibutton(ctrlGL, 'Text', 'Simulate', 'FontSize', 9, ...
 uibutton(ctrlGL, 'Text', 'Fit', 'FontSize', 10, 'FontWeight', 'bold', ...
     'BackgroundColor', BTN_PRIMARY, 'FontColor', [1 1 1], ...
     'ButtonPushedFcn', @(~,~) doFit());
+uibutton(ctrlGL, 'Text', 'MCMC...', 'FontSize', 9, ...
+    'BackgroundColor', [0.45 0.25 0.55], 'FontColor', [1 1 1], ...
+    'Tooltip', ['Sample the posterior around the current fit with ' ...
+                'random-walk Metropolis and show a corner plot. ' ...
+                'Run Fit first.'], ...
+    'ButtonPushedFcn', @(~,~) doMCMC());
 uibutton(ctrlGL, 'Text', 'Plot on Main', 'FontSize', 9, ...
     'BackgroundColor', BTN_PRIMARY, 'FontColor', [1 1 1], ...
     'ButtonPushedFcn', @(~,~) plotOnMain());
@@ -88,7 +94,7 @@ uibutton(ctrlGL, 'Text', 'Copy', 'FontSize', 9, ...
 lblFitStats = uilabel(ctrlGL, 'Text', '', ...
     'FontSize', 9, 'FontColor', [0.5 0.5 0.5], ...
     'HorizontalAlignment', 'right');
-lblFitStats.Layout.Column = 7;
+lblFitStats.Layout.Column = 8;
 
 % ── Row 2 left: Layer table ──────────────────────────────────────────
 tblLayers = uitable(rfRoot, ...
@@ -331,6 +337,99 @@ updateSLDPlot();
         end
     end
 
+    function doMCMC()
+    %DOMCMC  Sample the posterior around the current layer fit.
+    %   Requires a successful fit first (uses fitted layers as seed and
+    %   estimates σ from log-residuals). Only unfixed parameters are
+    %   sampled; fixed params are held constant. Shows a corner plot on
+    %   completion.
+        if isempty(rfResult.layers) || isempty(rfResult.R)
+            uialert(rfFig, 'Run Fit first — MCMC samples around the current best fit.', ...
+                'MCMC');
+            return;
+        end
+
+        % Ask for sampler settings
+        defAns = inputdlg({'Steps', 'Burn-in', 'Step size (σ/|p|)'}, ...
+            'MCMC sampling', 1, {'2000', '500', '0.05'});
+        if isempty(defAns), return; end
+        nSteps  = str2double(defAns{1});
+        nBurn   = str2double(defAns{2});
+        stepSz  = str2double(defAns{3});
+        if ~isfinite(nSteps) || nSteps < 100 || ~isfinite(nBurn) || ...
+                ~isfinite(stepSz) || stepSz <= 0
+            uialert(rfFig, 'Invalid MCMC settings.', 'MCMC');
+            return;
+        end
+
+        fitLayers = rfResult.layers;
+        nR        = size(fitLayers, 1);
+        pBest     = fitLayers(:)';       % [d1 sldR1 sldI1 sig1 d2 ...]
+        fixedMask = getFixedMask();
+
+        % Bounds (same as doFit)
+        lb = repmat([-Inf -Inf -Inf 0], 1, nR);
+        ub = repmat([Inf Inf Inf Inf], 1, nR);
+        for ri = 1:nR
+            lb((ri-1)*4 + 1) = 0;
+        end
+
+        % Free-parameter indices and human labels
+        freeIdx = find(~fixedMask);
+        if isempty(freeIdx)
+            uialert(rfFig, 'All parameters are fixed — nothing to sample.', 'MCMC');
+            return;
+        end
+        paramNames = repmat({''}, 1, numel(pBest));
+        for ri = 1:nR
+            base = (ri-1)*4;
+            paramNames{base+1} = sprintf('d_{%d}', ri);
+            paramNames{base+2} = sprintf('SLD_{%d}', ri);
+            paramNames{base+3} = sprintf('SLDi_{%d}', ri);
+            paramNames{base+4} = sprintf('\\sigma_{%d}', ri);
+        end
+
+        % Noise-level estimate: σ² from log-residuals at best fit
+        logY   = log10(max(yData, 1e-15));
+        logR   = log10(max(rfResult.R, 1e-15));
+        sigma2 = max(var(logY - logR), eps);
+
+        % Per-dim proposal scale; fixed params get 0 so they stay at pBest.
+        % mcmcSample uses a single scalar StepSize, so we sample in
+        % whitened coordinates  q = (p - pBest) ./ scaleVec  with step=1
+        % and transform back to p-space for the model call.
+        scaleVec = zeros(1, numel(pBest));
+        scaleVec(freeIdx) = max(abs(pBest(freeIdx)), 1e-6) * stepSz;
+
+        logPost = @(q) logPosteriorRefl(q, pBest, scaleVec, lb, ub, ...
+            fixedMask, sigma2, xData, yData, ...
+            efScale.Value, efBG.Value);
+
+        rfFig.Pointer = 'watch'; drawnow;
+        try
+            qInit = zeros(1, numel(pBest));
+            mcRes = fitting.mcmcSample(logPost, qInit, ...
+                NumSteps=nSteps, BurnIn=nBurn, StepSize=1.0);
+
+            % Transform q-samples back to physical parameters
+            pSamples = pBest + mcRes.samples .* scaleVec;
+
+            freeSamples = pSamples(:, freeIdx);
+            freeLabels  = paramNames(freeIdx);
+            freeTruth   = pBest(freeIdx);
+
+            plotting.cornerPlot(freeSamples, Labels=freeLabels, Truth=freeTruth);
+
+            rfFig.Pointer = 'arrow';
+            options.StatusFcn(sprintf(...
+                'MCMC: %d samples, accept=%.1f%% (scaffold sampler — see docs/theory/fitting.md)', ...
+                size(freeSamples,1), 100*mcRes.acceptRate));
+        catch ME
+            rfFig.Pointer = 'arrow';
+            uialert(rfFig, sprintf('MCMC failed:\n%s', ME.message), 'Error');
+        end
+    end
+
     function plotRQ(Rmodel, residuals)
         cla(axRQ);
         semilogy(axRQ, xData, yData, 'k.', 'MarkerSize', 3);
@@ -391,4 +490,28 @@ function v = toNum(val)
     else, v = 0;
     end
     if isnan(v), v = 0; end
+end
+
+function lp = logPosteriorRefl(q, pBest, scaleVec, lb, ub, fixedMask, ...
+        sigma2, xData, yData, sc, bg)
+%LOGPOSTERIORREFL  Log-posterior for MCMC sampling around a refl fit.
+%   q is in whitened coordinates; p = pBest + q.*scaleVec. Fixed params
+%   have scaleVec=0 so q never moves them. Prior is flat inside the
+%   [lb, ub] box and -Inf outside; likelihood is Gaussian on
+%   log10(reflectivity) residuals with variance sigma2.
+    p = pBest + q .* scaleVec;
+    p(fixedMask) = pBest(fixedMask);        % hard-lock fixed params
+    if any(p < lb) || any(p > ub)
+        lp = -Inf; return;
+    end
+    try
+        layers = reshape(p, [], 4);
+        R = fitting.parrattRefl(xData, layers, Scale=sc, Background=bg);
+        logModel = log10(max(R,      1e-15));
+        logY     = log10(max(yData,  1e-15));
+        resid    = logY - logModel;
+        lp = -0.5 * sum(resid.^2) / sigma2;
+    catch
+        lp = -Inf;
+    end
 end

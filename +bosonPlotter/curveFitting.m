@@ -278,8 +278,8 @@ uibutton(cfBottomGL, 'Text', 'Close', ...
     'ButtonPushedFcn', @(~,~) onCFClose());
 
 % ── Row 6: Secondary actions + extended stats ────────────────────────
-cfBottom2GL = uigridlayout(cfRootGL, [1 4], ...
-    'ColumnWidth', {'2x', 85, 100, 80}, ...
+cfBottom2GL = uigridlayout(cfRootGL, [1 5], ...
+    'ColumnWidth', {'2x', 85, 100, 80, 95}, ...
     'Padding', [0 0 0 0], 'ColumnSpacing', 6);
 cfBottom2GL.Layout.Row = 6;
 
@@ -301,6 +301,12 @@ uibutton(cfBottom2GL, 'Text', 'Global Fit', ...
     'FontSize', 9, ...
     'Tooltip', 'Fit the same model to multiple datasets with shared parameter constraints', ...
     'ButtonPushedFcn', @(~,~) onGlobalFit());
+uibutton(cfBottom2GL, 'Text', 'Sample Posterior', ...
+    'BackgroundColor', [0.45 0.25 0.55], 'FontColor', [1 1 1], ...
+    'FontSize', 9, ...
+    'Tooltip', ['MCMC-sample the posterior around the current fit and ' ...
+                'show a corner plot. Run Fit first.'], ...
+    'ButtonPushedFcn', @(~,~) onCFMCMCSample());
 
 % Cursor state (created after axes exist; [] when cursors are off or removed)
 cfCursors = [];
@@ -1413,4 +1419,113 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
 
     end % onGlobalFit
 
+% ════════════════════════════════════════════════════════════════════════
+
+    function onCFMCMCSample()
+    %ONCFMCMCSAMPLE  Sample the posterior around the current fit.
+    %   Requires a successful fit first (cfResult must be populated).
+    %   Uses a Gaussian likelihood with σ² = RMSE²  and a flat prior
+    %   inside the table's [Lower, Upper] box. Samples in whitened
+    %   coordinates so mcmcSample's scalar StepSize can handle
+    %   heterogeneous parameter scales. Displays a corner plot of the
+    %   free (unfixed) parameters.
+        if isempty(cfResult.params) || isempty(cfResult.modelFcn)
+            uialert(cfFig, 'Run Fit first — MCMC samples around the current best fit.', ...
+                'Sample Posterior');
+            return;
+        end
+
+        defAns = inputdlg({'Steps', 'Burn-in', 'Step size (σ/|p|)'}, ...
+            'MCMC sampling', 1, {'4000', '800', '0.05'});
+        if isempty(defAns), return; end
+        nSteps = str2double(defAns{1});
+        nBurn  = str2double(defAns{2});
+        stepSz = str2double(defAns{3});
+        if ~isfinite(nSteps) || nSteps < 100 || ~isfinite(nBurn) || ...
+                ~isfinite(stepSz) || stepSz <= 0
+            uialert(cfFig, 'Invalid MCMC settings.', 'Sample Posterior');
+            return;
+        end
+
+        % Resolve current model / bounds / fixed mask
+        try
+            [fcn, pNames, ~, lb, ub, fixedMask, ~] = resolveModel();
+        catch ME
+            uialert(cfFig, ME.message, 'Sample Posterior');
+            return;
+        end
+        [xSeg, ySeg] = getDataSegment();
+        if numel(xSeg) < 3
+            uialert(cfFig, 'Not enough data in range.', 'Sample Posterior');
+            return;
+        end
+
+        pBest = cfResult.params(:)';
+        nP    = numel(pBest);
+        if numel(pNames) ~= nP || numel(lb) ~= nP || numel(ub) ~= nP
+            uialert(cfFig, ...
+                'Parameter table is out of sync with the fit — re-run Fit and try again.', ...
+                'Sample Posterior');
+            return;
+        end
+
+        freeIdx = find(~fixedMask);
+        if isempty(freeIdx)
+            uialert(cfFig, 'All parameters are fixed — nothing to sample.', ...
+                'Sample Posterior');
+            return;
+        end
+
+        % Noise level from fit residuals (profile-likelihood fixed-σ approx)
+        sigma2 = max(var(cfResult.residuals), eps);
+        if sigma2 == 0, sigma2 = eps; end
+
+        scaleVec = zeros(1, nP);
+        scaleVec(freeIdx) = max(abs(pBest(freeIdx)), 1e-6) * stepSz;
+
+        logPost = @(q) logPosteriorCF(q, pBest, scaleVec, lb, ub, ...
+            fixedMask, sigma2, xSeg, ySeg, fcn);
+
+        cfFig.Pointer = 'watch'; drawnow;
+        try
+            qInit = zeros(1, nP);
+            mcRes = fitting.mcmcSample(logPost, qInit, ...
+                NumSteps=nSteps, BurnIn=nBurn, StepSize=1.0);
+
+            pSamples    = pBest + mcRes.samples .* scaleVec;
+            freeSamples = pSamples(:, freeIdx);
+            freeLabels  = pNames(freeIdx);
+            freeTruth   = pBest(freeIdx);
+
+            plotting.cornerPlot(freeSamples, Labels=freeLabels, Truth=freeTruth);
+            cfFig.Pointer = 'arrow';
+            options.StatusFcn(sprintf( ...
+                'MCMC: %d samples, accept=%.1f%% (scaffold sampler)', ...
+                size(freeSamples,1), 100*mcRes.acceptRate));
+        catch ME
+            cfFig.Pointer = 'arrow';
+            uialert(cfFig, sprintf('MCMC failed:\n%s', ME.message), 'Error');
+        end
+    end
+
+end
+
+function lp = logPosteriorCF(q, pBest, scaleVec, lb, ub, fixedMask, ...
+        sigma2, xSeg, ySeg, fcn)
+%LOGPOSTERIORCF  Log-posterior for Curve Fit MCMC (whitened q-space).
+%   p = pBest + q.*scaleVec. Flat prior inside [lb, ub]; Gaussian
+%   likelihood on residuals with variance sigma2. Fixed params are
+%   hard-locked to pBest so nothing moves them regardless of q.
+    p = pBest + q .* scaleVec;
+    p(fixedMask) = pBest(fixedMask);
+    if any(p < lb) || any(p > ub)
+        lp = -Inf; return;
+    end
+    try
+        yModel = fcn(xSeg, p);
+        resid  = ySeg - yModel;
+        lp = -0.5 * sum(resid.^2) / sigma2;
+    catch
+        lp = -Inf;
+    end
 end
