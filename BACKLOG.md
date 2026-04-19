@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-04-19 (W4 Physics workstream — all 4 items shipped: #18 xraySLD dispersion, #19 simulateDiffraction |F|², #20 neutronSLD absorption, #21 phaseDatabase basis)
+**Last regenerated:** 2026-04-19 (W4 Physics shipped; W5 #23/#25/#26/#27 reconciled — already extracted in commits `38246dd` and `97c8096`)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -48,7 +48,6 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#10** W3 Features → Project / session save with full state recovery
 - [ ] **#11** W3 Features → Free-form SLD profile (spline) for reflectometry
 - [ ] **#12** W3 Features → Rocking-curve / RSM decomposition
-- [ ] **#23** W5 Decomposition → Extract `onAutoMagCorrections` (115 lines)
 - [ ] **#24** W5 Decomposition → Documentation coverage — package READMEs
 - [ ] **#29** W6 Docs → Theory: spectroscopy.md
 - [ ] **#30** W6 Docs → Theory: thin_films.md
@@ -97,9 +96,6 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#15** W3 Features → Analysis provenance log (Mantid-style)
 - [ ] **#16** W3 Features → 2D histogram / density plot
 - [ ] **#17** W3 Features → Smart unit/symbol rendering in axis labels
-- [ ] **#25** W5 Decomposition → Extract `applyParserAnalysisConfig` (243 lines)
-- [ ] **#26** W5 Decomposition → Extract `updateControlsForActiveDataset` (188 lines)
-- [ ] **#27** W5 Decomposition → Extract `onPlotTemplates` (163 lines)
 - [ ] **#28** W5 Decomposition → Extract FermiViewer measurement subsystem
 - [ ] **#42** W6 Docs → Docstring upgrade: `+calc/` formulas
 - [ ] **#43** W6 Docs → Docstring upgrade: `+fitting/` formulas
@@ -122,7 +118,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 | Plan | Status | Open items | Notes |
 |------|--------|------------|-------|
-| MASTERPLAN (MATLAB consolidated) | Active | 2 T1 / 29 T2 / 23 T3 | 9 source plans consolidated 2026-04-19; W4 Physics (4 items) shipped 2026-04-19 |
+| MASTERPLAN (MATLAB consolidated) | Active | 2 T1 / 28 T2 / 20 T3 | 9 source plans consolidated 2026-04-19; W4 Physics (4 items) shipped 2026-04-19; W5 #23/#25/#26/#27 reconciled as already done |
 | origin-feature-gap | Active (Python) | 6 T1 / 7 T2 / 1 T3 | MATLAB side complete; Python port pending — excluded from MASTERPLAN |
 | dataworkspace-python-port | Active (Python) | 3 T1 / 3 T2 / 2 T3 | Python-port architecture; excluded from MASTERPLAN |
 | porting_plan | Active (Python) | 7 phase-level items | Thin film toolkit architecture; excluded from MASTERPLAN |
