@@ -5486,81 +5486,11 @@ function varargout = BosonPlotter(options)
     end
 
     function onResetCorrections(~,~)
-        % Guard: confirm if corrections have been applied
-        if appData.activeIdx >= 1 && ~isempty(appData.datasets)
-            dsReset = appData.datasets{appData.activeIdx};
-            if ~isempty(dsReset.corrData)
-                sel = uiconfirm(fig, ...
-                    'Discard all corrections for the active dataset?', ...
-                    'Reset Corrections', 'Options', {'Reset', 'Cancel'}, ...
-                    'DefaultOption', 2, 'CancelOption', 2);
-                if ~strcmp(sel, 'Reset'), return; end
-            end
-        end
-        % Determine neutral yOff: 1.0 for neutron (multiplicative), 0 for others (additive)
-        isNeutronReset = false;
-        if appData.activeIdx >= 1 && ~isempty(appData.datasets)
-            dsCheck = appData.datasets{appData.activeIdx};
-            isNeutronReset = isfield(dsCheck, 'parserName') && isNeutronParser(dsCheck.parserName);
-        end
-        yOffDefault = guiTernary(isNeutronReset, 1, 0);
-
-        efXOffset.Value     = 0;
-        efYOffset.Value     = yOffDefault;
-        efBGSlope.Value     = 0;
-        efBGIntercept.Value = 0;
-        ddBGOrder.Value     = 'Linear';
-        cbSmooth.Value      = false;
-        efSmoothWin.Value   = 5;
-        ddSmoothMethod.Value = 'Moving';
-        efXTrimMin.Value    = '';
-        efXTrimMax.Value    = '';
-        ddNormalize.Value   = 'None';
-        efSavePath.Value    = '';
-        % Reset magnetometry fields
-        efSampleMass.Value   = 0;
-        efSampleWidth.Value  = 0;
-        efSampleHeight.Value = 0;
-        ddDimUnit.Value      = 'mm';
-        efSampleThick.Value  = 0;
-        ddThickUnit.Value    = 'nm';
-        ddMomentUnit.Value   = 'emu';
-        ddFieldUnit.Value    = 'Oe';
-        ddUnitSystem.Value   = 'CGS';
-
-        if appData.activeIdx >= 1 && ~isempty(appData.datasets)
-            ds               = appData.datasets{appData.activeIdx};
-            ds.corrData      = [];
-            ds.mask          = true(size(ds.data.time));
-            ds.xOff          = 0;
-            ds.yOff          = yOffDefault;
-            ds.bgSlope       = 0;
-            ds.bgInt         = 0;
-            ds.bgPoly        = [];
-            ds.smoothEnabled = false;
-            ds.smoothWindow  = 5;
-            ds.smoothMethod  = 'Moving';
-            ds.xTrimMin      = NaN;
-            ds.xTrimMax      = NaN;
-            ds.normMethod    = 'None';
-            ds.sampleMass    = 0;
-            ds.sampleWidth   = 0;
-            ds.sampleHeight  = 0;
-            ds.dimUnit       = 'mm';
-            ds.sampleThick   = 0;
-            ds.thickUnit     = 'nm';
-            ds.momentUnit    = 'emu';
-            ds.fieldUnit     = 'Oe';
-            ds.unitSystem    = 'CGS';
-            ds.peaks         = struct('center',{},'fwhm',{},'height',{},'area',{}, ...
-                                      'xRange',{},'status',{},'bg',{},'model',{},'eta',{});
-            appData.datasets{appData.activeIdx} = ds;
-            appData.selectedPeakIdx = 0;
-        end
-
-        cancelInteractions();
-        peakCb.refreshPeakTable();
-        onPlot([],[]);
+    %ONRESETCORRECTIONS  Delegate — see +bosonPlotter/resetCorrections.m.
+        cb.cancelInteractions = @cancelInteractions;
+        cb.refreshPeakTable   = peakCb.refreshPeakTable;
+        cb.onPlot             = @() onPlot([],[]);
+        bosonPlotter.resetCorrections(appData, fig, ui, cb);
     end
 
     function onUndoCorrections(~,~)
