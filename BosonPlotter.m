@@ -5185,93 +5185,10 @@ function varargout = BosonPlotter(options)
     % ── Corrections callbacks ─────────────────────────────────────────────
 
     function onApplyCorrectionsAll(~,~)
-    %ONAPPLYCORRECTIONSALL  Apply current corrections to all datasets.
-        if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data');
-            return;
-        end
-
-        setStatus('Applying corrections to all datasets...');
-        fig.Pointer = 'watch';
-        drawnow;
-
-        % Get current correction parameters from UI
-        xOff     = efXOffset.Value;
-        yOff     = efYOffset.Value;
-        bgSlope  = efBGSlope.Value;
-        bgIntcpt = efBGIntercept.Value;
-        smoothEnabled = cbSmooth.Value;
-        smoothWin = efSmoothWin.Value;
-        smoothMeth = ddSmoothMethod.Value;
-        xTrimMin = str2num_trim(efXTrimMin.Value);
-        xTrimMax = str2num_trim(efXTrimMax.Value);
-        normVal  = ddNormalize.Value;
-
-        % Apply to all datasets
-        for di = 1:numel(appData.datasets)
-            ds = appData.datasets{di};
-            d = ds.data;
-
-            % Save undo state (same logic as onApplyCorrections)
-            undoState.corrData       = ds.corrData;
-            undoState.mask           = guiTernary(isfield(ds,'mask'), ds.mask, true(size(ds.data.time)));
-            undoState.xOff           = ds.xOff;
-            undoState.yOff           = ds.yOff;
-            undoState.bgSlope        = ds.bgSlope;
-            undoState.bgInt          = ds.bgInt;
-            undoState.bgPoly         = guiTernary(isfield(ds,'bgPoly'), ds.bgPoly, []);
-            undoState.smoothEnabled  = ds.smoothEnabled;
-            undoState.smoothWindow   = ds.smoothWindow;
-            undoState.smoothMethod   = ds.smoothMethod;
-            undoState.xTrimMin       = ds.xTrimMin;
-            undoState.xTrimMax       = ds.xTrimMax;
-            undoState.normMethod     = ds.normMethod;
-            ds.undoState = undoState;
-
-            % Apply corrections via extracted pipeline
-            uiVals = struct('xOff', xOff, 'yOff', yOff, ...
-                'bgSlope', bgSlope, 'bgInt', bgIntcpt, ...
-                'xTrimMin', xTrimMin, 'xTrimMax', xTrimMax, ...
-                'smoothEnabled', smoothEnabled, ...
-                'smoothWindow', smoothWin, ...
-                'smoothMethod', smoothMeth, ...
-                'normMethod', normVal, ...
-                'derivativeMode', 'None', ...
-                'fieldUnit', 'Oe', 'momentUnit', 'emu');
-            corrParams = bosonPlotter.correctionParams(ds, uiVals);
-            bgArgs = {};
-            if cbSubtractBG.Value && ~isempty(appData.bgDataset)
-                bgArgs = {'BgDataset', appData.bgDataset, ...
-                          'BgInterp', ddBGInterp.Value};
-            end
-            corrData = bosonPlotter.applyCorrections(d, corrParams, bgArgs{:});
-
-            % Save corrected data
-            ds.corrData      = corrData;
-            ds.xOff          = xOff;
-            ds.yOff          = yOff;
-            ds.bgSlope       = bgSlope;
-            ds.bgInt         = bgIntcpt;
-            ds.smoothEnabled = smoothEnabled;
-            ds.smoothWindow  = smoothWin;
-            ds.smoothMethod  = smoothMeth;
-            ds.xTrimMin      = xTrimMin;
-            ds.xTrimMax      = xTrimMax;
-            ds.normMethod    = normVal;
-
-            appData.datasets{di} = ds;
-            try
-                appData.model.updateDataset(di, ds);
-            catch
-            end
-        end
-
-        % Refresh plot
-        fig.Pointer = 'arrow';
-        setStatus(sprintf('Corrections applied to all %d datasets.', numel(appData.datasets)));
-        onPlot([],[]);
-        uialert(fig, sprintf('Corrections applied to all %d datasets.', ...
-            numel(appData.datasets)), 'Batch Apply Complete');
+    %ONAPPLYCORRECTIONSALL  Delegate — see +bosonPlotter/applyCorrectionsAll.m.
+        cb.setStatus = @setStatus;
+        cb.onPlot    = @() onPlot([],[]);
+        bosonPlotter.applyCorrectionsAll(appData, fig, ui, cb);
     end
 
     function onApplyCorrections(~,~)
