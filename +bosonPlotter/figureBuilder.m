@@ -73,7 +73,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         uilabel(typeGL,'Text','Figure type:','FontSize',11, ...
             'FontWeight','bold','HorizontalAlignment','right');
         ddFigType = uidropdown(typeGL, ...
-            'Items', {'Multi-Panel','Quick Grid','Waterfall','Overlay + Residual','Normalized Overlay','Before / After','Parameter Evolution','Broken Axis','Confidence Band','Contour / Heatmap','Color Scatter (Z)','Marginal Histogram','Grouped Plot','FFT / Spectral'}, ...
+            'Items', {'Multi-Panel','Quick Grid','Waterfall','Overlay + Residual','Normalized Overlay','Before / After','Parameter Evolution','Broken Axis','Confidence Band','Contour / Heatmap','Color Scatter (Z)','Marginal Histogram','Grouped Plot','FFT / Spectral','Ternary','Box / Violin'}, ...
             'Value', 'Multi-Panel', ...
             'ValueChangedFcn', @onTypeChanged);
         uilabel(typeGL,'Text','');  % spacer
@@ -185,6 +185,8 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         mhWidgets = struct();   % marginal histogram
         gpWidgets = struct();   % grouped plot
         fsWidgets = struct();   % FFT / spectral
+        tpWidgets = struct();   % ternary
+        bvWidgets = struct();   % box / violin
 
         % Initial population
         onTypeChanged([], []);
@@ -257,6 +259,10 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
                     buildGroupedPlotConfig();
                 case 'FFT / Spectral'
                     buildFFTSpectralConfig();
+                case 'Ternary'
+                    buildTernaryConfig();
+                case 'Box / Violin'
+                    buildBoxViolinConfig();
             end
         end
 
@@ -660,6 +666,8 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
                 case 'Marginal Histogram',  generateMarginalHistogram();
                 case 'Grouped Plot',        generateGroupedPlot();
                 case 'FFT / Spectral',      generateFFTSpectral();
+                case 'Ternary',             generateTernary();
+                case 'Box / Violin',        generateBoxViolin();
             end
         end
 
@@ -3178,6 +3186,265 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
                     idxHi = hi; idxLo = lo; return;
                 end
             end
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  CONFIG: Ternary
+        % ────────────────────────────────────────────────────────────────
+        function buildTernaryConfig()
+            gl = uigridlayout(configPanel, [8 2], ...
+                'RowHeight', {24, 24, 24, 24, 24, 24, 24, 24}, ...
+                'ColumnWidth', {110, '1x'}, ...
+                'Padding', [8 6 8 6], 'RowSpacing', 4);
+
+            uilabel(gl,'Text','Dataset:','HorizontalAlignment','right','FontWeight','bold');
+            tpWidgets.ddDS = uidropdown(gl,'Items', dsNames, 'ItemsData', 1:nDS, ...
+                'Value', min(activeIdx, nDS), ...
+                'ValueChangedFcn', @(~,~) tpUpdateCols());
+
+            uilabel(gl,'Text','A fraction:','HorizontalAlignment','right');
+            tpWidgets.ddA = uidropdown(gl,'Items',{'--'},'ItemsData',0);
+
+            uilabel(gl,'Text','B fraction:','HorizontalAlignment','right');
+            tpWidgets.ddB = uidropdown(gl,'Items',{'--'},'ItemsData',0);
+
+            uilabel(gl,'Text','C fraction:','HorizontalAlignment','right');
+            tpWidgets.ddC = uidropdown(gl,'Items',{'--'},'ItemsData',0);
+
+            uilabel(gl,'Text','Color by:','HorizontalAlignment','right');
+            tpWidgets.ddVal = uidropdown(gl,'Items',{'(none)'},'ItemsData',-1);
+
+            uilabel(gl,'Text','Labels (A,B,C):','HorizontalAlignment','right');
+            tpWidgets.edLabels = uieditfield(gl,'text','Value','A,B,C');
+
+            uilabel(gl,'Text','Marker size:','HorizontalAlignment','right');
+            tpWidgets.spSize = uispinner(gl,'Value',48,'Limits',[4 400],'Step',4);
+
+            tpWidgets.cbGrid = uicheckbox(gl,'Text','10% gridlines','Value',true);
+            tpWidgets.cbGrid.Layout.Row = 8; tpWidgets.cbGrid.Layout.Column = 2;
+
+            tpUpdateCols();
+        end
+
+        function tpUpdateCols()
+            di = tpWidgets.ddDS.Value;
+            if di < 1 || di > nDS, return; end
+            d = getPlotData(di);
+            cols = d.labels;
+            if isempty(cols), return; end
+            idxData = 1:numel(cols);
+            tpWidgets.ddA.Items = cols;  tpWidgets.ddA.ItemsData = idxData;
+            tpWidgets.ddB.Items = cols;  tpWidgets.ddB.ItemsData = idxData;
+            tpWidgets.ddC.Items = cols;  tpWidgets.ddC.ItemsData = idxData;
+            tpWidgets.ddA.Value = idxData(1);
+            tpWidgets.ddB.Value = idxData(min(2, end));
+            tpWidgets.ddC.Value = idxData(min(3, end));
+            tpWidgets.ddVal.Items    = [{'(none)'}, cols];
+            tpWidgets.ddVal.ItemsData = [-1, idxData];
+            tpWidgets.ddVal.Value    = -1;
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  GENERATE: Ternary
+        % ────────────────────────────────────────────────────────────────
+        function generateTernary()
+            di = tpWidgets.ddDS.Value;
+            if di < 1 || di > nDS
+                uialert(bFig,'No valid dataset selected.','No data'); return;
+            end
+            d = getPlotData(di);
+            aIdx = tpWidgets.ddA.Value;
+            bIdx = tpWidgets.ddB.Value;
+            cIdx = tpWidgets.ddC.Value;
+            vIdx = tpWidgets.ddVal.Value;
+            if any([aIdx bIdx cIdx] < 1) || any([aIdx bIdx cIdx] > numel(d.labels))
+                uialert(bFig,'Select three valid A/B/C columns.','Ternary'); return;
+            end
+
+            aV = d.values(:, aIdx);
+            bV = d.values(:, bIdx);
+            cV = d.values(:, cIdx);
+            good = ~isnan(aV) & ~isnan(bV) & ~isnan(cV) & (aV+bV+cV) > 0 & ...
+                   aV >= 0 & bV >= 0 & cV >= 0;
+            if nnz(good) < 1
+                uialert(bFig,'No valid composition rows (non-negative, sum>0).','Ternary'); return;
+            end
+            F = [aV(good), bV(good), cV(good)];
+
+            vals = [];
+            if vIdx > 0 && vIdx <= numel(d.labels)
+                vTmp = d.values(:, vIdx);
+                vals = vTmp(good);
+            end
+
+            lblStr = strtrim(string(tpWidgets.edLabels.Value));
+            lblParts = split(lblStr, ",");
+            if numel(lblParts) ~= 3
+                lblParts = string({d.labels{aIdx}, d.labels{bIdx}, d.labels{cIdx}});
+            end
+            lblParts = strtrim(lblParts);
+
+            fmtOpts = getFormatOpts();
+            outFig = figure('Name','Ternary','NumberTitle','off', ...
+                'Units','inches','Position',[2 2 spBFigW.Value spBFigH.Value]);
+            oAx = axes(outFig);
+
+            if isempty(vals)
+                plotting.ternaryPlot(F, ...
+                    'Parent', oAx, ...
+                    'Labels', lblParts(:)', ...
+                    'MarkerSize', tpWidgets.spSize.Value, ...
+                    'Grid', tpWidgets.cbGrid.Value);
+            else
+                plotting.ternaryPlot(F, ...
+                    'Parent', oAx, ...
+                    'Labels', lblParts(:)', ...
+                    'Values', vals(:), ...
+                    'MarkerSize', tpWidgets.spSize.Value, ...
+                    'Grid', tpWidgets.cbGrid.Value);
+                cb = colorbar(oAx);
+                cb.Label.String = d.labels{vIdx};
+                cb.Label.Interpreter = 'none';
+            end
+            oAx.FontSize = fmtOpts.fontSize; oAx.FontName = fmtOpts.fontName;
+
+            figure(outFig);
+            delete(bFig);
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  CONFIG: Box / Violin
+        % ────────────────────────────────────────────────────────────────
+        function buildBoxViolinConfig()
+            gl = uigridlayout(configPanel, [7 4], ...
+                'RowHeight', {22, 100, 22, 22, 22, 22, 22}, ...
+                'ColumnWidth', {100, '1x', 100, '1x'}, ...
+                'Padding', [8 8 8 8], 'RowSpacing', 4, 'ColumnSpacing', 6);
+
+            uilabel(gl,'Text','Dataset:','HorizontalAlignment','right','FontSize',9);
+            bvWidgets.ddDS = uidropdown(gl,'Items', dsNames, 'ItemsData', 1:nDS, ...
+                'Value', min(activeIdx, nDS), 'FontSize', 9, ...
+                'ValueChangedFcn', @(~,~) bvUpdateChannels());
+            bvWidgets.ddDS.Layout.Column = [2 4];
+
+            uilabel(gl,'Text','Y columns:','HorizontalAlignment','right','FontSize',9);
+            bvWidgets.lbY = uilistbox(gl,'Items', allYLabels, 'Multiselect','on', ...
+                'Value', allYLabels(1), 'FontSize', 9);
+            bvWidgets.lbY.Layout.Row = 2; bvWidgets.lbY.Layout.Column = [2 4];
+
+            uilabel(gl,'Text','Group by:','HorizontalAlignment','right','FontSize',9);
+            bvWidgets.ddGroup = uidropdown(gl,'Items', [{'(none)'}, allYLabels], ...
+                'ItemsData', [-1, 1:numel(allYLabels)], ...
+                'Value', -1, 'FontSize', 9);
+            bvWidgets.ddGroup.Layout.Column = [2 4];
+
+            uilabel(gl,'Text','Style:','HorizontalAlignment','right','FontSize',9);
+            bvWidgets.ddStyle = uidropdown(gl, ...
+                'Items', {'box','violin','swarm','box+swarm'}, ...
+                'Value', 'box', 'FontSize', 9);
+
+            uilabel(gl,'Text','Orientation:','HorizontalAlignment','right','FontSize',9);
+            bvWidgets.ddOrient = uidropdown(gl, ...
+                'Items', {'vertical','horizontal'}, ...
+                'Value', 'vertical', 'FontSize', 9);
+
+            bvWidgets.cbMean = uicheckbox(gl,'Text','Show mean marker','Value',true,'FontSize',9);
+            bvWidgets.cbMean.Layout.Row = 6; bvWidgets.cbMean.Layout.Column = [1 2];
+
+            bvWidgets.cbOutliers = uicheckbox(gl,'Text','Show outliers (box)','Value',true,'FontSize',9);
+            bvWidgets.cbOutliers.Layout.Row = 6; bvWidgets.cbOutliers.Layout.Column = [3 4];
+
+            uilabel(gl,'Text','Width:','HorizontalAlignment','right','FontSize',9);
+            bvWidgets.spWidth = uispinner(gl,'Value',0.6,'Limits',[0.1 1.5],'Step',0.05,'FontSize',9);
+        end
+
+        function bvUpdateChannels()
+            di = bvWidgets.ddDS.Value;
+            if di < 1 || di > nDS, return; end
+            d = getPlotData(di);
+            cols = d.labels;
+            if isempty(cols), return; end
+            bvWidgets.lbY.Items = cols;
+            bvWidgets.lbY.Value = cols(1);
+            bvWidgets.ddGroup.Items    = [{'(none)'}, cols];
+            bvWidgets.ddGroup.ItemsData = [-1, 1:numel(cols)];
+            bvWidgets.ddGroup.Value    = -1;
+        end
+
+        % ────────────────────────────────────────────────────────────────
+        %  GENERATE: Box / Violin
+        % ────────────────────────────────────────────────────────────────
+        function generateBoxViolin()
+            di = bvWidgets.ddDS.Value;
+            if di < 1 || di > nDS
+                uialert(bFig,'No valid dataset selected.','No data'); return;
+            end
+            d = getPlotData(di);
+
+            ySel = bvWidgets.lbY.Value;
+            if ischar(ySel) || isstring(ySel), ySel = cellstr(ySel); end
+            if isempty(ySel)
+                uialert(bFig,'Pick at least one Y column.','Box / Violin'); return;
+            end
+
+            gIdx = bvWidgets.ddGroup.Value;
+            dataCell = {};
+            labels   = {};
+
+            if gIdx > 0 && gIdx <= numel(d.labels) && numel(ySel) == 1
+                % Group one Y column by a grouping column
+                yi = find(strcmp(d.labels, ySel{1}), 1);
+                if isempty(yi)
+                    uialert(bFig,'Y column not found.','Box / Violin'); return;
+                end
+                yV = d.values(:, yi);
+                gV = d.values(:, gIdx);
+                good = ~isnan(yV) & ~isnan(gV);
+                yV = yV(good); gV = gV(good);
+                [uG, ~, gi] = unique(round(gV, 6));
+                for ki = 1:numel(uG)
+                    dataCell{end+1} = yV(gi == ki); %#ok<AGROW>
+                    labels{end+1}   = sprintf('%s=%.4g', d.labels{gIdx}, uG(ki)); %#ok<AGROW>
+                end
+            else
+                % One or more Y columns as separate groups
+                for ki = 1:numel(ySel)
+                    yi = find(strcmp(d.labels, ySel{ki}), 1);
+                    if isempty(yi), continue; end
+                    yV = d.values(:, yi);
+                    yV = yV(~isnan(yV));
+                    dataCell{end+1} = yV; %#ok<AGROW>
+                    labels{end+1}   = d.labels{yi}; %#ok<AGROW>
+                end
+            end
+
+            if isempty(dataCell) || all(cellfun(@isempty, dataCell))
+                uialert(bFig,'No valid data for the selected columns.','Box / Violin'); return;
+            end
+
+            fmtOpts = getFormatOpts();
+            outFig = figure('Name','Box / Violin','NumberTitle','off', ...
+                'Units','inches','Position',[2 2 spBFigW.Value spBFigH.Value]);
+            oAx = axes(outFig);
+
+            plotting.boxViolinSwarm(oAx, dataCell, ...
+                Style        = string(bvWidgets.ddStyle.Value), ...
+                Labels       = labels, ...
+                Orientation  = string(bvWidgets.ddOrient.Value), ...
+                ShowMean     = bvWidgets.cbMean.Value, ...
+                ShowOutliers = bvWidgets.cbOutliers.Value, ...
+                Width        = bvWidgets.spWidth.Value);
+
+            oAx.FontSize = fmtOpts.fontSize; oAx.FontName = fmtOpts.fontName;
+            oAx.Box = 'on';
+            if strcmp(bvWidgets.ddOrient.Value, 'vertical')
+                ylabel(oAx, 'Value', 'FontSize', fmtOpts.fontSize, 'Interpreter', 'none');
+            else
+                xlabel(oAx, 'Value', 'FontSize', fmtOpts.fontSize, 'Interpreter', 'none');
+            end
+
+            figure(outFig);
+            delete(bFig);
         end
 
 end  % figureBuilder
