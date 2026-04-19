@@ -4104,83 +4104,15 @@ function varargout = BosonPlotter(options)
     end
 
     function onFringeClick(~,~)
-    %ONFRINGECLICK  Handle a click during fringe thickness pick mode.
-        cp = ax.CurrentPoint;
-        xClick = cp(1,1);  yClick = cp(1,2);
-        if xClick < ax.XLim(1) || xClick > ax.XLim(2) || ...
-           yClick < ax.YLim(1) || yClick > ax.YLim(2)
-            return;
-        end
-
-        % Get displayed data for the active dataset
-        ds = appData.datasets{appData.activeIdx};
-        primaryD = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
-        xVec = double(primaryD.time);
-
-        % Snap to nearest data point (normalized distance)
-        ySel2  = ensureCell(lbY.Value);
-        bestD  = Inf;
-        bestX  = xClick;
-        bestY  = yClick;
-        xRange = diff(ax.XLim);
-        yRange = diff(ax.YLim);
-        % In log scale, use log-space distances for Y
-        isLogY = strcmp(ax.YScale, 'log');
-        for k = 1:numel(ySel2)
-            yIdx = find(strcmp(primaryD.labels, ySel2{k}), 1);
-            if isempty(yIdx), continue; end
-            yVec = primaryD.values(:, yIdx);
-            valid = ~isnan(xVec) & ~isnan(yVec);
-            if isLogY
-                dy = (log10(max(yVec(valid), eps)) - log10(max(yClick, eps))) / log10(max(ax.YLim(2)/ax.YLim(1), 10));
-            else
-                dy = (yVec(valid) - yClick) / yRange;
-            end
-            dx = (xVec(valid) - xClick) / xRange;
-            dists = sqrt(dx.^2 + dy.^2);
-            [mD, mI] = min(dists);
-            if mD < bestD
-                bestD = mD;
-                validIdx = find(valid);
-                bestX = xVec(validIdx(mI));
-                bestY = yVec(validIdx(mI));
-            end
-        end
-
-        appData.fringeClickCount = appData.fringeClickCount + 1;
-        n = appData.fringeClickCount;
-        appData.fringeQ(n) = bestX;
-
-        % Place a draggable marker
-        markerColors = {[0.10 0.65 0.85], [0.85 0.35 0.10]};  % blue, orange
-        hold(ax, 'on');
-        hm = plot(ax, bestX, bestY, 'v', ...
-            'MarkerSize',       12, ...
-            'MarkerFaceColor',  markerColors{n}, ...
-            'MarkerEdgeColor',  'w', ...
-            'LineWidth',        1.2, ...
-            'HitTest',          'on', ...
-            'HandleVisibility', 'off', ...
-            'Tag',              'GUIFringeMarker');
-        % Enable dragging: mouse-down on marker starts a drag
-        hm.ButtonDownFcn = @(src, evt) onFringeMarkerDown(n);
-        hold(ax, 'off');
-
-        if n == 1
-            appData.fringeMarkers = hm;
-            btnFringeThick.Text = 'Click peak 2 of 2...';
-        else
-            appData.fringeMarkers(2) = hm;
-            % Restore normal interaction and compute thickness
-            fig.WindowButtonDownFcn   = @onAxesButtonDown;
-            fig.WindowButtonMotionFcn = @onMouseHover;
-            fig.Pointer               = 'arrow';
-            btnFringeThick.Text            = ['Fringe ' char(916) 't (2-click)'];
-            btnFringeThick.BackgroundColor = BTN_ACCENT;
-            btnFringeThick.Enable          = 'on';
-
-            updateFringeThickness();
-        end
+    %ONFRINGECLICK  Delegate to extracted +bosonPlotter module.
+        ofcWidgets_.lbY            = lbY;
+        ofcWidgets_.btnFringeThick = btnFringeThick;
+        ofcCb_.onFringeMarkerDown    = @onFringeMarkerDown;
+        ofcCb_.onAxesButtonDown      = @onAxesButtonDown;
+        ofcCb_.onMouseHover          = @onMouseHover;
+        ofcCb_.updateFringeThickness = @updateFringeThickness;
+        ofcCb_.BTN_ACCENT            = BTN_ACCENT;
+        bosonPlotter.onFringeClick(appData, fig, ax, ofcWidgets_, ofcCb_);
     end
 
     function onFringeMarkerDown(markerIdx)
@@ -5971,40 +5903,9 @@ function onLoadBackground(~,~)
     end
 
     function onCopyDataToClipboard(~,~)
-    %ONCOPYDATATOCLIPBOARD  Copy selected datasets as tab-delimited text to clipboard.
-    %   Opens a dataset picker dialog; copies data with Origin multi-row headers.
-        if isempty(appData.datasets)
-            uialert(fig, 'Load a file first.', 'No data');
-            return;
-        end
-
-        % Build display names for each loaded dataset
-        nDS = numel(appData.datasets);
-        names = cell(1, nDS);
-        for i = 1:nDS
-            [~, fn, ex] = fileparts(appData.datasets{i}.filepath);
-            badge = getParserBadge(appData.datasets{i}.parserName);
-            names{i} = sprintf('%s %s%s', badge, fn, ex);
-        end
-
-        % Modal multi-select dialog
-        sel = listdlg('ListString', names, ...
-            'SelectionMode', 'multiple', ...
-            'InitialValue', appData.activeIdx, ...
-            'Name', 'Copy to Clipboard', ...
-            'PromptString', 'Select datasets to copy:', ...
-            'ListSize', [350 300]);
-        if isempty(sel), return; end
-
-        try
-            clipStr = bosonPlotter.buildClipboardString(appData, sel);
-            clipboard('copy', clipStr);
-            uialert(fig, sprintf('Copied %d dataset(s) to clipboard.\nPaste into Origin or Excel.', ...
-                numel(sel)), 'Copied');
-        catch ME
-            logGUIError('Clipboard error', ME.message, ME);
-            uialert(fig, ME.message, 'Clipboard error');
-        end
+    %ONCOPYDATATOCLIPBOARD  Delegate to extracted +bosonPlotter module.
+        ocdcCb_.logGUIError = @logGUIError;
+        bosonPlotter.onCopyDataToClipboard(appData, fig, ocdcCb_);
     end
 
 function onSendToOrigin(~,~)
