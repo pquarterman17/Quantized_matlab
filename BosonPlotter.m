@@ -6704,35 +6704,8 @@ function onSendToOrigin(~,~)
         % Single click — begin drag-zoom if data is loaded
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
         appData.zoomStartPt       = [x0, y0];
-        fig.WindowButtonMotionFcn = @onZoomMouseMove;
+        fig.WindowButtonMotionFcn = @(~,~) bosonPlotter.onZoomMouseMove(appData, ax);
         fig.WindowButtonUpFcn     = @onZoomMouseUp;
-    end
-
-    function onZoomMouseMove(~,~)
-    %ONZOOMMOUSEMOVE  Update the rubber-band rectangle while dragging.
-        if isempty(appData.zoomStartPt), return; end
-        cp = ax.CurrentPoint;
-        x1 = cp(1,1);  y1 = cp(1,2);
-        x0 = appData.zoomStartPt(1);
-        y0 = appData.zoomStartPt(2);
-        xLo = min(x0,x1);  xHi = max(x0,x1);
-        yLo = min(y0,y1);  yHi = max(y0,y1);
-        if ~isempty(appData.zoomRectPatch) && isvalid(appData.zoomRectPatch)
-            set(appData.zoomRectPatch, ...
-                'XData', [xLo xHi xHi xLo xLo], ...
-                'YData', [yLo yLo yHi yHi yLo]);
-        else
-            hold(ax,'on');
-            appData.zoomRectPatch = patch(ax, ...
-                [xLo xHi xHi xLo xLo], [yLo yLo yHi yHi yLo], ...
-                [0.20 0.55 0.90], ...
-                'FaceAlpha',       0.12, ...
-                'EdgeColor',       [0.20 0.55 0.90], ...
-                'LineWidth',       1.5, ...
-                'Tag',             'GUIZoomBox', ...
-                'HandleVisibility','off');
-            hold(ax,'off');
-        end
     end
 
     function onZoomMouseUp(~,~)
