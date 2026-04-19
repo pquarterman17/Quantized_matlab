@@ -3837,52 +3837,17 @@ function varargout = BosonPlotter(options)
     % ── Y-translate drag (XRD) ───────────────────────────────────────────
 
     function onYTranslateDrag(~,~)
-    %ONYTRANSLATEDRAG  Arm click-drag to shift the data vertically in real time.
-        if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data'); return;
-        end
-        cancelInteractions();
-        btnYTranslate.Text            = 'Drag on plot to translate...';
-        btnYTranslate.BackgroundColor = [0.00 0.55 0.80];
-        btnYTranslate.Enable          = 'off';
-        btnAutoPeak.Enable            = 'off';
-        btnManualPeak.Enable          = 'off';
-        fig.WindowButtonDownFcn = @onYTransDown;
-    end
-
-    function onYTransDown(~,~)
-        cp = ax.CurrentPoint;
-        x0 = cp(1,1);  y0 = cp(1,2);
-        if x0 < ax.XLim(1) || x0 > ax.XLim(2) || ...
-           y0 < ax.YLim(1) || y0 > ax.YLim(2)
-            return;
-        end
-        appData.yTranslateY0   = y0;
-        appData.yTranslateOff0 = efYOffset.Value;
-        fig.WindowButtonMotionFcn = @onYTransMove;
-        fig.WindowButtonUpFcn     = @onYTransUp;
-    end
-
-    function onYTransMove(~,~)
-        if isempty(appData.yTranslateY0), return; end
-        cp = ax.CurrentPoint;
-        dy = cp(1,2) - appData.yTranslateY0;
-        % Moving data UP (dy > 0 in axes units) → subtract more → yOff decreases
-        % y_corrected = yRaw - BG - yOff   =>   increase y_corr by dy => reduce yOff by dy
-        efYOffset.Value = appData.yTranslateOff0 - dy;
-        onApplyCorrections([],[]);
-    end
-
-    function onYTransUp(~,~)
-        fig.WindowButtonDownFcn   = @onAxesButtonDown;
-        fig.WindowButtonMotionFcn = @onMouseHover;
-        fig.WindowButtonUpFcn     = '';
-        appData.yTranslateY0 = [];
-        btnYTranslate.Text            = 'Y Translate (drag)';
-        btnYTranslate.BackgroundColor = BTN_ACCENT;
-        btnYTranslate.Enable          = 'on';
-        btnAutoPeak.Enable            = 'on';
-        btnManualPeak.Enable          = 'on';
+    %ONYTRANSLATEDRAG  Delegate to extracted +bosonPlotter module.
+        oytdWidgets_.btnYTranslate = btnYTranslate;
+        oytdWidgets_.btnAutoPeak   = btnAutoPeak;
+        oytdWidgets_.btnManualPeak = btnManualPeak;
+        oytdWidgets_.efYOffset     = efYOffset;
+        oytdWidgets_.BTN_ACCENT    = BTN_ACCENT;
+        oytdCb_.cancelInteractions = @cancelInteractions;
+        oytdCb_.onApplyCorrections = @onApplyCorrections;
+        oytdCb_.onAxesButtonDown   = @onAxesButtonDown;
+        oytdCb_.onMouseHover       = @onMouseHover;
+        bosonPlotter.onYTranslateDrag(appData, fig, ax, oytdWidgets_, oytdCb_);
     end
 
     % ── Fit curve visibility / color ─────────────────────────────────────
