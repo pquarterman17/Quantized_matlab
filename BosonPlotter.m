@@ -2447,6 +2447,8 @@ function varargout = BosonPlotter(options)
     ui.lbY              = lbY;
     ui.lbY2             = lbY2;
     ui.lbDatasets       = lbDatasets;
+    ui.btnRemoveDS      = btnRemoveDS;
+    ui.btnMerge         = btnMerge;
     % Scale / display
     ui.ddScaleX         = ddScaleX;
     ui.ddScaleY         = ddScaleY;
@@ -3553,92 +3555,8 @@ function varargout = BosonPlotter(options)
     end
 
     function rebuildDatasetList(keepActiveIdx)
-    %REBUILDDATASETLIST  Sync lbDatasets Items/ItemsData to appData.datasets.
-    %  Applies appData.searchFilter (case-insensitive substring) to the display
-    %  strings, but always keeps the active dataset visible regardless of filter.
-        N = numel(appData.datasets);
-        if N == 0
-            lbDatasets.Items     = {'(no files loaded — click  Add File(s)...  to begin)'};
-            lbDatasets.ItemsData = {0};
-            lbDatasets.Value     = {0};
-            appData.activeIdx    = 0;
-            % Disable dataset-dependent buttons when no data loaded
-            btnRemoveDS.Enable  = 'off';
-            btnMerge.Enable     = 'off';
-            return;
-        else
-            % Re-enable dataset buttons when data is available
-            btnRemoveDS.Enable  = 'on';
-            btnMerge.Enable     = 'on';
-        end
-
-        % Build full display strings for all datasets
-        allItems    = cell(1, N);
-        allIdxData  = num2cell(1:N);
-        dsColors    = zeros(N, 3);  % resolved plot colors for swatch styling
-        defaultCols = plotting.lineColors(N);
-        for i = 1:N
-            dsI = appData.datasets{i};
-            badgeStr = getParserBadge(dsI.parserName);
-            if isfield(dsI,'legendName') && ~isempty(dsI.legendName)
-                displayStr = dsI.legendName;
-            elseif isfield(dsI,'displayName') && ~isempty(dsI.displayName)
-                displayStr = dsI.displayName;
-            else
-                [~, fn, fext] = fileparts(dsI.filepath);
-                displayStr = [fn, fext];
-            end
-            noteTag = '';
-            if isfield(dsI, 'notes') && ~isempty(dsI.notes)
-                noteTag = [' ' char(9998)];  % ✎ pencil
-            end
-            if isfield(dsI,'color') && ~isempty(dsI.color)
-                dsColors(i,:) = dsI.color;
-            else
-                dsColors(i,:) = defaultCols(i,:);
-            end
-            allItems{i} = sprintf('%s [%d]  %s  %s%s', char(9679), i, badgeStr, displayStr, noteTag);
-        end
-
-        % Apply search filter (always keep active dataset visible)
-        filt = strtrim(appData.searchFilter);
-        if isempty(filt)
-            visIdx = 1:N;
-        else
-            filtLC = lower(filt);
-            visIdx = find(cellfun(@(s) contains(lower(s), filtLC), allItems));
-            % Always include active dataset so it stays selectable
-            if keepActiveIdx && appData.activeIdx >= 1 && appData.activeIdx <= N
-                if ~ismember(appData.activeIdx, visIdx)
-                    visIdx = sort([visIdx, appData.activeIdx]);
-                end
-            end
-        end
-
-        if isempty(visIdx)
-            lbDatasets.Items     = {'(no matches)'};
-            lbDatasets.ItemsData = {0};
-            lbDatasets.Value     = {0};
-            return;
-        end
-
-        lbDatasets.Items     = allItems(visIdx);
-        lbDatasets.ItemsData = allIdxData(visIdx);
-
-        if keepActiveIdx && appData.activeIdx >= 1 && appData.activeIdx <= N && ...
-           ismember(appData.activeIdx, visIdx)
-            lbDatasets.Value = {appData.activeIdx};
-        else
-            appData.activeIdx = visIdx(1);
-            lbDatasets.Value  = {visIdx(1)};
-        end
-
-        % Apply color swatches via uistyle per visible item
-        removeStyle(lbDatasets);
-        for si = 1:numel(visIdx)
-            s = uistyle('FontColor', dsColors(visIdx(si),:));
-            addStyle(lbDatasets, s, 'item', si);
-        end
+    %REBUILDDATASETLIST  Delegate — see +bosonPlotter/rebuildDatasetList.m.
+        bosonPlotter.rebuildDatasetList(appData, ui, keepActiveIdx);
     end
 
     function cancelInteractions()
