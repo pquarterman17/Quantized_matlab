@@ -76,6 +76,14 @@ function removeDataset(appData, fig, ax, ui, headless, callbacks)
     end
     appData.datasets(indicesToRemove) = [];
 
+    % Sweep stale overlay graphics + state (fringe markers, peak
+    % annotations, masks, cursors, etc).  cla() on the empty-datasets
+    % branch below does not touch HandleVisibility='off' overlays, so
+    % fringe labels would otherwise linger after the last dataset is
+    % removed.  Partial removes also scrub overlays that may reference
+    % data points belonging to the removed dataset.
+    bosonPlotter.clearOverlays(appData, ax);
+
     if isempty(appData.datasets)
         appData.activeIdx = 0;
         ui.lbDatasets.Items     = {'(no files loaded — click  Add File(s)...  to begin)'};
