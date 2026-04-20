@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-04-19 (W4 Physics shipped; W5 #23/#25/#26/#27 reconciled — already extracted in commits `38246dd` and `97c8096`; added W1 #59 FermiViewer annotations clipping)
+**Last regenerated:** 2026-04-19 (W1 #59 FermiViewer Annotations clipping fixed; W4 Physics shipped; W5 #23/#25/#26/#27 reconciled — already extracted in commits `38246dd` and `97c8096`)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -41,7 +41,6 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 ### MASTERPLAN (MATLAB consolidated) — `plans/MASTERPLAN.md`
 - [ ] **#1** W1 Bugs → FermiViewer right-side tools panel overcrowded (tabled)
-- [ ] **#59** W1 Bugs → FermiViewer Annotations panel clipped when expanded (EDS channel covers buttons)
 - [ ] **#2** W2 UX → Measurement panel expose symbol + color
 - [ ] **#3** W2 UX → Annotation selection + right-panel sync
 - [ ] **#4** W2 UX → Toolbar metrics consistent across all four GUIs (deferred)
@@ -119,7 +118,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 | Plan | Status | Open items | Notes |
 |------|--------|------------|-------|
-| MASTERPLAN (MATLAB consolidated) | Active | 2 T1 / 29 T2 / 20 T3 | 9 source plans consolidated 2026-04-19; W4 Physics (4 items) shipped 2026-04-19; W5 #23/#25/#26/#27 reconciled as already done; W1 #59 added (FermiViewer annotations clipping) |
+| MASTERPLAN (MATLAB consolidated) | Active | 2 T1 / 28 T2 / 20 T3 | 9 source plans consolidated 2026-04-19; W4 Physics (4 items) shipped 2026-04-19; W5 #23/#25/#26/#27 reconciled as already done; W1 #59 (FermiViewer annotations clipping) fixed 2026-04-19 |
 | origin-feature-gap | Active (Python) | 6 T1 / 7 T2 / 1 T3 | MATLAB side complete; Python port pending — excluded from MASTERPLAN |
 | dataworkspace-python-port | Active (Python) | 3 T1 / 3 T2 / 2 T3 | Python-port architecture; excluded from MASTERPLAN |
 | porting_plan | Active (Python) | 7 phase-level items | Thin film toolkit architecture; excluded from MASTERPLAN |
