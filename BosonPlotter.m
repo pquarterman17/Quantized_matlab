@@ -6491,7 +6491,10 @@ function onSendToOrigin(~,~)
                     clearCompletedBoxPatch();
                     appData.boxIntStartPt = [x0, y0];
                     fig.WindowButtonMotionFcn = @(~,~) bosonPlotter.onBoxIntMove(appData, ax);
-                    fig.WindowButtonUpFcn     = @onBoxIntUp;
+                    obiuCb_.onMouseHover             = @onMouseHover;
+                    obiuCb_.clearCompletedBoxPatch   = @clearCompletedBoxPatch;
+                    obiuCb_.extract2DBoxIntegral     = @extract2DBoxIntegral;
+                    fig.WindowButtonUpFcn     = @(~,~) bosonPlotter.onBoxIntUp(appData, fig, ax, obiuCb_);
                 end
                 return;
             end
@@ -6520,63 +6523,6 @@ function onSendToOrigin(~,~)
         ozmuCb_.saveAxisLimsToActiveDataset  = @saveAxisLimsToActiveDataset;
         ozmuCb_.onPlot                       = @() onPlot([],[]);
         bosonPlotter.onZoomMouseUp(appData, fig, ax, ui, ozmuCb_);
-    end
-
-    function onBoxIntUp(~,~)
-    %ONBOXINTUP  Finalise box-integration selection and extract integrated profile.
-    %  On successful integration the rubber-band patch is converted to a
-    %  solid "completed" marker that stays on the map until the next box
-    %  draw, dataset switch, or Reset View — gives visual feedback of
-    %  what region was integrated (previously the patch vanished).
-        % Always restore default motion/up handlers FIRST so later
-        % modal dialogs don't leave callbacks in a half-registered
-        % state. This is a documented uifigure quirk that caused the
-        % second box-draw to register motion incorrectly.
-        fig.WindowButtonMotionFcn = @onMouseHover;
-        fig.WindowButtonUpFcn     = '';
-        if isempty(appData.boxIntStartPt)
-            return;
-        end
-        cp = ax.CurrentPoint;
-        x1 = cp(1,1);  y1 = cp(1,2);
-        x0 = appData.boxIntStartPt(1);
-        y0 = appData.boxIntStartPt(2);
-
-        % Detach the rubber-band handle before clearing state; we may
-        % promote it to a completed-box marker below.
-        dragPatch             = appData.boxIntPatch;
-        appData.boxIntPatch   = [];
-        appData.boxIntStartPt = [];
-        appData.boxIntMode    = false;
-
-        % Minimum drag threshold (1% of axis span in both directions)
-        xDrag = abs(x1 - x0);  xSpan = diff(ax.XLim);
-        yDrag = abs(y1 - y0);  ySpan = diff(ax.YLim);
-        if xDrag < xSpan * 0.01 || yDrag < ySpan * 0.01
-            % Drag was too small to be a real box — drop the rubber-band
-            if ~isempty(dragPatch) && isvalid(dragPatch)
-                delete(dragPatch);
-            end
-            return;
-        end
-
-        % Promote the rubber-band to the "completed box" style (solid
-        % green edge) and keep it visible. A previous completed box, if
-        % any, is replaced so only the most-recent integration is marked.
-        clearCompletedBoxPatch();
-        if ~isempty(dragPatch) && isvalid(dragPatch)
-            dragPatch.LineStyle = '-';
-            dragPatch.EdgeColor = [0.15 0.65 0.30];
-            dragPatch.LineWidth = 2.0;
-            dragPatch.Tag       = 'GUIBoxIntCompleted';
-            appData.boxIntCompletedPatch = dragPatch;
-        end
-        % Record the region coords so the marker can be re-drawn after
-        % any plot refresh (renderPlot calls cla which wipes patches).
-        appData.boxIntCompletedRegion = ...
-            [min(x0,x1) max(x0,x1) min(y0,y1) max(y0,y1)];
-
-        extract2DBoxIntegral(x0, y0, x1, y1);
     end
 
     function clearCompletedBoxPatch()
