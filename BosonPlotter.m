@@ -6401,7 +6401,14 @@ function onSendToOrigin(~,~)
     %  Fires continuously while the mouse moves over the figure in idle (non-drag) mode.
 
         % -- Panel resize border detection: update cursor and store hover direction --
-        dir = detectResizeBorder();
+        dir = bosonPlotter.detectResizeBorder(fig, struct( ...
+            'fileListPanel',  fileListPanel, ...
+            'ctrlPanel',      ctrlPanel, ...
+            'corrPanel',      corrPanel, ...
+            'axLimPanel',     axLimPanel, ...
+            'savePanel',      savePanel, ...
+            'analysisPanel',  analysisPanel, ...
+            'dataTablePanel', dataTablePanel));
         appData.panelResizeDir = dir;
         if     any(strcmp(dir, {'h_row12', 'h_axdata'})), fig.Pointer = 'top';
         elseif any(strcmp(dir, {'v_col12', 'v_col23', 'v_content12', 'v_content23'}))
@@ -6983,79 +6990,6 @@ function onSendToOrigin(~,~)
     end
 
     % ── Panel drag-resize ────────────────────────────────────────────────
-
-    function dir = detectResizeBorder()
-    %DETECTRESIZEBORDER  Check whether fig.CurrentPoint is within SNAP_PX of a
-    %  resizable panel border.  Returns:
-    %    'h_row12'      — horizontal border between content row (1) and analysis row (2)
-    %    'h_axdata'     — horizontal border between axLimPanel and dataTablePanel
-    %    'v_col12'      — vertical border between corrections col (1) and axes col (2)
-    %    'v_col23'      — vertical border between axes col (2) and save/export col (3)
-    %    'v_content12'  — vertical border between file list and controls (top row)
-    %    'v_content23'  — vertical border between controls and preview (top row)
-    %    ''             — not near any known border
-        SNAP_PX = 5;
-        dir = '';
-        try
-            mp   = fig.CurrentPoint;                        % [x y] from figure bottom-left
-            aPos = getpixelposition(analysisPanel, true);   % [l b w h] relative to figure
-
-            % h_row12: top edge of the analysis panel (border between rows 1 & 2)
-            borderY = aPos(2) + aPos(4);
-            if abs(mp(2) - borderY) <= SNAP_PX && ...
-               mp(1) >= aPos(1) && mp(1) <= aPos(1) + aPos(3)
-                dir = 'h_row12'; return;
-            end
-
-            % Borders inside the analysis panel's y-band
-            if mp(2) >= aPos(2) && mp(2) <= aPos(2) + aPos(4)
-
-                % v_col12: right edge of corrections panel
-                cPos    = getpixelposition(corrPanel, true);
-                borderX = cPos(1) + cPos(3);
-                if abs(mp(1) - borderX) <= SNAP_PX
-                    dir = 'v_col12'; return;
-                end
-
-                % v_col23: left edge of savePanel (col 4 — always rightmost)
-                spPos    = getpixelposition(savePanel, true);
-                borderX2 = spPos(1);
-                if abs(mp(1) - borderX2) <= SNAP_PX
-                    dir = 'v_col23'; return;
-                end
-
-                % h_axdata: bottom edge of axLimPanel (border between axes and data table)
-                % Skip when data table is hidden (2D map mode — axes span both rows).
-                if strcmp(dataTablePanel.Visible, 'on')
-                    borderY2 = alPos(2);
-                    if abs(mp(2) - borderY2) <= SNAP_PX && ...
-                       mp(1) >= alPos(1) && mp(1) <= alPos(1) + alPos(3)
-                        dir = 'h_axdata'; return;
-                    end
-                end
-            end
-
-            % Borders inside the content row (top half of figure)
-            flPos = getpixelposition(fileListPanel, true);
-            cpPos = getpixelposition(ctrlPanel, true);
-            if mp(2) >= flPos(2) && mp(2) <= flPos(2) + flPos(4)
-
-                % v_content12: right edge of file list panel
-                borderX3 = flPos(1) + flPos(3);
-                if abs(mp(1) - borderX3) <= SNAP_PX
-                    dir = 'v_content12'; return;
-                end
-
-                % v_content23: right edge of controls panel
-                borderX4 = cpPos(1) + cpPos(3);
-                if abs(mp(1) - borderX4) <= SNAP_PX
-                    dir = 'v_content23'; return;
-                end
-            end
-        catch
-            % getpixelposition may throw on some MATLAB versions — silently skip
-        end
-    end
 
     function startPanelResize()
     %STARTPANELRESIZE  Delegate to extracted +bosonPlotter module.
