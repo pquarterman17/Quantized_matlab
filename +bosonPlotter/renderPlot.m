@@ -1039,8 +1039,7 @@ function u = guiXUnit(meta)
 end
 
 function s = guiLabel(name, unit)
-    if isempty(unit), s = name;
-    else, s = sprintf('%s (%s)', name, unit); end
+    s = bosonPlotter.smartLabel(name, unit);
 end
 
 function ls = guiLineSpec(style, a)

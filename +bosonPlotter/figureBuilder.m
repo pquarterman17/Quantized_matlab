@@ -3114,46 +3114,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
 
         function s = guiLabel(name, unit)
         %GUILABEL  Format an axis label: "Name (unit)" or just "Name".
-            name = greekify(name);
-            if isempty(unit)
-                s = name;
-            else
-                s = [name, ' (', greekify(unit), ')'];
-            end
-        end
-
-        function s = greekify(s)
-        %GREEKIFY  Replace spelled-out Greek letter names with Unicode characters.
-            pairs = {
-                'degrees', '°';
-                'epsilon', 'ε';
-                'degree',  '°';
-                'lambda',  'λ';
-                'omega',   'ω';
-                'theta',   'θ';
-                'sigma',   'σ';
-                'alpha',   'α';
-                'gamma',   'γ';
-                'delta',   'δ';
-                'kappa',   'κ';
-                'beta',    'β';
-                'zeta',    'ζ';
-                'phi',     'φ';
-                'chi',     'χ';
-                'psi',     'ψ';
-                'tau',     'τ';
-                'rho',     'ρ';
-                'deg',     '°';
-                'eta',     'η';
-                'mu',      'μ';
-                'nu',      'ν';
-                'xi',      'ξ';
-                'pi',      'π';
-            };
-            for k = 1:size(pairs, 1)
-                pat = ['(?i)(?<![a-zA-Z])', pairs{k,1}, '(?![a-zA-Z])'];
-                s   = regexprep(s, pat, pairs{k,2});
-            end
+            s = bosonPlotter.smartLabel(name, unit);
         end
 
         function idx = findErrorColumn(labels, yLabel)
