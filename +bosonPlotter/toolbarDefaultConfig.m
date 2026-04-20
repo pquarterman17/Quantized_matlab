@@ -12,9 +12,9 @@ function ids = toolbarDefaultConfig()
 % ── Examples ──────────────────────────────────────────────────────────────
 %
 %   ids = bosonPlotter.toolbarDefaultConfig();
-%   % ids == {'cursor','autoscale','grid','legend','copy','save'}
+%   % ids == {'cursor','autoscale','clearOverlays','grid','legend','copy','save'}
 %
 % ════════════════════════════════════════════════════════════════════════
 
-    ids = {'cursor', 'autoscale', 'grid', 'legend', 'copy', 'save'};
+    ids = {'cursor', 'autoscale', 'clearOverlays', 'grid', 'legend', 'copy', 'save'};
 end

@@ -804,6 +804,9 @@ function varargout = BosonPlotter(options)
     tbActions(end+1) = struct('id','autoscale',  'label','Auto',   ...
         'tooltip','Reset all axis limits to auto-scale', ...
         'callback',@(~,~) onAutoLimits([],[]));
+    tbActions(end+1) = struct('id','clearOverlays', 'label','Clear', ...
+        'tooltip','Clear all overlays (fringe markers, peaks, masks, cursors, zoom boxes, annotations)', ...
+        'callback',@(~,~) onClearOverlays([],[]));
     tbActions(end+1) = struct('id','grid',       'label','Grid',   ...
         'tooltip','Toggle grid lines on/off', ...
         'callback',@(~,~) onContextToggle('grid'));
@@ -6348,6 +6351,15 @@ function onSendToOrigin(~,~)
         saveAxisLimsToActiveDataset();
         updateControlsForActiveDataset();   % re-pull parser defaults
         onPlot([],[]);
+    end
+
+    function onClearOverlays(~,~)
+    %ONCLEAROVERLAYS  Toolbar action — strip all interactive overlays
+    %  (fringe markers/labels, peak annotations, masks, zoom boxes,
+    %  cursor markers, smoothing preview, user annotations) from the
+    %  plot and reset their appData state.  Leaves datasets untouched.
+        bosonPlotter.clearOverlays(appData, ax);
+        setStatus('Overlays cleared.');
     end
 
     function onEditAxisLabelsMenu()
