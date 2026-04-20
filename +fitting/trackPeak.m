@@ -32,6 +32,25 @@ function result = trackPeak(datasets, seedPosition, options)
 %       % Track Bragg peak at 2θ = 45.2° across temperature series
 %       r = fitting.trackPeak(scans, 45.2, Window=1.5, Shape='lorentzian');
 %       plot(temperatures, r.center, 'o-');  % peak shift vs T
+%
+%   Width-to-FWHM conventions
+%   ─────────────────────────────
+%   The local fit returns a width parameter that is converted to FWHM:
+%
+%     Gaussian:    sigma -> FWHM = 2*sqrt(2*ln 2) * sigma  ~ 2.355 * sigma
+%     Lorentzian:  gamma -> FWHM = 2 * gamma
+%
+%   Integrated areas use the analytical forms
+%
+%     Gaussian:    A = amplitude * sigma * sqrt(2*pi)
+%     Lorentzian:  A = amplitude * pi * gamma
+%
+%   The "Follow" mode is essential for steep peak migration (e.g. lattice
+%   thermal expansion across a phase transition) — without it the search
+%   window stays anchored at the seed and may lose the peak.
+%
+%   See also fitting.pawleyRefine (whole-pattern fit when peaks overlap),
+%   fitting.curveFit (the underlying single-peak optimiser).
 
 arguments
     datasets     cell

@@ -19,10 +19,30 @@ function [z, sld] = sldProfile(layers, options)
 %       z   — [N×1] depth vector (Å), 0 = top of first film layer
 %       sld — [N×1] real SLD profile (Å⁻²)
 %
+%   Method
+%   ─────────────────────────────
+%   The profile is built as a sum of error-function transitions, one per
+%   interface, which is the real-space dual of Nevot-Croce roughness in
+%   the reflectivity calculation:
+%
+%       rho(z) = rho_1 + sum_{j>=2}  (Drho_j/2) * [1 + erf((z - z_{j-1}) / (sigma_j * sqrt(2)))]
+%
+%   where Drho_j = rho_j - rho_{j-1} is the SLD contrast at interface j
+%   and sigma_j is the rms roughness (in A). When sigma_j -> 0 the erf
+%   collapses to a step at z = z_{j-1}, recovering the box model.
+%   A small floor (sigma >= 0.5 A) is enforced to avoid the singular limit.
+%
 %   Example:
 %       layers = [0 0 0 0; 200 3.47e-6 0 5; 0 2.07e-6 0 3];
 %       [z, sld] = fitting.sldProfile(layers);
 %       plot(z, sld * 1e6);  ylabel('SLD (10^{-6} Å^{-2})');
+%
+%   References
+%   ─────────────────────────────
+%   - Nevot, L. & Croce, P., "Caracterisation des surfaces par reflexion
+%     rasante de rayons X", Rev. Phys. Appl. 15, 761-779 (1980).
+%   - Als-Nielsen, J. & McMorrow, D., "Elements of Modern X-ray Physics",
+%     2nd ed., Wiley, 2011, Ch. 3.
 
 arguments
     layers  (:,4) double

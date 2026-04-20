@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-04-19 (W1 #59 FermiViewer Annotations clipping fixed; W3 #17 Smart axis labels shipped; W4 Physics shipped; W5 #23/#25/#26/#27 reconciled — already extracted in commits `38246dd` and `97c8096`)
+**Last regenerated:** 2026-04-19 (W1 #59 fixed; W3 #17 Smart axis labels shipped; W4 Physics shipped; W5 #23/#25/#26/#27 reconciled — already extracted in commits `38246dd` and `97c8096`; W6 #41 + #43 docs shipped)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -61,7 +61,6 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#38** W6 Docs → Tutorial: reflectometry-workflow.md
 - [ ] **#39** W6 Docs → Tutorial: transport-workflow.md
 - [ ] **#40** W6 Docs → Tutorial: eels-analysis-workflow.md
-- [ ] **#41** W6 Docs → Tutorial: curve-fitting-workflow.md
 - [ ] **#47** W7 Parsers → `importOxford` (paused — awaiting example file)
 - [ ] **#48** W7 Parsers → `importOpus` (paused — awaiting example file)
 - [ ] **#50** W8 DataWorkspace → Shared model migration (PARTIAL)
@@ -97,7 +96,6 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#16** W3 Features → 2D histogram / density plot
 - [ ] **#28** W5 Decomposition → Extract FermiViewer measurement subsystem
 - [ ] **#42** W6 Docs → Docstring upgrade: `+calc/` formulas
-- [ ] **#43** W6 Docs → Docstring upgrade: `+fitting/` formulas
 - [ ] **#44** W6 Docs → Docstring upgrade: `+utilities/` physics functions
 - [ ] **#45** W6 Docs → Docstring upgrade: `+imaging/` physics functions
 - [ ] **#46** W6 Docs → Plan hygiene: update physics-analysis-gaps.md
@@ -117,7 +115,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 | Plan | Status | Open items | Notes |
 |------|--------|------------|-------|
-| MASTERPLAN (MATLAB consolidated) | Active | 2 T1 / 28 T2 / 19 T3 | 9 source plans consolidated 2026-04-19; W4 Physics (4 items) shipped 2026-04-19; W5 #23/#25/#26/#27 reconciled as already done; W1 #59 (FermiViewer annotations clipping) and W3 #17 (smart axis labels) fixed 2026-04-19 |
+| MASTERPLAN (MATLAB consolidated) | Active | 2 T1 / 27 T2 / 18 T3 | 9 source plans consolidated 2026-04-19; W4 Physics (4 items) shipped 2026-04-19; W5 #23/#25/#26/#27 reconciled as already done; W1 #59 (annotations clipping), W3 #17 (smart axis labels), W6 #41 (curve-fitting tutorial) and W6 #43 (+fitting docstrings + theory) shipped 2026-04-19 |
 | origin-feature-gap | Active (Python) | 6 T1 / 7 T2 / 1 T3 | MATLAB side complete; Python port pending — excluded from MASTERPLAN |
 | dataworkspace-python-port | Active (Python) | 3 T1 / 3 T2 / 2 T3 | Python-port architecture; excluded from MASTERPLAN |
 | porting_plan | Active (Python) | 7 phase-level items | Thin film toolkit architecture; excluded from MASTERPLAN |

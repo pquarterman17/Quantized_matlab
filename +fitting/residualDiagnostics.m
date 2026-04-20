@@ -25,6 +25,40 @@ function diag = residualDiagnostics(residuals)
 %       r = randn(100, 1);
 %       d = fitting.residualDiagnostics(r);
 %       fprintf('%s\n', d.summary);
+%
+%   Diagnostic formulas
+%   ─────────────────────────────
+%   Q-Q plot uses Blom plotting positions  p_i = (i - 3/8)/(n + 1/4),
+%   then x_i = Phi^{-1}(p_i). A straight line on (qqX, qqY) implies
+%   normally distributed residuals.
+%
+%   Durbin-Watson statistic:
+%
+%       DW = sum_{i=2..n} (r_i - r_{i-1})^2 / sum_i r_i^2
+%
+%   DW ~ 2 indicates no first-order autocorrelation; DW < 1.5 indicates
+%   positive autocorrelation (typical when the model is missing a
+%   trend); DW > 2.5 indicates negative autocorrelation. Critical values
+%   depend on n and the number of regressors (Durbin & Watson 1951).
+%
+%   Wald-Wolfowitz runs test: under random sign sequencing, the number
+%   of runs R has mean and variance
+%
+%       mu_R   = 2*nPos*nNeg/n + 1
+%       var_R  = 2*nPos*nNeg*(2*nPos*nNeg - n) / (n^2 * (n - 1))
+%
+%   and Z = (R - mu_R)/sqrt(var_R) is approximately standard normal for
+%   nPos, nNeg >= 10. Significant Z (|Z| > 1.96) indicates structure
+%   missed by the model.
+%
+%   References
+%   ─────────────────────────────
+%   - Durbin, J. & Watson, G.S., "Testing for serial correlation in least
+%     squares regression. II", Biometrika 38, 159-178 (1951).
+%   - Wald, A. & Wolfowitz, J., "On a test whether two samples are from
+%     the same population", Ann. Math. Stat. 11, 147-162 (1940).
+%   - Bevington, P.R. & Robinson, D.K., "Data Reduction and Error
+%     Analysis", 3rd ed., McGraw-Hill, 2003. Ch. 4 (residual analysis).
 
 arguments
     residuals double

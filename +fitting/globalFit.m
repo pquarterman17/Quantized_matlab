@@ -40,6 +40,15 @@ function result = globalFit(datasets, modelFcn, p0, sharedMask, options)
 %       r = fitting.globalFit(datasets, expFcn, [1 2 0], shared);
 %       fprintf('Shared τ = %.2f ± %.2f\n', r.sharedParams(1), r.sharedErrors(1));
 %       disp(r.perDataset(:,1));  % per-dataset A values
+%
+%   See also fitting.globalCurveFit (richer per-dataset model + named
+%   shared-parameter constraints), fitting.batchFit (independent fits).
+%
+%   Reference
+%   ─────────────────────────────
+%   - Beechem, J.M., "Global analysis of biochemical and biophysical data",
+%     Methods Enzymol. 210, 37-54 (1992). The canonical introduction to
+%     the shared-parameter / per-dataset fitting framework.
 
 arguments
     datasets   cell

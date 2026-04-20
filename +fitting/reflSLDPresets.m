@@ -14,10 +14,37 @@ function presets = reflSLDPresets()
 %       .sldImag  — absorption SLD (Å⁻², imaginary part; 0 if negligible)
 %       .density  — mass density (g/cm³)
 %
+%   Notes:
+%       The X-ray SLDs are computed for Cu Kα1 (8.04 keV) using
+%
+%           rho_x = r_e * rho_e,
+%
+%       where r_e = 2.8179e-15 m is the classical electron radius and
+%       rho_e = (rho_m * N_A / M) * sum_i n_i * Z_i is the electron number
+%       density. Neutron SLDs use the bound coherent scattering lengths
+%       tabulated by Sears (1992):
+%
+%           rho_n = (rho_m * N_A / M) * sum_i n_i * b_i.
+%
+%       Negative neutron SLDs (Ti, H2O, polyethylene) reflect the negative
+%       coherent scattering length of those isotopes — exploit this for
+%       contrast matching in neutron experiments.
+%
 %   Example:
 %       p = fitting.reflSLDPresets();
 %       si = p(strcmp({p.name}, 'Silicon'));
 %       fprintf('Si SLD (neutron): %.4e Å⁻²\n', si.sldN);
+%
+%   References
+%   ─────────────────────────────
+%   - Sears, V.F., "Neutron scattering lengths and cross sections",
+%     Neutron News 3(3), 26-37 (1992).
+%   - Henke, B.L., Gullikson, E.M. & Davis, J.C., "X-ray interactions:
+%     photoabsorption, scattering, transmission, and reflection at
+%     E = 50-30000 eV, Z = 1-92", At. Data Nucl. Data Tables 54, 181 (1993).
+%   - NIST Center for Neutron Research SLD calculator,
+%     https://www.ncnr.nist.gov/resources/activation/ — independent
+%     cross-check for any preset value.
 
 % Helper to build one entry
     function m = mat(name, formula, sldX, sldN, sldImag, density)

@@ -53,6 +53,33 @@ function results = globalCurveFit(datasets, models, constraints, options)
 %
 %       % No shared params — equivalent to batch independent fits
 %       r = fitting.globalCurveFit(datasets, gauss, []);
+%
+%   Method
+%   ─────────────────────────────
+%   The global cost is the sum of per-dataset weighted residual sums:
+%
+%       chi2_global = sum_k  sum_i  w_{k,i} * (y_{k,i} - f_k(x_{k,i}; p_k))^2
+%
+%   Each dataset has its own parameter vector p_k. Shared parameters are
+%   represented once in a "super-vector" of length nGroups + n_independent
+%   slots; constrained-bounded transforms are applied (see curveFit).
+%   Standard errors come from the central-difference Hessian of the global
+%   cost, scaled by the global reduced chi-squared.
+%
+%   When to use:
+%     - Same model applied to multiple measurements (e.g. temperature
+%       series) where you have prior knowledge that some parameters
+%       cannot vary across measurements (instrument FWHM, lattice
+%       constant of a stable phase, baseline offset).
+%     - Reduces the effective parameter count vs. independent batch
+%       fitting and tightens uncertainties on the shared parameters.
+%
+%   References
+%   ─────────────────────────────
+%   - Beechem, J.M., "Global analysis of biochemical and biophysical data",
+%     Methods Enzymol. 210, 37-54 (1992). DOI: 10.1016/0076-6879(92)10004-W
+%   - Bevington, P.R. & Robinson, D.K., "Data Reduction and Error Analysis
+%     for the Physical Sciences", 3rd ed., McGraw-Hill, 2003. Ch. 8.
 
 arguments
     datasets   (1,:) cell

@@ -42,6 +42,28 @@ function result = surfaceFit(xData, yData, zData, model, options)
 %     Z = 3*exp(-X.^2/2 - Y.^2/2);
 %     result = fitting.surfaceFit(X, Y, Z, '2D Gaussian');
 %     fprintf('Center: (%.3f, %.3f)\n', result.params(2), result.params(4));
+%
+%   Method
+%   ─────────────────────────────
+%   The surface analogue of fitting.curveFit. Minimises
+%
+%       chi2 = sum_i  (z_i - f(x_i, y_i; p))^2
+%
+%   over the bounded parameter space using fminsearch with the same
+%   logit-style bound transform. Errors come from the central-difference
+%   Hessian of chi2, scaled by the reduced chi-squared.
+%
+%   For diffraction-map fits (q_x, q_z, intensity) the most useful models
+%   are '2D Gaussian' or '2D Pseudo-Voigt'; for surface-topography (height
+%   vs. (x,y)) use 'Plane' or 'Paraboloid' to subtract sample tilt before
+%   measuring rms roughness.
+%
+%   Reference
+%   ─────────────────────────────
+%   - Bevington, P.R. & Robinson, D.K., "Data Reduction and Error Analysis",
+%     3rd ed., McGraw-Hill, 2003. Ch. 8 (least-squares for multidimensional
+%     models). The covariance / Jacobian propagation here is the same as in
+%     fitting.curveFit.
 
 arguments
     xData  double

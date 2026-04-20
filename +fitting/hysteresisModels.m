@@ -13,10 +13,47 @@ function catalog = hysteresisModels()
 %     'Approach to Saturation' — M = Ms(1 - a/H - b/H²) + χ·H
 %     'Langevin + Background'  — M = Ms·L(μH/kT) + χ·H
 %
+%   Model formulas (with units)
+%   ─────────────────────────────
+%   H is the applied field (Oe or A/m); M is magnetization (emu, or any
+%   linear unit); chi is dimensionless volume susceptibility (or per-mass
+%   if M is in emu/g). The tanh-based forms are empirical descriptors of
+%   irreversible switching, NOT full Stoner-Wohlfarth astroid solutions.
+%
+%     Tanh Hysteresis     M(H) = Ms * tanh((H - Hc)/Hw)
+%     Two-Component (F+P) M(H) = Ms * tanh((H - Hc)/Hw) + chi * H
+%                         (ferromagnetic loop + paramagnetic background)
+%     Linear Background   M(H) = chi * H + offset
+%     Approach to Sat.    M(H) = Ms * (1 - a/H - b/H^2) + chi * H
+%                         (high-field expansion, Akulov 1931)
+%     Langevin + BG       M(H) = Ms * L(mu*H/kT) + chi * H,
+%                         L(x) = coth(x) - 1/x
+%                         (superparamagnetic clusters with linear BG)
+%
+%   When to use which:
+%     - Tanh / F+P: soft ferromagnets, thin films with linear paramagnetic
+%       contamination from substrate.
+%     - Approach to Saturation: estimate Ms from data near saturation
+%       without full loop fitting.
+%     - Langevin + BG: superparamagnetic nanoparticle assemblies above
+%       blocking temperature.
+%
 %   Example:
 %       cat = fitting.hysteresisModels();
 %       m = cat(strcmp({cat.name}, 'Two-Component (F+P)'));
 %       R = fitting.curveFit(H, M, m.fcn, m.p0, Lower=m.lb, Upper=m.ub);
+%
+%   References
+%   ─────────────────────────────
+%   - Cullity, B.D. & Graham, C.D., "Introduction to Magnetic Materials",
+%     2nd ed., Wiley/IEEE, 2009. Ch. 9 (hysteresis), Ch. 11 (super-
+%     paramagnetism), Ch. 7 (approach-to-saturation analysis).
+%   - Akulov, N.S., "Zur Theorie der Magnetisierungskurve von Einkristallen",
+%     Z. Phys. 67, 794 (1931). (a/H + b/H^2 expansion.)
+%   - Stoner, E.C. & Wohlfarth, E.P., "A mechanism of magnetic hysteresis
+%     in heterogeneous alloys", Phil. Trans. R. Soc. A 240, 599 (1948).
+%   - Bean, C.P. & Livingston, J.D., "Superparamagnetism", J. Appl. Phys.
+%     30, 120S (1959). DOI: 10.1063/1.2185850
 
 INF = Inf;
 

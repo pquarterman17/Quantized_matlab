@@ -41,6 +41,41 @@ function metrics = fitCompare(yData, residuals, nParams, options)
 %       m3 = fitting.fitCompare(y, res3.residuals, 3, ...
 %           ResidRef=res2.residuals, NParamsRef=2);
 %       fprintf('F(1,%d) = %.3f  p = %.4f\n', numel(y)-3, m3.fStat, m3.fPvalue);
+%
+%   Formulas
+%   ─────────────────────────────
+%   For RSS = sum(residuals.^2), TSS = sum((y - mean(y)).^2), n samples,
+%   p free parameters:
+%
+%       R^2     = 1 - RSS/TSS
+%       adj-R^2 = 1 - (1 - R^2) * (n - 1)/(n - p - 1)
+%       AIC     = n*log(RSS/n) + 2*p              (Gaussian-error form, +const)
+%       AICc    = AIC + 2*p*(p+1)/(n - p - 1)     (small-sample correction)
+%       BIC     = n*log(RSS/n) + p*log(n)         (Schwarz criterion)
+%
+%   For nested models with RSS_full < RSS_ref (p_full > p_ref):
+%
+%       F = [(RSS_ref - RSS_full)/(p_full - p_ref)] / [RSS_full/(n - p_full)]
+%
+%   distributed as F(p_full - p_ref, n - p_full) under the null hypothesis
+%   that the extra parameters are zero.
+%
+%   Interpretation guidelines (informal): differences in AIC of 2 are
+%   "weak", 4-7 "considerable", > 10 "decisive" (Burnham & Anderson 2002).
+%   BIC penalises complexity more aggressively than AIC for n >= 8.
+%
+%   References
+%   ─────────────────────────────
+%   - Akaike, H., "A new look at the statistical model identification",
+%     IEEE Trans. Automat. Contr. 19, 716-723 (1974).
+%   - Schwarz, G., "Estimating the dimension of a model", Ann. Statist. 6,
+%     461-464 (1978).
+%   - Burnham, K.P. & Anderson, D.R., "Model Selection and Multimodel
+%     Inference", 2nd ed., Springer, 2002. (AIC/AICc decision rules.)
+%   - Hurvich, C.M. & Tsai, C.L., "Regression and time series model
+%     selection in small samples", Biometrika 76, 297-307 (1989). (AICc.)
+%   - Bevington, P.R. & Robinson, D.K., "Data Reduction and Error Analysis",
+%     3rd ed., McGraw-Hill, 2003. Ch. 11 (F-test for nested models).
 
 arguments
     yData     (:,1) double

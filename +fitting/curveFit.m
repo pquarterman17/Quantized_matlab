@@ -42,6 +42,49 @@ function result = curveFit(xData, yData, modelFcn, p0, options)
 %       .nIter     — number of iterations used
 %       .nFree     — number of free parameters
 %       .nPoints   — number of data points
+%
+%   Method
+%   ─────────────────────────────
+%   Minimizes the (weighted) sum of squared residuals
+%
+%       chi2 = sum_i  w_i * (y_i - f(x_i; p))^2
+%
+%   using MATLAB's fminsearch (Nelder-Mead simplex). Bounded parameters
+%   are mapped to an unbounded inner optimization variable via a
+%   logit-style transform; errors are propagated back through the
+%   transform's Jacobian. Parameter standard errors are read from the
+%   diagonal of the covariance matrix
+%
+%       Cov(p_hat) = inv(H/2) * chiSqRed,
+%
+%   where H is the central-difference Hessian of chi2 at the optimum and
+%   chiSqRed = sum(residuals.^2) / (N - nFree). R2 is computed against the
+%   weighted total sum of squares; AIC uses the Gaussian-error log-likelihood
+%   form  AIC = 2*nFree - 2*logL = N*log(chiSqRed) + 2*nFree (+ constant).
+%
+%   Example
+%   ─────────────────────────────
+%       % Exponential decay with bounds and a fixed offset
+%       x  = linspace(0, 5, 60)';
+%       y  = 2.0 * exp(-x/1.3) + 0.05 + 0.02*randn(60,1);
+%       fcn = @(x,p) p(1)*exp(-x./p(2)) + p(3);
+%       res = fitting.curveFit(x, y, fcn, [1 1 0], ...
+%                Lower=[0 0 -1], Upper=[Inf Inf 1], ...
+%                Fixed=[false false false]);
+%       fprintf('A   = %.3f ± %.3f\n', res.params(1), res.errors(1));
+%       fprintf('tau = %.3f ± %.3f\n', res.params(2), res.errors(2));
+%       fprintf('R^2 = %.4f\n', res.R2);
+%
+%   References
+%   ─────────────────────────────
+%   - Bevington, P.R. & Robinson, D.K., "Data Reduction and Error Analysis
+%     for the Physical Sciences", 3rd ed., McGraw-Hill, 2003. Ch. 8 (least
+%     squares) and Ch. 11 (parameter errors via curvature matrix).
+%   - Nelder, J.A. & Mead, R., "A Simplex Method for Function Minimization",
+%     Computer Journal 7, 308-313 (1965). DOI: 10.1093/comjnl/7.4.308
+%   - Lagarias, J.C. et al., "Convergence Properties of the Nelder-Mead
+%     Simplex Method in Low Dimensions", SIAM J. Optim. 9, 112-147 (1998).
+%     (MATLAB's fminsearch implementation reference.)
 
 arguments
     xData    (:,1) double

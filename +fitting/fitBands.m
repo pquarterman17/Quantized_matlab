@@ -37,6 +37,45 @@ function bands = fitBands(xGrid, modelFcn, params, covar, nPoints, nFree, option
 %         by a Cornish-Fisher correction for the t-distribution.
 %       - If covar is empty or non-positive-semi-definite, NaN bands are
 %         returned gracefully.
+%
+%   Method
+%   ─────────────────────────────
+%   At each grid point x_i, the predicted-mean variance is
+%
+%       var_CI(x_i) = J(x_i) * Cov(p_hat) * J(x_i)',
+%
+%   where J(x_i) = ∂f/∂p evaluated at the best-fit parameters. The
+%   prediction-band variance adds the residual variance estimate:
+%
+%       var_PI(x_i) = var_CI(x_i) + s^2.
+%
+%   Half-bandwidth is t_(alpha/2, dof) * sqrt(var). See Bevington Eq. 8.13
+%   (covariance) and Draper & Smith Eq. 1.4.7 (prediction interval).
+%
+%   Example
+%   ─────────────────────────────
+%       % Linear fit, then 95% bands on a fine grid
+%       x   = linspace(0, 10, 30)';
+%       y   = 2.5*x + 1 + 0.3*randn(30,1);
+%       res = fitting.curveFit(x, y, @(x,p) p(1)*x + p(2), [1 0]);
+%       xg  = linspace(0, 10, 200)';
+%       b   = fitting.fitBands(xg, @(x,p) p(1)*x + p(2), ...
+%                res.params, res.covar, res.nPoints, res.nFree, Level=0.95);
+%       figure; hold on
+%       plot(x, y, 'k.', xg, b.yFit, 'r-')
+%       fill([xg; flipud(xg)], [b.ciLo; flipud(b.ciHi)], 'r', ...
+%            FaceAlpha=0.2, EdgeColor='none')
+%
+%   References
+%   ─────────────────────────────
+%   - Bevington, P.R. & Robinson, D.K., "Data Reduction and Error Analysis
+%     for the Physical Sciences", 3rd ed., McGraw-Hill, 2003. Ch. 8.
+%   - Draper, N.R. & Smith, H., "Applied Regression Analysis", 3rd ed.,
+%     Wiley, 1998. Ch. 1 and 5 (confidence vs. prediction intervals).
+%   - Abramowitz, M. & Stegun, I.A., "Handbook of Mathematical Functions",
+%     §26.2.23 (rational approximation for the inverse normal CDF).
+%   - Hill, G.W. (1970), "Algorithm 395: Student's t-distribution",
+%     Comm. ACM 13, 617-619 (Cornish-Fisher t-quantile).
 
 arguments
     xGrid    (:,1) double
