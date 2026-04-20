@@ -6657,47 +6657,12 @@ function onSendToOrigin(~,~)
     end
 
     function executeFixedBoxIntegration(cx, cy)
-    %EXECUTEFIXEDBOXINTEGRATION  Place a fixed-size box centred at (cx,cy) and integrate.
-    %  Inf in boxW/boxH (from an "all"/":"/"*" keyword) is resolved to the
-    %  active map's full axis2/axis1 extent so "full range" means the real
-    %  data span, not just whatever slice the user has zoomed into.
-        clearBoxPreview();
-        [~, boxW, boxH] = hasFixedBoxSize();
-        if isinf(boxW) || isinf(boxH)
-            map = appData.datasets{appData.activeIdx}.data.metadata.parserSpecific.map2D;
-        end
-        if isinf(boxW)
-            xLo = min(map.axis2(:));  xHi = max(map.axis2(:));
-        else
-            hw = boxW / 2;
-            xLo = cx - hw;  xHi = cx + hw;
-        end
-        if isinf(boxH)
-            yLo = min(map.axis1(:));  yHi = max(map.axis1(:));
-        else
-            hh = boxH / 2;
-            yLo = cy - hh;  yHi = cy + hh;
-        end
-
-        % Draw overlay showing the fixed-size box and keep it visible as
-        % the "completed box" marker for this integration.
-        clearCompletedBoxPatch();
-        hold(ax, 'on');
-        hBoxOverlay = patch(ax, ...
-            [xLo xHi xHi xLo xLo], [yLo yLo yHi yHi yLo], ...
-            'k', ...
-            'FaceAlpha',       0, ...
-            'EdgeColor',       [0.15 0.65 0.30], ...
-            'LineStyle',       '-', ...
-            'LineWidth',       2.0, ...
-            'Tag',             'GUIBoxIntCompleted', ...
-            'HandleVisibility','off');
-        hold(ax, 'off');
-        drawnow;
-        appData.boxIntCompletedPatch  = hBoxOverlay;
-        appData.boxIntCompletedRegion = [xLo xHi yLo yHi];
-
-        extract2DBoxIntegral(xLo, yLo, xHi, yHi);
+    %EXECUTEFIXEDBOXINTEGRATION  Delegate — see +bosonPlotter/executeFixedBoxIntegration.m.
+        efbiCb_.clearBoxPreview        = @clearBoxPreview;
+        efbiCb_.hasFixedBoxSize        = @hasFixedBoxSize;
+        efbiCb_.clearCompletedBoxPatch = @clearCompletedBoxPatch;
+        efbiCb_.extract2DBoxIntegral   = @extract2DBoxIntegral;
+        bosonPlotter.executeFixedBoxIntegration(appData, ax, cx, cy, efbiCb_);
     end
 
     function onFigSizeChanged(~,~)
