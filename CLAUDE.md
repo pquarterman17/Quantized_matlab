@@ -171,6 +171,16 @@ MATLAB silently allows `uigridlayout` clipping: if a parent row allocates 22 px 
 - Each dataset stores axis limits in `ds.axLims` (persisted across switches)
 - Peak Analysis window: see [docs/gui_bosonplotter.md](docs/gui_bosonplotter.md)
 
+### BosonPlotter — where new code goes
+MASTERPLAN W5 #22 targets `BosonPlotter.m` under 8,000 lines. Without a policy, new features tend to land inside the monolith as fast as extractions pull lines out and the target never arrives. Rule for any new BosonPlotter code:
+
+- **Default to `+bosonPlotter/<feature>.m`** — implement the feature as a public package function that takes the handles/state it needs (typically the `ui` struct + callback structs like `corrCb_`, `ptCb_`, `anaCb_`). Call it from a minimal nested dispatcher in `BosonPlotter.m`.
+- **Do not add new nested functions to `BosonPlotter.m`** unless they are one- or two-liners that merely forward to a `+bosonPlotter/` helper. The legacy nested-function pattern is closed for new code.
+- **Never add doubly-nested functions** (8-space indent) to `BosonPlotter.m` — see `matlab-gui-complexity.md` for why (parser-slot cost and worse refactorability).
+- **Enforcement:** `tests/gui/test_bosonPlotterSize.m` asserts `BosonPlotter.m <= 8,650 lines` and nested-fn total `<= 290`. Runs via `runAllTests(Group="gui")`. **Ratchet the ceiling downward** as extractions lower the baseline; never raise it to accept growth. Current baseline: 8,609 lines / 270 nested fns (2026-04-21).
+
+This policy applies to `BosonPlotter.m` specifically. `FermiViewer.m` and `DiraCulator.m` have separate cap-tracking memories — apply the same pattern if they grow unchecked.
+
 ### DataWorkspace
 - BosonPlotter creates `appData.model` (a `WorkspaceModel`) at startup; both the toolbar "Workspace" button and the "Open in DataWorkspace" button pass `Model=appData.model` so both windows share the same instance
 - All data mutations go through `WorkspaceModel` methods, never by writing `model.datasets{k}` directly (`SetAccess=private`)

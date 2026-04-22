@@ -102,6 +102,7 @@ SUITES = {
     T('gui','test_styleResolution'),        'gui',    'Style resolution: template/global/ds/channel precedence chain + user templates'
     T('gui','test_renderPlot_styling'),     'gui',    'renderPlot styling: live template switches apply FontName/Size/LineWidth/TickDir to axes'
     T('gui','test_layoutIntegrity'),        'gui',    'Layout integrity: walk uigridlayout tree + flag clipped / zero-size / undersized nested grids'
+    T('gui','test_bosonPlotterSize'),       'gui',    'Size ratchet: BosonPlotter.m line count + nested-fn count stay under their ceilings (see W5 #22)'
     T('gui','test_magUnitConversion'),      'gui',    'Mag unit conversion: Oe→T live dropdown change + ds.data preservation + missing-mass warn'
     T('gui','test_plotStyleDialog'),        'gui',    'Plot Style dialog (Phase B) + session round-trip (Phase C): overrides, precedence, reset, save/load'
     T('gui','test_rowLevelMasking'),        'gui',    'Row-level masking: no mask column, context menu, soft-red row style'
