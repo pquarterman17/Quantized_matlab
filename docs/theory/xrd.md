@@ -480,6 +480,69 @@ The canonical representative for each group of equivalent reflections is chosen 
 
 ---
 
+## Reciprocal-Space Map Decomposition (`rsmAnalyze`, `rsmStrain`)
+
+A reciprocal-space map (RSM) around an asymmetric reflection is the standard probe for epitaxial-film mismatch: the substrate and the film appear as two distinct peaks in the $(Q_x, Q_z)$ plane, and their relative position encodes both the in-plane and out-of-plane lattice parameters of the film.
+
+### Reciprocal-space coordinates
+
+From an area-detector scan in $(\omega, 2\theta)$ with wavelength $\lambda$:
+
+$$
+Q_x = \frac{2\pi}{\lambda}\,[\cos\omega - \cos(2\theta - \omega)]
+$$
+
+$$
+Q_z = \frac{2\pi}{\lambda}\,[\sin\omega + \sin(2\theta - \omega)]
+$$
+
+These conversions are already populated by `parser.computeQSpace` whenever the XRDML file carries a wavelength. `fitting.rsmAnalyze` fits each peak in angle space *and* in $Q$ space using the same detector pixels.
+
+### Peak decomposition
+
+`fitting.rsmAnalyze(map, NPeaks=N)` runs four stages:
+
+1. **Smoothing.** A separable 1D Gaussian kernel of standard deviation `SmoothSigma` (pixels) is convolved along each axis to suppress single-pixel noise before peak-finding. The raw intensity is preserved for the subsequent fit.
+2. **Local maxima.** Any pixel that is $\ge$ every pixel in its $3\times 3$ neighbourhood and above `Threshold`$\,\cdot\,\max(I_{\text{smooth}})$ is admitted as a candidate. A greedy min-separation pass then rejects candidates that are within `MinSeparation` pixels of a brighter one.
+3. **Per-peak fit.** A $(2\,\mathrm{FitWindow}+1)^2$ patch is cut around each candidate and fit with the selected 2D model (Gaussian, Lorentzian, or pseudo-Voigt) via `fitting.surfaceFit`. Bounds lock the centre inside the patch and confine widths to $[0.01, 2]\,\times$ patch span so the optimizer cannot drive them to infinity (where $x_0$ becomes irrelevant). The same patch is refit against $(Q_x, Q_z)$ when present.
+4. **Classification.** Peaks are sorted by amplitude; rank 1 is labelled *substrate*, rank 2 is labelled *film*.
+
+FWHM conversions (from fitted scale parameters $\sigma$, $w$, and mixing $\eta$):
+
+$$
+\mathrm{FWHM}_\text{G} = 2\sqrt{2\ln 2}\,\sigma,\quad \mathrm{FWHM}_\text{L} = 2w,\quad \mathrm{FWHM}_\text{PV} = \eta\cdot 2w + (1-\eta)\cdot 2\sqrt{2\ln 2}\,\sigma.
+$$
+
+### Strain and relaxation
+
+Because $Q \propto 1/a$ for a fixed Miller index, strains follow directly from the ratio of substrate and film peak positions without knowing $(hkl)$ absolutely:
+
+$$
+\varepsilon_{\parallel} = \frac{a^{\text{film}}_{\parallel} - a^{\text{sub}}_{\parallel}}{a^{\text{sub}}_{\parallel}} = \frac{Q_x^{\text{sub}}}{Q_x^{\text{film}}} - 1,\qquad \varepsilon_{\perp} = \frac{Q_z^{\text{sub}}}{Q_z^{\text{film}}} - 1.
+$$
+
+A fully-pseudomorphic film lies at $Q_x^{\text{film}} = Q_x^{\text{sub}}$ ($\varepsilon_{\parallel} = 0$); a fully-relaxed film lies at the bulk reciprocal-lattice position. The *relaxation* is the fractional departure from pseudomorphism toward the bulk:
+
+$$
+R = \frac{Q_x^{\text{film}} - Q_x^{\text{sub}}}{Q_x^{\text{bulk}} - Q_x^{\text{sub}}},\qquad R \in [0, 1].
+$$
+
+`fitting.rsmStrain` accepts an optional `Bulk=[Qx, Qz]` vector; when omitted only the strains are returned ($R=$ NaN).
+
+### When to use
+
+- Epitaxial thin-film characterisation around asymmetric reflections (e.g.\ (224), (404)) where substrate and film separate in $(Q_x, Q_z)$.
+- Quick extraction of FWHM in both angle and $Q$ space for mosaicity / grain-size analysis.
+- As a reproducible alternative to manual cursor picking — the 2D fit is less biased than reading a pixel centroid.
+
+### See also
+
+- `docs/gui_bosonplotter.md` — the interactive **Decompose RSM…** dialog in the 2D Map View panel.
+- `parser.computeQSpace` — adds $(Q_x, Q_z)$ grids to 2D map metadata when wavelength is known.
+- `fitting.surfaceFit`, `fitting.surfaceModels` — underlying 2D fitter.
+
+---
+
 ## References
 
 1. Cullity, B.D. & Stock, S.R., *Elements of X-Ray Diffraction*, 3rd ed., Prentice Hall, 2001.
@@ -505,3 +568,7 @@ The canonical representative for each group of equivalent reflections is chosen 
 11. Langford, J.I. & Wilson, A.J.C., "Scherrer after sixty years: A survey and some new results in the determination of crystallite size," *J. Appl. Cryst.* **11** (1978) 102--113.
 
 12. Bevington, P.R. & Robinson, D.K., *Data Reduction and Error Analysis for the Physical Sciences*, 3rd ed., McGraw-Hill, 2003.
+
+13. Heinke, H., Moller, M.O., Hommel, D., & Landwehr, G., "Relaxation and mosaicity profiles in epitaxial layers studied by high-resolution x-ray diffraction," *J. Crystal Growth* **135** (1994) 41--52. (Strain and relaxation extraction from asymmetric RSMs.)
+
+14. Fewster, P.F., *X-Ray Scattering from Semiconductors*, 2nd ed., Imperial College Press, 2003. (Standard reference for RSM interpretation of epitaxial films.)

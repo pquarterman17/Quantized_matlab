@@ -2373,6 +2373,7 @@ function varargout = BosonPlotter(options)
     lblMap2DInfo     = mw.lblMap2DInfo;
     cbMap2DSingle    = mw.cbMap2DSingle;
     btnFitSurface    = mw.btnFitSurface;
+    btnDecomposeRSM  = mw.btnDecomposeRSM;
     btnClear2DMatrix = mw.btnClear2DMatrix;
 
     % Wire 2D map callbacks (deferred from builder)
@@ -2390,6 +2391,7 @@ function varargout = BosonPlotter(options)
     btnArcIntegrate.ButtonPushedFcn  = @onArcIntButton;
     cbMap2DSingle.ValueChangedFcn    = @(~,~) onToggleSinglePrecision();
     btnFitSurface.ButtonPushedFcn    = @onFitSurface;
+    btnDecomposeRSM.ButtonPushedFcn  = @(~,~) onDecomposeRSM();
     btnClear2DMatrix.ButtonPushedFcn = @(~,~) onClear2DMatrix();
 
     % ── Drag-and-drop: register every major surface as a drop target (R2023a+) ──
@@ -6074,6 +6076,20 @@ function onSendToOrigin(~,~)
         bosonPlotter.surfaceFitDialog(mapData, ...
             Title="Surface Fit — " + ds.name, ...
             Appearance=resolveActiveAppearance());
+    end
+
+    function onDecomposeRSM(~,~)
+    %ONDECOMPOSERSM  Open the RSM peak-decomposition dialog for the active map.
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        ds = appData.datasets{appData.activeIdx};
+        if ~is2DDataset(ds)
+            uialert(fig, 'Active dataset is not a 2D area-detector map.', 'Decompose RSM');
+            return;
+        end
+        map = ds.data.metadata.parserSpecific.map2D;
+        bosonPlotter.rsmDecomposeDialog(map, ...
+            Title       = "Decompose RSM — " + ds.name, ...
+            OverlayAxes = ax);
     end
 
     function onPoleFigure(~,~)

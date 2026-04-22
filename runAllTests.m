@@ -169,6 +169,7 @@ SUITES = {
     T('fitting','test_residualDiagnostics'), 'fitting', 'Residual diagnostics: Q-Q, DW, runs test, skewness'
     T('fitting','test_fitCompare'),          'fitting', 'Model comparison metrics: AIC, BIC, adjR2, F-test'
     T('fitting','test_surfaceFit'),          'fitting', 'Surface/3D fitting: models, autoGuess, surfaceFit engine'
+    T('fitting','test_rsmAnalyze'),          'fitting', 'RSM decomposition: rsmAnalyze finds substrate/film peaks in 2D maps; rsmStrain computes ε∥, ε⊥, and relaxation (MASTERPLAN W3 #12)'
     T('fitting','test_odrFit'),              'fitting', 'Orthogonal distance regression (Deming): closed-form slope, jackknife errors, λ dependence, ODR-vs-OLS on symmetric noise'
     T('fitting','test_anovaPca'),            'fitting', 'One-way ANOVA and PCA (SVD-based): F-distribution p-values, explained variance, orthonormal loadings'
     T('fitting','test_cursor_anchor'),       'fitting', 'Cursor fit region + anchor spline background (pure-computation layer)'

@@ -123,6 +123,23 @@ The derivative dropdown includes 5 options: `None`, `dY/dX`, `d²Y/dX²`, `∫Y 
 
 For 2D XRDML area-detector data, the map panel includes: intensity scale (Linear/Log₁₀), colorbar min/max range override, 10 colormaps (parula, viridis, plasma, inferno, hot, jet, turbo, gray, bone, copper).
 
+## Decompose RSM...
+
+The 2D Map panel ends with three action buttons: **Fit Surface…**, **Decompose RSM…**, and **Clear 2D Matrix**.
+
+**Decompose RSM…** opens a dialog wrapping `fitting.rsmAnalyze` and `fitting.rsmStrain`. It
+
+- detects up to *N* peaks in the active 2D map (smoothing + local maxima + min-separation),
+- fits each peak in angle space *and* in $(Q_x, Q_z)$ space (when wavelength metadata is available) with a 2D Gaussian / Lorentzian / pseudo-Voigt,
+- classifies the brightest peak as *substrate*, the second as *film*,
+- reports per-peak centre, FWHM, and amplitude in a results table,
+- computes $\varepsilon_{\parallel}$ and $\varepsilon_{\perp}$ from the substrate/film Q-pair, and
+- overlays labelled markers on the parent map axes — squares for the substrate, circles for the film.
+
+Controls: **# peaks** (default 2), **Fit model**, **Threshold** (fraction of smoothed max), **Smooth σ** (pixels), **Fit window** (half-size of the per-peak patch in pixels). Markers are removed when the dialog closes.
+
+Theory, formulas, and references live in `docs/theory/xrd.md` → *Reciprocal-Space Map Decomposition*.
+
 ## Peak Analysis Window
 
 `peakFig` is a separate `uifigure` containing the peak table, fitting controls, export buttons, and advanced crystallography tools. It opens automatically after peak detection (`onAutoPeak`) or on the first manual peak add. The "Peaks..." button in the corrections panel opens it on demand. Closing the window just hides it (`Visible='off'`); peaks and markers on the main axes are unaffected.
