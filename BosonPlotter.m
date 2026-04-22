@@ -100,6 +100,7 @@ function varargout = BosonPlotter(options)
 %   api.autoPeaks()            — run auto peak detection
 %   api.fitPeaks()             — fit detected peaks individually
 %   api.getPeaks()             — return peaks struct from active dataset
+%   api.getModel()             — shared dataWorkspace.WorkspaceModel instance
 %   api.setDatasetVisible(idx, vis) — toggle dataset visibility
 %   api.saveSession(outPath)   — save session .mat (no dialog)
 %   api.loadSession(matPath)   — restore session .mat (no dialog)
@@ -2714,6 +2715,7 @@ function varargout = BosonPlotter(options)
     api.openPlotStyle       = @onOpenPlotStyleDialog;
     api.getStyleOverrides   = @() appData.styleOverrides;
     api.setStyleOverrides   = @assignStyleOverrides;
+    api.getModel            = @() appData.model;
     api.getActiveDataset    = @getActiveDatasetSafe;
     api.setMap2DColormap    = @setMap2DColormapDirect;
     api.maskRegion          = @maskRegionDirect;
@@ -2921,6 +2923,7 @@ function varargout = BosonPlotter(options)
         if isfield(restored, 'styleOverrides') && isstruct(restored.styleOverrides)
             appData.styleOverrides = restored.styleOverrides;
         end
+        bosonPlotter.syncWorkspaceModelFromSession(appData, datasets, restored);
         % Sync the Template dropdown so the UI matches restored state
         try refreshTemplateDropdown(); catch, end
         if ~isempty(ddTemplate) && isvalid(ddTemplate) && ...

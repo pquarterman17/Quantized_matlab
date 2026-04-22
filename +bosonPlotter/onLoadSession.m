@@ -11,6 +11,9 @@ function onLoadSession(appData, fig, widgets, callbacks)
 %     - Background file / dataset references
 %     - Plot style and last directory
 %     - Phase A/B template state and style overrides
+%     - WorkspaceModel state: row masks, computed/formula columns,
+%       and X/Y/err column-role assignments (legacy sessions default
+%       to empty, matching pre-2026-04 behaviour)
 %     - Widget values (colormap, scale, BG interpolation, axis
 %       channel selections) through
 %       `bosonPlotter.sessionManager.applyGuiState`
@@ -75,6 +78,12 @@ function onLoadSession(appData, fig, widgets, callbacks)
     if isfield(restored, 'styleOverrides') && isstruct(restored.styleOverrides)
         appData.styleOverrides = restored.styleOverrides;
     end
+
+    % Sync the WorkspaceModel.  Required so formula/computed columns,
+    % row masks, and column-role assignments survive the round-trip —
+    % previously the model was untouched on load and its state was
+    % effectively wiped whenever a session reopened.
+    bosonPlotter.syncWorkspaceModelFromSession(appData, datasets, restored);
     % Sync the Template dropdown so the UI reflects the restored state
     callbacks.refreshTemplateDropdown();
     if ~isempty(widgets.ddTemplate) && isvalid(widgets.ddTemplate)
@@ -131,3 +140,4 @@ function d = resolveStartDir(lastDir)
         d = pwd;
     end
 end
+

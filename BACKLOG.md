@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-04-21 (W2 #2 + #3 reconciled — FermiViewer measurement symbol/color dropdowns + selection-aware restyle + Delete/Remove shipped in commits `f886259`…`f648876`)
+**Last regenerated:** 2026-04-21 (W3 #10 shipped — session save/load now round-trips WorkspaceModel mask + computed columns + column roles; W2 #2 + #3 reconciled earlier same day)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -43,7 +43,6 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#1** W1 Bugs → FermiViewer right-side tools panel overcrowded (tabled)
 - [ ] **#4** W2 UX → Toolbar metrics consistent across all four GUIs (deferred)
 - [ ] **#9** W3 Features → Small-angle scattering (Guinier / Porod / IFT)
-- [ ] **#10** W3 Features → Project / session save with full state recovery
 - [ ] **#11** W3 Features → Free-form SLD profile (spline) for reflectometry
 - [ ] **#12** W3 Features → Rocking-curve / RSM decomposition
 - [ ] **#24** W5 Decomposition → Documentation coverage — package READMEs
@@ -113,7 +112,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 | Plan | Status | Open items | Notes |
 |------|--------|------------|-------|
-| MASTERPLAN (MATLAB consolidated) | Active | 2 T1 / 25 T2 / 18 T3 | 9 source plans consolidated 2026-04-19; W4 Physics (4 items) shipped 2026-04-19; W5 #23/#25/#26/#27 reconciled as already done; W1 #59, W3 #17, W6 #41, W6 #43 shipped 2026-04-19; **W2 #2 + #3 (FermiViewer measurement UX) reconciled 2026-04-21** |
+| MASTERPLAN (MATLAB consolidated) | Active | 2 T1 / 24 T2 / 18 T3 | 9 source plans consolidated 2026-04-19; W4 Physics (4 items) shipped 2026-04-19; W5 #23/#25/#26/#27 reconciled as already done; W1 #59, W3 #17, W6 #41, W6 #43 shipped 2026-04-19; W2 #2 + #3 (FermiViewer measurement UX) reconciled 2026-04-21; **W3 #10 (session round-trip for WorkspaceModel state) shipped 2026-04-21** |
 | origin-feature-gap | Active (Python) | 6 T1 / 7 T2 / 1 T3 | MATLAB side complete; Python port pending — excluded from MASTERPLAN |
 | dataworkspace-python-port | Active (Python) | 3 T1 / 3 T2 / 2 T3 | Python-port architecture; excluded from MASTERPLAN |
 | porting_plan | Active (Python) | 7 phase-level items | Thin film toolkit architecture; excluded from MASTERPLAN |

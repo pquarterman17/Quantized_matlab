@@ -143,6 +143,23 @@ classdef sessionManager
                 savedStyleOverrides = appData.styleOverrides; %#ok<NASGU>
             end
 
+            % WorkspaceModel state not owned by individual datasets: row
+            % masks, computed/formula columns, and X/Y/err column roles.
+            % These live on the model instance, so savedDatasets alone
+            % doesn't round-trip them.  Stored as separate variables (not
+            % a nested struct) for backward/forward-compat parsing.
+            savedMask            = {}; %#ok<NASGU>
+            savedComputedColumns = {}; %#ok<NASGU>
+            savedColumnRoles     = {}; %#ok<NASGU>
+            savedModelVersion    = ''; %#ok<NASGU>
+            if isprop(appData, 'model') && ~isempty(appData.model) && isvalid(appData.model)
+                modelSnap = appData.model.createSnapshot();
+                savedMask            = modelSnap.mask;            %#ok<NASGU>
+                savedComputedColumns = modelSnap.computedColumns; %#ok<NASGU>
+                savedColumnRoles     = modelSnap.columnRoles;     %#ok<NASGU>
+                savedModelVersion    = modelSnap.version;         %#ok<NASGU>
+            end
+
             % Unpack guiState fields as individual variables for backward
             % compatibility with session files written before this refactor.
             savedColormap  = guiState.savedColormap;  %#ok<NASGU>
@@ -159,6 +176,8 @@ classdef sessionManager
                 'savedBgFile',    'savedBgDataset',      ...
                 'savedStyle',     'savedLastDir',        ...
                 'savedActiveTemplate', 'savedStyleOverrides', ...
+                'savedMask', 'savedComputedColumns',     ...
+                'savedColumnRoles', 'savedModelVersion', ...
                 'savedColormap',  'savedMap2DCmap',      ...
                 'savedXSel',                             ...
                 'savedYSel',      'savedY2Sel',          ...
@@ -250,6 +269,15 @@ classdef sessionManager
             if isempty(char(restored.activeTemplate))
                 restored.activeTemplate = 'screen';
             end
+
+            % WorkspaceModel non-dataset state.  Legacy sessions (pre
+            % 2026-04) lack these fields — return empty cells and let the
+            % caller fill defaults keyed to the restored dataset count.
+            restored.modelState = struct( ...
+                'mask',            {pick_('savedMask',            {})}, ...
+                'computedColumns', {pick_('savedComputedColumns', {})}, ...
+                'columnRoles',     {pick_('savedColumnRoles',     {})}, ...
+                'version',         pick_('savedModelVersion',     ''));
 
             % Pack GUI fields back into a guiState struct
             gs.savedColormap  = pick_('savedColormap',  '');

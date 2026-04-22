@@ -105,6 +105,7 @@ SUITES = {
     T('gui','test_bosonPlotterSize'),       'gui',    'Size ratchet: BosonPlotter.m line count + nested-fn count stay under their ceilings (see W5 #22)'
     T('gui','test_magUnitConversion'),      'gui',    'Mag unit conversion: Oe→T live dropdown change + ds.data preservation + missing-mass warn'
     T('gui','test_plotStyleDialog'),        'gui',    'Plot Style dialog (Phase B) + session round-trip (Phase C): overrides, precedence, reset, save/load'
+    T('gui','test_sessionRoundtripWorkspace'), 'gui', 'Session round-trip: WorkspaceModel mask + computed columns + column roles survive save/load (MASTERPLAN W3 #10)'
     T('gui','test_rowLevelMasking'),        'gui',    'Row-level masking: no mask column, context menu, soft-red row style'
     T('gui','test_plotInteractions'),       'gui',    'Plot interactions: double-click labels, context menus on traces, cursor panel readout'
     T('gui','test_insetGraph'),             'gui',    'Inset graph: create, region limits, rect/connectors, remove, replacement, Position option'
