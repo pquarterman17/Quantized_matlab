@@ -136,6 +136,7 @@ SUITES = {
     T('imaging','test_em_clear_overlays_diff_rings'), 'emgui','EM Viewer Clear Overlays removes diff_ring + diff_spot tagged handles (regression)'
     T('imaging','test_em_box_profile'),       'emgui','EM Viewer Box Profile: rotated-box overlay + runWidthAveragedProfile engine + clearOverlays cleanup'
     T('imaging','test_em_zoom_toggle_marquee'),'emgui','EM Viewer zoom toggle + marquee multi-select: default drag selects, zoom toggle on reverts to box-zoom'
+    T('imaging','test_em_rect_roi_polyline'), 'emgui','EM Viewer rectROI + polyline as measurements: registered, selectable, marquee, individual/bulk delete'
     T('imaging','test_eds_composite'),      'eds',    'EDS multi-channel composite mode API tests'
     T('imaging','test_real_dm3'),           'em',     'Real DM3/TIFF files from +test_datasets/Microscopy'
     T('imaging','test_eels'),              'eels',   'EELS utilities: edge table, background, thickness, ZLP align, extract map'
