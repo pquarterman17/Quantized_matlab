@@ -133,6 +133,7 @@ SUITES = {
     T('imaging','test_scaleBarPersistsThroughProcessing'), 'emgui','EM Viewer scale bar: persists across filters, rotate/flip, crop, and undo (regression)'
     T('gui','test_measurementLabelDefaults'), 'emgui','EM Viewer distance label defaults: font size, transparent background, perpendicular offset, tilt tooltip'
     T('imaging','test_transformToolbar'),     'emgui','EM Viewer icon transform toolbar: rotate/flip/zoom/fit/reset/crop wiring + capital-T geometry'
+    T('imaging','test_em_clear_overlays_diff_rings'), 'emgui','EM Viewer Clear Overlays removes diff_ring + diff_spot tagged handles (regression)'
     T('imaging','test_eds_composite'),      'eds',    'EDS multi-channel composite mode API tests'
     T('imaging','test_real_dm3'),           'em',     'Real DM3/TIFF files from +test_datasets/Microscopy'
     T('imaging','test_eels'),              'eels',   'EELS utilities: edge table, background, thickness, ZLP align, extract map'
