@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-04-21 (W3 #12 shipped — RSM decomposition via `+fitting/rsmAnalyze.m` + `+fitting/rsmStrain.m` + BosonPlotter Decompose RSM… dialog; W3 #10 reconciled earlier same day)
+**Last regenerated:** 2026-04-24 (W3 #8 shipped — instrument resolution smearing wired into `reflFitting` dialog with Pointwise dQ-from-data checkbox; W3 #12 RSM decomposition shipped 2026-04-21)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -16,7 +16,6 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 ## Tier 1 — High Impact (open)
 
 ### MASTERPLAN (MATLAB consolidated) — `plans/MASTERPLAN.md`
-- [ ] **#8** W3 Features → Instrument resolution smearing for reflectometry
 - [ ] **#22** W5 Decomposition → Continue `+bosonPlotter/` extraction — drive parent below 8k lines
 
 ### Origin parity (Python port, MATLAB side complete) — `plans/origin-feature-gap.md`
@@ -111,7 +110,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 | Plan | Status | Open items | Notes |
 |------|--------|------------|-------|
-| MASTERPLAN (MATLAB consolidated) | Active | 2 T1 / 23 T2 / 18 T3 | 9 source plans consolidated 2026-04-19; W4 Physics (4 items) shipped 2026-04-19; W5 #23/#25/#26/#27 reconciled as already done; W1 #59, W3 #17, W6 #41, W6 #43 shipped 2026-04-19; W2 #2 + #3 (FermiViewer measurement UX) reconciled 2026-04-21; W3 #10 (session round-trip for WorkspaceModel state) shipped 2026-04-21; **W3 #12 (RSM decomposition) shipped 2026-04-21** |
+| MASTERPLAN (MATLAB consolidated) | Active | 1 T1 / 23 T2 / 18 T3 | 9 source plans consolidated 2026-04-19; W4 Physics (4 items) shipped 2026-04-19; W5 #23/#25/#26/#27 reconciled as already done; W1 #59, W3 #17, W6 #41, W6 #43 shipped 2026-04-19; W2 #2 + #3 (FermiViewer measurement UX) reconciled 2026-04-21; W3 #10 (session round-trip) + W3 #12 (RSM decomposition) shipped 2026-04-21; **W3 #8 (resolution smearing wired into reflFitting) shipped 2026-04-24** |
 | origin-feature-gap | Active (Python) | 6 T1 / 7 T2 / 1 T3 | MATLAB side complete; Python port pending — excluded from MASTERPLAN |
 | dataworkspace-python-port | Active (Python) | 3 T1 / 3 T2 / 2 T3 | Python-port architecture; excluded from MASTERPLAN |
 | porting_plan | Active (Python) | 7 phase-level items | Thin film toolkit architecture; excluded from MASTERPLAN |

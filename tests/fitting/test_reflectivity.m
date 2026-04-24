@@ -322,6 +322,51 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════
+%  Pointwise dQ extraction contract (W3 #8 — reflFitting dialog wiring)
+% ════════════════════════════════════════════════════════════════════
+%
+% The reflFitting dialog offers a "Pointwise" checkbox that pulls a
+% per-point σ_Q vector from the active dataset's dQ column. This test
+% encodes the data-shape contract that the dialog depends on: if an
+% NCNR-style dataset is fed through and dQ lives at column k with label
+% 'dQ', parrattRefl must accept that column as a valid Resolution arg.
+
+fprintf('\n--- Pointwise dQ extraction contract (W3 #8) ---\n');
+
+% Mimic importNCNRRefl output shape: Qz in .time, [I, dI, dQ] in .values,
+% labels don't include the x-axis column.
+pd_ncnr = struct( ...
+    'time',   Qtest, ...
+    'values', [R_sharp, 0.01*R_sharp, 0.05*Qtest], ...   % I, dI, dQ (σ_Q)
+    'labels', {{'Intensity', 'dI', 'dQ'}}, ...
+    'units',  {{'a.u.', 'a.u.', '1/A'}}, ...
+    'metadata', struct());
+
+dQIdx = find(strcmpi(pd_ncnr.labels, 'dQ'), 1);
+try
+    if isempty(dQIdx)
+        fprintf('  FAIL: no dQ column found in NCNR-style labels\n');
+        failed = failed + 1;
+    else
+        dQcol = pd_ncnr.values(:, dQIdx);
+        R_pw  = fitting.parrattRefl(Qtest, layersTest, Resolution=dQcol);
+        stdPW    = std(log10(max(R_pw,    1e-20)));
+        stdSharp = std(log10(max(R_sharp, 1e-20)));
+        if numel(R_pw) == numel(Qtest) && stdPW < stdSharp
+            fprintf(['  PASS: NCNR-style dQ column smears R(Q) ' ...
+                     '(log-std %.2f → %.2f)\n'], stdSharp, stdPW);
+            passed = passed + 1;
+        else
+            fprintf('  FAIL: pointwise extraction did not reduce fringe contrast\n');
+            failed = failed + 1;
+        end
+    end
+catch ME
+    fprintf('  FAIL: pointwise extraction threw: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════
 %  SUMMARY
 % ════════════════════════════════════════════════════════════════════
 

@@ -134,8 +134,8 @@ axRes.Box = 'on'; grid(axRes, 'on');
 bosonPlotter.applyAppearanceToAxes(axRes, options.Appearance);
 
 % ── Row 4: Scale/BG controls + close ────────────────────────────────
-bottomGL = uigridlayout(rfRoot, [1 7], ...
-    'ColumnWidth', {50, 65, 50, 65, 50, '1x', 60}, ...
+bottomGL = uigridlayout(rfRoot, [1 9], ...
+    'ColumnWidth', {50, 65, 40, 65, 50, 65, 100, '1x', 60}, ...
     'Padding', [0 0 0 0], 'ColumnSpacing', 4);
 bottomGL.Layout.Row = 4; bottomGL.Layout.Column = [1 2];
 
@@ -144,11 +144,19 @@ efScale = uieditfield(bottomGL, 'numeric', 'Value', 1.0, 'FontSize', 9);
 uilabel(bottomGL, 'Text', 'BG:', 'HorizontalAlignment', 'right', 'FontSize', 9);
 efBG = uieditfield(bottomGL, 'numeric', 'Value', 1e-8, 'FontSize', 9, ...
     'ValueDisplayFormat', '%.2e');
-uilabel(bottomGL, 'Text', 'Smear:', 'HorizontalAlignment', 'right', 'FontSize', 9);
+uilabel(bottomGL, 'Text', 'dQ/Q:', 'HorizontalAlignment', 'right', 'FontSize', 9);
 efSmear = uieditfield(bottomGL, 'numeric', 'Value', 0, 'FontSize', 9, ...
-    'Tooltip', 'Gaussian dQ/Q resolution smearing (0 = none)');
-uibutton(bottomGL, 'Text', 'Close', 'FontSize', 9, ...
+    'Tooltip', ['Gaussian resolution smearing as fractional dQ/Q ' ...
+                '(e.g. 0.03 for NCNR typical). 0 = sharp Q.']);
+cbPointwise = uicheckbox(bottomGL, 'Text', 'Pointwise', 'FontSize', 9, ...
+    'Value', false, ...
+    'Tooltip', ['When checked, use per-point σ_Q from the dataset''s ' ...
+                'dQ column (e.g. NCNR reductus exports). Overrides ' ...
+                'the dQ/Q field. Falls back to dQ/Q if no dQ column ' ...
+                'is found.']);
+btnClose = uibutton(bottomGL, 'Text', 'Close', 'FontSize', 9, ...
     'ButtonPushedFcn', @(~,~) delete(rfFig));
+btnClose.Layout.Column = 9;
 
 % State
 rfResult = struct('Q', [], 'R', [], 'layers', [], 'R2', NaN);
@@ -178,6 +186,26 @@ updateSLDPlot();
             layers(ri, 2) = toNum(data{ri, 3}) * 1e-6;   % SLD (table is ×10⁻⁶)
             layers(ri, 3) = toNum(data{ri, 4}) * 1e-6;   % SLD imag
             layers(ri, 4) = toNum(data{ri, 5});           % sigma
+        end
+    end
+
+    function resArg = getResolutionArg()
+    %GETRESOLUTIONARG  Build the Resolution kwarg for fitting.parrattRefl.
+    %   Returns [] (no smearing), a scalar dQ/Q, or an [N×1] per-point σ_Q
+    %   vector. Pointwise mode scans plotD.labels for a dQ-like column
+    %   (dQ, resolution, sigma_q); if none is found, silently falls back
+    %   to the scalar field (the tooltip warns the user this can happen).
+        resArg = [];
+        if cbPointwise.Value
+            dQvec = findPointwiseDQ(plotD, numel(xData));
+            if ~isempty(dQvec)
+                resArg = dQvec(:);
+                return;
+            end
+        end
+        s = efSmear.Value;
+        if isfinite(s) && s > 0
+            resArg = s;
         end
     end
 
@@ -265,11 +293,13 @@ updateSLDPlot();
 
     function doSimulate()
         layers = getLayerMatrix();
+        resArg = getResolutionArg();
         R = fitting.parrattRefl(xData, layers, ...
-            Scale=efScale.Value, Background=efBG.Value);
+            Scale=efScale.Value, Background=efBG.Value, ...
+            Resolution=resArg);
         plotRQ(R, []);
         rfResult.Q = xData; rfResult.R = R; rfResult.layers = layers;
-        options.StatusFcn('Simulation plotted');
+        options.StatusFcn(['Simulation plotted' resolutionStatusSuffix(resArg)]);
     end
 
     function doFit()
@@ -287,9 +317,14 @@ updateSLDPlot();
             lb((ri-1)*4 + 1) = 0;  % thickness >= 0
         end
 
+        % Snapshot the resolution arg at fit-start so every model call in
+        % the curveFit loop uses the same kernel.
+        resArg = getResolutionArg();
+
         % Model function: reshape p vector back to layers matrix
         modelFcn = @(Q, p) fitting.parrattRefl(Q, reshape(p, [], 4), ...
-            Scale=efScale.Value, Background=efBG.Value);
+            Scale=efScale.Value, Background=efBG.Value, ...
+            Resolution=resArg);
 
         % Fit in log space (reflectivity spans orders of magnitude)
         logY = log10(max(yData, 1e-15));
@@ -313,7 +348,8 @@ updateSLDPlot();
 
             % Compute R(Q) with fitted params (linear space)
             Rfit = fitting.parrattRefl(xData, fitLayers, ...
-                Scale=efScale.Value, Background=efBG.Value);
+                Scale=efScale.Value, Background=efBG.Value, ...
+                Resolution=resArg);
 
             % R² in linear space
             ssRes = sum((yData - Rfit).^2);
@@ -401,9 +437,10 @@ updateSLDPlot();
         scaleVec = zeros(1, numel(pBest));
         scaleVec(freeIdx) = max(abs(pBest(freeIdx)), 1e-6) * stepSz;
 
+        resArgMCMC = getResolutionArg();
         logPost = @(q) logPosteriorRefl(q, pBest, scaleVec, lb, ub, ...
             fixedMask, sigma2, xData, yData, ...
-            efScale.Value, efBG.Value);
+            efScale.Value, efBG.Value, resArgMCMC);
 
         rfFig.Pointer = 'watch'; drawnow;
         try
@@ -492,13 +529,53 @@ function v = toNum(val)
     if isnan(v), v = 0; end
 end
 
+function dQvec = findPointwiseDQ(pd, nExpected)
+%FINDPOINTWISEDQ  Locate a per-point σ_Q column in a dataset's values.
+%   Returns [] if no dQ-like column exists or the column length doesn't
+%   match nExpected. Candidate labels (case-insensitive): 'dq',
+%   'resolution', 'sigma_q', 'sigmaq'. Matches importNCNRRefl and
+%   importNCNRDat conventions.
+    dQvec = [];
+    if ~isstruct(pd) || ~isfield(pd, 'labels') || isempty(pd.labels)
+        return;
+    end
+    if ~isfield(pd, 'values') || isempty(pd.values), return; end
+    candidates = {'dq', 'resolution', 'sigma_q', 'sigmaq'};
+    lbls = lower(string(pd.labels));
+    for ci = 1:numel(candidates)
+        idx = find(lbls == candidates{ci}, 1);
+        if ~isempty(idx) && idx <= size(pd.values, 2)
+            col = pd.values(:, idx);
+            if numel(col) == nExpected && all(isfinite(col)) && all(col >= 0)
+                dQvec = col;
+                return;
+            end
+        end
+    end
+end
+
+function suffix = resolutionStatusSuffix(resArg)
+%RESOLUTIONSTATUSSUFFIX  Short " (dQ/Q=X)" or " (pointwise σ_Q)" tag for
+%   the status bar, so the user can tell at a glance whether smearing
+%   was applied.
+    if isempty(resArg)
+        suffix = '';
+    elseif isscalar(resArg)
+        suffix = sprintf(' (dQ/Q=%.3g)', resArg);
+    else
+        suffix = sprintf(' (pointwise σ_Q, n=%d)', numel(resArg));
+    end
+end
+
 function lp = logPosteriorRefl(q, pBest, scaleVec, lb, ub, fixedMask, ...
-        sigma2, xData, yData, sc, bg)
+        sigma2, xData, yData, sc, bg, resArg)
 %LOGPOSTERIORREFL  Log-posterior for MCMC sampling around a refl fit.
 %   q is in whitened coordinates; p = pBest + q.*scaleVec. Fixed params
 %   have scaleVec=0 so q never moves them. Prior is flat inside the
 %   [lb, ub] box and -Inf outside; likelihood is Gaussian on
-%   log10(reflectivity) residuals with variance sigma2.
+%   log10(reflectivity) residuals with variance sigma2. resArg threads
+%   the instrument Q-resolution kernel (see fitting.parrattRefl) so the
+%   sampler sees the same smeared model the fit converged on.
     p = pBest + q .* scaleVec;
     p(fixedMask) = pBest(fixedMask);        % hard-lock fixed params
     if any(p < lb) || any(p > ub)
@@ -506,7 +583,8 @@ function lp = logPosteriorRefl(q, pBest, scaleVec, lb, ub, fixedMask, ...
     end
     try
         layers = reshape(p, [], 4);
-        R = fitting.parrattRefl(xData, layers, Scale=sc, Background=bg);
+        R = fitting.parrattRefl(xData, layers, ...
+            Scale=sc, Background=bg, Resolution=resArg);
         logModel = log10(max(R,      1e-15));
         logY     = log10(max(yData,  1e-15));
         resid    = logY - logModel;
