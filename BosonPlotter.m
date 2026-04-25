@@ -1663,6 +1663,11 @@ function varargout = BosonPlotter(options)
 
     % ── Axes & Appearance sub-panel (middle column) ──────────────────────
     % Ultra-compact 5-row layout:
+    % Apply tk.font.body to any corrGL buttons that didn't get an explicit
+    % FontSize during construction. Buttons styled by sectionHeader (which
+    % already sets FontSize) are left alone — see +bosonPlotter/applyDefaultFont.m.
+    bosonPlotter.applyDefaultFont(corrGL, tk.font.body);
+
     %   Row 1: X limits (label + min/max/step)
     %   Row 2: Y limits (label + min/max/step)  —  Y2 row hidden below
     %   Row 3: Y2 limits (hidden, RowHeight=0 until Y2 active)
@@ -2270,6 +2275,15 @@ function varargout = BosonPlotter(options)
         'FontWeight', 'bold', ...
         'Tooltip', 'Plot types, visualization options, and unit conversion');
     btnPlotOpt2.Layout.Row = 3; btnPlotOpt2.Layout.Column = [1 2];
+
+    % Bring any unstyled buttons in the analysis-row sub-grids
+    % (axLimGL / saveGL / nested sub-grids) down to tk.font.body so
+    % they match the surrounding panel typography. See
+    % +bosonPlotter/applyDefaultFont.m — the walk only touches buttons
+    % still at the MATLAB default 12 pt; explicitly-styled buttons
+    % (e.g. section headers via bosonPlotter.sectionHeader) are skipped.
+    bosonPlotter.applyDefaultFont(axLimGL, tk.font.body);
+    bosonPlotter.applyDefaultFont(saveGL,  tk.font.body);
 
     % ── Peak Analysis window (separate uifigure) ──────────────────────────
     % Construction delegated to +bosonPlotter/buildPeakWindow.m.
