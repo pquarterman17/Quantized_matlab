@@ -4042,134 +4042,31 @@ function varargout = BosonPlotter(options)
     end
 
     function onFringeMarkerDown(markerIdx)
-    %ONFRINGEMARKERDOWN  Begin dragging a fringe marker along the data curve.
-        appData.fringeDragIdx = markerIdx;
-        ofmmCb_.updateFringeThickness = @updateFringeThickness;
-        ofmuCb_.onMouseHover          = @onMouseHover;
-        fig.WindowButtonMotionFcn = @(~,~) bosonPlotter.onFringeMarkerMove(appData, ax, lbY, ofmmCb_);
-        fig.WindowButtonUpFcn     = @(~,~) bosonPlotter.onFringeMarkerUp(appData, fig, ofmuCb_);
-        fig.Pointer               = 'hand';
+    %ONFRINGEMARKERDOWN  Delegate to extracted +bosonPlotter module.
+        bosonPlotter.onFringeMarkerDown(markerIdx, appData, fig, ax, lbY, fringeCallbacks_());
     end
 
     function updateFringeThickness()
-    %UPDATEFRINGETHICKNESS  Compute and display t = 2*pi / |ΔQ|.
-        Q1 = appData.fringeQ(1);
-        Q2 = appData.fringeQ(2);
-        if isnan(Q1) || isnan(Q2), return; end
-
-        dQ = abs(Q2 - Q1);
-        if dQ < eps
-            tStr = 't = Inf (points overlap)';
-        else
-            % t = 2*pi / dQ in Å, convert to nm
-            t_A  = 2 * pi / dQ;
-            t_nm = t_A / 10;
-            tStr = sprintf('t %s %.1f nm  (%.1f %s)    %sQ = %.5f %s%s%s', ...
-                char(8776), t_nm, t_A, char(197), ...  % ≈, Å
-                char(916), dQ, char(197), char(8315), char(185));  % Δ, Å⁻¹
-        end
-
-        % Show thickness annotation on plot (top-left, below title)
-        if ~isempty(appData.fringeAnnotation) && isvalid(appData.fringeAnnotation)
-            appData.fringeAnnotation.String = tStr;
-        else
-            hold(ax, 'on');
-            appData.fringeAnnotation = text(ax, 0.02, 0.96, tStr, ...
-                'Units',              'normalized', ...
-                'FontSize',           12, ...
-                'FontWeight',         'bold', ...
-                'Color',              [0.95 0.85 0.20], ...
-                'BackgroundColor',    [0.10 0.10 0.10 0.75], ...
-                'Margin',             4, ...
-                'VerticalAlignment',  'top', ...
-                'HitTest',            'off', ...
-                'HandleVisibility',   'off', ...
-                'Tag',                'GUIFringeAnnotation');
-            hold(ax, 'off');
-        end
-
-        % Also update status bar
-        setStatus(tStr);
-
-        % Draw a horizontal double-arrow between the two markers
-        drawFringeSpan();
-    end
-
-    function drawFringeSpan()
-    %DRAWFRINGESPAN  Draw a line connecting the two fringe markers.
-        delete(findall(ax, 'Tag', 'GUIFringeSpan'));
-        if any(isnan(appData.fringeQ)), return; end
-        Q1 = appData.fringeQ(1);
-        Q2 = appData.fringeQ(2);
-        if numel(appData.fringeMarkers) < 2, return; end
-        y1 = appData.fringeMarkers(1).YData;
-        y2 = appData.fringeMarkers(2).YData;
-        yMid = (y1 + y2) / 2;
-        hold(ax, 'on');
-        plot(ax, [Q1, Q2], [yMid, yMid], '--', ...
-            'Color', [0.95 0.85 0.20 0.6], ...
-            'LineWidth', 1.5, ...
-            'HitTest', 'off', ...
-            'HandleVisibility', 'off', ...
-            'Tag', 'GUIFringeSpan');
-        hold(ax, 'off');
+    %UPDATEFRINGETHICKNESS  Delegate to extracted +bosonPlotter module.
+        bosonPlotter.updateFringeThickness(appData, ax, fringeCallbacks_());
     end
 
     function recreateFringeMarkers()
-    %RECREATEFRINGEMARKERS  Re-place fringe markers after a full redraw.
-    %   The markers and annotation are destroyed by drawToAxes' cla().
-    %   This function rebuilds them at the stored Q positions.
-        ds = appData.datasets{appData.activeIdx};
-        primaryD = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
-        xVec = double(primaryD.time);
-        ySel2 = ensureCell(lbY.Value);
-        markerColors = {[0.10 0.65 0.85], [0.85 0.35 0.10]};
-        appData.fringeMarkers = gobjects(1, 2);
-        for mi = 1:2
-            Qval = appData.fringeQ(mi);
-            % Find nearest data point to get Y value
-            bestY = 0;
-            bestDx = Inf;
-            for k = 1:numel(ySel2)
-                yIdx = find(strcmp(primaryD.labels, ySel2{k}), 1);
-                if isempty(yIdx), continue; end
-                yVec = primaryD.values(:, yIdx);
-                valid = ~isnan(xVec) & ~isnan(yVec);
-                [mDx, mI] = min(abs(xVec(valid) - Qval));
-                if mDx < bestDx
-                    bestDx = mDx;
-                    validIdx = find(valid);
-                    bestY = yVec(validIdx(mI));
-                end
-            end
-            hold(ax, 'on');
-            hm = plot(ax, Qval, bestY, 'v', ...
-                'MarkerSize',       12, ...
-                'MarkerFaceColor',  markerColors{mi}, ...
-                'MarkerEdgeColor',  'w', ...
-                'LineWidth',        1.2, ...
-                'HitTest',          'on', ...
-                'HandleVisibility', 'off', ...
-                'Tag',              'GUIFringeMarker');
-            hm.ButtonDownFcn = @(~,~) onFringeMarkerDown(mi);
-            hold(ax, 'off');
-            appData.fringeMarkers(mi) = hm;
-        end
-        % Recreate the annotation and span line
-        appData.fringeAnnotation = [];  % force fresh creation
-        updateFringeThickness();
+    %RECREATEFRINGEMARKERS  Delegate to extracted +bosonPlotter module.
+        bosonPlotter.recreateFringeMarkers(appData, ax, lbY, fringeCallbacks_());
     end
 
     function clearFringeMarkers()
-    %CLEARFRINGEMARKERS  Remove fringe thickness markers and annotation.
-        delete(findall(ax, 'Tag', 'GUIFringeMarker'));
-        delete(findall(ax, 'Tag', 'GUIFringeAnnotation'));
-        delete(findall(ax, 'Tag', 'GUIFringeSpan'));
-        appData.fringeMarkers    = [];
-        appData.fringeAnnotation = [];
-        appData.fringeQ          = [NaN NaN];
-        appData.fringeClickCount = 0;
-        appData.fringeDragIdx    = 0;
+    %CLEARFRINGEMARKERS  Delegate to extracted +bosonPlotter module.
+        bosonPlotter.clearFringeMarkers(appData, ax);
+    end
+
+    function cb = fringeCallbacks_()
+    %FRINGECALLBACKS_  Build the callbacks struct shared by fringe extractions.
+        cb = struct( ...
+            'setStatus',    @setStatus, ...
+            'onMouseHover', @onMouseHover, ...
+            'fig',          fig);
     end
 
     % ════════════════════════════════════════════════════════════════════

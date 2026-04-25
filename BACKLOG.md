@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-04-25 (W5 #22 progress: applyMaskInBox + buildToolbar extracted, BosonPlotter.m 8650 → 8552. Earlier same day: W3 #15, W3 #14, W3 #16, W2 #5/#6/#7 all shipped. Six items closed + decomposition ratchet.)
+**Last regenerated:** 2026-04-25 (W5 #22 progress: applyMaskInBox + buildToolbar + fringe subsystem extracted, BosonPlotter.m 8650 → 8449 (201-line drop). Earlier same day: W3 #15, W3 #14, W3 #16, W2 #5/#6/#7 all shipped. Six items closed + significant decomposition.)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
