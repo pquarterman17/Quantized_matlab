@@ -1042,14 +1042,8 @@ try
     api.reset(); drawnow;
     api.addFiles({XRDML}); drawnow;
 
-    % Find cursor button — text contains 'Cursor'
-    allBtns = findobj(api.fig, 'Type', 'uibutton');
-    btn = [];
-    for k = 1:numel(allBtns)
-        if contains(allBtns(k).Text, 'Cursor')
-            btn = allBtns(k); break;
-        end
-    end
+    % Find cursor button by Tag — toolbar buttons are now icon-only
+    btn = findButtonByTag(api.fig, 'cursor');
     assert(~isempty(btn), 'Data cursor button not found');
 
     % Activate — requires visible figure
@@ -1074,14 +1068,8 @@ try
     api.reset(); drawnow;
     api.addFiles({XRDML}); drawnow;
 
-    % Find the 'Auto' button in the axis toolbar
-    allBtns = findobj(api.fig, 'Type', 'uibutton');
-    btnAuto = [];
-    for k = 1:numel(allBtns)
-        if strcmp(allBtns(k).Text, 'Auto')
-            btnAuto = allBtns(k); break;
-        end
-    end
+    % Find the 'Auto' button in the axis toolbar (icon-only, Tag=autoscale)
+    btnAuto = findButtonByTag(api.fig, 'autoscale');
     assert(~isempty(btnAuto), 'Auto (scale) button not found');
 
     btnAuto.ButtonPushedFcn(btnAuto, []);
@@ -1103,7 +1091,7 @@ try
     api.reset(); drawnow;
     api.addFiles({XRDML}); drawnow;
 
-    btn = findButtonByText(api.fig, 'Grid');
+    btn = findButtonByTag(api.fig, 'grid');
     assert(~isempty(btn), 'Grid button not found');
 
     ax = findobj(api.fig, 'Type', 'axes');
@@ -1949,6 +1937,19 @@ function btn = findButtonByText(fig, txt)
     btn = [];
     for k = 1:numel(allBtns)
         if strcmp(allBtns(k).Text, txt)
+            btn = allBtns(k); return;
+        end
+    end
+end
+
+function btn = findButtonByTag(fig, tagStr)
+%FINDBUTTONBYTAG  Find first uibutton whose Tag matches tagStr.
+%   Use for toolbar buttons whose Text may be empty (icon-only buttons
+%   set Tag = action.id rather than relying on a visible label).
+    allBtns = findobj(fig, 'Type', 'uibutton');
+    btn = [];
+    for k = 1:numel(allBtns)
+        if strcmp(allBtns(k).Tag, tagStr)
             btn = allBtns(k); return;
         end
     end
