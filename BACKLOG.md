@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-04-24 (W3 #8 shipped — instrument resolution smearing wired into `reflFitting` dialog with Pointwise dQ-from-data checkbox; W3 #12 RSM decomposition shipped 2026-04-21)
+**Last regenerated:** 2026-04-24 (W6 theory-docs sweep — #29 spectroscopy, #30 thin_films, #31 electrochemistry, #33 statistics shipped; #34 imaging expanded; #32 fitting reconciled as already done; W3 #8 resolution smearing earlier 2026-04-24)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -44,12 +44,6 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#9** W3 Features → Small-angle scattering (Guinier / Porod / IFT)
 - [ ] **#11** W3 Features → Free-form SLD profile (spline) for reflectometry
 - [ ] **#24** W5 Decomposition → Documentation coverage — package READMEs
-- [ ] **#29** W6 Docs → Theory: spectroscopy.md
-- [ ] **#30** W6 Docs → Theory: thin_films.md
-- [ ] **#31** W6 Docs → Theory: electrochemistry.md
-- [ ] **#32** W6 Docs → Theory: fitting.md
-- [ ] **#33** W6 Docs → Theory: statistics.md
-- [ ] **#34** W6 Docs → Theory: imaging.md
 - [ ] **#35** W6 Docs → Tutorial: magnetometry-workflow.md
 - [ ] **#36** W6 Docs → Tutorial: superconductor-workflow.md
 - [ ] **#37** W6 Docs → Tutorial: xrd-analysis-workflow.md
@@ -110,7 +104,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 | Plan | Status | Open items | Notes |
 |------|--------|------------|-------|
-| MASTERPLAN (MATLAB consolidated) | Active | 1 T1 / 23 T2 / 18 T3 | 9 source plans consolidated 2026-04-19; W4 Physics (4 items) shipped 2026-04-19; W5 #23/#25/#26/#27 reconciled as already done; W1 #59, W3 #17, W6 #41, W6 #43 shipped 2026-04-19; W2 #2 + #3 (FermiViewer measurement UX) reconciled 2026-04-21; W3 #10 (session round-trip) + W3 #12 (RSM decomposition) shipped 2026-04-21; **W3 #8 (resolution smearing wired into reflFitting) shipped 2026-04-24** |
+| MASTERPLAN (MATLAB consolidated) | Active | 1 T1 / 17 T2 / 18 T3 | 9 source plans consolidated 2026-04-19; W4 Physics (4 items) shipped 2026-04-19; W5 #23/#25/#26/#27 reconciled as already done; W1 #59, W3 #17, W6 #41, W6 #43 shipped 2026-04-19; W2 #2 + #3 reconciled 2026-04-21; W3 #10 + W3 #12 shipped 2026-04-21; W3 #8 shipped 2026-04-24; **W6 theory-docs sweep 2026-04-24 — #29/#30/#31/#33 shipped, #34 expanded, #32 reconciled** |
 | origin-feature-gap | Active (Python) | 6 T1 / 7 T2 / 1 T3 | MATLAB side complete; Python port pending — excluded from MASTERPLAN |
 | dataworkspace-python-port | Active (Python) | 3 T1 / 3 T2 / 2 T3 | Python-port architecture; excluded from MASTERPLAN |
 | porting_plan | Active (Python) | 7 phase-level items | Thin film toolkit architecture; excluded from MASTERPLAN |
