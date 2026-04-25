@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-04-24 (W6 theory-docs sweep — #29 spectroscopy, #30 thin_films, #31 electrochemistry, #33 statistics shipped; #34 imaging expanded; #32 fitting reconciled as already done; W3 #8 resolution smearing earlier 2026-04-24)
+**Last regenerated:** 2026-04-24 (W6 tutorials sweep — #35 magnetometry, #36 superconductor, #37 XRD, #38 reflectometry, #39 transport, #40 EELS shipped; W6 theory-docs sweep #29-34 earlier same day; W3 #8 resolution smearing earlier same day)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -44,12 +44,6 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#9** W3 Features → Small-angle scattering (Guinier / Porod / IFT)
 - [ ] **#11** W3 Features → Free-form SLD profile (spline) for reflectometry
 - [ ] **#24** W5 Decomposition → Documentation coverage — package READMEs
-- [ ] **#35** W6 Docs → Tutorial: magnetometry-workflow.md
-- [ ] **#36** W6 Docs → Tutorial: superconductor-workflow.md
-- [ ] **#37** W6 Docs → Tutorial: xrd-analysis-workflow.md
-- [ ] **#38** W6 Docs → Tutorial: reflectometry-workflow.md
-- [ ] **#39** W6 Docs → Tutorial: transport-workflow.md
-- [ ] **#40** W6 Docs → Tutorial: eels-analysis-workflow.md
 - [ ] **#47** W7 Parsers → `importOxford` (paused — awaiting example file)
 - [ ] **#48** W7 Parsers → `importOpus` (paused — awaiting example file)
 - [ ] **#50** W8 DataWorkspace → Shared model migration (PARTIAL)
@@ -104,7 +98,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 | Plan | Status | Open items | Notes |
 |------|--------|------------|-------|
-| MASTERPLAN (MATLAB consolidated) | Active | 1 T1 / 17 T2 / 18 T3 | 9 source plans consolidated 2026-04-19; W4 Physics (4 items) shipped 2026-04-19; W5 #23/#25/#26/#27 reconciled as already done; W1 #59, W3 #17, W6 #41, W6 #43 shipped 2026-04-19; W2 #2 + #3 reconciled 2026-04-21; W3 #10 + W3 #12 shipped 2026-04-21; W3 #8 shipped 2026-04-24; **W6 theory-docs sweep 2026-04-24 — #29/#30/#31/#33 shipped, #34 expanded, #32 reconciled** |
+| MASTERPLAN (MATLAB consolidated) | Active | 1 T1 / 11 T2 / 18 T3 | 9 source plans consolidated 2026-04-19; W4 Physics (4 items) shipped 2026-04-19; W5 #23/#25/#26/#27 reconciled as already done; W1 #59, W3 #17, W6 #41, W6 #43 shipped 2026-04-19; W2 #2 + #3 reconciled 2026-04-21; W3 #10 + W3 #12 shipped 2026-04-21; W3 #8 shipped 2026-04-24; W6 theory-docs sweep #29-34 shipped 2026-04-24; **W6 tutorials sweep 2026-04-24 — #35/#36/#37/#38/#39/#40 shipped (all six)** |
 | origin-feature-gap | Active (Python) | 6 T1 / 7 T2 / 1 T3 | MATLAB side complete; Python port pending — excluded from MASTERPLAN |
 | dataworkspace-python-port | Active (Python) | 3 T1 / 3 T2 / 2 T3 | Python-port architecture; excluded from MASTERPLAN |
 | porting_plan | Active (Python) | 7 phase-level items | Thin film toolkit architecture; excluded from MASTERPLAN |
