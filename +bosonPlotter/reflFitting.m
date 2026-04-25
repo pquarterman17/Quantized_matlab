@@ -45,9 +45,11 @@ BTN_PRIMARY = options.ButtonColors.primary;
 BTN_TOOL    = options.ButtonColors.tool;
 BTN_FG      = options.ButtonColors.fg;
 
-% Material presets
+% Material presets. Prepend a non-empty placeholder for "manual entry" —
+% R2025b's uitable rejects empty strings in popupmenu ColumnFormat lists.
 presets = fitting.reflSLDPresets();
-presetNames = [{''}, {presets.name}];  % empty = manual entry
+MANUAL_ENTRY = '(manual)';
+presetNames = [{MANUAL_ENTRY}, {presets.name}];
 
 % ════════════════════════════════════════════════════════════════════════
 % Build dialog (800 × 650)
@@ -62,17 +64,25 @@ rfRoot = uigridlayout(rfFig, [4 2], ...
     'Padding', [8 6 8 6], 'RowSpacing', 6, 'ColumnSpacing', 6);
 
 % ── Row 1: Controls ──────────────────────────────────────────────────
-ctrlGL = uigridlayout(rfRoot, [1 8], ...
-    'ColumnWidth', {80, 80, 80, 80, 80, 80, 80, '1x'}, ...
+ctrlGL = uigridlayout(rfRoot, [1 9], ...
+    'ColumnWidth', {44, 70, 75, 75, 80, 80, 80, 80, '1x'}, ...
     'Padding', [0 0 0 0], 'ColumnSpacing', 4);
 ctrlGL.Layout.Row = 1; ctrlGL.Layout.Column = [1 2];
 
-uibutton(ctrlGL, 'Text', 'Add Layer', 'FontSize', 9, ...
+uilabel(ctrlGL, 'Text', 'Mode:', 'HorizontalAlignment', 'right', 'FontSize', 9);
+ddMode = uidropdown(ctrlGL, 'Items', {'Layers', 'Spline'}, ...
+    'Value', 'Layers', 'FontSize', 9, ...
+    'Tooltip', ['Layers: classic box-stack with explicit roughness. ' ...
+                'Spline: free-form SLD(z) from knot points (PCHIP), ' ...
+                'for graded interfaces and model-independent fits.'], ...
+    'ValueChangedFcn', @(~,~) onModeChanged());
+
+btnAdd = uibutton(ctrlGL, 'Text', 'Add Layer', 'FontSize', 9, ...
     'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
-    'ButtonPushedFcn', @(~,~) addLayer());
-uibutton(ctrlGL, 'Text', 'Remove', 'FontSize', 9, ...
+    'ButtonPushedFcn', @(~,~) addRow());
+btnRemove = uibutton(ctrlGL, 'Text', 'Remove', 'FontSize', 9, ...
     'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
-    'ButtonPushedFcn', @(~,~) removeLayer());
+    'ButtonPushedFcn', @(~,~) removeRow()); %#ok<NASGU>
 uibutton(ctrlGL, 'Text', 'Simulate', 'FontSize', 9, ...
     'BackgroundColor', [0.22 0.44 0.22], 'FontColor', [1 1 1], ...
     'ButtonPushedFcn', @(~,~) doSimulate());
@@ -96,7 +106,7 @@ lblFitStats = uilabel(ctrlGL, 'Text', '', ...
     'HorizontalAlignment', 'right');
 lblFitStats.Layout.Column = 8;
 
-% ── Row 2 left: Layer table ──────────────────────────────────────────
+% ── Row 2 left: Layer table (Layers mode) ──────────────────────────
 tblLayers = uitable(rfRoot, ...
     'ColumnName', {'Material', 'd (Å)', 'SLD (×10⁻⁶)', 'SLD_imag', 'σ (Å)', 'Fixed'}, ...
     'ColumnEditable', [true true true true true true], ...
@@ -105,6 +115,21 @@ tblLayers = uitable(rfRoot, ...
     'CellEditCallback', @onLayerEdit, ...
     'FontSize', 9);
 tblLayers.Layout.Row = 2; tblLayers.Layout.Column = 1;
+
+% ── Row 2 left: Knot table (Spline mode, hidden initially) ─────────
+% Knot data for the spline-SLD profile: each row is one (z, SLD) pair.
+% Profile interpolates between adjacent knots (PCHIP); plateaus to first /
+% last knot's SLD outside the knot range — those values become the
+% ambient (z<min) and substrate (z>max) plateaus expected by parrattRefl.
+tblKnots = uitable(rfRoot, ...
+    'ColumnName', {'z (Å)', 'SLD (×10⁻⁶)', 'Fixed'}, ...
+    'ColumnEditable', [true true true], ...
+    'ColumnFormat', {'numeric', 'numeric', 'logical'}, ...
+    'ColumnWidth', {'auto', 100, 60}, ...
+    'CellEditCallback', @(~,~) updateSLDPlot(), ...
+    'FontSize', 9, ...
+    'Visible', 'off');
+tblKnots.Layout.Row = 2; tblKnots.Layout.Column = 1;
 
 % ── Row 2 right: SLD profile ────────────────────────────────────────
 axSLD = uiaxes(rfRoot);
@@ -163,6 +188,7 @@ rfResult = struct('Q', [], 'R', [], 'layers', [], 'R2', NaN);
 
 % Initialize with default 3-layer stack: air / 200Å SiO2 / Si
 initLayers();
+initKnots();
 updateSLDPlot();
 
 % ════════════════════════════════════════════════════════════════════════
@@ -172,12 +198,102 @@ updateSLDPlot();
     function initLayers()
         tblLayers.Data = { ...
             'Air / Vacuum', 0,   0,       0,    0,   true; ...
-            '',             200, 3.47,    0,    5,   false; ...
+            MANUAL_ENTRY,   200, 3.47,    0,    5,   false; ...
             'Silicon',      0,   2.073,   0,    3,   false};
     end
 
+    function initKnots()
+        % Default: 5 knots forming a smoothed equivalent of the box stack
+        % (air → 200 Å of SiO₂ → Si). The two endpoint knots set the
+        % ambient (z<0) and substrate (z>200) plateaus respectively.
+        tblKnots.Data = { ...
+                0,    0.000,  true;  ...   % ambient endpoint (z=0, vacuum)
+               40,    3.470,  false; ...   % entering film
+              100,    3.470,  false; ...   % mid-film
+              160,    3.470,  false; ...   % exiting film
+              200,    2.073,  true};       % substrate endpoint (z=200, Si)
+    end
+
+    function isSpline = inSplineMode()
+        isSpline = strcmp(ddMode.Value, 'Spline');
+    end
+
+    function onModeChanged()
+        % Toggle table visibility and update the Add button label.
+        if inSplineMode()
+            tblLayers.Visible = 'off';
+            tblKnots.Visible  = 'on';
+            btnAdd.Text       = 'Add Knot';
+        else
+            tblKnots.Visible  = 'off';
+            tblLayers.Visible = 'on';
+            btnAdd.Text       = 'Add Layer';
+        end
+        updateSLDPlot();
+    end
+
+    function addRow()
+        if inSplineMode()
+            addKnot();
+        else
+            addLayer();
+        end
+    end
+
+    function removeRow()
+        if inSplineMode()
+            removeKnot();
+        else
+            removeLayer();
+        end
+    end
+
+    function addKnot()
+        data = tblKnots.Data;
+        nR   = size(data, 1);
+        sel  = tblKnots.Selection;
+        % Insert after selected row (or before last knot if no selection)
+        if ~isempty(sel)
+            insertAfter = sel(1, 1);
+        else
+            insertAfter = nR - 1;
+        end
+        insertAfter = max(1, min(insertAfter, nR - 1));
+        zNew   = 0.5 * (toNum(data{insertAfter, 1}) + toNum(data{insertAfter+1, 1}));
+        sldNew = 0.5 * (toNum(data{insertAfter, 2}) + toNum(data{insertAfter+1, 2}));
+        newRow = {zNew, sldNew, false};
+        data   = [data(1:insertAfter, :); newRow; data(insertAfter+1:end, :)];
+        tblKnots.Data = data;
+        updateSLDPlot();
+    end
+
+    function removeKnot()
+        data = tblKnots.Data;
+        nR   = size(data, 1);
+        if nR <= 2, return; end
+        sel = tblKnots.Selection;
+        if ~isempty(sel)
+            row = sel(1, 1);
+            if row > 1 && row < nR
+                data(row, :) = [];
+                tblKnots.Data = data;
+                updateSLDPlot();
+            end
+        else
+            data(nR-1, :) = [];   % remove second-to-last by default
+            tblKnots.Data = data;
+            updateSLDPlot();
+        end
+    end
+
     function layers = getLayerMatrix()
-    %GETLAYERMATRIX  Build [M×4] layer matrix from table data.
+    %GETLAYERMATRIX  Build [M×4] layer matrix for fitting.parrattRefl.
+    %   In Layers mode, reads the box-stack table directly. In Spline
+    %   mode, microslices the spline-interpolated SLD(z) profile.
+        if inSplineMode()
+            layers = bosonPlotter.reflBuildSplineLayers(tblKnots.Data);
+            return;
+        end
         data = tblLayers.Data;
         nR = size(data, 1);
         layers = zeros(nR, 4);
@@ -232,7 +348,7 @@ updateSLDPlot();
         data = tblLayers.Data;
         nR = size(data, 1);
         % Insert before substrate (last row)
-        newRow = {'', 100, 0, 0, 3, false};
+        newRow = {MANUAL_ENTRY, 100, 0, 0, 3, false};
         if nR >= 2
             data = [data(1:nR-1, :); newRow; data(nR, :)];
         else
@@ -265,10 +381,11 @@ updateSLDPlot();
     function onLayerEdit(~, evt)
         row = evt.Indices(1);
         col = evt.Indices(2);
-        % If material column changed, auto-fill SLD
+        % If material column changed and the user picked a real preset
+        % (not the (manual) placeholder), auto-fill SLD.
         if col == 1
             matName = evt.NewData;
-            if ~isempty(matName)
+            if ~isempty(matName) && ~strcmp(matName, MANUAL_ENTRY)
                 idx = find(strcmp({presets.name}, matName), 1);
                 if ~isempty(idx)
                     tblLayers.Data{row, 3} = presets(idx).sldN * 1e6;  % display in ×10⁻⁶
@@ -280,11 +397,36 @@ updateSLDPlot();
     end
 
     function updateSLDPlot()
-        layers = getLayerMatrix();
-        if size(layers, 1) < 2, return; end
-        [z, sldProf] = fitting.sldProfile(layers);
         cla(axSLD);
-        plot(axSLD, z, sldProf * 1e6, 'b-', 'LineWidth', 1.5);
+        if inSplineMode()
+            % Re-run splineSLD directly so the plot can also overlay knot
+            % markers — getLayerMatrix would only give us the microsliced
+            % output and we'd lose the knot positions.
+            data = tblKnots.Data;
+            nR   = size(data, 1);
+            if nR < 2, return; end
+            zK   = cellfun(@toNum, data(:, 1));
+            sldK = cellfun(@toNum, data(:, 2)) * 1e-6;
+            [zK, sortIdx] = sort(zK);
+            sldK = sldK(sortIdx);
+            try
+                [z, sldProf] = fitting.splineSLD(zK, sldK, ...
+                    SldAmbient=sldK(1), SldSubstrate=sldK(end), ...
+                    ZRange=[zK(1)-50, zK(end)+50], NPoints=400);
+            catch
+                return;   % e.g. duplicate z — silently bail until user fixes
+            end
+            plot(axSLD, z, sldProf * 1e6, 'b-', 'LineWidth', 1.5);
+            hold(axSLD, 'on');
+            plot(axSLD, zK, sldK * 1e6, 'ro', ...
+                'MarkerFaceColor', [1 0.75 0.75], 'MarkerSize', 6);
+            hold(axSLD, 'off');
+        else
+            layers = getLayerMatrix();
+            if size(layers, 1) < 2, return; end
+            [z, sldProf] = fitting.sldProfile(layers);
+            plot(axSLD, z, sldProf * 1e6, 'b-', 'LineWidth', 1.5);
+        end
         xlabel(axSLD, 'Depth (Å)');
         ylabel(axSLD, 'SLD (10^{-6} Å^{-2})');
         title(axSLD, 'SLD Profile');
@@ -303,6 +445,10 @@ updateSLDPlot();
     end
 
     function doFit()
+        if inSplineMode()
+            doFitSpline();
+            return;
+        end
         layers = getLayerMatrix();
         nR = size(layers, 1);
 
@@ -373,12 +519,100 @@ updateSLDPlot();
         end
     end
 
+    function doFitSpline()
+    %DOFITSPLINE  Fit knot z and SLD parameters in Spline mode.
+    %   Parameter layout: p = [z1, z2, ..., zN, sld1*1e6, sld2*1e6, ..., sldN*1e6]
+    %   Two blocks (z then SLD) so the param vector is easy to reshape.
+    %   Each knot's "Fixed" checkbox locks BOTH its z and its SLD.
+    %   Bounds: z within zRange-padding window; SLD within ±20×10⁻⁶
+    %   (covers all common materials including D₂O at 6.36 and dense oxides).
+        data = tblKnots.Data;
+        nK   = size(data, 1);
+        if nK < 2
+            uialert(rfFig, 'Spline mode needs at least 2 knots.', 'Fit');
+            return;
+        end
+        zK0   = cellfun(@toNum, data(:, 1));
+        sldK0 = cellfun(@toNum, data(:, 2));               % already in ×10⁻⁶
+        knotFixed = cellfun(@logical, data(:, 3));
+
+        p0    = [zK0; sldK0]';                             % [N z, N sld] block layout
+        nP    = numel(p0);
+        fixed = false(1, nP);
+        fixed(1:nK)         = knotFixed;                   % lock z when knot is fixed
+        fixed(nK+1:2*nK)    = knotFixed;                   % lock SLD when knot is fixed
+
+        zSpan = max(zK0(end) - zK0(1), 1);
+        zPad  = max(50, 0.25 * zSpan);
+        lb_z   = (zK0(1) - zPad) * ones(1, nK);
+        ub_z   = (zK0(end) + zPad) * ones(1, nK);
+        % First/last z are typically anchors — clamp them tighter
+        lb_z(1)    = zK0(1)   - 1; ub_z(1)    = zK0(1)   + 1;
+        lb_z(end)  = zK0(end) - 1; ub_z(end)  = zK0(end) + 1;
+        lb_sld = -20 * ones(1, nK);   % ×10⁻⁶
+        ub_sld =  20 * ones(1, nK);
+        lb = [lb_z, lb_sld];
+        ub = [ub_z, ub_sld];
+
+        resArg = getResolutionArg();
+        sc     = efScale.Value;
+        bg     = efBG.Value;
+
+        modelFcn    = @(Q, p) splineModel(Q, p, nK, sc, bg, resArg);
+        logModelFcn = @(Q, p) log10(max(modelFcn(Q, p), 1e-15));
+        logY        = log10(max(yData, 1e-15));
+
+        rfFig.Pointer = 'watch'; drawnow;
+        try
+            res = fitting.curveFit(xData, logY, logModelFcn, p0, ...
+                Lower=lb, Upper=ub, Fixed=fixed, CalcErrors=true);
+
+            % Write fitted params back into the knot table
+            zFit   = res.params(1:nK);
+            sldFit = res.params(nK+1:2*nK);
+            for ki = 1:nK
+                tblKnots.Data{ki, 1} = zFit(ki);
+                tblKnots.Data{ki, 2} = sldFit(ki);
+            end
+
+            % Final R(Q) and residuals
+            Rfit = modelFcn(xData, res.params);
+            ssRes = sum((yData - Rfit).^2);
+            ssTot = sum((yData - mean(yData)).^2);
+            R2lin = 1 - ssRes / max(ssTot, eps);
+
+            plotRQ(Rfit, yData - Rfit);
+            updateSLDPlot();
+
+            fitLayers = bosonPlotter.reflBuildSplineLayers(tblKnots.Data);
+            rfResult.Q = xData; rfResult.R = Rfit;
+            rfResult.layers = fitLayers; rfResult.R2 = R2lin;
+
+            lblFitStats.Text = sprintf('R%s=%.4f  %s%s=%.4g  Exit=%d  [Spline %d kn]', ...
+                char(178), R2lin, char(967), char(178), res.chiSqRed, res.exitFlag, nK);
+
+            rfFig.Pointer = 'arrow';
+            options.StatusFcn(sprintf('Refl fit (spline): R%s=%.4f, %d knots', ...
+                char(178), R2lin, nK));
+        catch ME
+            rfFig.Pointer = 'arrow';
+            uialert(rfFig, sprintf('Spline fit failed:\n%s', ME.message), 'Error');
+        end
+    end
+
     function doMCMC()
     %DOMCMC  Sample the posterior around the current layer fit.
     %   Requires a successful fit first (uses fitted layers as seed and
     %   estimates σ from log-residuals). Only unfixed parameters are
     %   sampled; fixed params are held constant. Shows a corner plot on
     %   completion.
+        if inSplineMode()
+            uialert(rfFig, ['MCMC is only supported in Layers mode for now. ' ...
+                'Spline-mode posterior sampling needs a knot-aware ' ...
+                'parameter scaling and is on the W3 #11 follow-up list. ' ...
+                'Switch to Layers mode and re-fit to use MCMC.'], 'MCMC');
+            return;
+        end
         if isempty(rfResult.layers) || isempty(rfResult.R)
             uialert(rfFig, 'Run Fit first — MCMC samples around the current best fit.', ...
                 'MCMC');
@@ -501,22 +735,42 @@ updateSLDPlot();
     function copyResults()
         if isempty(rfResult.layers), return; end
         lines = {};
-        lines{end+1} = 'Reflectivity Fit Results';
-        lines{end+1} = sprintf('R² = %.6f', rfResult.R2);
-        lines{end+1} = '';
-        lines{end+1} = sprintf('%-20s %10s %12s %10s %8s', ...
-            'Material', 'd (Å)', 'SLD (×10⁻⁶)', 'SLD_imag', 'σ (Å)');
-        lines{end+1} = repmat('-', 1, 62);
-        data = tblLayers.Data;
-        for ri = 1:size(data, 1)
-            matName = data{ri, 1};
-            if isempty(matName), matName = '—'; end
-            lines{end+1} = sprintf('%-20s %10.2f %12.4f %10.4f %8.2f', ...
-                matName, rfResult.layers(ri,1), rfResult.layers(ri,2)*1e6, ...
-                rfResult.layers(ri,3)*1e6, rfResult.layers(ri,4)); %#ok<AGROW>
+        if inSplineMode()
+            lines{end+1} = 'Reflectivity Fit Results (Spline mode)';
+            lines{end+1} = sprintf('R² = %.6f', rfResult.R2);
+            lines{end+1} = '';
+            lines{end+1} = sprintf('%10s %14s %8s', 'z (Å)', 'SLD (×10⁻⁶)', 'Fixed');
+            lines{end+1} = repmat('-', 1, 36);
+            data = tblKnots.Data;
+            for ri = 1:size(data, 1)
+                lines{end+1} = sprintf('%10.2f %14.4f %8s', ...
+                    toNum(data{ri, 1}), toNum(data{ri, 2}), ...
+                    yesNo(logical(data{ri, 3}))); %#ok<AGROW>
+            end
+        else
+            lines{end+1} = 'Reflectivity Fit Results';
+            lines{end+1} = sprintf('R² = %.6f', rfResult.R2);
+            lines{end+1} = '';
+            lines{end+1} = sprintf('%-20s %10s %12s %10s %8s', ...
+                'Material', 'd (Å)', 'SLD (×10⁻⁶)', 'SLD_imag', 'σ (Å)');
+            lines{end+1} = repmat('-', 1, 62);
+            data = tblLayers.Data;
+            for ri = 1:size(data, 1)
+                matName = data{ri, 1};
+                if isempty(matName) || strcmp(matName, MANUAL_ENTRY)
+                    matName = '—';
+                end
+                lines{end+1} = sprintf('%-20s %10.2f %12.4f %10.4f %8.2f', ...
+                    matName, rfResult.layers(ri,1), rfResult.layers(ri,2)*1e6, ...
+                    rfResult.layers(ri,3)*1e6, rfResult.layers(ri,4)); %#ok<AGROW>
+            end
         end
         clipboard('copy', strjoin(lines, newline));
         options.StatusFcn('Reflectivity fit results copied to clipboard');
+    end
+
+    function s = yesNo(b)
+        if b, s = 'yes'; else, s = 'no'; end
     end
 
 end
@@ -592,4 +846,24 @@ function lp = logPosteriorRefl(q, pBest, scaleVec, lb, ub, fixedMask, ...
     catch
         lp = -Inf;
     end
+end
+
+function R = splineModel(Q, p, nK, sc, bg, resArg)
+%SPLINEMODEL  Reflectivity model for spline-mode fitting.
+%   Reconstructs the (z, SLD) knot table from parameter vector
+%   p = [z1..zN, sld1..sldN] (SLD in ×10⁻⁶ units), builds the
+%   spline-microsliced layer matrix via reflBuildSplineLayers, and
+%   evaluates parrattRefl with the dialog's scale / background /
+%   resolution kwargs. Out-of-order z values from the fitter are
+%   handled inside reflBuildSplineLayers (sort + de-duplicate), so
+%   the model is well-defined even mid-iteration.
+    knotData = cell(nK, 3);
+    for ki = 1:nK
+        knotData{ki, 1} = p(ki);
+        knotData{ki, 2} = p(nK + ki);
+        knotData{ki, 3} = false;
+    end
+    layers = bosonPlotter.reflBuildSplineLayers(knotData);
+    R = fitting.parrattRefl(Q, layers, ...
+        Scale=sc, Background=bg, Resolution=resArg);
 end
