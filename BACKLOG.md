@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-04-24 (W3 #11 fully closed — backend + GUI dialog integration shipped, `reflFitting` Mode dropdown + knot table + doFitSpline. Prev: W6 tutorials sweep #35-40, W6 theory-docs sweep #29-34, W3 #8 — all earlier same day)
+**Last regenerated:** 2026-04-25 (W6 docstring upgrades + plan hygiene moved to bottom of Tier 3 — deprioritized below all other nice-to-have work per user direction. Prev: W3 #11 fully closed 2026-04-24)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -77,16 +77,18 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#15** W3 Features → Analysis provenance log (Mantid-style)
 - [ ] **#16** W3 Features → 2D histogram / density plot
 - [ ] **#28** W5 Decomposition → Extract FermiViewer measurement subsystem
-- [ ] **#42** W6 Docs → Docstring upgrade: `+calc/` formulas
-- [ ] **#44** W6 Docs → Docstring upgrade: `+utilities/` physics functions
-- [ ] **#45** W6 Docs → Docstring upgrade: `+imaging/` physics functions
-- [ ] **#46** W6 Docs → Plan hygiene: update physics-analysis-gaps.md
 - [ ] **#49** W7 Parsers → `importSPC` (paused — awaiting example file)
 - [ ] **#51** W8 DataWorkspace → Multi-dataset operations
 - [ ] **#52** W8 DataWorkspace → Remove legacy table from BosonPlotter (~400–500 line cleanup)
 - [ ] **#56** W9 Bug-reporting → Cloudflare Worker relay
 - [ ] **#57** W9 Bug-reporting → "Submit directly" button in dialog
 - [ ] **#58** W9 Bug-reporting → Rate-limit + spam protection
+
+#### Deprioritized — theory docs (lowest priority, pick up only when no other T3 work remains)
+- [ ] **#42** W6 Docs → Docstring upgrade: `+calc/` formulas
+- [ ] **#44** W6 Docs → Docstring upgrade: `+utilities/` physics functions
+- [ ] **#45** W6 Docs → Docstring upgrade: `+imaging/` physics functions
+- [ ] **#46** W6 Docs → Plan hygiene: update physics-analysis-gaps.md
 
 ### Origin parity (Python) — `plans/origin-feature-gap.md`
 - [ ] **#14** Column formulas → Python
@@ -97,7 +99,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 | Plan | Status | Open items | Notes |
 |------|--------|------------|-------|
-| MASTERPLAN (MATLAB consolidated) | Active | 1 T1 / 10 T2 / 18 T3 | 9 source plans consolidated 2026-04-19; W4 Physics (4 items) shipped 2026-04-19; W5 #23/#25/#26/#27 reconciled as already done; W1 #59, W3 #17, W6 #41, W6 #43 shipped 2026-04-19; W2 #2 + #3 reconciled 2026-04-21; W3 #10 + W3 #12 shipped 2026-04-21; W3 #8 shipped 2026-04-24; W6 theory-docs sweep #29-34 shipped 2026-04-24; W6 tutorials sweep #35-40 shipped 2026-04-24; **W3 #11 fully shipped 2026-04-24 — backend + GUI Mode dropdown + knot table + doFitSpline** |
+| MASTERPLAN (MATLAB consolidated) | Active | 1 T1 / 10 T2 / 14+4 T3 | 9 source plans consolidated 2026-04-19; W4 Physics (4 items) shipped 2026-04-19; W5 #23/#25/#26/#27 reconciled as already done; W1 #59, W3 #17, W6 #41, W6 #43 shipped 2026-04-19; W2 #2 + #3 reconciled 2026-04-21; W3 #10 + W3 #12 shipped 2026-04-21; W3 #8 shipped 2026-04-24; W6 theory-docs sweep #29-34 + tutorials #35-40 shipped 2026-04-24; W3 #11 fully shipped 2026-04-24; **W6 #42/#44/#45/#46 (theory-docs work) deprioritized below all other T3 items 2026-04-25** (the "+4" in T3 is the deprioritized bucket) |
 | origin-feature-gap | Active (Python) | 6 T1 / 7 T2 / 1 T3 | MATLAB side complete; Python port pending — excluded from MASTERPLAN |
 | dataworkspace-python-port | Active (Python) | 3 T1 / 3 T2 / 2 T3 | Python-port architecture; excluded from MASTERPLAN |
 | porting_plan | Active (Python) | 7 phase-level items | Thin film toolkit architecture; excluded from MASTERPLAN |
