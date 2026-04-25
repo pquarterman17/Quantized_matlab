@@ -13,31 +13,18 @@ if ~contains(path, rootDir)
 end
 
 fprintf('\n=== test_fitBands ===\n');
-global TEST_FITBANDS_PASSED TEST_FITBANDS_FAILED
+% Globals are the simplest way to share pass/fail counters with the
+% local helper functions — refactoring to a class would be heavier
+% than the test warrants.
+global TEST_FITBANDS_PASSED TEST_FITBANDS_FAILED %#ok<GVMIS>
 TEST_FITBANDS_PASSED = 0;
 TEST_FITBANDS_FAILED = 0;
 
 rng(42);
 
-% ════════════════════════════════════════════════════════════════════════
-% Helpers
-% ════════════════════════════════════════════════════════════════════════
-
-    function tf = approxEq(a, b, tol)
-        tf = all(abs(a - b) <= tol);
-    end
-
-    function logPass(msg)
-        global TEST_FITBANDS_PASSED
-        fprintf('  PASS: %s\n', msg);
-        TEST_FITBANDS_PASSED = TEST_FITBANDS_PASSED + 1;
-    end
-
-    function logFail(msg)
-        global TEST_FITBANDS_FAILED
-        fprintf('  FAIL: %s\n', msg);
-        TEST_FITBANDS_FAILED = TEST_FITBANDS_FAILED + 1;
-    end
+% Helpers (`approxEq`, `logPass`, `logFail`) live at the end of the file.
+% Pre-R2024a MATLAB requires script-local functions to be after all
+% top-level executable code; keeping them there works in every release.
 
 % ════════════════════════════════════════════════════════════════════════
 % Shared linear-model fit (y = a*x + b)
@@ -231,7 +218,7 @@ xD1 = linspace(0.1, 5, 20)';
 yD1 = 3.0 * xD1 + 0.2 * randn(20, 1);
 slopeFcn = @(x, p) p(1) * x;
 
-res1 = fitting.curveFit(xD1, yD1, slopeFcn, [1]);
+res1 = fitting.curveFit(xD1, yD1, slopeFcn, 1);
 
 try
     b1 = fitting.fitBands(xGrid, slopeFcn, res1.params, res1.covar, ...
@@ -288,4 +275,25 @@ fprintf('\n=== test_fitBands: %d passed, %d failed ===\n\n', ...
     TEST_FITBANDS_PASSED, TEST_FITBANDS_FAILED);
 if TEST_FITBANDS_FAILED > 0
     error('test_fitBands: %d test(s) FAILED', TEST_FITBANDS_FAILED);
+end
+
+% ════════════════════════════════════════════════════════════════════════
+% Helpers (must be at end of script for R2022b–R2023b compatibility;
+% R2024a relaxed this to allow function defs anywhere in scripts)
+% ════════════════════════════════════════════════════════════════════════
+
+function tf = approxEq(a, b, tol)
+    tf = all(abs(a - b) <= tol);
+end
+
+function logPass(msg)
+    global TEST_FITBANDS_PASSED %#ok<GVMIS>
+    fprintf('  PASS: %s\n', msg);
+    TEST_FITBANDS_PASSED = TEST_FITBANDS_PASSED + 1;
+end
+
+function logFail(msg)
+    global TEST_FITBANDS_FAILED %#ok<GVMIS>
+    fprintf('  FAIL: %s\n', msg);
+    TEST_FITBANDS_FAILED = TEST_FITBANDS_FAILED + 1;
 end

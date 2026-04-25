@@ -16,14 +16,8 @@ fprintf('\n=== test_fitCompare ===\n');
 passed = 0;
 failed = 0;
 
-% ════════════════════════════════════════════════════════════════════════
-%  HELPER: tolerance check
-% ════════════════════════════════════════════════════════════════════════
-
-function tf = near(a, b, tol)
-    if nargin < 3, tol = 1e-6; end
-    tf = abs(a - b) <= tol * (1 + abs(b));
-end
+% Helper `near()` lives at end of file — pre-R2024a MATLAB requires
+% script-local functions to come after all top-level executable code.
 
 % ════════════════════════════════════════════════════════════════════════
 %  OUTPUT STRUCT FIELDS
@@ -372,4 +366,14 @@ end
 fprintf('\n=== test_fitCompare: %d passed, %d failed ===\n\n', passed, failed);
 if failed > 0
     error('test_fitCompare:failures', '%d test(s) failed.', failed);
+end
+
+% ════════════════════════════════════════════════════════════════════════
+% Helpers (must be at end of script for R2022b–R2023b compatibility;
+% R2024a relaxed this to allow function defs anywhere in scripts)
+% ════════════════════════════════════════════════════════════════════════
+
+function tf = near(a, b, tol)
+    if nargin < 3, tol = 1e-6; end
+    tf = abs(a - b) <= tol * (1 + abs(b));
 end

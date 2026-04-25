@@ -126,7 +126,7 @@ catch ME
 end
 
 try
-    fitting.splineSLD([0; 100], [1e-6]);
+    fitting.splineSLD([0; 100], 1e-6);
     fprintf('  FAIL: did not error on length mismatch\n'); failed = failed + 1;
 catch ME
     if contains(ME.identifier, 'knotMismatch')
