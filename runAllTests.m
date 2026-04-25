@@ -192,6 +192,7 @@ SUITES = {
     T('plotting','test_ternaryPlot'),       'plotting', 'ternaryPlot — three-component compositions on equilateral triangle (phase diagrams, alloy maps)'
     T('plotting','test_polarContour'),      'plotting', 'polarContour — filled-contour intensity maps on polar coordinates (XRD pole figures, texture plots)'
     T('plotting','test_axisBreak'),         'plotting', 'axisBreak — split Y/X axis with zigzag/slash/gap break marks, remove() restore'
+    T('plotting','test_densityPlot'),       'plotting', 'densityPlot — 2D density heatmap (W3 #16): bin sizing, edges, log compression, smoothing, non-finite filter, colormap delegation'
     % ── Spectral tests ───────────────────────────────────────────────────
     T('calc','test_fftSpectral'),          'spectral','FFT spectral analysis, windows, Welch PSD, cross-correlation'
     % ── Signal processing tests ──────────────────────────────────────────

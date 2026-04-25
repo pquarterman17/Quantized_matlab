@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-04-25 (W2 #5/#6/#7 FermiViewer histogram UX bundle shipped — transfer-function ramp overlay, ImageJ-style B/C drag, clipping indicators. Earlier: W6 docstring upgrades + plan hygiene deprioritized below all other T3.)
+**Last regenerated:** 2026-04-25 (W3 #16 2D density plot shipped — new `+plotting/densityPlot.m`. Earlier same day: W2 #5/#6/#7 FermiViewer histogram UX bundle shipped; W6 docstring upgrades deprioritized.)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -72,7 +72,6 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#13** W3 Features → Connect batch fitting to multi-peak + reflectivity
 - [ ] **#14** W3 Features → Action-log macro replay
 - [ ] **#15** W3 Features → Analysis provenance log (Mantid-style)
-- [ ] **#16** W3 Features → 2D histogram / density plot
 - [ ] **#28** W5 Decomposition → Extract FermiViewer measurement subsystem
 - [ ] **#49** W7 Parsers → `importSPC` (paused — awaiting example file)
 - [ ] **#51** W8 DataWorkspace → Multi-dataset operations
@@ -96,7 +95,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 | Plan | Status | Open items | Notes |
 |------|--------|------------|-------|
-| MASTERPLAN (MATLAB consolidated) | Active | 1 T1 / 10 T2 / 11+4 T3 | 9 source plans consolidated 2026-04-19; W4 Physics (4 items) shipped 2026-04-19; W5 #23/#25/#26/#27 reconciled as already done; W1 #59, W3 #17, W6 #41, W6 #43 shipped 2026-04-19; W2 #2 + #3 reconciled 2026-04-21; W3 #10 + W3 #12 shipped 2026-04-21; W3 #8 shipped 2026-04-24; W6 theory-docs sweep #29-34 + tutorials #35-40 shipped 2026-04-24; W3 #11 fully shipped 2026-04-24; W6 #42/#44/#45/#46 deprioritized 2026-04-25 (the "+4" in T3 is the deprioritized bucket); **W2 #5/#6/#7 FermiViewer histogram UX bundle shipped 2026-04-25** |
+| MASTERPLAN (MATLAB consolidated) | Active | 1 T1 / 10 T2 / 10+4 T3 | 9 source plans consolidated 2026-04-19; W4 Physics (4 items) shipped 2026-04-19; W5 #23/#25/#26/#27 reconciled as already done; W1 #59, W3 #17, W6 #41, W6 #43 shipped 2026-04-19; W2 #2 + #3 reconciled 2026-04-21; W3 #10 + W3 #12 shipped 2026-04-21; W3 #8 shipped 2026-04-24; W6 theory-docs sweep #29-34 + tutorials #35-40 shipped 2026-04-24; W3 #11 fully shipped 2026-04-24; W6 #42/#44/#45/#46 deprioritized 2026-04-25; W2 #5/#6/#7 FermiViewer histogram UX bundle shipped 2026-04-25; **W3 #16 2D density plot shipped 2026-04-25** |
 | origin-feature-gap | Active (Python) | 6 T1 / 7 T2 / 1 T3 | MATLAB side complete; Python port pending — excluded from MASTERPLAN |
 | dataworkspace-python-port | Active (Python) | 3 T1 / 3 T2 / 2 T3 | Python-port architecture; excluded from MASTERPLAN |
 | porting_plan | Active (Python) | 7 phase-level items | Thin film toolkit architecture; excluded from MASTERPLAN |

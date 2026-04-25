@@ -48,6 +48,7 @@ end
 |----------|-------------|
 | `boxViolinSwarm(ax, dataCell)` | Box, violin, or bee-swarm plot for grouped data |
 | `colorScatterZ(ax, x, y, z)` | Scatter plot with points coloured by a third variable Z |
+| `densityPlot(ax, x, y)` | 2D density / heatmap of dense scatter (10⁴+ points) with bin sizing, log compression, and Gaussian smoothing |
 | `groupedPlot(ax, x, y, groups)` | Plot data automatically grouped by a categorical variable |
 | `marginalHistogram(ax, x, y)` | Scatter plot with marginal histograms on X and Y axes |
 | `polarPlot(theta, r)` | Polar coordinate plot for angular-dependent measurements |
@@ -78,6 +79,12 @@ plotting.polarPlot(theta_deg * pi/180, kerr_signal, Units='deg');
 ```matlab
 data = parser.importXRDML('reciprocal_space_map.xrdml');
 plotting.surface3D(data, Type='contourf', Colormap='viridis');
+```
+
+#### Example — density plot for dense scatter
+```matlab
+% 50,000-point M-H sweep — individual markers overplot, density plot reveals structure
+plotting.densityPlot(ax, H_Oe, M_emu, NBins=200, LogCounts=true, Colormap='viridis');
 ```
 
 ---
