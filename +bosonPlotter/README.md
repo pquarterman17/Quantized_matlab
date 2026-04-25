@@ -111,7 +111,9 @@ bosonPlotter.spreadsheetPopup(data, Title='VSM scan', ReadOnly=true);
 | `AppState` | Handle class: shared GUI state for BosonPlotter; all `appData.X` fields |
 | `UndoManager` | Unlimited undo/redo stack; entries carry `undo`/`redo` function handles |
 | `sessionManager` | Static-method class: save/load BosonPlotter session `.mat` files |
-| `actionLog` | Handle class: record GUI actions as reproducible MATLAB commands; export as `.m` script |
+| `actionLog` | Handle class: record GUI actions as reproducible MATLAB commands; `record(str)` for string commands or `recordCall(fn, args, Lhs=, Raw=)` for structured tuples; `exportScript(path)` writes a `.m` script |
+| `serializeArg` | Convert any value to its MATLAB literal source form; round-trips via `eval`; used by `actionLog.recordCall` |
+| `exportScript(fig, path)` | Free-function form of `actionLog.exportScript` — pulls the macroLog off the figure via `getappdata` |
 | `datasetGroups` | Handle class: manage named groups of dataset indices for batch operations |
 
 #### AppState
@@ -146,9 +148,38 @@ bosonPlotter.sessionManager.applyGuiState(restored.guiState, widgets);
 #### actionLog
 ```matlab
 log = bosonPlotter.actionLog();
+
+% String-based recording (the original API; still works for ad-hoc commands)
 log.record("d = parser.importAuto('sample.dat');");
-log.record("d = utilities.smoothData(d.time, d.values);");
-log.exportScript('analysis.m');
+
+% Structured recording — auto-serializes args via bosonPlotter.serializeArg
+log.recordCall("parser.importAuto", {'sample.dat'}, Lhs="d");
+log.recordCall("utilities.smoothData", ...
+    {"d.time", "d.values", 5}, ...
+    Lhs="d.values", Raw=[true true false]);   % d.time / d.values are expressions
+
+log.exportScript('analysis.m');               % method form (writes the script)
+
+% Free-function form — pulls the macroLog off any open BosonPlotter window
+% via setappdata(fig, 'macroLog', ...). Convenient when only the figure
+% handle (not the api struct) is in scope.
+bosonPlotter.exportScript(api.fig, 'analysis.m');
+```
+
+Replay with `run('analysis.m')`. See
+[docs/gui_bosonplotter.md → Macro Recording & Replay](../docs/gui_bosonplotter.md#macro-recording--replay)
+for full toolbar workflow and caveats.
+
+#### serializeArg
+```matlab
+% Convert any value to its MATLAB literal source form (round-trip via eval)
+bosonPlotter.serializeArg(5)                          % '5'
+bosonPlotter.serializeArg('hello')                    % '''hello'''
+bosonPlotter.serializeArg([1 2; 3 4])                 % '[1 2;3 4]'
+bosonPlotter.serializeArg({1, 'two', true})           % '{1, ''two'', true}'
+bosonPlotter.serializeArg(struct('a', 1))             % 'struct(''a'', 1)'
+% Falls back to '<unsupported:CLASS>' for exotic types so a single weird
+% arg never breaks an entire macro export.
 ```
 
 #### datasetGroups

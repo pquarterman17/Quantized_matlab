@@ -82,9 +82,65 @@ plotting.surface3D(data, Type='contourf', Colormap='viridis');
 ```
 
 #### Example — density plot for dense scatter
+
+When >10⁴ scatter points overplot, individual markers lose meaning.
+`densityPlot` bins (x, y) into a 2D grid and renders the count map as
+an image — *density* of points rather than the points themselves.
+
 ```matlab
-% 50,000-point M-H sweep — individual markers overplot, density plot reveals structure
+% 50,000-point M-H sweep — markers overplot, density plot reveals structure
 plotting.densityPlot(ax, H_Oe, M_emu, NBins=200, LogCounts=true, Colormap='viridis');
+xlabel(ax, 'H (Oe)'); ylabel(ax, 'M (μ_B)');
+```
+
+**Auto bin count** (default `ceil(sqrt(N)/2)` clamped to [16, 256]):
+
+```matlab
+plotting.densityPlot(ax, x, y);                 % auto bins from data size
+plotting.densityPlot(ax, x, y, NBins=128);      % uniform 128×128
+plotting.densityPlot(ax, x, y, NBins=[60 200]); % 60 bins along x, 200 along y
+```
+
+**Explicit edges** — useful for matching another plot's grid or for
+non-uniform spacing:
+
+```matlab
+plotting.densityPlot(ax, H_Oe, M_emu, ...
+    XEdges = -1e4:50:1e4, ...   % 50 Oe bins
+    YEdges = linspace(-3, 3, 100));
+```
+
+**Log counts** — flatten the dynamic range when one bin dominates
+(e.g. a clustered transport sweep with most points near zero field):
+
+```matlab
+plotting.densityPlot(ax, V, I, LogCounts=true);   % colorbar shows log10(1+count)
+```
+
+**Smoothing** — separable Gaussian (no toolbox required) reveals
+underlying structure when bin sampling is sparse:
+
+```matlab
+plotting.densityPlot(ax, x, y, NBins=80, SmoothSigma=1.5);
+plotting.densityPlot(ax, x, y, NBins=80, SmoothSigma=[2 0.5]);  % anisotropic
+```
+
+**Colormap** — names route through `bosonPlotter.colorMaps` (built-in
++ perceptual `viridis`/`plasma`/`inferno`); also accepts an `[M×3]`
+RGB matrix:
+
+```matlab
+plotting.densityPlot(ax, x, y, Colormap='inferno');
+plotting.densityPlot(ax, x, y, Colormap=[linspace(0,1,32)' zeros(32,2)]);
+```
+
+**Output handles** — for further customization:
+
+```matlab
+h = plotting.densityPlot(ax, x, y);
+% h.image, h.axes, h.colorbar, h.counts, h.xCenters, h.yCenters
+disp(sum(h.counts(:)))              % total binned points
+h.colorbar.Label.String = 'Events / bin';
 ```
 
 ---

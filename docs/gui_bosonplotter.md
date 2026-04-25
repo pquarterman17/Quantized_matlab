@@ -205,6 +205,108 @@ overrides = api.getStyleOverrides();
 api.setStyleOverrides(struct('lineWidth', 2.0, 'fontSize', 14));
 ```
 
+## Macro Recording & Replay
+
+BosonPlotter records GUI actions as MATLAB commands and exports them
+as a runnable `.m` script — so any analysis you click through can be
+replayed verbatim later, shared with a collaborator, or pasted into a
+notebook for a paper.
+
+### Toolbar workflow
+
+1. Click the **⏺** button in the status bar (lower-right) — it turns
+   red and starts recording. The button text shows the running count
+   of captured commands (`■ 12`).
+2. Use BosonPlotter normally: load files, apply corrections, fit peaks,
+   change plot styles. Each action emits a command into the macro log.
+3. Click the **■** button again to stop. The status line reports the
+   total command count.
+4. Click **Save Script** — pick a path, and the macro is written as a
+   self-contained `.m` file with `setupToolbox` and timestamps.
+
+To replay later:
+
+```matlab
+run('analysis_macro.m')      % runs the entire recorded session
+```
+
+### Headless API
+
+```matlab
+api = BosonPlotter('Visible','off');
+api.startMacroRecord();
+api.loadFiles({'sample.dat'});
+% ... programmatic actions ...
+api.stopMacroRecord();
+
+% Two equivalent ways to write the script:
+api.getMacroLog().exportScript('session.m');           % via the log object
+bosonPlotter.exportScript(api.fig, 'session.m');       % via the figure handle
+```
+
+The figure-handle form is convenient when you only have a window open
+(e.g. someone's interactive session) and want to grab its log:
+
+```matlab
+% From any other code, given an open BosonPlotter window:
+bosonPlotter.exportScript(gcf, 'whatever_they_just_did.m');
+```
+
+### Structured recording with `recordCall`
+
+The toolbar callbacks pre-format commands as strings via `sprintf`. If
+you're emitting your own commands into the log from a custom script or
+extension, prefer the structured `recordCall` API — it serializes
+arguments via `bosonPlotter.serializeArg` and avoids quote-escaping
+bugs.
+
+```matlab
+log = api.getMacroLog();
+
+% Records:  d = parser.importAuto('sample.dat');
+log.recordCall("parser.importAuto", {'sample.dat'}, Lhs="d");
+
+% Records:  d.values = utilities.smoothData(d.time, d.values, 5);
+log.recordCall("utilities.smoothData", ...
+    {"d.time", "d.values", 5}, ...
+    Lhs="d.values", ...
+    Raw=[true true false]);          % first two args are expressions, not values
+```
+
+Use `Raw=[true true false]` to pass arguments through verbatim (for
+referencing existing variables like `d.time` rather than serializing
+their current value). Unset entries default to literal serialization.
+
+### Standalone serialization
+
+`bosonPlotter.serializeArg(value)` converts a value to its MATLAB
+literal source form (round-trip via `eval`). Useful outside the macro
+log too — for instance, generating reproducible test fixtures:
+
+```matlab
+bosonPlotter.serializeArg(5)            % '5'
+bosonPlotter.serializeArg('it''s')      % '''it''''s'''
+bosonPlotter.serializeArg([1 2; 3 4])   % '[1 2;3 4]'
+bosonPlotter.serializeArg(true)         % 'true'
+bosonPlotter.serializeArg({1, 'two'})   % '{1, ''two''}'
+bosonPlotter.serializeArg(struct('a',1,'b','x'))   % 'struct(''a'', 1, ''b'', ''x'')'
+```
+
+Falls back to `<unsupported:CLASS>` for exotic types (graphics handles,
+custom classes) so a single weird arg never breaks an entire export.
+
+### Caveats
+
+- **Captures actions, not state.** If you change a slider during
+  recording, only the *change* is logged — the script will reproduce
+  that change starting from a fresh BosonPlotter session.
+- **GUI-only fragments.** Some toolbar buttons emit `% comment` lines
+  rather than runnable code (informational only). Replay still works;
+  those comments simply don't execute.
+- **File paths are absolute.** The exported script references files by
+  the absolute paths used at recording time. Edit paths if you ship
+  the script elsewhere.
+
 ## GUI Development Notes
 
 - `cla()` alone does not remove graphics objects with `HandleVisibility='off'` (peak markers). Use `delete(ax.Children)` before `cla()` to clear all children.
