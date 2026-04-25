@@ -32,11 +32,12 @@ function test_bosonPlotterSize
     % ════════════════════════════════════════════════════════════════════
     %  TEST 1: Line-count ratchet
     % ════════════════════════════════════════════════════════════════════
-    % Current: 8,609 lines (2026-04-21). Target per W5 #22: < 8,000.
+    % Current: 8,552 lines (2026-04-25 — applyMaskInBox + buildToolbar
+    % extracted, 98-line drop). Target per W5 #22: < 8,000.
     % Ceiling carries a small buffer (~50 lines) so one in-flight edit
     % won't fail the build before an extraction commit lands. Ratchet
     % DOWN whenever an extraction lowers the baseline.
-    LINE_CEILING = 8650;
+    LINE_CEILING = 8600;
 
     fprintf('\n== TEST 1: BosonPlotter.m line-count ratchet ==\n');
     try

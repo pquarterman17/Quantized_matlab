@@ -4543,60 +4543,8 @@ function varargout = BosonPlotter(options)
     % ════════════════════════════════════════════════════════════════════
 
     function buildToolbar(parentGL, config, registry, btnColor)
-    %BUILDTOOLBAR  Clear and repopulate parentGL with buttons for each action in config.
-    %
-    %   parentGL  — uigridlayout (1 row) that hosts the toolbar buttons
-    %   config    — {1×N} cell of action IDs; empty → use factory default
-    %   registry  — struct array with .id / .label / .tooltip / .callback
-    %   btnColor  — [1×3] background colour for buttons
-
-        if isempty(config)
-            config = bosonPlotter.toolbarDefaultConfig();
-        end
-
-        % Keep only IDs present in the registry
-        allRegIds = {registry.id};
-        config    = config(ismember(config, allRegIds));
-        if isempty(config)
-            config = bosonPlotter.toolbarDefaultConfig();
-            config = config(ismember(config, allRegIds));
-        end
-
-        nBtns = numel(config);
-
-        % Remove all existing children (buttons + spacer)
-        existingChildren = parentGL.Children;
-        for ci = 1:numel(existingChildren)
-            if isvalid(existingChildren(ci))
-                delete(existingChildren(ci));
-            end
-        end
-
-        % Set column widths: spacer | btn1 | btn2 | …
-        % Assigning ColumnWidth resizes the grid automatically.
-        BTN_W = 55;
-        colWidths = [{'1x'}, repmat({BTN_W}, 1, nBtns)];
-        parentGL.ColumnWidth = colWidths;
-
-        % Spacer label
-        spacer = uilabel(parentGL, 'Text', '');
-        spacer.Layout.Column = 1;
-
-        % Create a button for each action
-        for bi = 1:nBtns
-            actId = config{bi};
-            idx   = find(strcmp(allRegIds, actId), 1);
-            if isempty(idx), continue; end
-            act = registry(idx);
-            btn = uibutton(parentGL, 'Text', act.label, ...
-                'BackgroundColor', btnColor, ...
-                'FontColor',       [0.85 0.85 0.85], ...
-                'FontSize',        9, ...
-                'Tooltip',         act.tooltip, ...
-                'ButtonPushedFcn', act.callback);
-            btn.Tag           = act.id;   % so callbacks can locate this button
-            btn.Layout.Column = bi + 1;
-        end
+    %BUILDTOOLBAR  Delegate to extracted +bosonPlotter module.
+        bosonPlotter.buildToolbar(parentGL, config, registry, btnColor);
     end
 
     function cfg = loadToolbarConfig()
@@ -5442,55 +5390,9 @@ function onLoadBackground(~,~)
     end
 
     function applyMaskInBox(xMin, xMax, yMin, yMax)
-    %APPLYMASKINBOX  Mask data points inside the given box for the active dataset.
-        ds = appData.datasets{appData.activeIdx};
-        primaryD = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
-
-        % Build displayed x vector (same logic as drawToAxes)
-        xSel2  = ddX.Value;
-        xName2 = guiXName(ds.data.metadata);
-        if strcmp(xSel2, xName2)
-            xVec = primaryD.time;
-        else
-            idx2 = find(strcmp(primaryD.labels, xSel2), 1);
-            if isempty(idx2)
-                xVec = primaryD.time;
-            else
-                xVec = primaryD.values(:, idx2);
-            end
-        end
-        xVec = double(xVec);
-
-        % Collect all selected Y channels so box-select hits any visible trace
-        ySel2 = ensureCell(lbY.Value);
-        inBox = false(size(xVec));
-        for k = 1:numel(ySel2)
-            yIdx = find(strcmp(primaryD.labels, ySel2{k}), 1);
-            if isempty(yIdx), continue; end
-            yVec = primaryD.values(:, yIdx);
-            inBox = inBox | (xVec >= xMin & xVec <= xMax & ...
-                             yVec >= yMin & yVec <= yMax);
-        end
-
-        % Map displayed indices back to raw indices
-        if ~isempty(ds.corrData)
-            rawRows = bgDisplayToRawRows(ds, inBox);
-        else
-            rawRows = find(inBox);
-        end
-
-        if isempty(rawRows), return; end
-
-        % Ensure mask exists
-        if ~isfield(ds, 'mask') || isempty(ds.mask)
-            ds.mask = true(size(ds.data.time));
-        end
-        ds.mask(rawRows) = false;
-        appData.datasets{appData.activeIdx} = ds;
-
-        nMasked = sum(~ds.mask);
-        setStatus(sprintf('Masked %d points (%d total masked)', numel(rawRows), nMasked));
-        onPlot([], []);
+    %APPLYMASKINBOX  Delegate to extracted +bosonPlotter module.
+        bosonPlotter.applyMaskInBox(appData, ui, xMin, xMax, yMin, yMax, ...
+            struct('setStatus', @setStatus, 'onPlot', @() onPlot([],[])));
     end
 
     function onUnmaskAll(~,~)
