@@ -107,8 +107,12 @@ function localMove(appData, fig, widgets)
             widgets.analysisGL.ColumnWidth = cw;
 
         case 'h_axdata'
+            % axLimPanel is the top row (Layout.Row = 1); the draggable
+            % border is its BOTTOM edge. In MATLAB figure coords y is
+            % bottom-up, so cursor moving down (delta_y < 0) lowers the
+            % border, which GROWS the top panel — hence subtract delta_y.
             delta_y = mp(2) - appData.panelResizeStart(2);
-            newH    = round(appData.panelResizeOrig + delta_y);
+            newH    = round(appData.panelResizeOrig - delta_y);
             newH    = max(60, min(newH, 400));
             widgets.analysisGL.RowHeight = {newH, '1x'};
 
