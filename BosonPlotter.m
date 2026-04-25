@@ -4866,43 +4866,8 @@ function onLoadBackground(~,~)
     end
 
     function updateSmoothPreview()
-    %UPDATESMOOTHPREVIEW  Recompute and redraw the dashed smooth preview line.
-        clearSmoothPreview();
-        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
-        if ~cbSmooth.Value, return; end
-
-        ds = appData.datasets{appData.activeIdx};
-        d  = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
-        if isempty(d) || isempty(d.values), return; end
-
-        xVec = double(d.time);
-        yVec = d.values(:, 1);  % preview on first Y column only
-
-        win  = max(1, round(efSmoothWin.Value));
-        % Map GUI dropdown labels to smoothData 'Method' values (lowercase)
-        persistent methMap
-        if isempty(methMap)
-            methMap = containers.Map( ...
-                {'Moving','Gaussian','Savitzky-Golay'}, ...
-                {'moving','gaussian','savitzky-golay'});
-        end
-        methKey = ddSmoothMethod.Value;
-        if isKey(methMap, methKey)
-            methVal = methMap(methKey);
-        else
-            methVal = 'moving';
-        end
-        try
-            ySmooth = utilities.smoothData(yVec, 'Method', methVal, 'Window', win);
-        catch
-            return;  % silently skip if smoothData fails (e.g. insufficient data)
-        end
-
-        hold(ax, 'on');
-        appData.smoothPreviewLine = plot(ax, xVec, ySmooth, ...
-            '--', 'Color', [0.2 0.7 1.0], 'LineWidth', 1.5, ...
-            'Tag', 'GUISmoothPreview', 'HandleVisibility', 'off');
-        hold(ax, 'off');
+    %UPDATESMOOTHPREVIEW  Delegate to extracted +bosonPlotter module.
+        bosonPlotter.updateSmoothPreview(appData, ui, ax);
     end
 
     function clearSmoothPreview()

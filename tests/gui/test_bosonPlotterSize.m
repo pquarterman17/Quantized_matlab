@@ -32,14 +32,14 @@ function test_bosonPlotterSize
     % ════════════════════════════════════════════════════════════════════
     %  TEST 1: Line-count ratchet
     % ════════════════════════════════════════════════════════════════════
-    % Current: 8,383 lines (2026-04-25 — saveAxisLimsToActiveDataset and
-    % onAsymmetryToggle extracted on top of fringe subsystem +
-    % applyMaskInBox + buildToolbar; total 267 off the W5 #22 ratchet
-    % today). Target per W5 #22: < 8,000.
+    % Current: 8,348 lines (2026-04-25 — updateSmoothPreview extracted on
+    % top of saveAxisLimsToActiveDataset/onAsymmetryToggle/fringe-subsystem/
+    % applyMaskInBox/buildToolbar; total 302 off the W5 #22 ratchet today).
+    % Target per W5 #22: < 8,000.
     % Ceiling carries a small buffer (~50 lines) so one in-flight edit
     % won't fail the build before an extraction commit lands. Ratchet
     % DOWN whenever an extraction lowers the baseline.
-    LINE_CEILING = 8430;
+    LINE_CEILING = 8400;
 
     fprintf('\n== TEST 1: BosonPlotter.m line-count ratchet ==\n');
     try

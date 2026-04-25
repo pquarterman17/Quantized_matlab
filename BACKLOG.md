@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-04-25 (W5 #22 progress: applyMaskInBox + buildToolbar + fringe subsystem + saveAxisLimsToActiveDataset + onAsymmetryToggle extracted, BosonPlotter.m 8650 → 8383 (267-line drop, 33% to <8k target). Earlier same day: W3 #15, W3 #14, W3 #16, W2 #5/#6/#7 all shipped. Six items closed + significant decomposition.)
+**Last regenerated:** 2026-04-25 (W5 #22 progress: 5 extractions today — applyMaskInBox, buildToolbar, full fringe subsystem, saveAxisLimsToActiveDataset, onAsymmetryToggle, updateSmoothPreview. BosonPlotter.m 8650 → 8348 (302-line drop, 46% to <8k target). Earlier same day: W3 #15, W3 #14, W3 #16, W2 #5/#6/#7 all shipped.)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
