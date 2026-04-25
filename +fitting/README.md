@@ -192,8 +192,10 @@ fprintf('R^2 = %.4f\n', result.R2);
 
 | Function | Description |
 |---|---|
-| `parrattRefl` | Specular reflectivity R(Q) via Parratt recursion with Névot-Croce roughness |
-| `sldProfile` | Depth-resolved SLD profile with error-function interfacial transitions |
+| `parrattRefl` | Specular reflectivity R(Q) via Parratt recursion with Névot-Croce roughness; optional instrument resolution smearing |
+| `sldProfile` | Depth-resolved SLD profile from a layer stack with error-function interfacial transitions |
+| `splineSLD` | Free-form SLD profile from spline-interpolated knot points (PCHIP / cubic / linear); for graded interfaces and model-independent fitting |
+| `profileToLayers` | Convert any (z, SLD) profile into the layer-matrix format expected by `parrattRefl` via microslicing |
 | `reflSLDPresets` | Material SLD lookup table (X-ray and neutron) for common substrates, metals, oxides, and polymers |
 
 ### `parrattRefl` example
@@ -217,3 +219,34 @@ xlabel('Q (A^{-1})');  ylabel('Reflectivity');
 [z, sld] = fitting.sldProfile(layers);
 plot(z, sld * 1e6);   ylabel('SLD (10^{-6} A^{-2})');
 ```
+
+### Free-form spline SLD (graded interfaces)
+
+For polymer brushes, graded oxides, or any profile not well-described by
+a stack of boxes, define the SLD at a few depth knots and let `splineSLD`
+fill in the continuous profile. `profileToLayers` then microslices it
+into the layer matrix `parrattRefl` consumes.
+
+```matlab
+% Polymer brush: graded transition from D2O ambient through brush to Si
+zKnots   = [0 50 150 200 250]';
+sldKnots = [6.36e-6 5.5e-6 3.0e-6 2.2e-6 2.07e-6]';
+
+[z, sld] = fitting.splineSLD(zKnots, sldKnots, ...
+    SldAmbient=6.36e-6, SldSubstrate=2.07e-6, ZRange=[-30 280]);
+
+layers = fitting.profileToLayers(z, sld, ...
+    SldAmbient=6.36e-6, SldSubstrate=2.07e-6);
+
+Q = linspace(0.005, 0.25, 200)';
+R = fitting.parrattRefl(Q, layers, Roughness=false);  % profile already smooth
+```
+
+**When to use which:**
+- `sldProfile` (layer-based) — sharp box-like layers with explicit roughness; minimum parameters.
+- `splineSLD` + `profileToLayers` — graded / spline-described interfaces; more parameters but model-independent.
+
+PCHIP is the default interpolation because reflectometry profiles often
+have sharp layer boundaries between widely-different SLDs and cubic spline
+can ring around them. Use `Method='spline'` only when the underlying SLD
+is genuinely smooth.
