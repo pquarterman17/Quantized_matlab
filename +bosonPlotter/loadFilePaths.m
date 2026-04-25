@@ -159,13 +159,18 @@ function loadFilePaths(appData, fpaths, fig, headless, callbacks)
         try
             [data, parserName] = guiImportFn(fp);
 
-            % Template matching: auto-apply or suggest overrides
+            % Template matching: auto-apply (high confidence) or suggest
+            % overrides (medium confidence, interactive only). In headless
+            % mode the suggestion uiconfirm is skipped — it would block
+            % the test until a user clicks. High-confidence templates
+            % still auto-apply because that's the same decision the user
+            % would make.
             try
                 [tmpl, conf] = templates.TemplateEngine.match(data, Type='tabular');
                 if conf >= 0.8 && ~isempty(tmpl)
                     data = templates.TemplateEngine.apply(data, tmpl);
                     callbacks.setStatus(sprintf('Applied template: %s', tmpl.name));
-                elseif conf >= 0.4 && ~isempty(tmpl)
+                elseif conf >= 0.4 && ~isempty(tmpl) && ~headless
                     sel = uiconfirm(fig, ...
                         sprintf('Suggested template: "%s" (%.0f%% match)\nApply it?', tmpl.name, conf*100), ...
                         'Template Suggestion', ...
@@ -177,8 +182,9 @@ function loadFilePaths(appData, fpaths, fig, headless, callbacks)
                         edited = templates.ColumnMapper(data, Template=tmpl, ParentFig=fig);
                         if ~isempty(edited), data = edited; end
                     end
-                elseif conf < 0.4 && ismember(parserName, {'importCSV', 'importExcel'})
+                elseif conf < 0.4 && ismember(parserName, {'importCSV', 'importExcel'}) && ~headless
                     % Generic parsers: offer Column Mapper for unknown layouts
+                    % (skipped in headless — no user to interact with).
                     edited = templates.ColumnMapper(data, ParentFig=fig);
                     if ~isempty(edited), data = edited; end
                 end
