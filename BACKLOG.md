@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-04-24 (W6 tutorials sweep — #35 magnetometry, #36 superconductor, #37 XRD, #38 reflectometry, #39 transport, #40 EELS shipped; W6 theory-docs sweep #29-34 earlier same day; W3 #8 resolution smearing earlier same day)
+**Last regenerated:** 2026-04-24 (W3 #11 backend shipped — `+fitting/splineSLD.m` + `+fitting/profileToLayers.m`; GUI dialog deferred. Prev: W6 tutorials sweep #35-40, W6 theory-docs sweep #29-34, W3 #8 — all earlier same day)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -42,7 +42,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#1** W1 Bugs → FermiViewer right-side tools panel overcrowded (tabled)
 - [ ] **#4** W2 UX → Toolbar metrics consistent across all four GUIs (deferred)
 - [ ] **#9** W3 Features → Small-angle scattering (Guinier / Porod / IFT)
-- [ ] **#11** W3 Features → Free-form SLD profile (spline) for reflectometry
+- [ ] **#11** W3 Features → Free-form SLD profile spline — GUI dialog integration only (backend shipped 2026-04-24)
 - [ ] **#24** W5 Decomposition → Documentation coverage — package READMEs
 - [ ] **#47** W7 Parsers → `importOxford` (paused — awaiting example file)
 - [ ] **#48** W7 Parsers → `importOpus` (paused — awaiting example file)
@@ -98,7 +98,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 | Plan | Status | Open items | Notes |
 |------|--------|------------|-------|
-| MASTERPLAN (MATLAB consolidated) | Active | 1 T1 / 11 T2 / 18 T3 | 9 source plans consolidated 2026-04-19; W4 Physics (4 items) shipped 2026-04-19; W5 #23/#25/#26/#27 reconciled as already done; W1 #59, W3 #17, W6 #41, W6 #43 shipped 2026-04-19; W2 #2 + #3 reconciled 2026-04-21; W3 #10 + W3 #12 shipped 2026-04-21; W3 #8 shipped 2026-04-24; W6 theory-docs sweep #29-34 shipped 2026-04-24; **W6 tutorials sweep 2026-04-24 — #35/#36/#37/#38/#39/#40 shipped (all six)** |
+| MASTERPLAN (MATLAB consolidated) | Active | 1 T1 / 11 T2 / 18 T3 | 9 source plans consolidated 2026-04-19; W4 Physics (4 items) shipped 2026-04-19; W5 #23/#25/#26/#27 reconciled as already done; W1 #59, W3 #17, W6 #41, W6 #43 shipped 2026-04-19; W2 #2 + #3 reconciled 2026-04-21; W3 #10 + W3 #12 shipped 2026-04-21; W3 #8 shipped 2026-04-24; W6 theory-docs sweep #29-34 shipped 2026-04-24; W6 tutorials sweep #35-40 shipped 2026-04-24; **W3 #11 backend shipped 2026-04-24 (GUI dialog deferred — item remains open in T2 with reduced scope)** |
 | origin-feature-gap | Active (Python) | 6 T1 / 7 T2 / 1 T3 | MATLAB side complete; Python port pending — excluded from MASTERPLAN |
 | dataworkspace-python-port | Active (Python) | 3 T1 / 3 T2 / 2 T3 | Python-port architecture; excluded from MASTERPLAN |
 | porting_plan | Active (Python) | 7 phase-level items | Thin film toolkit architecture; excluded from MASTERPLAN |
