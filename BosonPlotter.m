@@ -2740,6 +2740,9 @@ function varargout = BosonPlotter(options)
     api.isMacroRecording    = @() appData.macroRecording;
     api.startMacroRecord    = @() onToggleMacroRecord([], []);
     api.stopMacroRecord     = @() onToggleMacroRecord([], []);
+    api.getHistory          = @(idx)    historyAPI('get',    idx, '');
+    api.exportHistory       = @(idx, p) historyAPI('export', idx, p);
+    api.formatHistory       = @(idx)    historyAPI('format', idx, '');
     api.toggleAxAppearance  = @() onToggleAxAppearance();
     api.getAxAppearanceState = @() struct( ...
         'collapsed',        appData.sectionCollapsed.axAppearance, ...
@@ -4806,6 +4809,16 @@ function varargout = BosonPlotter(options)
             appData.macroLog.record(cmd);
             % Update record button text with entry count
             btnMacroRecord.Text = sprintf('%s %d', char(9632), appData.macroLog.nEntries());
+        end
+    end
+
+    function out = historyAPI(action, idx, path)
+    %HISTORYAPI  Dispatcher for api.getHistory/exportHistory/formatHistory (W3 #15).
+        ds_ = appData.datasets{idx};
+        switch action
+            case 'get',    out = ds_.history;
+            case 'format', out = bosonPlotter.formatHistory(ds_);
+            case 'export', bosonPlotter.exportHistoryScript(ds_, path); out = [];
         end
     end
 
@@ -7913,6 +7926,12 @@ function ds = buildDs(fp, data, parserName)
     ds.data        = data;
     ds.filepath    = fp;
     ds.parserName  = parserName;
+    % Per-dataset provenance log (W3 #15) — initial import entry.
+    [~, fn_, fe_] = fileparts(fp);
+    impCmd = guiTernary(~isempty(parserName), ...
+        sprintf("data = parser.%s('%s');", parserName, strrep(fp,'''','''''')), "");
+    ds = bosonPlotter.appendHistory(ds, "import", ...
+        sprintf("imported %s%s via %s", fn_, fe_, parserName), impCmd);
     ds.displayName = '';          % '' = use filepath-derived name in rebuildDatasetList
     ds.visible     = true;        % Visibility toggle for hiding datasets without removing them
     ds.corrData    = [];

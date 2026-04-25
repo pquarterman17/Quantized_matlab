@@ -219,9 +219,16 @@ function onApplyCorrections(appData, ui, callbacks)
     ui.btnApply.FontColor = callbacks.BTN_FG;
 
     % Record correction parameters in macro
-    callbacks.recordAction(sprintf("%% Apply corrections: XOff=%.6g YOff=%.6g BGSlope=%.6g BGInt=%.6g Smooth=%s Norm=%s Deriv=%s", ...
+    correctionSummary = sprintf("XOff=%.6g YOff=%.6g BGSlope=%.6g BGInt=%.6g Smooth=%s Norm=%s Deriv=%s", ...
         xOff, yOff, bgSlope, bgIntcpt, ...
-        string(ui.cbSmooth.Value), ui.ddNormalize.Value, ui.ddDerivative.Value));
+        string(ui.cbSmooth.Value), ui.ddNormalize.Value, ui.ddDerivative.Value);
+    callbacks.recordAction("% Apply corrections: " + correctionSummary);
+
+    % Append to per-dataset provenance log (W3 #15). Empty cmd: corrections
+    % depend on UI widget state; we record the parameter summary for audit
+    % rather than a replayable call.
+    appData.datasets{appData.activeIdx} = bosonPlotter.appendHistory( ...
+        appData.datasets{appData.activeIdx}, "correction", correctionSummary, "");
 
     % ── Push UndoManager entry for unlimited undo/redo ───────────────
     % undoState (prevState) captured above; build newState from the
