@@ -47,6 +47,69 @@ classdef actionLog < handle
             obj.timestamps(end+1) = datetime('now');
         end
 
+        function recordCall(obj, fn, args, opts)
+            %RECORDCALL  Record a structured function call.
+            %
+            %   log.recordCall(fn, {arg1, arg2, ...})
+            %   log.recordCall(fn, args, Lhs="d")
+            %   log.recordCall(fn, args, Lhs="d", Raw=[true false ...])
+            %
+            %   Builds a single MATLAB statement and appends it to the log.
+            %   Each entry of `args` is converted to a literal via
+            %   `bosonPlotter.serializeArg`. To pass an expression instead
+            %   of a value-to-be-serialized (e.g. an existing variable
+            %   `data.values`), set the corresponding `Raw` flag to true
+            %   and pass the expression as a string in `args`.
+            %
+            %   Inputs:
+            %     fn   — function name (string), e.g. "parser.importAuto"
+            %     args — cell array of argument values (or expressions if Raw)
+            %     Lhs  — optional left-hand-side variable name (default "")
+            %     Raw  — logical vector matching numel(args); true entries
+            %            are inserted verbatim. Default = false(1, numel(args)).
+            %
+            %   Examples:
+            %     log.recordCall("parser.importAuto", {'sample.dat'}, Lhs="d")
+            %       % d = parser.importAuto('sample.dat');
+            %     log.recordCall("utilities.smoothData", ...
+            %                    {"d.time", "d.values", 5}, ...
+            %                    Lhs="d.values", Raw=[true true false])
+            %       % d.values = utilities.smoothData(d.time, d.values, 5);
+            arguments
+                obj
+                fn   (1,1) string
+                args      cell
+                opts.Lhs  (1,1) string  = ""
+                opts.Raw  (1,:) logical = false(1,0)
+            end
+            n = numel(args);
+            if isempty(opts.Raw)
+                rawMask = false(1, n);
+            elseif numel(opts.Raw) == n
+                rawMask = opts.Raw;
+            else
+                error('bosonPlotter:actionLog:rawMaskSize', ...
+                    'Raw mask must have %d entries, got %d.', n, numel(opts.Raw));
+            end
+
+            argStrs = cell(1, n);
+            for k = 1:n
+                if rawMask(k)
+                    argStrs{k} = char(args{k});
+                else
+                    argStrs{k} = bosonPlotter.serializeArg(args{k});
+                end
+            end
+            argList = strjoin(argStrs, ', ');
+
+            if strlength(opts.Lhs) > 0
+                cmd = sprintf('%s = %s(%s);', char(opts.Lhs), char(fn), argList);
+            else
+                cmd = sprintf('%s(%s);', char(fn), argList);
+            end
+            obj.record(string(cmd));
+        end
+
         function undo(obj)
             %UNDO  Remove the last recorded command.
             if ~isempty(obj.commands)

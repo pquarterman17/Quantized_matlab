@@ -348,6 +348,9 @@ function varargout = BosonPlotter(options)
                              'Position',[-9999 -9999 initW initH]}];
     end
     fig = uifigure(figArgs{:});
+    % Expose the macro log on the figure so `bosonPlotter.exportScript(fig, ...)`
+    % and other free-function helpers can find it without an `api` reference.
+    setappdata(fig, 'macroLog', appData.macroLog);
     MIN_FIG_H = 500;   % reduced minimum so GUI works on small screens
     LAYOUT_DEFAULTS = struct('figW',initW,'figH',initH,'ctrlPanelW',190, ...
         'corrPanelW',320,'axLimPanelW',200,'fileListW',180);
