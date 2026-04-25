@@ -2461,7 +2461,14 @@ function varargout = BosonPlotter(options)
     % Scale / display
     ui.ddScaleX         = ddScaleX;
     ui.ddScaleY         = ddScaleY;
+    ui.ddScaleY2        = ddScaleY2;
     ui.cbCountsPerSec   = cbCountsPerSec;
+    ui.cbCalculateAsymmetry = cbCalculateAsymmetry;
+    % 2D map controls
+    ui.ddMap2DCmap      = ddMap2DCmap;
+    ui.ddMap2DScale     = ddMap2DScale;
+    ui.efMap2DCMin      = efMap2DCMin;
+    ui.efMap2DCMax      = efMap2DCMax;
     % Dataset appearance
     ui.ddDatasetColor   = ddDatasetColor;
     ui.ddDatasetColorR  = ddDatasetColorR;
@@ -3478,45 +3485,8 @@ function varargout = BosonPlotter(options)
     end
 
     function saveAxisLimsToActiveDataset()
-    %SAVEAXISLIMSTOACTIVEDATASET  Persist axis limits + plot-view state.
-    %  Called before switching datasets so each dataset remembers its own
-    %  zoom, axis scale (linear/log), grid/direction, and 2D map state.
-        if appData.activeIdx < 1 || isempty(appData.datasets), return; end
-        lims.xMin  = efXMin.Value;
-        lims.xMax  = efXMax.Value;
-        lims.xStep = efXStep.Value;
-        lims.yMin   = efYMin.Value;
-        lims.yMax   = efYMax.Value;
-        lims.yStep  = efYStep.Value;
-        lims.y2Min  = efY2Min.Value;
-        lims.y2Max  = efY2Max.Value;
-        lims.y2Step = efY2Step.Value;
-        appData.datasets{appData.activeIdx}.axLims = lims;
-
-        % Capture plot-view state so log/linear, grid, and axis direction
-        % survive a dataset toggle. Reading from live axes catches user
-        % changes made via context menu (grid/invert) that don't update
-        % a dropdown.
-        ps = struct();
-        ps.xScale  = ddScaleX.Value;
-        ps.yScale  = ddScaleY.Value;
-        ps.y2Scale = ddScaleY2.Value;
-        if ~isempty(ax) && isvalid(ax)
-            ps.gridX = ax.XGrid;
-            ps.gridY = ax.YGrid;
-            ps.xDir  = ax.XDir;
-            ps.yDir  = ax.YDir;
-        end
-        % 2D map state — widgets always exist; values are still read for
-        % non-2D parsers so user overrides persist if they later load a
-        % 2D dataset into the same session.
-        if ~isempty(ddMap2DCmap) && isvalid(ddMap2DCmap)
-            ps.map2DCmap  = ddMap2DCmap.Value;
-            ps.map2DScale = ddMap2DScale.Value;
-            ps.map2DCMin  = efMap2DCMin.Value;
-            ps.map2DCMax  = efMap2DCMax.Value;
-        end
-        appData.datasets{appData.activeIdx}.plotState = ps;
+    %SAVEAXISLIMSTOACTIVEDATASET  Delegate to extracted +bosonPlotter module.
+        bosonPlotter.saveAxisLimsToActiveDataset(appData, ui, ax);
     end
 
     function rebuildDatasetList(keepActiveIdx)
@@ -5642,45 +5612,9 @@ function onSendToOrigin(~,~)
     end
 
     function onAsymmetryToggle(~,~)
-    %ONASYMMETRYTOGGLE  Handle spin asymmetry checkbox state changes.
-    %   When asymmetry is enabled:
-    %     - Hide PNR datasets (importNCNRPNR) since asymmetry needs DAT files
-    %     - Switch to linear Y scale
-    %   When disabled:
-    %     - Restore PNR dataset visibility
-    %     - Restore previous log Y state
-
-        if cbCalculateAsymmetry.Value
-            % Asymmetry enabled: store previous log state and hide PNR data
-            if ~isprop(appData, 'asymmetryPrevLogY')
-                appData.asymmetryPrevLogY = strcmp(ddScaleY.Value, 'Log');
-            end
-            ddScaleY.Value = 'Linear';  % Switch to linear scale
-
-            % Hide all PNR datasets
-            for i = 1:numel(appData.datasets)
-                if strcmp(appData.datasets{i}.parserName, 'importNCNRPNR')
-                    if ~isfield(appData.datasets{i}, 'hiddenForAsymmetry')
-                        appData.datasets{i}.hiddenForAsymmetry = false;
-                    end
-                    appData.datasets{i}.hiddenForAsymmetry = true;
-                end
-            end
-        else
-            % Asymmetry disabled: restore PNR visibility and previous log state
-            for i = 1:numel(appData.datasets)
-                if isfield(appData.datasets{i}, 'hiddenForAsymmetry') && appData.datasets{i}.hiddenForAsymmetry
-                    appData.datasets{i}.hiddenForAsymmetry = false;
-                end
-            end
-
-            % Restore previous log Y state if we stored it
-            if isprop(appData, 'asymmetryPrevLogY')
-                if appData.asymmetryPrevLogY, ddScaleY.Value = 'Log'; else, ddScaleY.Value = 'Linear'; end
-            end
-        end
-
-        onPlot([], []);  % Redraw plot with updated visibility and scale
+    %ONASYMMETRYTOGGLE  Delegate to extracted +bosonPlotter module.
+        bosonPlotter.onAsymmetryToggle(appData, ui, ...
+            struct('onPlot', @() onPlot([],[])));
     end
 
     function drawToAxes(targetAx)
