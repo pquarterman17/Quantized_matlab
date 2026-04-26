@@ -225,12 +225,11 @@ function applyParserAnalysisConfig(pName, appData, ui, CROW, peakFig, callbacks)
                   callbacks.is2DDataset(appData.datasets{appData.activeIdx});
     if is2D_active
         ui.map2DPanel.Visible = 'on';
-        ui.analysisGL.ColumnWidth = {appData.corrPanelWidth, '1x', '2x', 180};
-        % Hide the data table — 1D projection rows are not useful in 2D
-        % map mode and the panel wastes space that the axes or map panel
-        % could use.  Let the Axes panel expand to fill both rows.
+        % Col 2 collapses to 0 so the heatmap (col 3) can take the freed
+        % horizontal space in 2D mode — there's no axes/data-table panel
+        % to keep visible there now.
+        ui.analysisGL.ColumnWidth = {appData.corrPanelWidth, 0, '1x', 180};
         ui.dataTablePanel.Visible   = 'off';
-        ui.axLimPanel.Layout.Row    = [1 2];
         % Disable all corrections — not meaningful for raw 2D maps
         for hh = {ui.efXOffset, ui.efYOffset, ui.efBGSlope, ui.efBGIntercept, ...
                   ui.btnApply, ui.btnReset, ui.btnApplyAll, ui.btnUndo, ...
@@ -249,9 +248,7 @@ function applyParserAnalysisConfig(pName, appData, ui, CROW, peakFig, callbacks)
         ui.analysisPanel.Title = 'Analysis  —  XRD 2D Map';
     else
         ui.map2DPanel.Visible = 'off';
-        % Restore the data table and axes panel to normal 1D layout
         ui.dataTablePanel.Visible   = 'on';
-        ui.axLimPanel.Layout.Row    = 1;
     end
 
     % Sync undo/redo button state after layout changes (enable flags above

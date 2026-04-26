@@ -17,8 +17,8 @@ function onFigSizeChanged(appData, fig, widgets, constants, callbacks)
 %     * Adapts the analysis-grid column widths (corrections + 2D map
 %       + save/export) the same way, collapsing the 2D map column to
 %       0 when the active dataset is 1D.
-%     * Keeps the data-table hidden and the axLimPanel stretched over
-%       both rows while in 2D mode (regardless of resize).
+%     * Keeps the data-table hidden and collapses col 2 while in 2D mode
+%       (regardless of resize) so the heatmap takes the freed space.
 %   Finally, re-installs itself as the SizeChangedFcn so the next
 %   resize fires again.
 %
@@ -26,8 +26,7 @@ function onFigSizeChanged(appData, fig, widgets, constants, callbacks)
 %   appData    - bosonPlotter.AppState handle (reads datasets / activeIdx)
 %   fig        - Main figure handle (reads/writes Position; callback owner)
 %   widgets    - Widget struct with fields:
-%                   .rootGL, .contentGL, .analysisGL,
-%                   .dataTablePanel, .axLimPanel
+%                   .rootGL, .contentGL, .analysisGL, .dataTablePanel
 %   constants  - Struct with fields:
 %                   .MIN_FIG_H, .LAYOUT_DEFAULTS (struct with fileListW,
 %                   ctrlPanelW, corrPanelW)
@@ -64,21 +63,25 @@ function onFigSizeChanged(appData, fig, widgets, constants, callbacks)
 
     is2D_now = appData.activeIdx >= 1 && ~isempty(appData.datasets) && ...
                callbacks.is2DDataset(appData.datasets{appData.activeIdx});
-    if is2D_now, col3W = '2x'; else, col3W = 0; end
+    % In 2D mode, col 2 (data table) collapses so col 3 (heatmap) gets the
+    % horizontal space; in 1D mode, col 2 expands ('1x') and col 3 hides.
+    if is2D_now
+        col2W = 0;     col3W = '1x';
+    else
+        col2W = '1x';  col3W = 0;
+    end
     defCorrW = constants.LAYOUT_DEFAULTS.corrPanelW;
     if figW < 900
         if is2D_now, col4W = 140; else, col4W = 0; end
-        widgets.analysisGL.ColumnWidth = {min(260, defCorrW), '1x', col3W, col4W};
+        widgets.analysisGL.ColumnWidth = {min(260, defCorrW), col2W, col3W, col4W};
     elseif figW < 1100
-        widgets.analysisGL.ColumnWidth = {min(280, defCorrW), '1x', col3W, 180};
+        widgets.analysisGL.ColumnWidth = {min(280, defCorrW), col2W, col3W, 180};
     end
 
     if is2D_now
         widgets.dataTablePanel.Visible = 'off';
-        widgets.axLimPanel.Layout.Row  = [1 2];
     else
         widgets.dataTablePanel.Visible = 'on';
-        widgets.axLimPanel.Layout.Row  = 1;
     end
 
 end

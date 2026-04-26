@@ -1,5 +1,5 @@
 function startPanelResize(appData, fig, widgets, callbacks)
-%STARTPANELRESIZE  Arm a live drag-resize for one of the six panel borders.
+%STARTPANELRESIZE  Arm a live drag-resize for one of the five panel borders.
 %
 % Syntax
 %   bosonPlotter.startPanelResize(appData, fig, widgets, callbacks)
@@ -10,10 +10,9 @@ function startPanelResize(appData, fig, widgets, callbacks)
 %   Snapshots the current pixel-size of the panel being resized so that
 %   relative-motion-to-pixel-delta conversion works correctly, then
 %   installs motion and up handlers so the border tracks the mouse
-%   until release.  Six resize directions are supported:
+%   until release.  Five resize directions are supported:
 %     'h_row12'       - analysis panel height (above/below preview)
 %     'v_col12'       - corrections panel width
-%     'h_axdata'      - axLimPanel height (row 1 of analysisGL)
 %     'v_col23'       - save/export panel width (col 4)
 %     'v_content12'   - file list panel width (col 1)
 %     'v_content23'   - controls panel width (col 2)
@@ -24,7 +23,7 @@ function startPanelResize(appData, fig, widgets, callbacks)
 %   fig        - Main figure handle (reads CurrentPoint; window callback owner)
 %   widgets    - Widget struct with fields:
 %                   .rootGL, .analysisGL, .contentGL,
-%                   .analysisPanel, .corrPanel, .axLimPanel, .savePanel,
+%                   .analysisPanel, .corrPanel, .savePanel,
 %                   .fileListPanel, .ctrlPanel
 %   callbacks  - Struct of function handles:
 %                   .onMouseHover(src, evt)
@@ -46,14 +45,6 @@ function startPanelResize(appData, fig, widgets, callbacks)
                 appData.panelResizeOrig = cPos(3);
             catch
                 appData.panelResizeOrig = appData.corrPanelWidth;
-            end
-        case 'h_axdata'
-            rh = widgets.analysisGL.RowHeight;
-            try
-                alPos = getpixelposition(widgets.axLimPanel, true);
-                appData.panelResizeOrig = alPos(4);
-            catch
-                appData.panelResizeOrig = guiTernary(isnumeric(rh{1}), rh{1}, 110);
             end
         case 'v_col23'
             try
@@ -105,16 +96,6 @@ function localMove(appData, fig, widgets)
             cw    = widgets.analysisGL.ColumnWidth;
             cw{1} = newW;
             widgets.analysisGL.ColumnWidth = cw;
-
-        case 'h_axdata'
-            % axLimPanel is the top row (Layout.Row = 1); the draggable
-            % border is its BOTTOM edge. In MATLAB figure coords y is
-            % bottom-up, so cursor moving down (delta_y < 0) lowers the
-            % border, which GROWS the top panel — hence subtract delta_y.
-            delta_y = mp(2) - appData.panelResizeStart(2);
-            newH    = round(appData.panelResizeOrig - delta_y);
-            newH    = max(60, min(newH, 400));
-            widgets.analysisGL.RowHeight = {newH, '1x'};
 
         case 'v_col23'
             delta_x = mp(1) - appData.panelResizeStart(1);

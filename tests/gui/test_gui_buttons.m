@@ -493,22 +493,26 @@ try
     if ~isempty(cbWf.ValueChangedFcn), cbWf.ValueChangedFcn(cbWf, []); end
     drawnow;
 
-    % Find waterfall spacing edit field by tooltip
-    allEf = findobj(api.fig, 'Type', 'uieditfield');
+    % Find waterfall spacing edit field by tooltip — it's a NUMERIC field
+    % (not text), so search both EditField and NumericEditField types. The
+    % old test searched only 'uieditfield' and incidentally matched the
+    % former efXStep/efYStep tick-spacing inputs — those were deleted when
+    % the Axes panel was consolidated, so the search must be made specific.
+    allNum = findobj(api.fig, 'Type', 'uinumericeditfield');
     efWfSp = [];
-    for k = 1:numel(allEf)
-        tt = allEf(k).Tooltip;
-        if contains(tt, 'spacing', 'IgnoreCase', true) || contains(tt, 'waterfall', 'IgnoreCase', true)
-            efWfSp = allEf(k); break;
+    for k = 1:numel(allNum)
+        tt = allNum(k).Tooltip;
+        if contains(tt, 'stacked traces', 'IgnoreCase', true)
+            efWfSp = allNum(k); break;
         end
     end
-    assert(~isempty(efWfSp), 'Waterfall spacing edit field not found');
+    assert(~isempty(efWfSp), 'Waterfall spacing numeric edit field not found');
 
-    efWfSp.Value = '500';
+    efWfSp.Value = 500;
     if ~isempty(efWfSp.ValueChangedFcn), efWfSp.ValueChangedFcn(efWfSp, []); end
     drawnow;
 
-    assert(strcmp(efWfSp.Value, '500'), 'spacing value not set');
+    assert(efWfSp.Value == 500, 'spacing value not set');
     fprintf('  Waterfall spacing set to 500\n');
     fprintf('  PASS\n'); passed = passed + 1;
 catch ME

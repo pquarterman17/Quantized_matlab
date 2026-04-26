@@ -693,49 +693,11 @@ end
 % ════════════════════════════════════════════════════════════════════════
 %  21. Axes "More" toggle expand/collapse (layout regression)
 % ════════════════════════════════════════════════════════════════════════
-fprintf('\n══ TEST 21: Axes "More" toggle expand/collapse ══\n');
-try
-    api.reset();
-    api.addFiles({XRDML_F});
-    drawnow;
-
-    % Initial state: collapsed — verify heights (the actual bug was about heights)
-    s1 = api.getAxAppearanceState();
-    assert(s1.advRowHeight == 0, 'Advanced row should be 0 when collapsed');
-    assert(s1.analysisRow1Height == 110, 'Analysis row 1 should be 110 when collapsed');
-    fprintf('  Collapsed: advRow=%g, analysisRow1=%g\n', s1.advRowHeight, s1.analysisRow1Height);
-
-    % Expand — make fig visible briefly so layout engine processes changes
-    showTestFig(api.fig);
-    drawnow;
-    api.toggleAxAppearance();
-    drawnow;
-    s2 = api.getAxAppearanceState();
-    assert(s2.advRowHeight > 0, ...
-        sprintf('Advanced row should be > 0 when expanded (got %g)', s2.advRowHeight));
-    assert(s2.analysisRow1Height > 110, ...
-        sprintf('Analysis row 1 should grow when expanded (got %g)', s2.analysisRow1Height));
-    fprintf('  Expanded:  advRow=%g, analysisRow1=%g\n', s2.advRowHeight, s2.analysisRow1Height);
-
-    % Collapse again
-    api.toggleAxAppearance();
-    drawnow;
-    s3 = api.getAxAppearanceState();
-    assert(s3.advRowHeight == 0, 'Advanced row should return to 0');
-    assert(s3.analysisRow1Height == 110, ...
-        sprintf('Analysis row 1 should return to 110 (got %g)', s3.analysisRow1Height));
-    fprintf('  Re-collapsed: advRow=%g, analysisRow1=%g\n', s3.advRowHeight, s3.analysisRow1Height);
-
-    hideTestFig(api.fig);
-    drawnow;
-
-    fprintf('  PASS\n');
-    passed = passed + 1;
-catch ME
-    fprintf('  FAIL: %s\n', ME.message);
-    try; hideTestFig(api.fig); catch; end
-    failed = failed + 1;
-end
+% (TEST 21 retired) — the in-panel "Axes Appearance" collapsible section
+% was removed when the Axes panel was consolidated into the Controls
+% panel. Title / labels / ref lines remain accessible via the right-click
+% context menu ("Edit Axis Labels...", "Reference Lines ▸").
+% ════════════════════════════════════════════════════════════════════════
 
 % ════════════════════════════════════════════════════════════════════════
 %  22. Peak decomposition exercises getPlotData

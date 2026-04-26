@@ -12,11 +12,9 @@ function dir = detectResizeBorder(fig, panels)
 %   Returned direction tags:
 %     'h_row12'      — horizontal border between content row (1) and
 %                      analysis row (2)
-%     'h_axdata'     — horizontal border between axLimPanel and
-%                      dataTablePanel
 %     'v_col12'      — vertical border between corrections col (1) and
-%                      axes col (2)
-%     'v_col23'      — vertical border between axes col (2) and
+%                      data table col (2)
+%     'v_col23'      — vertical border between data table col (2) and
 %                      save/export col (3)
 %     'v_content12'  — vertical border between file list and controls
 %                      (top row)
@@ -32,8 +30,7 @@ function dir = detectResizeBorder(fig, panels)
 %   fig     - Main BosonPlotter figure handle
 %   panels  - Struct of panel handles:
 %               .fileListPanel, .ctrlPanel, .corrPanel,
-%               .axLimPanel,    .savePanel, .analysisPanel,
-%               .dataTablePanel
+%               .savePanel, .analysisPanel, .dataTablePanel
 
     SNAP_PX = 5;
     dir = '';
@@ -63,17 +60,6 @@ function dir = detectResizeBorder(fig, panels)
             borderX2 = spPos(1);
             if abs(mp(1) - borderX2) <= SNAP_PX
                 dir = 'v_col23'; return;
-            end
-
-            % h_axdata: bottom edge of axLimPanel (border between axes and data table)
-            % Skip when data table is hidden (2D map mode — axes span both rows).
-            if strcmp(panels.dataTablePanel.Visible, 'on')
-                alPos    = getpixelposition(panels.axLimPanel, true);
-                borderY2 = alPos(2);
-                if abs(mp(2) - borderY2) <= SNAP_PX && ...
-                   mp(1) >= alPos(1) && mp(1) <= alPos(1) + alPos(3)
-                    dir = 'h_axdata'; return;
-                end
             end
         end
 

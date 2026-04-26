@@ -630,20 +630,22 @@ function varargout = BosonPlotter(options)
 
     % Left controls panel
     % Title updates to show parser name after each load.
-    % Row layout (7 rows):
-    %   1 -  26px  X dropdown
-    %   2 -  '1x'  Y listbox (multi-select)
+    % Row layout (9 rows):
+    %   1 -  24px  X dropdown
+    %   2 -  '2x'  Y listbox (multi-select)
     %   3 -  '1x'  Right Y-axis selector
-    %   4 -  70px  Plot-style / colormap / theme buttons
-    %   5 -  24px  Log-scale checkboxes
-    %   6 -  26px  Waterfall + Refresh
-    %   7 -  24px  Annotation mode
+    %   4 -  44px  Colormap + template selectors
+    %   5 -  66px  Linear/Log scale dropdowns (X, Y, Y2)
+    %   6 - 110px  Axis limits (X/Y/Y2 min/max + fmt) + Auto/Reset
+    %   7 -  22px  Waterfall + spacing
+    %   8 -  22px  Cts/s + Refresh
+    %   9 -  20px  Annotate + Style + Plot Options
     ctrlPanel = uipanel(contentGL,'Title','Controls','FontSize', tk.font.title, ...
         'Scrollable','on');
     ctrlPanel.Layout.Column = 2;
 
-    ctrlGL = uigridlayout(ctrlPanel,[8 1], ...
-        'RowHeight', {24,'2x','1x',44,66,22,22,20}, ...
+    ctrlGL = uigridlayout(ctrlPanel,[9 1], ...
+        'RowHeight', {24,'2x','1x',44,66,110,22,22,20}, ...
         'Padding',   tk.pad.normal, ...
         'RowSpacing', 2);
 
@@ -750,10 +752,88 @@ function varargout = BosonPlotter(options)
         'Tooltip','Right Y-axis scale');
     ddScaleY2.Layout.Row = 3; ddScaleY2.Layout.Column = 2;
 
-    % Row 6: Waterfall toggle + spacing
+    % Row 6: Axis limits (X/Y/Y2 min/max + fmt) + Auto/Reset
+    % Replaces the old standalone Axes panel (analysisGL col 2 row 1) so
+    % limits live next to the Linear/Log scale dropdowns they're paired
+    % with. Step inputs, color override, legend location, and title /
+    % labels / ref lines moved to right-click and Plot Options ▾ menus.
+    AXLIM_BG = [0.17 0.17 0.17];
+    AXLIM_FG = [0.92 0.92 0.92];
+    limGL = uigridlayout(ctrlGL,[4 4], ...
+        'Padding', tk.pad.flush,'RowSpacing',2,'ColumnSpacing',3, ...
+        'RowHeight',{20,20,20,22},'ColumnWidth',{18,'1x','1x',60});
+    limGL.Layout.Row = 6;
+
+    % Row 1: X limits + format
+    lblXLim = uilabel(limGL,'Text','X:','HorizontalAlignment','right','FontSize', tk.font.label);
+    lblXLim.Layout.Row = 1; lblXLim.Layout.Column = 1;
+    efXMin = uieditfield(limGL,'text','Value','', ...
+        'Placeholder','min', 'Tooltip','X axis minimum — blank = auto', ...
+        'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, 'FontSize', tk.font.body, ...
+        'ValueChangedFcn',@(~,~) onPlot([],[]));
+    efXMin.Layout.Row = 1; efXMin.Layout.Column = 2;
+    efXMax = uieditfield(limGL,'text','Value','', ...
+        'Placeholder','max', 'Tooltip','X axis maximum — blank = auto', ...
+        'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, 'FontSize', tk.font.body, ...
+        'ValueChangedFcn',@(~,~) onPlot([],[]));
+    efXMax.Layout.Row = 1; efXMax.Layout.Column = 3;
+    ddXFmt = uidropdown(limGL, 'Items', TICKFMT_NAMES, 'ItemsData', TICKFMT_DATA, ...
+        'Value', '', 'FontSize', tk.font.body, 'Tooltip', 'X-axis tick label notation', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    ddXFmt.Layout.Row = 1; ddXFmt.Layout.Column = 4;
+
+    % Row 2: Y limits + format
+    lblYLim = uilabel(limGL,'Text','Y:','HorizontalAlignment','right','FontSize', tk.font.label);
+    lblYLim.Layout.Row = 2; lblYLim.Layout.Column = 1;
+    efYMin = uieditfield(limGL,'text','Value','', ...
+        'Placeholder','min', 'Tooltip','Y axis minimum — blank = auto', ...
+        'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, 'FontSize', tk.font.body, ...
+        'ValueChangedFcn',@(~,~) onPlot([],[]));
+    efYMin.Layout.Row = 2; efYMin.Layout.Column = 2;
+    efYMax = uieditfield(limGL,'text','Value','', ...
+        'Placeholder','max', 'Tooltip','Y axis maximum — blank = auto', ...
+        'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, 'FontSize', tk.font.body, ...
+        'ValueChangedFcn',@(~,~) onPlot([],[]));
+    efYMax.Layout.Row = 2; efYMax.Layout.Column = 3;
+    ddYFmt = uidropdown(limGL, 'Items', YTICKFMT_NAMES, 'ItemsData', YTICKFMT_DATA, ...
+        'Value', '__exp0', 'FontSize', tk.font.body, 'Tooltip', 'Left Y-axis tick label notation', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    ddYFmt.Layout.Row = 2; ddYFmt.Layout.Column = 4;
+
+    % Row 3: Y2 limits + format (RowHeight toggled to 0 when no Y2 active)
+    lblY2Lim = uilabel(limGL,'Text','Y2:','HorizontalAlignment','right','FontSize', tk.font.label);
+    lblY2Lim.Layout.Row = 3; lblY2Lim.Layout.Column = 1;
+    efY2Min = uieditfield(limGL,'text','Value','', ...
+        'Placeholder','min', 'Tooltip','Right Y-axis minimum — blank = auto', ...
+        'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, 'FontSize', tk.font.body, ...
+        'ValueChangedFcn',@(~,~) onPlot([],[]));
+    efY2Min.Layout.Row = 3; efY2Min.Layout.Column = 2;
+    efY2Max = uieditfield(limGL,'text','Value','', ...
+        'Placeholder','max', 'Tooltip','Right Y-axis maximum — blank = auto', ...
+        'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, 'FontSize', tk.font.body, ...
+        'ValueChangedFcn',@(~,~) onPlot([],[]));
+    efY2Max.Layout.Row = 3; efY2Max.Layout.Column = 3;
+    ddY2Fmt = uidropdown(limGL, 'Items', YTICKFMT_NAMES, 'ItemsData', YTICKFMT_DATA, ...
+        'Value', '', 'FontSize', tk.font.body, 'Tooltip', 'Right Y-axis tick label notation', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    ddY2Fmt.Layout.Row = 3; ddY2Fmt.Layout.Column = 4;
+
+    % Row 4: Auto-Scale + Reset
+    btnSmartScale = uibutton(limGL,'Text','Auto', ...
+        'ButtonPushedFcn',@onSmartScale, 'FontSize', tk.font.body, ...
+        'Tooltip','Auto-detect linear/log scale and set reasonable axis limits');
+    btnSmartScale.Layout.Row = 4; btnSmartScale.Layout.Column = [1 2];
+    btnAutoLimits = uibutton(limGL,'Text','Reset', ...
+        'ButtonPushedFcn',@onAutoLimits, 'FontSize', tk.font.body, ...
+        'Tooltip',['Reset View — clear manual axis limits and per-dataset' newline ...
+                   'plot state (log/linear, grid, direction, 2D cmap/cLim)' newline ...
+                   'so this dataset returns to auto defaults.']);
+    btnAutoLimits.Layout.Row = 4; btnAutoLimits.Layout.Column = [3 4];
+
+    % Row 7: Waterfall toggle + spacing
     wfGL = uigridlayout(ctrlGL,[1 2], ...
         'Padding', tk.pad.flush,'ColumnSpacing',4,'ColumnWidth',{'1x',50});
-    wfGL.Layout.Row = 6;
+    wfGL.Layout.Row = 7;
 
     cbWaterfall = uicheckbox(wfGL, ...
         'Text',    'Waterfall', ...
@@ -772,10 +852,10 @@ function varargout = BosonPlotter(options)
     % Waterfall gradient coloring (stored in appData, no separate widget)
     appData.wfGradient = false;
 
-    % Row 7: Cts/s + Refresh
+    % Row 8: Cts/s + Refresh
     miscGL = uigridlayout(ctrlGL,[1 2], ...
         'Padding', tk.pad.flush,'ColumnSpacing',4,'ColumnWidth',{'1x',55});
-    miscGL.Layout.Row = 7;
+    miscGL.Layout.Row = 8;
 
     cbCountsPerSec = uicheckbox(miscGL,'Text','Cts/s', ...
         'Value', false, 'Enable', 'off', ...
@@ -787,11 +867,11 @@ function varargout = BosonPlotter(options)
     'Tooltip','Force a full redraw of the current plot');
     btnPlot.Layout.Column = 2;
 
-    % Row 8: Annotation mode + Style… + Plot Options button
+    % Row 9: Annotation mode + Style… + Plot Options button
     annotPlotGL = uigridlayout(ctrlGL,[1 3], ...
         'Padding', tk.pad.flush,'ColumnSpacing',3, ...
         'ColumnWidth',{'1x','1x','1x'});
-    annotPlotGL.Layout.Row = 8;
+    annotPlotGL.Layout.Row = 9;
 
     cbAnnotationMode = uicheckbox(annotPlotGL, ...
         'Text',    'Annotate', ...
@@ -978,6 +1058,24 @@ function varargout = BosonPlotter(options)
             'MenuSelectedFcn', @(~,~) onAutoLimits([], []));
         uimenu(cmAxes, 'Text', 'Set Axis Limits...', ...
             'MenuSelectedFcn', @(~,~) onSetAxisLimitsMenu());
+        uimenu(cmAxes, 'Text', 'Set Tick Spacing...', ...
+            'MenuSelectedFcn', @(~,~) onSetTickSpacingMenu());
+
+        % Legend Location ▸ submenu — replaces the deleted in-panel dropdown.
+        smLegLoc = uimenu(cmAxes, 'Text', 'Legend Location');
+        LEG_LOCS = {'best','NE','NW','SE','SW','EastOutside','off'};
+        for il_ = 1:numel(LEG_LOCS)
+            uimenu(smLegLoc, 'Text', LEG_LOCS{il_}, ...
+                'MenuSelectedFcn', @(s,~) onContextSetLegendLoc(s.Text));
+        end
+
+        % Dataset Color ▸ submenu — replaces the deleted in-panel dropdown.
+        smDsColor = uimenu(cmAxes, 'Text', 'Dataset Color');
+        for ic_ = 1:numel(DS_COLOR_NAMES)
+            uimenu(smDsColor, 'Text', DS_COLOR_NAMES{ic_}, ...
+                'MenuSelectedFcn', @(s,~) onContextSetDatasetColor(s.Text));
+        end
+
         uimenu(cmAxes, 'Text', 'Copy Plot (Vector)', ...
             'MenuSelectedFcn', @(~,~) onCopyPlotToClipboard());
         uimenu(cmAxes, 'Text', 'Copy as PNG', ...
@@ -1668,18 +1766,12 @@ function varargout = BosonPlotter(options)
     % already sets FontSize) are left alone — see +bosonPlotter/applyDefaultFont.m.
     bosonPlotter.applyDefaultFont(corrGL, tk.font.body);
 
-    %   Row 1: X limits (label + min/max/step)
-    %   Row 2: Y limits (label + min/max/step)  —  Y2 row hidden below
-    %   Row 3: Y2 limits (hidden, RowHeight=0 until Y2 active)
-    %   Row 4: Auto Scale + Reset + Legend checkbox + Color dropdown
-    %   Row 5: Title + labels + format + ref lines (collapsible, default hidden)
-    axLimPanel = uipanel(analysisGL,'Title','Axes','FontSize', tk.font.title, ...
-        'Scrollable','on');
-    axLimPanel.Layout.Row = 1; axLimPanel.Layout.Column = 2;
-
-    % ── Data Table panel (row 2, col 2 — shares space with Axes above) ──
+    % ── Data Table panel (analysisGL col 2, both rows) ──────────────────
+    % Axes/limits/scale moved into the Controls panel (left column, ctrlGL).
+    % Title/labels/ref lines are accessible via right-click context menu and
+    % the Plot Options ▾ button — no longer in a separate panel.
     dataTablePanel = uipanel(analysisGL, 'Title', 'Data Table', 'FontSize', tk.font.title);
-    dataTablePanel.Layout.Row = 2; dataTablePanel.Layout.Column = 2;
+    dataTablePanel.Layout.Row = [1 2]; dataTablePanel.Layout.Column = 2;
 
     % ── Data Table contents (toolbar + filter bar + units + editable table) ──
     dataTableInnerGL = uigridlayout(dataTablePanel, [5 1], ...
@@ -1833,225 +1925,52 @@ function varargout = BosonPlotter(options)
     tblData.Layout.Row = 5;
     appData.tableSelection = [];  % [Nx2] matrix of [row col] pairs
 
-    % Rows: 1=X lim, 2=Y lim, 3=Y2 lim (hidden), 4=Auto/Reset/Legend/Color,
-    %       5=Appearance section header, 6=Appearance extras (collapsible)
-    % Cols 2-4 are fixed at 70 px so the min/max/step inputs stay
-    % compact for short numeric values. Earlier '1x' flex made them
-    % balloon to ~140 px in a wide panel which felt oversized.
-    axLimGL = uigridlayout(axLimPanel,[6 6], ...
-        'RowHeight',    {22, 22, 0, 22, 20, 0}, ...
-        'ColumnWidth',  {24, 70, 70, 70, 24, '1x'}, ...
-        'Padding',      tk.pad.normal, ...
-        'RowSpacing',   2, ...
-        'ColumnSpacing', 3);
-
-    % ── Row 1: X limits ──────────────────────────────────────────────
-    AXLIM_BG = [0.17 0.17 0.17];
-    AXLIM_FG = [0.92 0.92 0.92];
-
-    lblXLim = uilabel(axLimGL,'Text','X:','HorizontalAlignment','right','FontSize', tk.font.label);
-    lblXLim.Layout.Row = 1; lblXLim.Layout.Column = 1;
-
-    efXMin = uieditfield(axLimGL,'text','Value','', ...
-        'Placeholder','min', 'Tooltip','X axis minimum — blank = auto', ...
-        'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, 'FontSize', tk.font.body, ...
+    % ── Hidden floaters: not visible, but read by callbacks ──────────────
+    % These were formerly visible widgets in axLimPanel. After the Axes
+    % panel was deleted (axes/limits moved to ctrlGL above; less-used
+    % features moved to right-click + Plot Options ▾ menus), they remain
+    % as the source of truth for the corresponding values:
+    %   efXStep / efYStep / efY2Step  — set via right-click "Tick Spacing"
+    %   ddDatasetColor / ddDatasetColorR — set via right-click "Dataset Color"
+    %   ddLegendLoc                   — set via right-click "Legend Location"
+    %   efCustomTitle / efCustom*Label / efLegendName(R) — set via
+    %       right-click "Edit Axis Labels..." / "Edit Legend..." dialogs
+    % Existing callbacks (onPlot, renderPlot, saveAxisLimsToActiveDataset)
+    % still read from these handles unchanged.
+    efXStep = uieditfield(fig,'text','Value','','Visible','off', ...
         'ValueChangedFcn',@(~,~) onPlot([],[]));
-    efXMin.Layout.Row = 1; efXMin.Layout.Column = 2;
-
-    efXMax = uieditfield(axLimGL,'text','Value','', ...
-        'Placeholder','max', 'Tooltip','X axis maximum — blank = auto', ...
-        'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, 'FontSize', tk.font.body, ...
+    efYStep = uieditfield(fig,'text','Value','','Visible','off', ...
         'ValueChangedFcn',@(~,~) onPlot([],[]));
-    efXMax.Layout.Row = 1; efXMax.Layout.Column = 3;
-
-    efXStep = uieditfield(axLimGL,'text','Value','', ...
-        'Placeholder','step', 'Tooltip','X axis tick spacing — blank = auto', ...
-        'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, 'FontSize', tk.font.body, ...
+    efY2Step = uieditfield(fig,'text','Value','','Visible','off', ...
         'ValueChangedFcn',@(~,~) onPlot([],[]));
-    efXStep.Layout.Row = 1; efXStep.Layout.Column = 4;
 
-    % X-row right side: X tick format dropdown
-    lblFmtX = uilabel(axLimGL,'Text','fmt','FontSize', tk.font.caption,'HorizontalAlignment','right', ...
-        'FontColor', tk.color.textDim);
-    lblFmtX.Layout.Row = 1; lblFmtX.Layout.Column = 5;
-    ddXFmt = uidropdown(axLimGL, 'Items', TICKFMT_NAMES, 'ItemsData', TICKFMT_DATA, ...
-        'Value', '', 'FontSize', tk.font.body, 'Tooltip', 'X-axis tick label notation', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    ddXFmt.Layout.Row = 1; ddXFmt.Layout.Column = 6;
-
-    % ── Row 2: Y limits ──────────────────────────────────────────────
-    lblYLim = uilabel(axLimGL,'Text','Y:','HorizontalAlignment','right','FontSize', tk.font.label);
-    lblYLim.Layout.Row = 2; lblYLim.Layout.Column = 1;
-
-    efYMin = uieditfield(axLimGL,'text','Value','', ...
-        'Placeholder','min', 'Tooltip','Y axis minimum — blank = auto', ...
-        'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, 'FontSize', tk.font.body, ...
-        'ValueChangedFcn',@(~,~) onPlot([],[]));
-    efYMin.Layout.Row = 2; efYMin.Layout.Column = 2;
-
-    efYMax = uieditfield(axLimGL,'text','Value','', ...
-        'Placeholder','max', 'Tooltip','Y axis maximum — blank = auto', ...
-        'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, 'FontSize', tk.font.body, ...
-        'ValueChangedFcn',@(~,~) onPlot([],[]));
-    efYMax.Layout.Row = 2; efYMax.Layout.Column = 3;
-
-    efYStep = uieditfield(axLimGL,'text','Value','', ...
-        'Placeholder','step', 'Tooltip','Y axis tick spacing — blank = auto', ...
-        'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, 'FontSize', tk.font.body, ...
-        'ValueChangedFcn',@(~,~) onPlot([],[]));
-    efYStep.Layout.Row = 2; efYStep.Layout.Column = 4;
-
-    % Y-row right side: Y tick format dropdown
-    lblFmtY = uilabel(axLimGL,'Text','fmt','FontSize', tk.font.caption,'HorizontalAlignment','right', ...
-        'FontColor', tk.color.textDim);
-    lblFmtY.Layout.Row = 2; lblFmtY.Layout.Column = 5;
-    ddYFmt = uidropdown(axLimGL, 'Items', YTICKFMT_NAMES, 'ItemsData', YTICKFMT_DATA, ...
-        'Value', '__exp0', 'FontSize', tk.font.body, 'Tooltip', 'Left Y-axis tick label notation', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    ddYFmt.Layout.Row = 2; ddYFmt.Layout.Column = 6;
-
-    % ── Row 3: Y2 limits (hidden until Y2 active) ────────────────────
-    lblY2Lim = uilabel(axLimGL,'Text','Y2:','HorizontalAlignment','right','FontSize', tk.font.label);
-    lblY2Lim.Layout.Row = 3; lblY2Lim.Layout.Column = 1;
-
-    efY2Min = uieditfield(axLimGL,'text','Value','', ...
-        'Placeholder','min', 'Tooltip','Right Y-axis minimum — blank = auto', ...
-        'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, 'FontSize', tk.font.body, ...
-        'ValueChangedFcn',@(~,~) onPlot([],[]));
-    efY2Min.Layout.Row = 3; efY2Min.Layout.Column = 2;
-
-    efY2Max = uieditfield(axLimGL,'text','Value','', ...
-        'Placeholder','max', 'Tooltip','Right Y-axis maximum — blank = auto', ...
-        'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, 'FontSize', tk.font.body, ...
-        'ValueChangedFcn',@(~,~) onPlot([],[]));
-    efY2Max.Layout.Row = 3; efY2Max.Layout.Column = 3;
-
-    efY2Step = uieditfield(axLimGL,'text','Value','', ...
-        'Placeholder','step', 'Tooltip','Right Y-axis tick spacing — blank = auto', ...
-        'BackgroundColor', AXLIM_BG, 'FontColor', AXLIM_FG, 'FontSize', tk.font.body, ...
-        'ValueChangedFcn',@(~,~) onPlot([],[]));
-    efY2Step.Layout.Row = 3; efY2Step.Layout.Column = 4;
-
-    lblFmtR = uilabel(axLimGL,'Text','fmt','FontSize', tk.font.caption,'HorizontalAlignment','right', ...
-        'FontColor', tk.color.textDim);
-    lblFmtR.Layout.Row = 3; lblFmtR.Layout.Column = 5;
-    ddY2Fmt = uidropdown(axLimGL, 'Items', YTICKFMT_NAMES, 'ItemsData', YTICKFMT_DATA, ...
-        'Value', '', 'FontSize', tk.font.body, 'Tooltip', 'Right Y-axis tick label notation', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    ddY2Fmt.Layout.Row = 3; ddY2Fmt.Layout.Column = 6;
-
-    % ── Row 4: Action buttons + legend + color ───────────────────────
-    btnSmartScale = uibutton(axLimGL,'Text','Auto', ...
-        'ButtonPushedFcn',@onSmartScale, 'FontSize', tk.font.body, ...
-        'Tooltip','Auto-detect linear/log scale and set reasonable axis limits');
-    btnSmartScale.Layout.Row = 4; btnSmartScale.Layout.Column = 1;
-
-    btnAutoLimits = uibutton(axLimGL,'Text','Reset', ...
-        'ButtonPushedFcn',@onAutoLimits, 'FontSize', tk.font.body, ...
-        'Tooltip',['Reset View — clear manual axis limits and per-dataset' newline ...
-                   'plot state (log/linear, grid, direction, 2D cmap/cLim)' newline ...
-                   'so this dataset returns to auto defaults.']);
-    btnAutoLimits.Layout.Row = 4; btnAutoLimits.Layout.Column = 2;
-
-    ddLegendLoc = uidropdown(axLimGL, ...
+    ddLegendLoc = uidropdown(fig, ...
         'Items', {'best','NE','NW','SE','SW','EastOutside','off'}, ...
-        'Value', 'best', 'FontSize', tk.font.body, ...
-        'Tooltip', ['Legend location ("off" hides it).' newline ...
-                    'Right-click for "Edit Legend..." (per-dataset names, style).'], ...
+        'Value', 'best', 'Visible','off', ...
         'ValueChangedFcn', @onToolbarLegendToggle);
-    ddLegendLoc.Layout.Row = 4; ddLegendLoc.Layout.Column = 3;
-    cmLegend = uicontextmenu(fig);
-    uimenu(cmLegend, 'Text', 'Edit Legend...', ...
-        'MenuSelectedFcn', @(~,~) onOpenLegendEditor());
-    ddLegendLoc.ContextMenu = cmLegend;
 
-    ddDatasetColor = uidropdown(axLimGL, ...
+    ddDatasetColor = uidropdown(fig, ...
         'Items', DS_COLOR_NAMES, 'ItemsData', DS_COLOR_RGBS, ...
-        'Value', [], 'Enable', 'off', ...
-        'Tooltip', 'Override line colour ("Auto" uses the palette)', ...
+        'Value', [], 'Enable', 'off', 'Visible','off', ...
         'ValueChangedFcn', @onDatasetColorChanged);
-    ddDatasetColor.Layout.Row = 4; ddDatasetColor.Layout.Column = [4 6];
 
-    ddDatasetColorR = uidropdown(axLimGL, ...
+    ddDatasetColorR = uidropdown(fig, ...
         'Items', DS_COLOR_NAMES, 'ItemsData', DS_COLOR_RGBS, ...
-        'Value', [], 'Enable', 'off', 'Visible', 'off', ...
-        'Tooltip', 'Override right-axis line colour', ...
+        'Value', [], 'Enable', 'off', 'Visible','off', ...
         'ValueChangedFcn', @onDatasetColorRChanged);
-    ddDatasetColorR.Layout.Row = 4; ddDatasetColorR.Layout.Column = 6;
 
-    % ── Row 6: Appearance extras (collapsible — default hidden) ──────
-    % Contains: title, labels, legend name, ref lines — all in a nested grid
-    AXLIM_ADV_ROW = 6;
-    AXLIM_ADV_HEIGHT = 90;
-    appData.sectionCollapsed.axAppearance = true;
-
-    axAdvGL = uigridlayout(axLimGL, [4 6], ...
-        'RowHeight', {20, 20, 20, 20}, ...
-        'ColumnWidth', {32, '1x', 32, '1x', '1x', '1x'}, ...
-        'Padding', tk.pad.flush, 'RowSpacing', 2, 'ColumnSpacing', 2);
-    axAdvGL.Layout.Row = 6; axAdvGL.Layout.Column = [1 6];
-
-    % Adv row 1: Title field + legend name
-    lblApTitle = uilabel(axAdvGL,'Text','Title:','FontSize', tk.font.body,'HorizontalAlignment','right');
-    lblApTitle.Layout.Row = 1; lblApTitle.Layout.Column = 1;
-    efCustomTitle = uieditfield(axAdvGL,'text','Value','', ...
-        'Placeholder','auto', 'Tooltip','Override the plot title — blank = auto', ...
+    efCustomTitle = uieditfield(fig,'text','Value','','Visible','off', ...
         'ValueChangedFcn', @(~,~) onPlot([],[]));
-    efCustomTitle.Layout.Row = 1; efCustomTitle.Layout.Column = [2 4];
-    lblApLegend = uilabel(axAdvGL,'Text','Leg:','FontSize', tk.font.body,'HorizontalAlignment','right');
-    lblApLegend.Layout.Row = 1; lblApLegend.Layout.Column = 5;
-    efLegendName = uieditfield(axAdvGL,'text','Value','', ...
-        'Enable','off', 'Placeholder','auto', ...
-        'Tooltip','Override the legend label — blank = auto', ...
+    efCustomXLabel = uieditfield(fig,'text','Value','','Visible','off', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    efCustomYLabel = uieditfield(fig,'text','Value','','Visible','off', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    efCustomY2Label = uieditfield(fig,'text','Value','','Visible','off', ...
+        'ValueChangedFcn', @(~,~) onPlot([],[]));
+    efLegendName = uieditfield(fig,'text','Value','','Enable','off','Visible','off', ...
         'ValueChangedFcn', @onLegendNameChanged);
-    efLegendName.Layout.Row = 1; efLegendName.Layout.Column = 6;
-    efLegendNameR = uieditfield(axAdvGL,'text','Value','', ...
-        'Enable','off', 'Visible','off', 'Placeholder','auto', ...
-        'Tooltip','Override right-axis legend label', ...
+    efLegendNameR = uieditfield(fig,'text','Value','','Enable','off','Visible','off', ...
         'ValueChangedFcn', @onLegendNameRChanged);
-    efLegendNameR.Layout.Row = 1; efLegendNameR.Layout.Column = 6;
-
-    % Adv row 2: X label + Y label
-    lblApXLabel = uilabel(axAdvGL,'Text','X lbl:','FontSize', tk.font.body,'HorizontalAlignment','right');
-    lblApXLabel.Layout.Row = 2; lblApXLabel.Layout.Column = 1;
-    efCustomXLabel = uieditfield(axAdvGL,'text','Value','', ...
-        'Placeholder','auto', 'Tooltip','Override X-axis label — blank = auto', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    efCustomXLabel.Layout.Row = 2; efCustomXLabel.Layout.Column = [2 3];
-    lblApYLabel = uilabel(axAdvGL,'Text','Y lbl:','FontSize', tk.font.body,'HorizontalAlignment','right');
-    lblApYLabel.Layout.Row = 2; lblApYLabel.Layout.Column = 4;
-    efCustomYLabel = uieditfield(axAdvGL,'text','Value','', ...
-        'Placeholder','auto', 'Tooltip','Override left Y-axis label — blank = auto', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    efCustomYLabel.Layout.Row = 2; efCustomYLabel.Layout.Column = [5 6];
-    efCustomY2Label = uieditfield(axAdvGL,'text','Value','', ...
-        'Visible','off', 'Placeholder','auto', ...
-        'Tooltip','Override right Y-axis label — blank = auto', ...
-        'ValueChangedFcn', @(~,~) onPlot([],[]));
-    efCustomY2Label.Layout.Row = 2; efCustomY2Label.Layout.Column = 6;
-
-    % Adv row 3: Reference lines
-    btnAddHLine = uibutton(axAdvGL,'Text','+ H Line', ...
-        'ButtonPushedFcn', @onAddHRefLine, 'FontSize', tk.font.body, ...
-        'Tooltip', 'Add a horizontal reference line at a specified Y value');
-    btnAddHLine.Layout.Row = 3; btnAddHLine.Layout.Column = [1 2];
-    btnAddVLine = uibutton(axAdvGL,'Text','+ V Line', ...
-        'ButtonPushedFcn', @onAddVRefLine, 'FontSize', tk.font.body, ...
-        'Tooltip', 'Add a vertical reference line at a specified X value');
-    btnAddVLine.Layout.Row = 3; btnAddVLine.Layout.Column = [3 4];
-    btnClearRefLines = uibutton(axAdvGL,'Text','Clear Lines', ...
-        'ButtonPushedFcn', @onClearRefLines, 'FontSize', tk.font.body, ...
-        'Tooltip', 'Remove all reference lines');
-    btnClearRefLines.Layout.Row = 3; btnClearRefLines.Layout.Column = [5 6];
-
-    % Row 5: visible "Appearance" section header toggling row 6 (axAdvGL).
-    % Matches the corrGL / saveGL collapsible-header pattern so the
-    % title / labels / legend-name / ref-line controls are discoverable
-    % (repo-audit W2 #16).
-    btnAxMore = bosonPlotter.sectionHeader(axLimGL, [char(9654) ' Appearance'], ...
-        @(~,~) onToggleAxAppearance(), ...
-        'Tooltip', 'Title, axis labels, legend name, and reference lines');
-    btnAxMore.Layout.Row = 5; btnAxMore.Layout.Column = [1 6];
 
     % ── Save / Export panel (analysisGL col 3 — vertical, collapsible) ─────
     savePanel = uipanel(analysisGL,'Title','Save / Export','FontSize', tk.font.title, ...
@@ -2276,14 +2195,14 @@ function varargout = BosonPlotter(options)
         'Tooltip', 'Plot types, visualization options, and unit conversion');
     btnPlotOpt2.Layout.Row = 3; btnPlotOpt2.Layout.Column = [1 2];
 
-    % Bring any unstyled buttons in the analysis-row sub-grids
-    % (axLimGL / saveGL / nested sub-grids) down to tk.font.body so
+    % Bring any unstyled buttons in the controls/save sub-grids
+    % (limGL / saveGL / nested sub-grids) down to tk.font.body so
     % they match the surrounding panel typography. See
     % +bosonPlotter/applyDefaultFont.m — the walk only touches buttons
     % still at the MATLAB default 12 pt; explicitly-styled buttons
     % (e.g. section headers via bosonPlotter.sectionHeader) are skipped.
-    bosonPlotter.applyDefaultFont(axLimGL, tk.font.body);
-    bosonPlotter.applyDefaultFont(saveGL,  tk.font.body);
+    bosonPlotter.applyDefaultFont(limGL,  tk.font.body);
+    bosonPlotter.applyDefaultFont(saveGL, tk.font.body);
 
     % ── Peak Analysis window (separate uifigure) ──────────────────────────
     % Construction delegated to +bosonPlotter/buildPeakWindow.m.
@@ -2442,7 +2361,7 @@ function varargout = BosonPlotter(options)
     % Registering each panel/listbox/axes individually ensures that a file
     % dropped anywhere in the window is caught.
     dropSurfaces = {ctrlPanel, axPanel, ax, analysisPanel, ...
-                    corrPanel, axLimPanel, savePanel, lbDatasets};
+                    corrPanel, dataTablePanel, savePanel, lbDatasets};
     for surf_i = 1:numel(dropSurfaces)
         try
             dropSurfaces{surf_i}.AllowDrop = true;   % R2024a+: must opt-in before DropFcn fires
@@ -2474,7 +2393,7 @@ function varargout = BosonPlotter(options)
     rCtxStatic_.efYMax                      = efYMax;
     rCtxStatic_.efY2Min                     = efY2Min;
     rCtxStatic_.efY2Max                     = efY2Max;
-    rCtxStatic_.axLimGL                     = axLimGL;
+    rCtxStatic_.limGL                       = limGL;
     rCtxStatic_.draw2DMap                   = @draw2DMap;
     rCtxStatic_.toggleY2Appearance          = @toggleY2Appearance;
     rCtxStatic_.applyAxisPrefix             = @bosonPlotter.applyAxisPrefix;
@@ -2554,7 +2473,7 @@ function varargout = BosonPlotter(options)
     ui.efY2Min          = efY2Min;
     ui.efY2Max          = efY2Max;
     ui.efY2Step         = efY2Step;
-    ui.axLimGL          = axLimGL;
+    ui.limGL            = limGL;
     % Correction labels (relabelled by applyParserAnalysisConfig)
     ui.lblXOff          = lblXOff;
     ui.lblYOff          = lblYOff;
@@ -2580,7 +2499,6 @@ function varargout = BosonPlotter(options)
     ui.corrGL           = corrGL;
     ui.map2DPanel       = map2DPanel;
     ui.dataTablePanel   = dataTablePanel;
-    ui.axLimPanel       = axLimPanel;
     % 2D map controls
     ui.cbMap2DQSpace    = cbMap2DQSpace;
     ui.btnArcIntegrate  = btnArcIntegrate;
@@ -2789,11 +2707,6 @@ function varargout = BosonPlotter(options)
     api.getHistory          = @(idx)    historyAPI('get',    idx, '');
     api.exportHistory       = @(idx, p) historyAPI('export', idx, p);
     api.formatHistory       = @(idx)    historyAPI('format', idx, '');
-    api.toggleAxAppearance  = @() onToggleAxAppearance();
-    api.getAxAppearanceState = @() struct( ...
-        'collapsed',        appData.sectionCollapsed.axAppearance, ...
-        'advRowHeight',     axLimGL.RowHeight{AXLIM_ADV_ROW}, ...
-        'analysisRow1Height', analysisGL.RowHeight{1});
     api.showDecomposition   = @() peakCb.onShowDecomposition([],[]);
     api.getTableData        = @() struct( ...
         'data',     {tblData.Data}, ...
@@ -3656,24 +3569,6 @@ function varargout = BosonPlotter(options)
             for k = 1:numel(childRows)
                 corrGL.RowHeight{childRows(k)} = defaultHeights(k);
             end
-        end
-    end
-
-    function onToggleAxAppearance()
-    %ONTOGGLEAXAPPEARANCE  Toggle the appearance extras row in axLimGL
-    %  and resize the parent analysisGL row so the expanded content is
-    %  not clipped by the Data Table panel below.
-        collapsed = ~appData.sectionCollapsed.axAppearance;
-        appData.sectionCollapsed.axAppearance = collapsed;
-        AXLIM_BASE_H = 110;   % matches analysisGL RowHeight{1}
-        if collapsed
-            btnAxMore.Text = [char(9654) ' Appearance'];  % ▶
-            axLimGL.RowHeight{AXLIM_ADV_ROW} = 0;
-            analysisGL.RowHeight{1} = AXLIM_BASE_H;
-        else
-            btnAxMore.Text = [char(9660) ' Appearance'];  % ▼
-            axLimGL.RowHeight{AXLIM_ADV_ROW} = AXLIM_ADV_HEIGHT;
-            analysisGL.RowHeight{1} = AXLIM_BASE_H + AXLIM_ADV_HEIGHT;
         end
     end
 
@@ -6115,6 +6010,42 @@ function onSendToOrigin(~,~)
         onPlot([],[]);
     end
 
+    function onSetTickSpacingMenu()
+    %ONSETTICKSPACINGMENU  Edit tick spacing for X / Y / Y2 axes.
+    %  Replaces the in-panel step inputs that were removed when the Axes
+    %  panel was consolidated into the Controls panel. Blank = auto.
+        prompts  = {'X tick spacing (blank = auto):', ...
+                    'Y tick spacing (blank = auto):', ...
+                    'Y2 tick spacing (blank = auto):'};
+        defaults = {efXStep.Value, efYStep.Value, efY2Step.Value};
+        answer   = inputdlg(prompts, 'Set Tick Spacing', [1 38], defaults);
+        if isempty(answer), return; end
+        efXStep.Value  = strtrim(answer{1});
+        efYStep.Value  = strtrim(answer{2});
+        efY2Step.Value = strtrim(answer{3});
+        onPlot([],[]);
+    end
+
+    function onContextSetLegendLoc(loc)
+    %ONCONTEXTSETLEGENDLOC  Set legend location from right-click submenu.
+    %  Programmatic .Value writes don't fire ValueChangedFcn, so we invoke
+    %  the legend-toggle callback explicitly.
+        ddLegendLoc.Value = loc;
+        onToolbarLegendToggle([],[]);
+    end
+
+    function onContextSetDatasetColor(colorName)
+    %ONCONTEXTSETDATASETCOLOR  Set per-dataset color override from submenu.
+    %  Maps the display name back to the RGB triplet stored in ItemsData,
+    %  enables the dropdown (auto-disabled when no override), and fires the
+    %  change callback explicitly.
+        idx = find(strcmp(DS_COLOR_NAMES, colorName), 1);
+        if isempty(idx), return; end
+        ddDatasetColor.Value  = DS_COLOR_RGBS{idx};
+        ddDatasetColor.Enable = 'on';
+        onDatasetColorChanged([],[]);
+    end
+
     function onMouseHover(~,~)
     %ONMOUSEHOVER  Update x,y readout and set resize cursor near panel borders.
     %  Fires continuously while the mouse moves over the figure in idle (non-drag) mode.
@@ -6124,12 +6055,11 @@ function onSendToOrigin(~,~)
             'fileListPanel',  fileListPanel, ...
             'ctrlPanel',      ctrlPanel, ...
             'corrPanel',      corrPanel, ...
-            'axLimPanel',     axLimPanel, ...
             'savePanel',      savePanel, ...
             'analysisPanel',  analysisPanel, ...
             'dataTablePanel', dataTablePanel));
         appData.panelResizeDir = dir;
-        if     any(strcmp(dir, {'h_row12', 'h_axdata'})), fig.Pointer = 'top';
+        if     strcmp(dir, 'h_row12'), fig.Pointer = 'top';
         elseif any(strcmp(dir, {'v_col12', 'v_col23', 'v_content12', 'v_content23'}))
                                                           fig.Pointer = 'left';
         else,                                             fig.Pointer = 'arrow';
@@ -6449,7 +6379,6 @@ function onSendToOrigin(~,~)
         ofscWidgets_.contentGL      = contentGL;
         ofscWidgets_.analysisGL     = analysisGL;
         ofscWidgets_.dataTablePanel = dataTablePanel;
-        ofscWidgets_.axLimPanel     = axLimPanel;
         ofscConst_.MIN_FIG_H        = MIN_FIG_H;
         ofscConst_.LAYOUT_DEFAULTS  = LAYOUT_DEFAULTS;
         ofscCb_.is2DDataset         = @is2DDataset;
@@ -6628,7 +6557,6 @@ function onSendToOrigin(~,~)
         sprWidgets_.contentGL      = contentGL;
         sprWidgets_.analysisPanel  = analysisPanel;
         sprWidgets_.corrPanel      = corrPanel;
-        sprWidgets_.axLimPanel     = axLimPanel;
         sprWidgets_.savePanel      = savePanel;
         sprWidgets_.fileListPanel  = fileListPanel;
         sprWidgets_.ctrlPanel      = ctrlPanel;
@@ -6989,23 +6917,19 @@ function onSendToOrigin(~,~)
     end
 
     function toggleY2Appearance(active)
-    %TOGGLEY2APPEARANCE  Show/hide right-axis appearance controls in the combined panel.
-    %  When active (true): L fields span cols 2-3, R fields visible in col 4.
-    %  When inactive: L fields span cols 2-4, R fields hidden.
+    %TOGGLEY2APPEARANCE  Toggle right-axis Enable state on the hidden floaters.
+    %  After the Axes panel was deleted, ddDatasetColor / ddDatasetColorR /
+    %  efLegendName / efLegendNameR / efCustomYLabel / efCustomY2Label are
+    %  hidden uifigure children with no Layout (no parent grid). They stay
+    %  invisible regardless; we just enable the right-axis variants when
+    %  Y2 is active so menu writes (or future dialogs) can read meaningful
+    %  state.
         if active
-            ddDatasetColor.Layout.Column  = [2 3];
-            ddDatasetColorR.Visible       = 'on';
-            efLegendName.Layout.Column    = [2 3];
-            efLegendNameR.Visible         = 'on';
-            efCustomYLabel.Layout.Column  = [2 3];
-            efCustomY2Label.Visible       = 'on';
+            ddDatasetColorR.Enable = 'on';
+            efLegendNameR.Enable   = 'on';
         else
-            ddDatasetColor.Layout.Column  = [2 4];
-            ddDatasetColorR.Visible       = 'off';
-            efLegendName.Layout.Column    = [2 4];
-            efLegendNameR.Visible         = 'off';
-            efCustomYLabel.Layout.Column  = [2 4];
-            efCustomY2Label.Visible       = 'off';
+            ddDatasetColorR.Enable = 'off';
+            efLegendNameR.Enable   = 'off';
         end
     end
 

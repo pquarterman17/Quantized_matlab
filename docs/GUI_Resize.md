@@ -43,10 +43,9 @@ Every grid is defined by a single `uigridlayout(...)` call. Change the
 | `styleGL` | **426** | 2×3 | rows `{20,'1x'}`, cols `{'1x','1x','1x'}` |
 | `logChkGL` | **459** | 1×4 | cols `{'1x','1x','1x','1x'}` |
 | `wfGL` | **478** | 1×3 | cols `{'1x',50,55}` |
-| `analysisGL` | **536** | 1×4 | cols `{350, 220, '7x', '3x'}` |
+| `analysisGL` | — | 2×4 | rows `{110,'1x'}`, cols `{320,'1x',0,210}` |
 | `corrGL` | **557** | 16×4 | rows `{24×8, 28, 28, 24, 20, 24, 24, 0, 0}`, cols `{70,'1x',88,'1x'}` |
-| `axLimGL` | **816** | 11×4 | rows `{22,26,26,0,28, 22,22,22,22,22,22}`, cols `{40,'1x','1x','1x'}` |
-| `fmtGL` | **1006** | 1×6 | cols `{16,'1x',16,'1x',0,0}` |
+| `limGL` (in `ctrlGL` row 6) | — | 4×4 | rows `{20,20,20,22}`, cols `{18,'1x','1x',60}` |
 | `saveGL` | **1036** | 13×2 | rows `{26,28,32×10,28}`, cols `{'1x','1x'}` |
 | `peakGL` | **1161** | 1×2 | cols `{'1x','2x'}` |
 | `peakBtnGL` | **1176** | 14×1 | rows `{20,24,24,24,24,20,24,'1x',20,24,0,24,24,0}` |
@@ -81,16 +80,22 @@ rootGL [3×1]                                          ← line 314
 │   │   │   └── [Waterfall | spacing | Replot]
 │   │   └── Row 10 (24px)  cbAnnotationMode
 │   └── Col 2 ('1x')   → axPanel → ax (preview axes)
-└── Row 3 ('1x')    → analysisGL [1×4]                ← line 536
-    ├── Col 1 (350 px)  → corrPanel → corrGL [16×4]    ← line 557
-    ├── Col 2 (220 px)  → axLimPanel → axLimGL [11×4]  ← line 816
-    │   └── Row 11: fmtGL [1×6]                        ← line 1006
-    ├── Col 3 ('7x')    → peakPanel → peakGL [1×2]     ← line 1161
-    │   ├── Col 1: peakBtnGL [14×1]                    ← line 1176
-    │   │   └── Row 8 area: minSepGL [6×2]             ← line 1276
-    │   └── Col 2: peakTable (uitable)
-    └── Col 4 ('3x')    → savePanel → saveGL [13×2]    ← line 1036
+└── Row 3 ('1x')    → analysisGL [2×4]
+    ├── Col 1 (320 px)  → corrPanel → corrGL [16×4]
+    ├── Col 2 ('1x')    → dataTablePanel (spans rows [1 2])
+    ├── Col 3 (0 px)    → map2DPanel (visible only in 2D mode)
+    └── Col 4 (210 px)  → savePanel → saveGL [8×1]
 ```
+
+**Note (2026-04-25):** The standalone Axes panel (limits, scale, tick
+format, color override, legend location, title/labels, ref lines) was
+consolidated. Limit min/max + tick format dropdowns + Auto/Reset live
+in `limGL` inside `ctrlGL` row 6 (in the left Controls panel). Step
+inputs, color override, and legend location are accessible via the
+right-click context menu on the axes ("Set Tick Spacing...", "Dataset
+Color ▸", "Legend Location ▸"). Title / labels / ref lines are
+accessible via the existing "Edit Axis Labels..." and "Reference
+Lines ▸" entries in the same right-click menu.
 
 ---
 

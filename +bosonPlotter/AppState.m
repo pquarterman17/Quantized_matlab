@@ -59,7 +59,6 @@ classdef AppState < handle
 
         % ── Min panel dimensions ───────────────────────────────────
         MIN_CORR_W      double = 280
-        MIN_AXLIM_W     double = 180
         MIN_PREVIEW_H   double = 150
         MIN_ANALYSIS_H  double = 180
 

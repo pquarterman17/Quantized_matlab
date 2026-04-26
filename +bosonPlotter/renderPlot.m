@@ -38,7 +38,7 @@ function renderPlot(targetAx, ctx)
 %     .customXLabel, .customYLabel, .customY2Label, .customTitle — label strings
 %     .isMainAx         — logical, true when targetAx is the main GUI axes
 %     .efXMin, .efXMax, .efYMin, .efYMax, .efY2Min, .efY2Max — widget handles
-%     .axLimGL          — grid layout handle (for Y2 row height)
+%     .limGL            — grid layout handle (for Y2 row height)
 %     .fig              — figure handle
 %     % Function handles for callbacks that remain in BosonPlotter:
 %     .draw2DMap               — @(targetAx, ds) draw2DMap(targetAx, ds)
@@ -864,7 +864,7 @@ function renderPlot(targetAx, ctx)
 
         % ── Right Y-axis (Y2) limits ──────────────────────────────────────
         if ctx.isMainAx
-            ctx.axLimGL.RowHeight{3} = 22 * hasY2;
+            ctx.limGL.RowHeight{3} = 20 * hasY2;
             ctx.toggleY2Appearance(hasY2);
         end
         if hasY2
