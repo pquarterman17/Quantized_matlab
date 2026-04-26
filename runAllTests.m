@@ -167,6 +167,7 @@ SUITES = {
     T('fitting','test_hysteresisWorkshopModel'),'fitting', 'HysteresisWorkshopModel handle class — extractHM/analyze/results in isolation'
     T('fitting','test_curveFitWorkshopModel'),'fitting', 'CurveFitWorkshopModel handle class — selectModel/autoGuess/fit/custom in isolation'
     T('fitting','test_reflWorkshopModel'),'fitting', 'ReflWorkshopModel handle class — simulate/addLayer/addKnot in isolation'
+    T('fitting','test_figureBuilderModel'),'fitting', 'FigureBuilderModel handle class — multi-panel config + generate in isolation'
     T('fitting','test_curve_fitting'),    'fitting', 'Curve fitting engine, models, autoGuess, parseEquation'
     T('fitting','test_constraints_batchfit'), 'fitting', 'Parameter constraints + batch fit dialog'
     T('fitting','test_templates_fft'),   'fitting', 'Publication templates and FFT filtering'
