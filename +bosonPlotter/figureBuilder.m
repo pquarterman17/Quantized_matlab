@@ -188,6 +188,17 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         tpWidgets = struct();   % ternary
         bvWidgets = struct();   % box / violin
 
+        % ── Workshop model (MASTERPLAN W5 #62 follow-up) ────────────────
+        % Bridges the dialog to the +figureBuilder/ package so model.generate()
+        % can dispatch to per-type package fns. Several generate*() callbacks
+        % below now sync widgets onto this model and call model.generate()
+        % instead of building the figure inline. Generators with rich
+        % features beyond the package fn (Multi-Panel Y2 / ref-line tools,
+        % Waterfall Z-coloring, Overlay+Residual error bars, Broken Axis
+        % gap markers, Contour level controls, FFT windowing) keep their
+        % nested implementations until the package fns enrich to match.
+        fbModel = bosonPlotter.figureBuilder.FigureBuilderModel();
+
         % Initial population
         onTypeChanged([], []);
 
@@ -512,109 +523,28 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %  GENERATE: Normalized Overlay
         % ────────────────────────────────────────────────────────────────
         function generateNormOverlay()
+        %GENERATENORMOVERLAY  Workshop-pattern thin wrapper.
+        %   Algorithm + rendering live in
+        %   bosonPlotter.figureBuilder.generateNormOverlay; this dialog
+        %   callback only syncs widget state to fbModel and dispatches.
             dsIdx = ensureCellNum(noWidgets.lbDS.Value);
-            yName = noWidgets.lbY.Value;
-            normMethod = noWidgets.ddNormMethod.Value;
-            alignMode  = noWidgets.ddAlign.Value;
-
             if isempty(dsIdx)
                 uialert(bFig,'Select at least one dataset.','No data'); return;
             end
-
-            fmtOpts = getFormatOpts();
-            ls = localLineSpec(ddBStyle.Value);
-
-            outFig = figure('Name','Normalized Overlay','NumberTitle','off', ...
-                'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
-            tAx = axes(outFig);
-            hold(tAx, 'on'); box(tAx, 'on'); grid(tAx, 'on');
-            tAx.FontSize = fmtOpts.fontSize;
-            tAx.FontName = fmtOpts.fontName;
-            tAx.TickDir  = 'in';
-
-            nTraces = numel(dsIdx);
-            if fmtOpts.grayscale
-                clrs = repmat(linspace(0, 0.7, nTraces)', 1, 3);
-            else
-                clrs = getColorsFromMap('lines (MATLAB default)', nTraces);
-            end
-
-            GS_STYLES  = {'-', '--', ':', '-.'};
-            GS_MARKERS = {'o', 's', '^', 'd', 'v', '>', '<', 'p'};
-
-            xLbl = ''; yLbl = 'Normalised';
-
-            for si = 1:nTraces
-                di = dsIdx(si);
-                if di < 1 || di > nDS, continue; end
-                d = getPlotData(di);
-                idx = find(strcmp(d.labels, yName), 1);
-                if isempty(idx), continue; end
-
-                xVec = d.time;
-                yVec = d.values(:, idx);
-                good = ~isnan(xVec) & ~isnan(yVec);
-                if isdatetime(xVec), good = ~isnat(xVec) & ~isnan(yVec); end
-                xVec = xVec(good); yVec = yVec(good);
-
-                if isempty(xLbl)
-                    xLbl = guiLabel(guiXName(d.metadata), guiXUnit(d.metadata));
-                end
-
-                % Normalize
-                switch normMethod
-                    case 'Peak (0-1)'
-                        yVec = yVec / max(abs(yVec));
-                    case 'Range (0-1)'
-                        mn = min(yVec); mx = max(yVec);
-                        if mx > mn, yVec = (yVec - mn) / (mx - mn); end
-                    case 'Z-score'
-                        m = mean(yVec); s = std(yVec);
-                        if s > 0, yVec = (yVec - m) / s; end
-                        yLbl = 'Z-score';
-                    case 'Area'
-                        a = trapz(double(xVec), yVec);
-                        if a ~= 0, yVec = yVec / a; end
-                        yLbl = 'Area-normalised';
-                end
-
-                % Alignment
-                switch alignMode
-                    case 'Peak center'
-                        [~, pkIdx] = max(yVec);
-                        xVec = xVec - xVec(pkIdx);
-                        xLbl = [xLbl, ' (aligned)'];  %#ok — only first pass appends
-                    case 'X offset'
-                        xVec = xVec - xVec(1);
-                end
-
-                baseColor = clrs(si, :);
-                plotLS = ls;
-                if fmtOpts.grayscale
-                    gsStyle  = GS_STYLES{mod(si-1, numel(GS_STYLES)) + 1};
-                    gsMarker = GS_MARKERS{mod(si-1, numel(GS_MARKERS)) + 1};
-                    plotLS = {'LineStyle', gsStyle, 'Marker', gsMarker, 'MarkerSize', 4};
-                end
-
-                plot(tAx, xVec, yVec, plotLS{:}, ...
-                    'Color', baseColor, ...
-                    'LineWidth', fmtOpts.lineWidth, ...
-                    'DisplayName', dsNames{di});
-            end
-
-            if noWidgets.cbLogY.Value, tAx.YScale = 'log'; end
-            xlabel(tAx, xLbl, 'FontSize', fmtOpts.fontSize);
-            ylabel(tAx, yLbl, 'FontSize', fmtOpts.fontSize);
-
-            if noWidgets.cbLegend.Value && nTraces > 1
-                legend(tAx, 'Interpreter','none','FontSize', max(fmtOpts.fontSize-2,6), 'Location','best');
-            end
-
+            fbModel.figureType = 'Normalized Overlay';
+            fbModel.normOverlayConfig = struct( ...
+                'datasets',   dsIdx, ...
+                'yChannel',   noWidgets.lbY.Value, ...
+                'normMethod', noWidgets.ddNormMethod.Value, ...
+                'alignMode',  noWidgets.ddAlign.Value, ...
+                'logY',       noWidgets.cbLogY.Value);
+            syncGlobalOptsToModel();
+            outFig = fbModel.generate(datasets);
             ttl = noWidgets.efTitle.Value;
             if ~isempty(ttl)
-                title(tAx, ttl, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
+                title(findobj(outFig,'Type','axes'), ttl, ...
+                    'FontSize', spFont.Value+1, 'Interpreter', 'none');
             end
-
             addRefLineTools(outFig);
             figure(outFig);
             delete(bFig);
@@ -1040,6 +970,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %  GENERATE: Before / After
         % ────────────────────────────────────────────────────────────────
         function generateBeforeAfter()
+        %GENERATEBEFOREAFTER  Workshop-pattern thin wrapper.
             dsIdx = baWidgets.ddDS.Value;
             ds = datasets{dsIdx};
             if isempty(ds.corrData)
@@ -1047,83 +978,14 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
                     'No corrected data');
                 return;
             end
-
-            selY = ensureCellStr(baWidgets.lbY.Value);
-            fmtOpts = getFormatOpts();
-            ls = localLineSpec(ddBStyle.Value);
-
-            outFig = figure('Name','Before / After Corrections','NumberTitle','off', ...
-                'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
-            tlo = tiledlayout(outFig, 1, 2, ...
-                'TileSpacing','compact','Padding','compact');
-
-            dRaw  = ds.data;
-            dCorr = ds.corrData;
-            nColors = max(numel(selY), 1);
-            colors = getColorsFromMap('lines (MATLAB default)', nColors);
-
-            panelAxes = gobjects(1, 2);
-
-            for side = 1:2
-                tAx = nexttile(tlo, side);
-                setupAx(tAx);
-                panelAxes(side) = tAx;
-
-                d = dRaw;
-                panelTitle = 'Raw';
-                if side == 2
-                    d = dCorr;
-                    panelTitle = 'Corrected';
-                end
-
-                for ki = 1:numel(selY)
-                    idx = find(strcmp(d.labels, selY{ki}), 1);
-                    if isempty(idx), continue; end
-
-                    xVec = d.time;
-                    yVec = d.values(:, idx);
-                    good = ~isnan(xVec) & ~isnan(yVec);
-                    if isdatetime(xVec), good = ~isnat(xVec) & ~isnan(yVec); end
-
-                    dName = selY{ki};
-                    if numel(selY) > 1
-                        dName = guiLabel(selY{ki}, d.units{min(idx, numel(d.units))});
-                    end
-
-                    plot(tAx, xVec(good), yVec(good), ls{:}, ...
-                        'Color', colors(ki,:), ...
-                        'LineWidth', fmtOpts.lineWidth, ...
-                        'DisplayName', dName);
-                end
-
-                if baWidgets.cbLogY.Value, tAx.YScale = 'log'; end
-
-                xLbl = guiLabel(guiXName(d.metadata), guiXUnit(d.metadata));
-                yLbl = '';
-                if ~isempty(selY)
-                    ci1 = find(strcmp(d.labels, selY{1}), 1);
-                    if ~isempty(ci1) && ci1 <= numel(d.units)
-                        yLbl = guiLabel(selY{1}, d.units{ci1});
-                    end
-                end
-
-                xlabel(tAx, xLbl, 'FontSize', fmtOpts.fontSize);
-                if side == 1
-                    ylabel(tAx, yLbl, 'FontSize', fmtOpts.fontSize);
-                end
-                title(tAx, panelTitle, 'FontSize', fmtOpts.fontSize+1);
-
-                if numel(selY) > 1
-                    legend(tAx,'Interpreter','none','FontSize',max(fmtOpts.fontSize-2,6),'Location','best');
-                end
-            end
-
-            % Link axes
-            linkaxes(panelAxes, 'x');
-            if baWidgets.cbLinkY.Value
-                linkaxes(panelAxes, 'xy');
-            end
-
+            fbModel.figureType = 'Before / After';
+            fbModel.beforeAfterConfig = struct( ...
+                'datasetIdx', dsIdx, ...
+                'yChannels',  {ensureCellStr(baWidgets.lbY.Value)}, ...
+                'logY',       baWidgets.cbLogY.Value, ...
+                'linkY',      baWidgets.cbLinkY.Value);
+            syncGlobalOptsToModel();
+            outFig = fbModel.generate(datasets);
             addRefLineTools(outFig);
             figure(outFig);
             delete(bFig);
@@ -1817,6 +1679,21 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
             tAx.TickDir  = 'in';
         end
 
+        function syncGlobalOptsToModel()
+        %SYNCGLOBALOPTSTOMODEL  Mirror the dialog's global widgets onto fbModel.globalOpts.
+        %   Called by model-dispatched generate*() wrappers immediately
+        %   before fbModel.generate(datasets). Keeps the model in lockstep
+        %   with whatever the user has changed in the right-hand widget bar.
+            fbModel.globalOpts.figureWidth  = spBFigW.Value;
+            fbModel.globalOpts.figureHeight = spBFigH.Value;
+            fbModel.globalOpts.fontSize     = spFont.Value;
+            fbModel.globalOpts.fontName     = ddFontName.Value;
+            fbModel.globalOpts.lineStyle    = ddBStyle.Value;
+            fbModel.globalOpts.errorStyle   = ddErrorStyle.Value;
+            fbModel.globalOpts.grayscale    = cbGrayscale.Value;
+            fbModel.globalOpts.template     = ddTemplate.Value;
+        end
+
         function [ci, xLbl, yLbl] = plotTraces(tAx, dsIdx, selY, ls, fmtOpts)
         %PLOTTRACES  Plot dataset/channel pairs into an axes. Returns trace count + labels.
             nTraces = max(numel(dsIdx) * numel(selY), 1);
@@ -2278,83 +2155,30 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %  GENERATE: Confidence Band
         % ────────────────────────────────────────────────────────────────
         function generateConfidenceBand()
+        %GENERATECONFIDENCEBAND  Workshop-pattern thin wrapper.
             dsIdx = ensureCellNum(cbWidgets.lbDS.Value);
             if numel(dsIdx) < 2
                 uialert(bFig, 'Select at least 2 datasets.', 'Too few'); return;
             end
-
-            yName  = cbWidgets.ddY.Value;
-            method = cbWidgets.ddMethod.Value;
-            logY   = cbWidgets.cbLogY.Value;
-
-            % Gather datasets and find the right channel
-            cellDS = cell(1, numel(dsIdx));
-            for si = 1:numel(dsIdx)
-                d = getPlotData(dsIdx(si));
-                chIdx = find(strcmp(d.labels, yName), 1);
-                if isempty(chIdx), chIdx = 1; end
-                cellDS{si} = d;
+            switch cbWidgets.ddMethod.Value
+                case 'Median ± IQR', summaryMode = 'median+iqr';
+                otherwise,           summaryMode = 'mean+std';
             end
-
-            % Compute band
-            switch method
-                case 'Mean ± Std',   mStr = 'mean';
-                case 'Median ± IQR', mStr = 'median';
-                otherwise,           mStr = 'mean';
-            end
-
-            chIdx = find(strcmp(cellDS{1}.labels, yName), 1);
-            if isempty(chIdx), chIdx = 1; end
-
-            band = utilities.confidenceBand(cellDS, 'Method', mStr, 'Channel', chIdx);
-
-            % Color map
-            colorMap = struct('Blue',[0.12 0.47 0.71], 'Red',[0.84 0.15 0.16], ...
-                'Green',[0.17 0.63 0.17], 'Orange',[1.0 0.5 0.05], ...
-                'Purple',[0.58 0.40 0.74], 'Gray',[0.5 0.5 0.5]);
-            cName = cbWidgets.ddColor.Value;
-            if isfield(colorMap, cName)
-                col = colorMap.(cName);
-            else
-                col = [0.12 0.47 0.71];
-            end
-
-            fmtOpts = getFormatOpts();
-
-            outFig = figure('Name','Confidence Band','NumberTitle','off', ...
-                'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
-            oAx = axes(outFig);
-            hold(oAx, 'on'); box(oAx, 'on'); grid(oAx, 'on');
-
-            % Shaded band
-            xFill = [band.x; flipud(band.x)];
-            yFill = [band.upper; flipud(band.lower)];
-            fill(oAx, xFill, yFill, col, 'FaceAlpha', 0.25, 'EdgeColor', 'none', ...
-                'HandleVisibility', 'off');
-
-            % Center line
-            plot(oAx, band.x, band.center, '-', 'Color', col, ...
-                'LineWidth', fmtOpts.lineWidth, ...
-                'DisplayName', sprintf('%s (n=%d)', method, band.nSets));
-
-            if logY, oAx.YScale = 'log'; end
-            oAx.FontSize = fmtOpts.fontSize;
-            oAx.FontName = fmtOpts.fontName;
-            oAx.TickDir = 'in';
-
-            % Labels
-            d1 = getPlotData(dsIdx(1));
-            xLbl = guiLabel(guiXName(d1.metadata), guiXUnit(d1.metadata));
-            yLbl = guiLabel(yName, d1.units{min(chIdx, numel(d1.units))});
-            xlabel(oAx, xLbl, 'FontSize', fmtOpts.fontSize);
-            ylabel(oAx, yLbl, 'FontSize', fmtOpts.fontSize);
-            legend(oAx, 'Location', 'best', 'FontSize', max(6, fmtOpts.fontSize-2));
-
+            fbModel.figureType = 'Confidence Band';
+            fbModel.confBandConfig = struct( ...
+                'datasets', dsIdx, ...
+                'yChannel', cbWidgets.ddY.Value, ...
+                'summary',  summaryMode);
+            syncGlobalOptsToModel();
+            outFig = fbModel.generate(datasets);
             ttl = cbWidgets.efTitle.Value;
             if ~isempty(ttl)
-                title(oAx, ttl, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
+                title(findobj(outFig,'Type','axes'), ttl, ...
+                    'FontSize', spFont.Value+1, 'Interpreter', 'none');
             end
-
+            if cbWidgets.cbLogY.Value
+                ax_ = findobj(outFig,'Type','axes'); ax_.YScale = 'log';
+            end
             addRefLineTools(outFig);
             figure(outFig);
             delete(bFig);
