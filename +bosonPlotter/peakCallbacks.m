@@ -299,6 +299,41 @@ cb.onKeyPress            = @onKeyPress;
         newPk.eta        = NaN;
         newPk.prominence = NaN;
         newPk.localSNR   = NaN;
+
+        % ── Auto-fit on add: estimate local FWHM, then run a quick local
+        %    fit so the user sees a result immediately. Failures are quiet
+        %    here — peak stays as 'manual' and the user can press Fit Peaks
+        %    later (which will surface a rich diagnostic dialog).
+        xvAll = double(d.time);  yvAll = d.values(:, yIdx);
+        validAll = ~isnan(xvAll) & ~isnan(yvAll) & dmask;
+        xvSorted = xvAll(validAll);  yvSorted = yvAll(validAll);
+        [xvSorted, sortIdx] = sort(xvSorted);
+        yvSorted = yvSorted(sortIdx);
+        if numel(xvSorted) >= 5
+            xSpanAll = diff([min(xvSorted), max(xvSorted)]);
+            fwhmEst  = estimateLocalFWHM(xvSorted, yvSorted, pkX, xSpanAll);
+            seed = struct('center', pkX, 'fwhm', fwhmEst);
+            if isfinite(fwhmEst)
+                hw  = 3.0 * fwhmEst;
+            else
+                hw  = xSpanAll * 0.03;
+            end
+            xLo = pkX - hw;  xHi = pkX + hw;
+            r = fitSinglePeak(xvSorted, yvSorted, xLo, xHi, seed, ctx.ddFitModel.Value, []);
+            if r.success
+                newPk.center = r.center;
+                newPk.fwhm   = r.fwhm;
+                newPk.height = r.height;
+                newPk.bg     = r.bg;
+                newPk.eta    = r.eta;
+                newPk.area   = r.area;
+                newPk.model  = r.model;
+                newPk.status = 'fitted';
+            elseif isfinite(fwhmEst)
+                newPk.fwhm = fwhmEst;  % still useful as a seed for later Fit Peaks
+            end
+        end
+
         ds.peaks(end+1) = newPk;
         ctx.appData.datasets{ctx.appData.activeIdx} = ds;
 
@@ -366,9 +401,12 @@ cb.onKeyPress            = @onKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function onFitPeaks(~,~)
-    %ONFITPEAKS  Fit a Lorentzian to each entry in ds.peaks to refine center/FWHM.
-    %  Lorentzian model: H / (1 + 4*((x - x0)/fwhm)^2) + bg
-    %  Fitted parameters: [H, x0, fwhm, bg].  Uses fminsearch (no toolbox needed).
+    %ONFITPEAKS  Fit each entry in ds.peaks via fitSinglePeak, with retry pass.
+    %  First pass: window from pk.xRange | ±3·FWHM | fallback ±3% of x-span.
+    %  Second pass (failed peaks only): widen window 1.5× and subtract the
+    %  SNIP background if available. Failures are collected with a reason
+    %  per peak and presented in a rich diagnostic dialog plus translucent
+    %  fit-window overlays on the main plot.
         if isempty(ctx.appData.datasets) || ctx.appData.activeIdx < 1
             uialert(ctx.fig,'Load a file first.','No data'); return;
         end
@@ -394,163 +432,77 @@ cb.onKeyPress            = @onKeyPress;
         dmask = buildDisplayMask(ds);
         valid = ~isnan(xv) & ~isnan(yv) & dmask;
         xv = xv(valid);  yv = yv(valid);
+        % Ensure monotone-increasing xv for fitSinglePeak
+        [xv, sortIdx] = sort(xv);
+        yv = yv(sortIdx);
         xSpan = diff([min(xv), max(xv)]);
 
-        FIT_HALFWIDTH_MULT  = 3.0;    % fit window = ±(this × FWHM)
-        FIT_FALLBACK_WIN    = 0.03;   % fallback half-window as fraction of x-span
-        FIT_INIT_WIDTH_FRAC = 0.3;    % initial FWHM guess: this × window width
-        FIT_MAX_FWHM_FRAC   = 0.5;    % reject fit if FWHM exceeds this × x-span
-        FIT_EXPAND_WIN      = 0.025;  % expanded window fraction when < 5 pts in window
+        % Cached SNIP background aligned to xv (used in retry pass)
+        snipBg = alignSnipBackground(ds, xv);
 
-        isPV    = strcmp(ctx.ddFitModel.Value, 'Pseudo-Voigt');
-        isSPVII = strcmp(ctx.ddFitModel.Value, 'Split Pearson VII');
-        isTCH   = strcmp(ctx.ddFitModel.Value, 'TCH-pV');
-        switch ctx.ddFitModel.Value
-            case 'Gaussian'
-                modelFun = @(p,x) p(1) .* exp(-4.*log(2).*((x-p(2))./p(3)).^2) + p(4);
-            case 'Pseudo-Voigt'
-                % p = [H, x0, fwhm, bg, eta]  eta in [0,1] (Lorentzian fraction)
-                modelFun = @(p,x) p(1) .* (p(5) ./ (1 + 4.*((x-p(2))./p(3)).^2) + ...
-                                  (1-p(5)) .* exp(-4.*log(2).*((x-p(2))./p(3)).^2)) + p(4);
-            case 'Split Pearson VII'
-                % p = [H, center, wL, wR, mL, mR, bg]
-                modelFun = @(p,x) utilities.splitPearsonVII(x, p);
-            case 'TCH-pV'
-                % p = [H, x0, fG, fL, bg]  — Thompson-Cox-Hastings
-                modelFun = @(p,x) utilities.tchPseudoVoigt(x(:), p(:)');
-            otherwise  % 'Lorentzian' (default)
-                modelFun = @(p,x) p(1) ./ (1 + 4.*((x - p(2))./p(3)).^2) + p(4);
-        end
-        opts = optimset('Display','off','MaxIter',8000,'TolX',1e-10,'TolFun',1e-14);
+        % Clear any prior fit-window overlays before this run.
+        clearFitWindowOverlays(ctx.ax);
 
-        nFailed = 0;
+        modelName = ctx.ddFitModel.Value;
+        failures = struct('idx', {}, 'center', {}, 'reason', {}, ...
+                          'suggestion', {}, 'window', {});
+
         for pki = 1:numel(ds.peaks)
             pk = ds.peaks(pki);
 
-            % ── Determine fit window ──────────────────────────────────────
+            % ── First-pass window ─────────────────────────────────────
             if ~isempty(pk.xRange) && numel(pk.xRange) == 2
                 xLo = pk.xRange(1);  xHi = pk.xRange(2);
             elseif ~isnan(pk.fwhm) && pk.fwhm > 0
-                hw   = FIT_HALFWIDTH_MULT * pk.fwhm;
+                hw   = 3.0 * pk.fwhm;
                 xLo  = pk.center - hw;
                 xHi  = pk.center + hw;
             else
-                hw   = xSpan * FIT_FALLBACK_WIN;
+                hw   = xSpan * 0.03;
                 xLo  = pk.center - hw;
                 xHi  = pk.center + hw;
             end
 
-            inWin = xv >= xLo & xv <= xHi;
-            if sum(inWin) < 5
-                % Expand window
-                inWin = xv >= (pk.center - xSpan*FIT_EXPAND_WIN) & ...
-                        xv <= (pk.center + xSpan*FIT_EXPAND_WIN);
-            end
-            if sum(inWin) < 4, nFailed = nFailed + 1; continue; end
+            seed = struct('center', pk.center, 'fwhm', pk.fwhm);
+            r = fitSinglePeak(xv, yv, xLo, xHi, seed, modelName, []);
 
-            xFit = xv(inWin);  yFit = yv(inWin);
-            bg0   = min(yFit);
-            % Use the DETECTED peak center, not max of window — max can snap
-            % to a neighboring larger peak that partially overlaps the window.
-            x0_0  = pk.center;
-            % Interpolate y at the detected center for height estimate
-            H0    = interp1(xFit, yFit, x0_0, 'linear', max(yFit)) - bg0;
-            if H0 <= 0, H0 = max(yFit) - bg0; end   % fallback if interp fails
-            % Use detected FWHM as initial guess when available; otherwise
-            % fall back to 30% of window width (or 2× point spacing minimum)
-            dx    = xFit(2) - xFit(1);
-            if ~isnan(pk.fwhm) && pk.fwhm > 0
-                fw0 = pk.fwhm;
-            else
-                fw0 = max(diff([min(xFit), max(xFit)]) * FIT_INIT_WIDTH_FRAC, dx*2);
+            % ── Retry pass: widen window 1.5× and subtract SNIP bg ──
+            if ~r.success
+                hw2  = 1.5 * (xHi - xLo) / 2;
+                xLo2 = pk.center - hw2;
+                xHi2 = pk.center + hw2;
+                r2 = fitSinglePeak(xv, yv, xLo2, xHi2, seed, modelName, snipBg);
+                if r2.success
+                    r = r2;
+                else
+                    % Use whichever window we last tried for the failure overlay
+                    r = r2;  % keeps reason from second attempt
+                end
             end
 
-            if isSPVII
-                % Split Pearson VII: p = [H, center, wL, wR, mL, mR, bg]
-                hw0 = fw0 / 2;
-                p0 = [H0, x0_0, hw0, hw0, 1.5, 1.5, bg0];
-            elseif isTCH
-                % TCH-pV: p = [H, x0, fG, fL, bg] — split FWHM equally as seed
-                % (yields eta ≈ 0.44, near the center of the mixing range)
-                fw_seed = fw0 / sqrt(2);
-                p0 = [H0, x0_0, fw_seed, fw_seed, bg0];
+            if r.success
+                ds.peaks(pki).center = r.center;
+                ds.peaks(pki).fwhm   = r.fwhm;
+                ds.peaks(pki).height = r.height;
+                ds.peaks(pki).bg     = r.bg;
+                ds.peaks(pki).eta    = r.eta;
+                ds.peaks(pki).area   = r.area;
+                ds.peaks(pki).status = 'fitted';
+                ds.peaks(pki).model  = r.model;
+                if strcmp(r.model, 'Split Pearson VII')
+                    ds.peaks(pki).asymmetry = abs(r.params(3)) / abs(r.params(4));
+                    ds.peaks(pki).fitParams = r.params;
+                elseif strcmp(r.model, 'TCH-pV')
+                    ds.peaks(pki).fitParams = r.params;
+                end
             else
-                p0 = [H0, x0_0, fw0, bg0];
-                if isPV, p0(end+1) = 0.5; end  %#ok<AGROW> % initial eta guess: 50% Lorentzian
-            end
-            objFun = @(p) sum((modelFun(p, xFit) - yFit).^2);
-            try
-                pFit = fminsearch(objFun, p0, opts);
-                if isSPVII
-                    fwhmFit = abs(pFit(3)) + abs(pFit(4));  % wL + wR
-                    etaFit  = NaN;
-                elseif isTCH
-                    % Combined FWHM via TCH polynomial; eta derived from fL/f
-                    fG = abs(pFit(3));  fL = abs(pFit(4));
-                    f5 = fG^5 + 2.69269*fG^4*fL + 2.42843*fG^3*fL^2 ...
-                       + 4.47163*fG^2*fL^3 + 0.07842*fG*fL^4 + fL^5;
-                    fwhmFit = f5^(1/5);
-                    if fwhmFit > 0
-                        r      = fL / fwhmFit;
-                        etaFit = max(0, min(1, 1.36603*r - 0.47719*r^2 + 0.11116*r^3));
-                    else
-                        etaFit = NaN;
-                    end
-                else
-                    fwhmFit = abs(pFit(3));
-                    etaFit  = guiTernary(isPV, max(0, min(1, pFit(5))), NaN);
-                end
-                % Accept only if center is inside fit window and fwhm is sane
-                if pFit(2) >= xLo && pFit(2) <= xHi && ...
-                   fwhmFit > 0     && fwhmFit < xSpan * FIT_MAX_FWHM_FRAC
-                    ds.peaks(pki).center = pFit(2);
-                    ds.peaks(pki).fwhm   = fwhmFit;
-                    ds.peaks(pki).height = pFit(1);
-                    if isSPVII
-                        bgFit = pFit(7);
-                    elseif isTCH
-                        bgFit = pFit(5);
-                    else
-                        bgFit = pFit(4);
-                    end
-                    ds.peaks(pki).bg     = bgFit;
-                    ds.peaks(pki).eta    = etaFit;
-                    ds.peaks(pki).status = 'fitted';
-                    ds.peaks(pki).model  = ctx.ddFitModel.Value;
-                    if isSPVII
-                        ds.peaks(pki).asymmetry = abs(pFit(3)) / abs(pFit(4));  % wL/wR ratio
-                        ds.peaks(pki).fitParams = pFit;  % store full [H,c,wL,wR,mL,mR,bg]
-                    elseif isTCH
-                        ds.peaks(pki).fitParams = pFit;  % store full [H,x0,fG,fL,bg]
-                    end
-                    % Compute area analytically (or numerically for Split Pearson VII)
-                    switch ctx.ddFitModel.Value
-                        case 'Gaussian'
-                            fittedArea = pFit(1) * fwhmFit * sqrt(pi / log(2)) / 2;
-                        case 'Pseudo-Voigt'
-                            % Area = H*fwhm*(eta*pi/2 + (1-eta)*sqrt(pi)/(2*sqrt(ln2)))
-                            A_L = pi / 2;
-                            A_G = sqrt(pi) / (2 * sqrt(log(2)));
-                            fittedArea = pFit(1) * fwhmFit * (etaFit * A_L + (1-etaFit) * A_G);
-                        case 'Split Pearson VII'
-                            % No closed-form integral — use numerical integration
-                            xDense = linspace(xLo, xHi, 500)';
-                            yDense = utilities.splitPearsonVII(xDense, pFit) - pFit(7);
-                            fittedArea = trapz(xDense, yDense);
-                        case 'TCH-pV'
-                            % Same pseudo-Voigt closed form using combined f, derived eta
-                            A_L = pi / 2;
-                            A_G = sqrt(pi) / (2 * sqrt(log(2)));
-                            fittedArea = pFit(1) * fwhmFit * (etaFit * A_L + (1-etaFit) * A_G);
-                        otherwise  % Lorentzian
-                            fittedArea = pFit(1) * fwhmFit * pi / 2;
-                    end
-                    ds.peaks(pki).area = fittedArea;
-                else
-                    nFailed = nFailed + 1;
-                end
-            catch
-                nFailed = nFailed + 1;
+                drawFitWindowOverlay(ctx.ax, r.window(1), r.window(2), sprintf('#%d', pki));
+                failures(end+1) = struct(...
+                    'idx',        pki, ...
+                    'center',     pk.center, ...
+                    'reason',     r.reason, ...
+                    'suggestion', suggestNextStep(r.reason, modelName), ...
+                    'window',     r.window); %#ok<AGROW>
             end
         end
 
@@ -558,8 +510,12 @@ cb.onKeyPress            = @onKeyPress;
         refreshPeakTable();
         ctx.onPlot();
 
-        if nFailed > 0
-            uialert(ctx.fig, sprintf('%d peak(s) could not be fitted — try Add Peak to refine seeds.', nFailed), 'Fit Warning');
+        if ~isempty(failures)
+            ctx.setStatus(sprintf('%d of %d peak(s) failed to fit — see dialog and red windows on plot.', ...
+                numel(failures), numel(ds.peaks)));
+            showFitFailuresDialog(ctx.fig, failures);
+        else
+            ctx.setStatus(sprintf('Fitted %d peak(s).', numel(ds.peaks)));
         end
     end
 
@@ -1255,5 +1211,342 @@ function v = readSidebar(ctx, fld, defaultVal)
     v = ctx.(fld).Value;
     if isempty(v) || ~isfinite(v) || v < 0
         v = defaultVal;
+    end
+end
+
+function bg = alignSnipBackground(ds, xv)
+%ALIGNSNIPBACKGROUND  Interpolate ds.snipBackground onto xv. Returns [] if absent.
+    bg = [];
+    if ~isfield(ds, 'snipBackground') || isempty(ds.snipBackground), return; end
+    sb = ds.snipBackground;
+    if ~isfield(sb, 'x') || ~isfield(sb, 'bg') || isempty(sb.x) || isempty(sb.bg)
+        return;
+    end
+    try
+        bg = interp1(double(sb.x), double(sb.bg), xv, 'linear', NaN);
+        if all(isnan(bg)), bg = []; end
+    catch
+        bg = [];
+    end
+end
+
+function fwhm = estimateLocalFWHM(xv, yv, xCenter, xSpan)
+%ESTIMATELOCALFWHM  Walk left+right from xCenter to find half-max points.
+%   Returns NaN if either side cannot bracket half-max within ~5% of x-span.
+%   xv must be monotone-increasing.
+    fwhm = NaN;
+    if numel(xv) < 5, return; end
+    [~, ic] = min(abs(xv - xCenter));
+    if ic <= 1 || ic >= numel(xv), return; end
+
+    yPeak = yv(ic);
+    % Local baseline: min y in ±5% of x-span around the click.
+    bandHW = max(xSpan * 0.05, 5 * (xv(min(end,ic+1)) - xv(max(1,ic-1))) / 2);
+    bandMask = xv >= (xCenter - bandHW) & xv <= (xCenter + bandHW);
+    if ~any(bandMask), return; end
+    yBase = min(yv(bandMask));
+    halfMax = yBase + 0.5 * (yPeak - yBase);
+    if ~isfinite(halfMax) || halfMax >= yPeak, return; end
+
+    % Walk left until y dips below halfMax.
+    iL = ic;
+    while iL > 1 && yv(iL) >= halfMax
+        iL = iL - 1;
+    end
+    if iL == 1 && yv(iL) >= halfMax, return; end
+    xL = interpHalfMax(xv(iL), xv(iL+1), yv(iL), yv(iL+1), halfMax);
+
+    % Walk right until y dips below halfMax.
+    iR = ic;
+    while iR < numel(xv) && yv(iR) >= halfMax
+        iR = iR + 1;
+    end
+    if iR == numel(xv) && yv(iR) >= halfMax, return; end
+    xR = interpHalfMax(xv(iR-1), xv(iR), yv(iR-1), yv(iR), halfMax);
+
+    fwhm = xR - xL;
+    % Sanity: reject implausibly wide estimates (> 20% of x-span).
+    if fwhm <= 0 || fwhm > xSpan * 0.20
+        fwhm = NaN;
+    end
+end
+
+function x = interpHalfMax(x1, x2, y1, y2, yT)
+    if y1 == y2
+        x = (x1 + x2) / 2;
+    else
+        x = x1 + (yT - y1) * (x2 - x1) / (y2 - y1);
+    end
+end
+
+function r = fitSinglePeak(xv, yv, xLo, xHi, pkSeed, modelName, snipBg)
+%FITSINGLEPEAK  Fit one peak in [xLo, xHi] to modelName; return result struct.
+%
+%   Inputs
+%     xv, yv     full active data (monotone xv)
+%     xLo, xHi   fit window (x-range)
+%     pkSeed     struct with .center .fwhm (NaN ok) used as initial guess
+%     modelName  one of {'Lorentzian','Gaussian','Pseudo-Voigt',
+%                        'Split Pearson VII','TCH-pV'}
+%     snipBg     [] or vector aligned with xv — subtracted before fit if given
+%
+%   Output struct r:
+%     r.success  logical
+%     r.reason   char  '', or one of:
+%                'too-few-points', 'window-too-narrow',
+%                'center-drift', 'fwhm-too-wide',
+%                'fminsearch-error'
+%     r.center, r.fwhm, r.height, r.bg, r.eta, r.area, r.params, r.model
+%     r.window   [xLo xHi] used for the fit (post-expansion if any)
+
+    r = struct('success', false, 'reason', '', ...
+               'center', NaN, 'fwhm', NaN, 'height', NaN, 'bg', NaN, ...
+               'eta', NaN, 'area', NaN, 'params', [], 'model', modelName, ...
+               'window', [xLo xHi]);
+
+    if numel(xv) < 5
+        r.reason = 'too-few-points'; return;
+    end
+    xSpan = diff([min(xv), max(xv)]);
+
+    % Optional background subtraction (NaN-safe: skip at NaN positions)
+    yWork = yv;
+    if ~isempty(snipBg) && numel(snipBg) == numel(yv)
+        ok = isfinite(snipBg);
+        yWork(ok) = yv(ok) - snipBg(ok);
+    end
+
+    inWin = xv >= xLo & xv <= xHi;
+    if sum(inWin) < 4
+        r.reason = 'window-too-narrow'; return;
+    end
+    xFit = xv(inWin);  yFit = yWork(inWin);
+
+    isPV    = strcmp(modelName, 'Pseudo-Voigt');
+    isSPVII = strcmp(modelName, 'Split Pearson VII');
+    isTCH   = strcmp(modelName, 'TCH-pV');
+    switch modelName
+        case 'Gaussian'
+            modelFun = @(p,x) p(1) .* exp(-4.*log(2).*((x-p(2))./p(3)).^2) + p(4);
+        case 'Pseudo-Voigt'
+            modelFun = @(p,x) p(1) .* (p(5) ./ (1 + 4.*((x-p(2))./p(3)).^2) + ...
+                              (1-p(5)) .* exp(-4.*log(2).*((x-p(2))./p(3)).^2)) + p(4);
+        case 'Split Pearson VII'
+            modelFun = @(p,x) utilities.splitPearsonVII(x, p);
+        case 'TCH-pV'
+            modelFun = @(p,x) utilities.tchPseudoVoigt(x(:), p(:)');
+        otherwise
+            modelFun = @(p,x) p(1) ./ (1 + 4.*((x - p(2))./p(3)).^2) + p(4);
+    end
+    opts = optimset('Display','off','MaxIter',8000,'TolX',1e-10,'TolFun',1e-14);
+
+    % Initial guesses
+    bg0  = min(yFit);
+    x0_0 = pkSeed.center;
+    H0   = interp1(xFit, yFit, x0_0, 'linear', max(yFit)) - bg0;
+    if H0 <= 0, H0 = max(yFit) - bg0; end
+    if ~isnan(pkSeed.fwhm) && pkSeed.fwhm > 0
+        fw0 = pkSeed.fwhm;
+    else
+        dx  = (xFit(end) - xFit(1)) / max(1, numel(xFit) - 1);
+        fw0 = max((xHi - xLo) * 0.3, dx * 2);
+    end
+
+    if isSPVII
+        hw0 = fw0 / 2;
+        p0 = [H0, x0_0, hw0, hw0, 1.5, 1.5, bg0];
+    elseif isTCH
+        fw_seed = fw0 / sqrt(2);
+        p0 = [H0, x0_0, fw_seed, fw_seed, bg0];
+    else
+        p0 = [H0, x0_0, fw0, bg0];
+        if isPV, p0(end+1) = 0.5; end %#ok<AGROW>
+    end
+
+    objFun = @(p) sum((modelFun(p, xFit) - yFit).^2);
+    try
+        pFit = fminsearch(objFun, p0, opts);
+    catch
+        r.reason = 'fminsearch-error'; return;
+    end
+
+    if isSPVII
+        fwhmFit = abs(pFit(3)) + abs(pFit(4));
+        etaFit  = NaN;
+        bgFit   = pFit(7);
+    elseif isTCH
+        fG = abs(pFit(3));  fL = abs(pFit(4));
+        f5 = fG^5 + 2.69269*fG^4*fL + 2.42843*fG^3*fL^2 ...
+           + 4.47163*fG^2*fL^3 + 0.07842*fG*fL^4 + fL^5;
+        fwhmFit = f5^(1/5);
+        if fwhmFit > 0
+            rR     = fL / fwhmFit;
+            etaFit = max(0, min(1, 1.36603*rR - 0.47719*rR^2 + 0.11116*rR^3));
+        else
+            etaFit = NaN;
+        end
+        bgFit = pFit(5);
+    else
+        fwhmFit = abs(pFit(3));
+        if isPV
+            etaFit = max(0, min(1, pFit(5)));
+        else
+            etaFit = NaN;
+        end
+        bgFit = pFit(4);
+    end
+
+    if pFit(2) < xLo || pFit(2) > xHi
+        r.reason = 'center-drift'; return;
+    end
+    if ~(fwhmFit > 0 && fwhmFit < xSpan * 0.5)
+        r.reason = 'fwhm-too-wide'; return;
+    end
+
+    % Compute area
+    switch modelName
+        case 'Gaussian'
+            fittedArea = pFit(1) * fwhmFit * sqrt(pi / log(2)) / 2;
+        case 'Pseudo-Voigt'
+            A_L = pi / 2;
+            A_G = sqrt(pi) / (2 * sqrt(log(2)));
+            fittedArea = pFit(1) * fwhmFit * (etaFit * A_L + (1-etaFit) * A_G);
+        case 'Split Pearson VII'
+            xDense = linspace(xLo, xHi, 500)';
+            yDense = utilities.splitPearsonVII(xDense, pFit) - pFit(7);
+            fittedArea = trapz(xDense, yDense);
+        case 'TCH-pV'
+            A_L = pi / 2;
+            A_G = sqrt(pi) / (2 * sqrt(log(2)));
+            fittedArea = pFit(1) * fwhmFit * (etaFit * A_L + (1-etaFit) * A_G);
+        otherwise
+            fittedArea = pFit(1) * fwhmFit * pi / 2;
+    end
+
+    r.success = true;
+    r.center  = pFit(2);
+    r.fwhm    = fwhmFit;
+    r.height  = pFit(1);
+    r.bg      = bgFit;
+    r.eta     = etaFit;
+    r.area    = fittedArea;
+    r.params  = pFit;
+end
+
+function suggestion = suggestNextStep(reason, modelName)
+%SUGGESTNEXTSTEP  One-line actionable hint based on a fit-failure reason.
+    switch reason
+        case 'window-too-narrow'
+            suggestion = 'window covered too few points — widen via right-click on the peak row, or zoom out before clicking Add Peak';
+        case 'center-drift'
+            suggestion = 'fit centre wandered out of the window — peak overlap likely; try Fit All (global) or Add Peak closer to the maximum';
+        case 'fwhm-too-wide'
+            if strcmpi(modelName, 'Lorentzian')
+                suggestion = 'shape diverged — try Gaussian or Pseudo-Voigt, or subtract background first (auto-detect once)';
+            else
+                suggestion = 'shape diverged — subtract background first (run auto-detect once) or pick a tighter manual seed';
+            end
+        case 'fminsearch-error'
+            suggestion = 'optimiser threw — usually NaN/inf in the data window; check for masked rows';
+        case 'too-few-points'
+            suggestion = 'not enough data points in scan — check x-range filter';
+        otherwise
+            suggestion = 'try a different fit model';
+    end
+end
+
+function clearFitWindowOverlays(ax)
+%CLEARFITWINDOWOVERLAYS  Delete all rectangles tagged 'peakFitWindow'.
+    if ~isvalid(ax), return; end
+    overlays = findobj(ax, 'Tag', 'peakFitWindow');
+    if ~isempty(overlays), delete(overlays); end
+end
+
+function drawFitWindowOverlay(ax, xLo, xHi, label)
+%DRAWFITWINDOWOVERLAY  Paint a translucent rect spanning [xLo, xHi] on ax.
+%   Tagged 'peakFitWindow' so onClearOverlays / next fit can sweep it.
+    if ~isvalid(ax) || ~isfinite(xLo) || ~isfinite(xHi) || xHi <= xLo
+        return;
+    end
+    yLim = ax.YLim;
+    h = patch(ax, ...
+        'XData', [xLo xHi xHi xLo], ...
+        'YData', [yLim(1) yLim(1) yLim(2) yLim(2)], ...
+        'FaceColor', [0.85 0.20 0.20], ...
+        'FaceAlpha', 0.10, ...
+        'EdgeColor', [0.85 0.20 0.20], ...
+        'EdgeAlpha', 0.55, ...
+        'LineStyle', '--', ...
+        'LineWidth', 1.0, ...
+        'HitTest',  'off', ...
+        'PickableParts', 'none', ...
+        'Tag', 'peakFitWindow');
+    h.HandleVisibility = 'off';
+    if nargin >= 4 && ~isempty(label)
+        text(ax, (xLo + xHi) / 2, yLim(2), label, ...
+            'VerticalAlignment','top', 'HorizontalAlignment','center', ...
+            'Color',[0.85 0.20 0.20], 'FontSize', 9, 'FontWeight','bold', ...
+            'Tag','peakFitWindow', 'HitTest','off', 'PickableParts','none', ...
+            'HandleVisibility','off');
+    end
+end
+
+function showFitFailuresDialog(parentFig, failures)
+%SHOWFITFAILURESDIALOG  Rich dialog listing failed peaks + actionable hints.
+%   failures: struct array with .idx .center .reason .suggestion .window
+    if isempty(failures), return; end
+    nF = numel(failures);
+
+    dlg = uifigure('Name', sprintf('Fit Issues (%d peak%s)', nF, plural(nF)), ...
+        'Position', [300 250 540 min(420, 110 + 64*nF)], ...
+        'Resize', 'off');
+    rootGL = uigridlayout(dlg, [3 1], ...
+        'RowHeight', {26, '1x', 32}, ...
+        'Padding', [12 10 12 10], 'RowSpacing', 6);
+
+    uilabel(rootGL, ...
+        'Text', sprintf('%d peak%s could not be fitted. Suggested fixes below:', nF, plural(nF)), ...
+        'FontWeight', 'bold');
+
+    % Scrollable list of per-peak details
+    scrollPanel = uipanel(rootGL, 'BorderType', 'none', 'Scrollable', 'on');
+    listGL = uigridlayout(scrollPanel, [nF 1], ...
+        'RowHeight', repmat({'fit'}, 1, nF), ...
+        'Padding', [0 0 4 0], 'RowSpacing', 4);
+
+    for k = 1:nF
+        f = failures(k);
+        msg = sprintf(['<html><b>Peak #%d</b> (centre %.3f) — <i>%s</i><br>' ...
+                       '&nbsp;&nbsp;%s</html>'], ...
+            f.idx, f.center, prettyReason(f.reason), f.suggestion);
+        uilabel(listGL, 'Text', msg, ...
+            'Interpreter', 'html', ...
+            'WordWrap', 'on', ...
+            'FontSize', 11);
+    end
+
+    btnRow = uigridlayout(rootGL, [1 2], ...
+        'ColumnWidth', {'1x', 110}, ...
+        'Padding', [0 0 0 0]);
+    uilabel(btnRow, 'Text', '');
+    btnOK = uibutton(btnRow, 'Text', 'OK', ...
+        'ButtonPushedFcn', @(~,~) delete(dlg));
+    btnOK.Layout.Column = 2;
+
+    if ~isempty(parentFig) && isvalid(parentFig) && ~strcmpi(parentFig.Visible, 'off')
+        figure(dlg);
+    end
+end
+
+function s = plural(n), if n == 1, s = ''; else, s = 's'; end, end
+
+function s = prettyReason(reason)
+    switch reason
+        case 'window-too-narrow', s = 'fit window too narrow';
+        case 'center-drift',       s = 'centre drifted out of window';
+        case 'fwhm-too-wide',      s = 'FWHM grew past sanity limit';
+        case 'fminsearch-error',   s = 'optimiser error';
+        case 'too-few-points',     s = 'too few data points';
+        otherwise,                 s = reason;
     end
 end
