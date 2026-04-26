@@ -60,7 +60,7 @@ classdef FigureBuilderModel < handle
         groupedPlotConfig   struct = struct('datasetIdx', 1, 'xChannel', '', 'yChannel', '', 'groupChannel', '', 'plotType', 'line', 'legend', true)
         fftSpectralConfig   struct = struct('datasetIdx', 1, 'yChannel', '', 'window', 'hanning', 'output', 'psd', 'detrend', 'mean', 'logY', true, 'logX', false)
         ternaryConfig       struct = struct('datasetIdx', 1, 'channels', {{}}, 'markerSize', 25)
-        boxViolinConfig     struct = struct('datasets', [], 'yChannel', '', 'mode', 'box')
+        boxViolinConfig     struct = struct('groupMode', 'datasets', 'datasets', [], 'datasetIdx', 1, 'yChannel', '', 'yChannels', {{}}, 'groupChannel', '', 'style', 'box', 'orientation', 'vertical', 'showMean', true, 'showOutliers', true, 'width', 0.6)
     end
 
     methods

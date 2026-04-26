@@ -2430,74 +2430,41 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %  GENERATE: Box / Violin
         % ────────────────────────────────────────────────────────────────
         function generateBoxViolin()
+        %GENERATEBOXVIOLIN  Workshop-pattern thin wrapper.
             di = bvWidgets.ddDS.Value;
             if di < 1 || di > nDS
                 uialert(bFig,'No valid dataset selected.','No data'); return;
             end
-            d = getPlotData(di);
-
             ySel = bvWidgets.lbY.Value;
             if ischar(ySel) || isstring(ySel), ySel = cellstr(ySel); end
             if isempty(ySel)
                 uialert(bFig,'Pick at least one Y column.','Box / Violin'); return;
             end
-
+            % Determine group mode from widget combination
+            d = getPlotData(di);
             gIdx = bvWidgets.ddGroup.Value;
-            dataCell = {};
-            labels   = {};
-
             if gIdx > 0 && gIdx <= numel(d.labels) && numel(ySel) == 1
-                % Group one Y column by a grouping column
-                yi = find(strcmp(d.labels, ySel{1}), 1);
-                if isempty(yi)
-                    uialert(bFig,'Y column not found.','Box / Violin'); return;
-                end
-                yV = d.values(:, yi);
-                gV = d.values(:, gIdx);
-                good = ~isnan(yV) & ~isnan(gV);
-                yV = yV(good); gV = gV(good);
-                [uG, ~, gi] = unique(round(gV, 6));
-                for ki = 1:numel(uG)
-                    dataCell{end+1} = yV(gi == ki); %#ok<AGROW>
-                    labels{end+1}   = sprintf('%s=%.4g', d.labels{gIdx}, uG(ki)); %#ok<AGROW>
-                end
+                groupMode = 'value-bins';
+                groupCh   = d.labels{gIdx};
             else
-                % One or more Y columns as separate groups
-                for ki = 1:numel(ySel)
-                    yi = find(strcmp(d.labels, ySel{ki}), 1);
-                    if isempty(yi), continue; end
-                    yV = d.values(:, yi);
-                    yV = yV(~isnan(yV));
-                    dataCell{end+1} = yV; %#ok<AGROW>
-                    labels{end+1}   = d.labels{yi}; %#ok<AGROW>
-                end
+                groupMode = 'channels';
+                groupCh   = '';
             end
-
-            if isempty(dataCell) || all(cellfun(@isempty, dataCell))
-                uialert(bFig,'No valid data for the selected columns.','Box / Violin'); return;
-            end
-
-            fmtOpts = getFormatOpts();
-            outFig = figure('Name','Box / Violin','NumberTitle','off', ...
-                'Units','inches','Position',[2 2 spBFigW.Value spBFigH.Value]);
-            oAx = axes(outFig);
-
-            plotting.boxViolinSwarm(oAx, dataCell, ...
-                Style        = string(bvWidgets.ddStyle.Value), ...
-                Labels       = labels, ...
-                Orientation  = string(bvWidgets.ddOrient.Value), ...
-                ShowMean     = bvWidgets.cbMean.Value, ...
-                ShowOutliers = bvWidgets.cbOutliers.Value, ...
-                Width        = bvWidgets.spWidth.Value);
-
-            oAx.FontSize = fmtOpts.fontSize; oAx.FontName = fmtOpts.fontName;
-            oAx.Box = 'on';
-            if strcmp(bvWidgets.ddOrient.Value, 'vertical')
-                ylabel(oAx, 'Value', 'FontSize', fmtOpts.fontSize, 'Interpreter', 'none');
-            else
-                xlabel(oAx, 'Value', 'FontSize', fmtOpts.fontSize, 'Interpreter', 'none');
-            end
-
+            fbModel.figureType = 'Box / Violin';
+            fbModel.boxViolinConfig = struct( ...
+                'groupMode',    groupMode, ...
+                'datasets',     [], ...
+                'datasetIdx',   di, ...
+                'yChannel',     ySel{1}, ...
+                'yChannels',    {ySel}, ...
+                'groupChannel', groupCh, ...
+                'style',        bvWidgets.ddStyle.Value, ...
+                'orientation',  bvWidgets.ddOrient.Value, ...
+                'showMean',     bvWidgets.cbMean.Value, ...
+                'showOutliers', bvWidgets.cbOutliers.Value, ...
+                'width',        bvWidgets.spWidth.Value);
+            syncGlobalOptsToModel();
+            outFig = fbModel.generate(datasets);
             figure(outFig);
             delete(bFig);
         end
