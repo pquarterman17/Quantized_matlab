@@ -354,8 +354,8 @@ function varargout = BosonPlotter(options)
     % and other free-function helpers can find it without an `api` reference.
     setappdata(fig, 'macroLog', appData.macroLog);
     MIN_FIG_H = 500;   % reduced minimum so GUI works on small screens
-    LAYOUT_DEFAULTS = struct('figW',initW,'figH',initH,'ctrlPanelW',190, ...
-        'corrPanelW',320,'axLimPanelW',200,'fileListW',180);
+    LAYOUT_DEFAULTS = struct('figW',initW,'figH',initH,'ctrlPanelW',155, ...
+        'corrPanelW',300,'axLimPanelW',200,'fileListW',150);
     PREFS_FILE   = fullfile(fileparts(mfilename('fullpath')),'layoutPrefs.mat');
     BUG_LOG_FILE = fullfile(fileparts(mfilename('fullpath')),'gui_bug_log.txt');
     fig.SizeChangedFcn = @onFigSizeChanged;
@@ -444,7 +444,7 @@ function varargout = BosonPlotter(options)
     % ── Content row: [Files | Controls | Preview] ─────────────────────────
     % File-list column is narrow; controls column fixed; preview fills remainder.
     contentGL = uigridlayout(rootGL,[1 3], ...
-        'ColumnWidth',  {180, 190, '1x'}, ...
+        'ColumnWidth',  {150, 155, '1x'}, ...
         'Padding',      tk.pad.flush, ...
         'ColumnSpacing', 6);
     contentGL.Layout.Row = 1; contentGL.Layout.Column = 1;
@@ -640,8 +640,7 @@ function varargout = BosonPlotter(options)
     %   7 -  22px  Waterfall + spacing
     %   8 -  22px  Cts/s + Refresh
     %   9 -  20px  Annotate + Style + Plot Options
-    ctrlPanel = uipanel(contentGL,'Title','Controls','FontSize', tk.font.title, ...
-        'Scrollable','on');
+    ctrlPanel = uipanel(contentGL,'Title','','Scrollable','on');
     ctrlPanel.Layout.Column = 2;
 
     ctrlGL = uigridlayout(ctrlPanel,[9 1], ...
@@ -895,7 +894,7 @@ function varargout = BosonPlotter(options)
     btnPlotOptions.Layout.Column = 3;
 
     % ── Right: preview axes ───────────────────────────────────────────────
-    axPanel = uipanel(contentGL,'Title','Preview','FontSize', tk.font.title);
+    axPanel = uipanel(contentGL,'Title','');
     axPanel.Layout.Column = 3;
     axGL = uigridlayout(axPanel,[3 1],'Padding', tk.pad.tight,'RowSpacing',1, ...
         'RowHeight',{18,'1x',20});
@@ -1154,7 +1153,7 @@ function varargout = BosonPlotter(options)
     analysisPanel.Layout.Row = 2; analysisPanel.Layout.Column = 1;
 
     analysisGL = uigridlayout(analysisPanel,[2 4], ...
-        'ColumnWidth', {320, '1x', 0, 210}, ...
+        'ColumnWidth', {300, '1x', 0, 0}, ...
         'RowHeight',   {110, '1x'}, ...
         'Padding',     tk.pad.normal, ...
         'ColumnSpacing', 6, ...
@@ -1770,7 +1769,7 @@ function varargout = BosonPlotter(options)
     % Axes/limits/scale moved into the Controls panel (left column, ctrlGL).
     % Title/labels/ref lines are accessible via right-click context menu and
     % the Plot Options ▾ button — no longer in a separate panel.
-    dataTablePanel = uipanel(analysisGL, 'Title', 'Data Table', 'FontSize', tk.font.title);
+    dataTablePanel = uipanel(analysisGL, 'Title', '');
     dataTablePanel.Layout.Row = [1 2]; dataTablePanel.Layout.Column = 2;
 
     % ── Data Table contents (toolbar + filter bar + units + editable table) ──
