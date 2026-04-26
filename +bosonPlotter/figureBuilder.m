@@ -685,182 +685,41 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %  GENERATE: Waterfall
         % ────────────────────────────────────────────────────────────────
         function generateWaterfall()
+        %GENERATEWATERFALL  Workshop-pattern thin wrapper.
             dsIdx = ensureCellNum(wfWidgets.lbDS.Value);
-            yName = wfWidgets.lbY.Value;
-            if isempty(dsIdx), uialert(bFig,'Select at least one dataset.','No data'); return; end
-
-            [outFig, tlo] = makeOutFig(1, 1, false);
-            tAx = nexttile(tlo);
-            setupAx(tAx);
-            fmtOpts = getFormatOpts();
-            ls = localLineSpec(ddBStyle.Value);
-
-            logMode   = wfWidgets.cbLogMode.Value;
-            edgeLabel = wfWidgets.cbEdgeLabels.Value;
-            reverse   = strcmp(wfWidgets.ddDir.Value, 'Top to Bottom');
-
-            % Compute auto spacing
+            if isempty(dsIdx)
+                uialert(bFig,'Select at least one dataset.','No data'); return;
+            end
             spStr = strtrim(wfWidgets.efSpacing.Value);
             manualSp = str2double(spStr);
-
-            % Gather Y ranges for auto-spacing
-            yRanges = [];
-            for si = 1:numel(dsIdx)
-                di = dsIdx(si);
-                if di < 1 || di > nDS, continue; end
-                d = getPlotData(di);
-                idx = find(strcmp(d.labels, yName), 1);
-                if isempty(idx), continue; end
-                col = d.values(:, idx);
-                col = col(~isnan(col));
-                if ~isempty(col)
-                    yRanges(end+1) = max(col) - min(col); %#ok<AGROW>
-                end
-            end
             if isnan(manualSp) || strcmpi(spStr, 'auto')
-                if isempty(yRanges)
-                    spacing = 1;
-                else
-                    spacing = 0.8 * median(yRanges);
-                end
+                spacing = NaN;
             else
                 spacing = manualSp;
             end
+            zChan = wfWidgets.ddColorZChan.Value;
+            if strcmp(zChan, '(none)'), zChan = ''; end
 
-            nColors = max(numel(dsIdx), 1);
-
-            % ── Z-coloring: compute per-trace Z value and map to colormap ──
-            useColorZ = wfWidgets.cbColorZ.Value && ...
-                        ~strcmp(wfWidgets.ddColorZChan.Value, '(none)');
-            if useColorZ
-                zChanName = wfWidgets.ddColorZChan.Value;
-                zVals = NaN(1, numel(dsIdx));
-                for zsi = 1:numel(dsIdx)
-                    zdi = dsIdx(zsi);
-                    if zdi < 1 || zdi > nDS, continue; end
-                    zd = getPlotData(zdi);
-                    zci = find(strcmp(zd.labels, zChanName), 1);
-                    if isempty(zci), continue; end
-                    col_z = zd.values(:, zci);
-                    col_z = col_z(~isnan(col_z));
-                    if ~isempty(col_z)
-                        zVals(zsi) = mean(col_z);
-                    end
-                end
-                zMin = min(zVals(~isnan(zVals)));
-                zMax = max(zVals(~isnan(zVals)));
-                if isempty(zMin) || zMin == zMax
-                    % Fallback: uniform coloring
-                    useColorZ = false;
-                else
-                    % colorMaps handles both MATLAB built-ins and the
-                    % custom perceptual set (viridis / plasma / inferno);
-                    % str2func(name)(256) would crash on the latter
-                    % because those aren't standalone path functions.
-                    cmapRGB = bosonPlotter.colorMaps(wfWidgets.ddColorZCmap.Value, 256);
-                    % Map each zVal to a row in the colormap
-                    zNorm = (zVals - zMin) / (zMax - zMin);
-                    colors = zeros(numel(dsIdx), 3);
-                    for zsi = 1:numel(dsIdx)
-                        if isnan(zNorm(zsi))
-                            colors(zsi, :) = [0.5 0.5 0.5];
-                        else
-                            rowIdx = max(1, round(zNorm(zsi) * 255) + 1);
-                            colors(zsi, :) = cmapRGB(rowIdx, :);
-                        end
-                    end
-                end
-            end
-
-            if ~useColorZ
-                if cbGrayscale.Value
-                    colors = repmat(linspace(0, 0.7, nColors)', 1, 3);
-                else
-                    colors = getColorsFromMap('lines (MATLAB default)', nColors);
-                end
-            end
-
-            traceOrder = 1:numel(dsIdx);
-            if reverse, traceOrder = flip(traceOrder); end
-
-            xLbl = ''; yLbl = '';
-            xMax = -inf;
-
-            for ti = 1:numel(traceOrder)
-                si = traceOrder(ti);
-                di = dsIdx(si);
-                if di < 1 || di > nDS, continue; end
-                d = getPlotData(di);
-                idx = find(strcmp(d.labels, yName), 1);
-                if isempty(idx), continue; end
-
-                xVec = d.time;
-                yVec = d.values(:, idx);
-
-                if isempty(xLbl)
-                    xLbl = guiLabel(guiXName(d.metadata), guiXUnit(d.metadata));
-                end
-                if isempty(yLbl) && idx <= numel(d.units)
-                    yLbl = guiLabel(yName, d.units{idx});
-                end
-
-                % Apply offset
-                wfOffset = si - 1;
-                if logMode
-                    yVec = yVec * spacing^wfOffset;
-                else
-                    yVec = yVec + wfOffset * spacing;
-                end
-
-                good = ~isnan(xVec) & ~isnan(yVec);
-                if isdatetime(xVec), good = ~isnat(xVec) & ~isnan(yVec); end
-
-                plot(tAx, xVec(good), yVec(good), ls{:}, ...
-                    'Color', colors(si, :), ...
-                    'LineWidth', fmtOpts.lineWidth, ...
-                    'DisplayName', dsNames{di});
-
-                % Edge label
-                if edgeLabel
-                    xGood = xVec(good);
-                    yGood = yVec(good);
-                    if ~isempty(xGood)
-                        xEnd = xGood(end);
-                        yEnd = yGood(end);
-                        if xEnd > xMax, xMax = xEnd; end
-                        text(tAx, double(xEnd), double(yEnd), ['  ' dsNames{di}], ...
-                            'FontSize', max(fmtOpts.fontSize-2, 6), ...
-                            'Color', colors(si,:), ...
-                            'Interpreter', 'none', ...
-                            'VerticalAlignment', 'middle', ...
-                            'Clipping', 'on');
-                    end
-                end
-            end
-
-            if wfWidgets.cbLogY.Value, tAx.YScale = 'log'; end
-            xlabel(tAx, xLbl, 'FontSize', fmtOpts.fontSize);
-            ylabel(tAx, yLbl, 'FontSize', fmtOpts.fontSize);
+            fbModel.figureType = 'Waterfall';
+            fbModel.waterfallConfig = struct( ...
+                'datasets',    dsIdx, ...
+                'yChannel',    wfWidgets.lbY.Value, ...
+                'spacing',     spacing, ...
+                'reverse',     strcmp(wfWidgets.ddDir.Value, 'Top to Bottom'), ...
+                'logMode',     wfWidgets.cbLogMode.Value, ...
+                'logY',        wfWidgets.cbLogY.Value, ...
+                'edgeLabels',  wfWidgets.cbEdgeLabels.Value, ...
+                'colorByZ',    wfWidgets.cbColorZ.Value, ...
+                'zChannel',    zChan, ...
+                'colormap',    wfWidgets.ddColorZCmap.Value, ...
+                'traceLabels', {dsNames(dsIdx)});
+            syncGlobalOptsToModel();
+            outFig = fbModel.generate(datasets);
             ttl = wfWidgets.efTitle.Value;
             if ~isempty(ttl)
-                title(tAx, ttl, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
+                title(findobj(outFig,'Type','axes'), ttl, ...
+                    'FontSize', spFont.Value+1, 'Interpreter', 'none');
             end
-
-            % Expand X limits for edge labels
-            if edgeLabel && xMax > -inf
-                xl = tAx.XLim;
-                tAx.XLim(2) = xl(2) + 0.15 * (xl(2) - xl(1));
-            end
-
-            % Colorbar for Z-coloring
-            if useColorZ
-                colormap(tAx, bosonPlotter.colorMaps(wfWidgets.ddColorZCmap.Value, 256));
-                cb = colorbar(tAx);
-                cb.Label.String = wfWidgets.ddColorZChan.Value;
-                cb.Label.FontSize = fmtOpts.fontSize;
-                tAx.CLim = [zMin, zMax];
-            end
-
             addRefLineTools(outFig);
             figure(outFig);
             delete(bFig);

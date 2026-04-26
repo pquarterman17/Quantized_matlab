@@ -47,7 +47,7 @@ classdef FigureBuilderModel < handle
     properties
         multiPanelConfig    struct = bosonPlotter.figureBuilder.FigureBuilderModel.defaultMultiPanelConfig()
         quickGridConfig     struct = struct('datasets', [], 'yChannels', {{}}, 'rows', 2, 'cols', 2, 'shareX', true, 'shareY', false, 'logY', false, 'titleMode', 'Filename', 'emptyMode', 'Leave blank')
-        waterfallConfig     struct = struct('datasets', [], 'yChannel', '', 'spacing', NaN, 'reverse', false)
+        waterfallConfig     struct = struct('datasets', [], 'yChannel', '', 'spacing', NaN, 'reverse', false, 'logMode', false, 'logY', false, 'edgeLabels', true, 'colorByZ', false, 'zChannel', '', 'colormap', 'viridis', 'traceLabels', {{}})
         overlayResConfig    struct = struct('datasets', [], 'yChannel', '', 'referenceIdx', 1, 'residualMode', 'difference')
         normOverlayConfig   struct = struct('datasets', [], 'yChannel', '', 'normMethod', 'Peak (0-1)', 'alignMode', 'None', 'logY', false)
         beforeAfterConfig   struct = struct('datasetIdx', 1, 'yChannels', {{}}, 'logY', false, 'linkY', true)
