@@ -163,6 +163,7 @@ SUITES = {
     T('calc','test_physics_tier3'),       'physics3', 'Physics Tier-3: BCS gap, Debye/Einstein, FORC, Kissinger, relaxation'
     % ── Fitting tests ────────────────────────────────────────────────────
     T('fitting','test_peak_detection'),   'fitting', 'Robust peak detection, background estimation, prominence'
+    T('fitting','test_peakWorkshopModel'),'fitting', 'PeakWorkshopModel handle class — detect/fit/manual/remove in isolation'
     T('fitting','test_curve_fitting'),    'fitting', 'Curve fitting engine, models, autoGuess, parseEquation'
     T('fitting','test_constraints_batchfit'), 'fitting', 'Parameter constraints + batch fit dialog'
     T('fitting','test_templates_fft'),   'fitting', 'Publication templates and FFT filtering'
