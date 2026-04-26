@@ -348,6 +348,12 @@ function varargout = BosonPlotter(options)
                              'Position',[-9999 -9999 initW initH]}];
     end
     fig = uifigure(figArgs{:});
+    % MATLAB R2024b+ figure-level theme — controls how built-in widget
+    % chrome (uitable empty viewports, scrollbars, dropdown overlays)
+    % renders. Without this, uitable's empty-data area renders with
+    % MATLAB's default dark-IDE chrome regardless of our manual
+    % BackgroundColor writes. Wrapped in try/catch for older MATLAB.
+    try, theme(fig, 'dark'); catch, end
     % UX design tokens — see +bosonPlotter/uxTokens.m for the scale.
     tk = bosonPlotter.uxTokens();
     % Expose the macro log on the figure so `bosonPlotter.exportScript(fig, ...)`

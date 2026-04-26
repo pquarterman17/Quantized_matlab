@@ -45,6 +45,18 @@ function onThemeChanged(appData, fig, ax, callbacks)
 
     tk = bosonPlotter.uxTokens(themeName);
 
+    % ── Figure-level MATLAB theme (R2024b+) ────────────────────────────
+    % This is what makes uitable's empty-data viewport, scrollbars, and
+    % other built-in widget chrome respect the active mode. Without it,
+    % widgets render with the IDE's default light chrome regardless of
+    % how we paint individual BackgroundColors. The lower-level theme()
+    % API is available since R2024b; gracefully no-op on older releases.
+    try
+        theme(fig, themeName);
+    catch
+        % Older MATLAB without theme() — manual colour writes still apply
+    end
+
     % ── Figure & axes ──────────────────────────────────────────────────
     fig.Color = tk.color.bgFigure;
 

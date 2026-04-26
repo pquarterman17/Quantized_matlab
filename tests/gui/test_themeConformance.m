@@ -196,6 +196,13 @@ function allowed = buildAllowedColors(tk)
         0.70 0.70 0.70;   % light-grey label text (sub-headers)
         0.80 0.80 0.80;   % muted button text (lighter)
         0.50 0.70 0.50;   % dark-mode textOk approximation
+
+        % MATLAB's theme(fig, ...) call sets panel ForegroundColor (title
+        % text) to near-black [0.13] in light mode and [0.92] in dark
+        % mode. We don't control that — built-in chrome colour from
+        % theme(). Allowlist the values theme() picks.
+        0.13 0.13 0.13;
+        0.92 0.92 0.92;
     ];
     allowed = palette;
 end
