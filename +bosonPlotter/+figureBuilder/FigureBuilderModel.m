@@ -57,7 +57,7 @@ classdef FigureBuilderModel < handle
         contourConfig       struct = struct('datasets', [], 'yChannel', '', 'yValues', [], 'yLabel', 'Index', 'colormap', 'parula', 'filled', true)
         colorScatterConfig  struct = struct('datasetIdx', 1, 'xChannel', 'time', 'yChannel', '', 'zChannel', '', 'colormap', 'parula', 'markerSize', 25)
         marginalHistConfig  struct = struct('datasetIdx', 1, 'xChannel', 'time', 'yChannel', '', 'nBins', 30)
-        groupedPlotConfig   struct = struct('datasets', [], 'yChannel', '', 'groups', {{}})
+        groupedPlotConfig   struct = struct('datasetIdx', 1, 'xChannel', '', 'yChannel', '', 'groupChannel', '', 'plotType', 'line', 'legend', true)
         fftSpectralConfig   struct = struct('datasetIdx', 1, 'yChannel', '', 'fs', 0, 'logY', true)
         ternaryConfig       struct = struct('datasetIdx', 1, 'channels', {{}}, 'markerSize', 25)
         boxViolinConfig     struct = struct('datasets', [], 'yChannel', '', 'mode', 'box')

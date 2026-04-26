@@ -2424,70 +2424,26 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %  GENERATE: Color Scatter (Z)
         % ────────────────────────────────────────────────────────────────
         function generateColorScatterZ()
-            di   = csWidgets.ddDS.Value;
-            xSel = csWidgets.ddX.Value;
-            ySel = csWidgets.ddY.Value;
-            zSel = csWidgets.ddZ.Value;
-            cmap = csWidgets.ddCmap.Value;
-            mkSz = csWidgets.spMkSize.Value;
-
+        %GENERATECOLORSCATTERZ  Workshop-pattern thin wrapper.
+            di = csWidgets.ddDS.Value;
             if di < 1 || di > nDS
                 uialert(bFig,'No valid dataset selected.','No data'); return;
             end
-
-            d = getPlotData(di);
-            fmtOpts = getFormatOpts();
-
-            % Resolve X
-            if strcmp(xSel, 'X (time/index)')
-                xVec = double(d.time(:));
-                xLbl = guiLabel(guiXName(d.metadata), guiXUnit(d.metadata));
-            else
-                xi = find(strcmp(d.labels, xSel), 1);
-                if isempty(xi), uialert(bFig,'X channel not found.','Missing'); return; end
-                xVec = d.values(:, xi);
-                xLbl = guiLabel(xSel, d.units{min(xi, numel(d.units))});
-            end
-
-            % Resolve Y
-            yi = find(strcmp(d.labels, ySel), 1);
-            if isempty(yi), uialert(bFig,'Y channel not found.','Missing'); return; end
-            yVec = d.values(:, yi);
-            yLbl = guiLabel(ySel, d.units{min(yi, numel(d.units))});
-
-            % Resolve Z
-            if strcmp(zSel, 'X (time/index)')
-                zVec = double(d.time(:));
-                zLbl = guiLabel(guiXName(d.metadata), guiXUnit(d.metadata));
-            else
-                zi = find(strcmp(d.labels, zSel), 1);
-                if isempty(zi), uialert(bFig,'Z channel not found.','Missing'); return; end
-                zVec = d.values(:, zi);
-                zLbl = guiLabel(zSel, d.units{min(zi, numel(d.units))});
-            end
-
-            good = ~isnan(xVec) & ~isnan(yVec) & ~isnan(zVec);
-            xVec = xVec(good); yVec = yVec(good); zVec = zVec(good);
-
-            if numel(xVec) < 2
-                uialert(bFig,'Not enough valid data points.','Insufficient data'); return;
-            end
-
-            outFig = figure('Name','Color Scatter (Z)','NumberTitle','off', ...
-                'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
-            oAx = axes(outFig);
-            hold(oAx,'on'); box(oAx,'on'); grid(oAx,'on');
-            oAx.FontSize = fmtOpts.fontSize;
-            oAx.FontName = fmtOpts.fontName;
-            oAx.TickDir  = 'in';
-
-            plotting.colorScatterZ(oAx, xVec, yVec, zVec, ...
-                Colormap=cmap, MarkerSize=mkSz, ...
-                ShowColorbar=true, ColorbarLabel=zLbl);
-
-            xlabel(oAx, xLbl, 'FontSize', fmtOpts.fontSize);
-            ylabel(oAx, yLbl, 'FontSize', fmtOpts.fontSize);
-
+            xCh = csWidgets.ddX.Value;
+            if strcmp(xCh, 'X (time/index)'), xCh = 'time'; end
+            zCh = csWidgets.ddZ.Value;
+            if strcmp(zCh, 'X (time/index)'), zCh = 'time'; end
+            fbModel.figureType = 'Color Scatter (Z)';
+            fbModel.colorScatterConfig = struct( ...
+                'datasetIdx', di, ...
+                'xChannel',   xCh, ...
+                'yChannel',   csWidgets.ddY.Value, ...
+                'zChannel',   zCh, ...
+                'colormap',   csWidgets.ddCmap.Value, ...
+                'markerSize', csWidgets.spMkSize.Value, ...
+                'alpha',      0.7);
+            syncGlobalOptsToModel();
+            outFig = fbModel.generate(datasets);
             addRefLineTools(outFig);
             figure(outFig);
             delete(bFig);
@@ -2542,48 +2498,20 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %  GENERATE: Marginal Histogram
         % ────────────────────────────────────────────────────────────────
         function generateMarginalHistogram()
-            di    = mhWidgets.ddDS.Value;
-            xSel  = mhWidgets.ddX.Value;
-            ySel  = mhWidgets.ddY.Value;
-            nBins = mhWidgets.spNBins.Value;
-            showKDE = mhWidgets.cbKDE.Value;
-
+        %GENERATEMARGINALHISTOGRAM  Workshop-pattern thin wrapper.
+            di = mhWidgets.ddDS.Value;
             if di < 1 || di > nDS
                 uialert(bFig,'No valid dataset selected.','No data'); return;
             end
-
-            d = getPlotData(di);
-            fmtOpts = getFormatOpts();
-
-            xi = find(strcmp(d.labels, xSel), 1);
-            yi = find(strcmp(d.labels, ySel), 1);
-            if isempty(xi) || isempty(yi)
-                uialert(bFig,'Channel not found in dataset.','Missing channel'); return;
-            end
-
-            xVec = d.values(:, xi);
-            yVec = d.values(:, yi);
-            good = ~isnan(xVec) & ~isnan(yVec);
-            xVec = xVec(good); yVec = yVec(good);
-
-            if numel(xVec) < 2
-                uialert(bFig,'Not enough valid data points.','Insufficient data'); return;
-            end
-
-            outFig = figure('Name','Marginal Histogram','NumberTitle','off', ...
-                'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
-            tmpAx = axes(outFig);
-
-            handles = plotting.marginalHistogram(tmpAx, xVec, yVec, ...
-                NBins=nBins, ShowKDE=showKDE);
-
-            xLbl = guiLabel(xSel, d.units{min(xi, numel(d.units))});
-            yLbl = guiLabel(ySel, d.units{min(yi, numel(d.units))});
-            xlabel(handles.axMain, xLbl, 'FontSize', fmtOpts.fontSize);
-            ylabel(handles.axMain, yLbl, 'FontSize', fmtOpts.fontSize);
-            handles.axMain.FontSize = fmtOpts.fontSize;
-            handles.axMain.FontName = fmtOpts.fontName;
-
+            fbModel.figureType = 'Marginal Histogram';
+            fbModel.marginalHistConfig = struct( ...
+                'datasetIdx', di, ...
+                'xChannel',   mhWidgets.ddX.Value, ...
+                'yChannel',   mhWidgets.ddY.Value, ...
+                'nBins',      mhWidgets.spNBins.Value, ...
+                'showKDE',    mhWidgets.cbKDE.Value);
+            syncGlobalOptsToModel();
+            outFig = fbModel.generate(datasets);
             addRefLineTools(outFig);
             figure(outFig);
             delete(bFig);
@@ -2647,54 +2575,21 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %  GENERATE: Grouped Plot
         % ────────────────────────────────────────────────────────────────
         function generateGroupedPlot()
-            di       = gpWidgets.ddDS.Value;
-            xSel     = gpWidgets.ddX.Value;
-            ySel     = gpWidgets.ddY.Value;
-            grpSel   = gpWidgets.ddGroup.Value;
-            plotType = gpWidgets.ddPlotType.Value;
-            showLeg  = gpWidgets.cbLegend.Value;
-
+        %GENERATEGROUPEDPLOT  Workshop-pattern thin wrapper.
+            di = gpWidgets.ddDS.Value;
             if di < 1 || di > nDS
                 uialert(bFig,'No valid dataset selected.','No data'); return;
             end
-
-            d = getPlotData(di);
-            fmtOpts = getFormatOpts();
-
-            xi   = find(strcmp(d.labels, xSel), 1);
-            yi   = find(strcmp(d.labels, ySel), 1);
-            grpi = find(strcmp(d.labels, grpSel), 1);
-
-            if isempty(xi) || isempty(yi) || isempty(grpi)
-                uialert(bFig,'One or more channels not found.','Missing channel'); return;
-            end
-
-            xVec = d.values(:, xi);
-            yVec = d.values(:, yi);
-            gVec = d.values(:, grpi);
-            good = ~isnan(xVec) & ~isnan(yVec) & ~isnan(gVec);
-            xVec = xVec(good); yVec = yVec(good); gVec = gVec(good);
-
-            if numel(xVec) < 2
-                uialert(bFig,'Not enough valid data points.','Insufficient data'); return;
-            end
-
-            outFig = figure('Name','Grouped Plot','NumberTitle','off', ...
-                'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
-            oAx = axes(outFig);
-            hold(oAx,'on'); box(oAx,'on'); grid(oAx,'on');
-            oAx.FontSize = fmtOpts.fontSize;
-            oAx.FontName = fmtOpts.fontName;
-            oAx.TickDir  = 'in';
-
-            plotting.groupedPlot(oAx, xVec, yVec, gVec, ...
-                PlotType=plotType, Legend=showLeg);
-
-            xLbl = guiLabel(xSel, d.units{min(xi, numel(d.units))});
-            yLbl = guiLabel(ySel, d.units{min(yi, numel(d.units))});
-            xlabel(oAx, xLbl, 'FontSize', fmtOpts.fontSize);
-            ylabel(oAx, yLbl, 'FontSize', fmtOpts.fontSize);
-
+            fbModel.figureType = 'Grouped Plot';
+            fbModel.groupedPlotConfig = struct( ...
+                'datasetIdx',   di, ...
+                'xChannel',     gpWidgets.ddX.Value, ...
+                'yChannel',     gpWidgets.ddY.Value, ...
+                'groupChannel', gpWidgets.ddGroup.Value, ...
+                'plotType',     gpWidgets.ddPlotType.Value, ...
+                'legend',       gpWidgets.cbLegend.Value);
+            syncGlobalOptsToModel();
+            outFig = fbModel.generate(datasets);
             addRefLineTools(outFig);
             figure(outFig);
             delete(bFig);
@@ -3033,6 +2928,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %  GENERATE: Ternary
         % ────────────────────────────────────────────────────────────────
         function generateTernary()
+        %GENERATETERNARY  Workshop-pattern thin wrapper.
             di = tpWidgets.ddDS.Value;
             if di < 1 || di > nDS
                 uialert(bFig,'No valid dataset selected.','No data'); return;
@@ -3045,54 +2941,28 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
             if any([aIdx bIdx cIdx] < 1) || any([aIdx bIdx cIdx] > numel(d.labels))
                 uialert(bFig,'Select three valid A/B/C columns.','Ternary'); return;
             end
-
-            aV = d.values(:, aIdx);
-            bV = d.values(:, bIdx);
-            cV = d.values(:, cIdx);
-            good = ~isnan(aV) & ~isnan(bV) & ~isnan(cV) & (aV+bV+cV) > 0 & ...
-                   aV >= 0 & bV >= 0 & cV >= 0;
-            if nnz(good) < 1
-                uialert(bFig,'No valid composition rows (non-negative, sum>0).','Ternary'); return;
-            end
-            F = [aV(good), bV(good), cV(good)];
-
-            vals = [];
+            % Optional value channel (vIdx <= 0 means no coloring)
             if vIdx > 0 && vIdx <= numel(d.labels)
-                vTmp = d.values(:, vIdx);
-                vals = vTmp(good);
+                valCh = d.labels{vIdx};
+            else
+                valCh = '';
             end
-
+            % Custom labels (split comma-separated string)
             lblStr = strtrim(string(tpWidgets.edLabels.Value));
             lblParts = split(lblStr, ",");
             if numel(lblParts) ~= 3
                 lblParts = string({d.labels{aIdx}, d.labels{bIdx}, d.labels{cIdx}});
             end
-            lblParts = strtrim(lblParts);
-
-            fmtOpts = getFormatOpts();
-            outFig = figure('Name','Ternary','NumberTitle','off', ...
-                'Units','inches','Position',[2 2 spBFigW.Value spBFigH.Value]);
-            oAx = axes(outFig);
-
-            if isempty(vals)
-                plotting.ternaryPlot(F, ...
-                    'Parent', oAx, ...
-                    'Labels', lblParts(:)', ...
-                    'MarkerSize', tpWidgets.spSize.Value, ...
-                    'Grid', tpWidgets.cbGrid.Value);
-            else
-                plotting.ternaryPlot(F, ...
-                    'Parent', oAx, ...
-                    'Labels', lblParts(:)', ...
-                    'Values', vals(:), ...
-                    'MarkerSize', tpWidgets.spSize.Value, ...
-                    'Grid', tpWidgets.cbGrid.Value);
-                cb = colorbar(oAx);
-                cb.Label.String = d.labels{vIdx};
-                cb.Label.Interpreter = 'none';
-            end
-            oAx.FontSize = fmtOpts.fontSize; oAx.FontName = fmtOpts.fontName;
-
+            fbModel.figureType = 'Ternary';
+            fbModel.ternaryConfig = struct( ...
+                'datasetIdx',   di, ...
+                'channels',     {{d.labels{aIdx}, d.labels{bIdx}, d.labels{cIdx}}}, ...
+                'valueChannel', valCh, ...
+                'markerSize',   tpWidgets.spSize.Value, ...
+                'grid',         tpWidgets.cbGrid.Value, ...
+                'labels',       {strtrim(lblParts(:)')});
+            syncGlobalOptsToModel();
+            outFig = fbModel.generate(datasets);
             figure(outFig);
             delete(bFig);
         end

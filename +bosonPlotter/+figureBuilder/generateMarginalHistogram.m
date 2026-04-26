@@ -1,11 +1,14 @@
 function outFig = generateMarginalHistogram(datasets, cfg, globalOpts)
-%GENERATEMARGINALHISTOGRAM  Scatter with marginal histograms on top + right.
+%GENERATEMARGINALHISTOGRAM  Scatter + marginal X/Y histograms for one dataset.
+%   Routes through plotting.marginalHistogram for the actual layout (which
+%   includes optional KDE overlays).
 %
 %   cfg fields:
 %     .datasetIdx  single dataset index
 %     .xChannel    X channel name (default 'time')
 %     .yChannel    Y channel name
 %     .nBins       histogram bin count (default 30)
+%     .showKDE     logical (default false) — overlay Gaussian KDE
     arguments
         datasets   cell
         cfg        struct
@@ -15,7 +18,8 @@ function outFig = generateMarginalHistogram(datasets, cfg, globalOpts)
     ds = datasets{cfg.datasetIdx};
     if ~isfield(cfg,'xChannel') || isempty(cfg.xChannel), cfg.xChannel = 'time'; end
     if ~isfield(cfg,'yChannel') || isempty(cfg.yChannel), cfg.yChannel = ds.data.labels{1}; end
-    if ~isfield(cfg,'nBins'),    cfg.nBins   = 30; end
+    if ~isfield(cfg,'nBins'),    cfg.nBins   = 30;     end
+    if ~isfield(cfg,'showKDE'),  cfg.showKDE = false;  end
 
     if strcmpi(cfg.xChannel, 'time')
         xv = double(ds.data.time);
@@ -29,28 +33,11 @@ function outFig = generateMarginalHistogram(datasets, cfg, globalOpts)
     xv = xv(valid); yv = yv(valid);
 
     outFig = bosonPlotter.figureBuilder.createOutFig('Marginal Histogram', globalOpts);
-    tlo = tiledlayout(outFig, 4, 4, 'TileSpacing','compact','Padding','compact');
-
-    % Top histogram (x)
-    axTop = nexttile(tlo, 1, [1 3]);
-    histogram(axTop, xv, cfg.nBins, 'FaceColor', [0.55 0.65 0.85]);
-    axTop.XTickLabel = []; axTop.Box = 'on';
-
-    % (top-right corner blank)
-    nexttile(tlo, 4, [1 1]); axis off;
-
-    % Main scatter (rows 2-4, cols 1-3)
-    axMain = nexttile(tlo, 5, [3 3]);
-    scatter(axMain, xv, yv, 8, 'filled', 'MarkerFaceAlpha', 0.5);
-    axMain.Box = 'on'; grid(axMain,'on');
-    xlabel(axMain, cfg.xChannel); ylabel(axMain, cfg.yChannel);
-
-    % Right histogram (y)
-    axRight = nexttile(tlo, 8, [3 1]);
-    histogram(axRight, yv, cfg.nBins, 'FaceColor', [0.55 0.65 0.85], 'Orientation','horizontal');
-    axRight.YTickLabel = []; axRight.Box = 'on';
-
-    for ax_ = [axTop axMain axRight]
-        ax_.FontSize = globalOpts.fontSize; ax_.FontName = globalOpts.fontName;
-    end
+    tmpAx = axes(outFig);
+    handles = plotting.marginalHistogram(tmpAx, xv, yv, ...
+        NBins=cfg.nBins, ShowKDE=cfg.showKDE);
+    xlabel(handles.axMain, cfg.xChannel, 'FontSize', globalOpts.fontSize);
+    ylabel(handles.axMain, cfg.yChannel, 'FontSize', globalOpts.fontSize);
+    handles.axMain.FontSize = globalOpts.fontSize;
+    handles.axMain.FontName = globalOpts.fontName;
 end

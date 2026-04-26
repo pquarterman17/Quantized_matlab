@@ -1,21 +1,22 @@
 function outFig = generateColorScatterZ(datasets, cfg, globalOpts)
-%GENERATECOLORSCATTERZ  Scatter of (x, y) coloured by a third channel z.
-%   All from the SAME dataset (channel triplet). Useful for state diagrams,
-%   parameter-coloured plots.
+%GENERATECOLORSCATTERZ  Scatter (x, y) coloured by z, all from one dataset.
+%   Routes through plotting.colorScatterZ for rendering — supports custom
+%   colormaps, alpha, edge colour, and a colorbar with label.
 %
 %   cfg fields:
-%     .datasetIdx  single dataset index
-%     .xChannel    X channel name (default: 'time' = ds.data.time)
-%     .yChannel    Y channel name
-%     .zChannel    Z channel name (drives the colour)
-%     .colormap    'parula' (default) | 'viridis' | etc.
-%     .markerSize  numeric (default 25)
+%     .datasetIdx     single dataset index
+%     .xChannel       'time' | column name (default 'time')
+%     .yChannel       Y channel name
+%     .zChannel       Z channel name (drives colour)
+%     .colormap       'viridis' (default) | 'plasma' | 'parula' | etc.
+%     .markerSize     numeric (default 25)
+%     .alpha          0–1 (default 0.7)
     arguments
         datasets   cell
         cfg        struct
         globalOpts struct
     end
-    if ~isfield(cfg,'datasetIdx') || isempty(cfg.datasetIdx), cfg.datasetIdx = 1; end
+    if ~isfield(cfg,'datasetIdx'), cfg.datasetIdx = 1; end
     ds = datasets{cfg.datasetIdx};
     labels = ds.data.labels;
     if ~isfield(cfg,'yChannel') || isempty(cfg.yChannel), cfg.yChannel = labels{1}; end
@@ -23,8 +24,9 @@ function outFig = generateColorScatterZ(datasets, cfg, globalOpts)
         if numel(labels) >= 2, cfg.zChannel = labels{2}; else, cfg.zChannel = labels{1}; end
     end
     if ~isfield(cfg,'xChannel') || isempty(cfg.xChannel), cfg.xChannel = 'time'; end
-    if ~isfield(cfg,'colormap'),   cfg.colormap   = 'parula'; end
+    if ~isfield(cfg,'colormap'),   cfg.colormap   = 'viridis'; end
     if ~isfield(cfg,'markerSize'), cfg.markerSize = 25; end
+    if ~isfield(cfg,'alpha'),      cfg.alpha      = 0.7; end
 
     if strcmpi(cfg.xChannel, 'time')
         xv = double(ds.data.time);
@@ -45,8 +47,8 @@ function outFig = generateColorScatterZ(datasets, cfg, globalOpts)
     outFig = bosonPlotter.figureBuilder.createOutFig('Color Scatter (Z)', globalOpts);
     tAx = axes(outFig); hold(tAx,'on'); tAx.Box = 'on'; grid(tAx,'on');
     tAx.FontSize = globalOpts.fontSize; tAx.FontName = globalOpts.fontName;
-    scatter(tAx, xv(valid), yv(valid), cfg.markerSize, zv(valid), 'filled');
-    try, colormap(tAx, cfg.colormap); catch, colormap(tAx, 'parula'); end
-    cb = colorbar(tAx); cb.Label.String = cfg.zChannel;
+    plotting.colorScatterZ(tAx, xv(valid), yv(valid), zv(valid), ...
+        MarkerSize=cfg.markerSize, Colormap=cfg.colormap, Alpha=cfg.alpha, ...
+        ColorbarLabel=cfg.zChannel);
     xlabel(tAx, cfg.xChannel); ylabel(tAx, cfg.yChannel);
 end
