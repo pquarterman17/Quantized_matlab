@@ -30,6 +30,7 @@ function build_icons()
 %       redo.png           <- redo-2
 %       watchFile.png      <- eye
 %       stop.png           <- square   (icon shown on the animate button while running)
+%       peakWorkshop.png   <- activity (pulse line — signal peaks)
 %
 %   Run:  run icons/bosonplotter/build_icons
 
@@ -111,6 +112,7 @@ lines = {
     "  ['redo-2',           'redo.png'],"
     "  ['eye',              'watchFile.png'],"
     "  ['square',           'stop.png'],"
+    "  ['activity',         'peakWorkshop.png'],"
     "];"
     ""
     "for (const [iconName, filename] of icons) {"
