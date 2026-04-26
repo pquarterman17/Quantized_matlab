@@ -66,7 +66,7 @@ function showAdvancedMenu(appData, fig, headless, callbacks)
     advScrollPanel.Layout.Row = 2;
 
     advMenuGL = uigridlayout(advScrollPanel, [26 2], ...
-        'RowHeight', {16, 26,26,26,  5,  16, 26,26,26,  5,  16, 26,  5,  16, 26,  5,  16, 26,  5,  16, 26,26,26,  5,  16, 26}, ...
+        'RowHeight', {16, 26,26,26,  5,  16, 26,26,26,  5,  16, 26,  5,  0,  0,  0,  16, 26,  5,  16, 26,26,26,  5,  16, 26}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding', [8 6 8 6], 'RowSpacing', 2, 'ColumnSpacing', 4);
 
@@ -112,14 +112,6 @@ function showAdvancedMenu(appData, fig, headless, callbacks)
 
     addBtn(advMenuGL, 12, 1, 'FFT Filter...', anaCb.onFFTFilter, ...
         'Frequency-domain lowpass / highpass / bandpass / notch filter');
-
-    % ── PEAK ANALYSIS ────────────────────────────────────────────────
-    hdr4 = uilabel(advMenuGL, 'Text', 'PEAK ANALYSIS', 'FontSize', 9, 'FontWeight', 'bold', 'FontColor', HDR_FC);
-    hdr4.Layout.Row = 14; hdr4.Layout.Column = [1 2];
-
-    addBtn(advMenuGL, 15, 1, 'Advanced Peak Analysis...', anaCb.onOpenAdvancedPeakAnalysis, ...
-        ['Robust peak detection with adaptive noise, prominence ' ...
-         'filtering, simultaneous multi-peak + polynomial background fitting']);
 
     % ── CORRECTION ───────────────────────────────────────────────────
     hdr5 = uilabel(advMenuGL, 'Text', 'CORRECTION', 'FontSize', 9, 'FontWeight', 'bold', 'FontColor', HDR_FC);

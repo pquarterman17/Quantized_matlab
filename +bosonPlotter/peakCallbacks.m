@@ -114,8 +114,10 @@ cb.onKeyPress            = @onKeyPress;
         PEAK_SEP_TOL_FRAC   = 0.005;  % seeds closer than this are merged
         PEAK_LOCAL_WIN_FRAC = 0.02;   % ±fraction of x-span for missed-seed search
 
-        % ── User-configurable minimum separation ─────────────────────────
+        % ── User-configurable detection params (sidebar of Peak Workshop) ──
         userMinSep = ctx.efMinSep.Value;
+        userSNR    = readSidebar(ctx, 'efNoise',      5);
+        userProm   = readSidebar(ctx, 'efProminence', 0.02);
 
         % ── Save existing manual seeds BEFORE rebuilding the list ─────────
         if ~isempty(ds.peaks) && isfield(ds.peaks, 'status')
@@ -129,7 +131,8 @@ cb.onKeyPress            = @onKeyPress;
 
         % ── SNIP-based peak detection ───────────────────────────────────
         [merged, bgEst] = utilities.findPeaksRobust(xv(:), yv(:), ...
-            'SNRThreshold',  5, ...
+            'SNRThreshold',  userSNR, ...
+            'MinProminence', userProm, ...
             'MinSeparation', guiTernary(userMinSep > 0, userMinSep, 0), ...
             'MaxPeaks',      50, ...
             'MaxWindowDeg',  2.0);
@@ -1238,5 +1241,19 @@ function y = evalMultiPeakPV(p, x, nP)
         L   = H ./ (1 + 4*((x-x0)/fw).^2);
         G   = H .* exp(-4*log(2)*((x-x0)/fw).^2);
         y   = y + eta*L + (1-eta)*G;
+    end
+end
+
+function v = readSidebar(ctx, fld, defaultVal)
+%READSIDEBAR  Pull a numeric value from a Peak Workshop sidebar widget.
+%   Returns defaultVal if the widget is missing, invalid, or non-finite.
+%   Used for back-compat: older callers may have built peakCtx_ before
+%   efNoise / efProminence existed.
+    if ~isfield(ctx, fld) || isempty(ctx.(fld)) || ~isvalid(ctx.(fld))
+        v = defaultVal; return;
+    end
+    v = ctx.(fld).Value;
+    if isempty(v) || ~isfinite(v) || v < 0
+        v = defaultVal;
     end
 end

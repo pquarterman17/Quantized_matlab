@@ -102,43 +102,17 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
 % ════════════════════════════════════════════════════════════════════════
 
     function onOpenAdvancedPeakAnalysis(~, ~)
-    %ONOPENADVANCEDPEAKANALYSIS  Launch the advanced peak analysis dialog.
+    %ONOPENADVANCEDPEAKANALYSIS  Launch the Peak Workshop.
+    %   Legacy entry point — previously opened a separate modal config
+    %   dialog (bosonPlotter.peakAnalysis). The Peak Workshop now folds
+    %   the modal's noise + prominence params into the sidebar, so this
+    %   redirects to the workshop. Modal source kept in
+    %   +bosonPlotter/peakAnalysis.m for reference; not called here.
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a dataset first.', 'Peak Analysis');
+            uialert(fig, 'Load a dataset first.', 'Peak Workshop');
             return;
         end
-        bosonPlotter.peakAnalysis(appData.datasets, appData.activeIdx, ax, ...
-            'StatusFcn',          setStatus, ...
-            'PeakUpdateCallback', @peakAnalysisApply, ...
-            'ButtonColors', struct('primary', BTN_PRIMARY, 'tool', BTN_TOOL, 'fg', BTN_FG), ...
-            'Appearance',   resolveActiveAppearance());
-
-        function peakAnalysisApply(peaksResult, bgEst)
-        %PEAKANALYSISAPPLY  Receive peaks from advanced analysis dialog.
-            ds = appData.datasets{appData.activeIdx};
-
-            requiredFields = {'center','fwhm','height','area','xRange','status','bg','model','eta'};
-            for fi = 1:numel(requiredFields)
-                fn = requiredFields{fi};
-                if ~isfield(peaksResult, fn)
-                    for pi = 1:numel(peaksResult)
-                        peaksResult(pi).(fn) = NaN;
-                    end
-                end
-            end
-
-            ds.peaks = peaksResult;
-            if ~isempty(bgEst)
-                d = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
-                xv = double(d.time);
-                valid = ~isnan(xv);
-                ds.snipBackground = struct('x', xv(valid), 'bg', bgEst(1:sum(valid)));
-            end
-            appData.datasets{appData.activeIdx} = ds;
-            peakCb.refreshPeakTable();
-            onPlot();
-            showPeakWindow();
-        end
+        showPeakWindow();
     end
 
     function onOpenIntegrationDialog(~, ~)

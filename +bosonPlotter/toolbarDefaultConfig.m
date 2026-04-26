@@ -18,5 +18,5 @@ function ids = toolbarDefaultConfig()
 % ════════════════════════════════════════════════════════════════════════
 
     ids = {'cursor', 'autoscale', 'clearOverlays', 'grid', 'legend', ...
-           'themeToggle', 'copy', 'save'};
+           'themeToggle', 'peakWorkshop', 'copy', 'save'};
 end

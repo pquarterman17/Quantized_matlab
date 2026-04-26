@@ -992,6 +992,9 @@ function varargout = BosonPlotter(options)
         'label', themeToggleLabel(appData.theme), ...
         'tooltip','Toggle plot theme between Light and Dark', ...
         'callback',@(s,e) onToggleTheme(s,e), 'iconOnly',false, 'group','view');
+    tbActions(end+1) = struct('id','peakWorkshop',  'label','Peaks', ...
+        'tooltip','Open the Peak Workshop — detect, fit, and analyze peaks (W-H, FFT, Lattice, Phases)', ...
+        'callback',@(~,~) showPeakWindow(),          'iconOnly',false, 'group','data');
 
     % Build toolbar for the first time
     buildToolbar(axToolbarGL, appData.toolbarConfig, tbActions, BTN_TOOL, tk.color.icon);
@@ -2267,15 +2270,13 @@ function varargout = BosonPlotter(options)
     btnRefineLattice  = pw.btnRefineLattice;
     btnMatchPhases    = pw.btnMatchPhases;
     efMinSep          = pw.efMinSep;
+    efNoise           = pw.efNoise;
+    efProminence      = pw.efProminence;
     efWavelength      = pw.efWavelength;
     efKFactor         = pw.efKFactor;
     efInstBroadening  = pw.efInstBroadening;
     ddXraySource      = pw.ddXraySource;
     chkShowBG         = pw.chkShowBG;
-
-    % Constants used by onToggleAdvancedPeakTools
-    PEAK_ADV_ROWS    = 9;
-    PEAK_ADV_HEIGHTS = 46;
 
     % ── Initialize extracted peak-callbacks module ──────────────────────
     peakCtx_.appData            = appData;
@@ -2286,6 +2287,8 @@ function varargout = BosonPlotter(options)
     peakCtx_.efXMin             = efXMin;
     peakCtx_.efXMax             = efXMax;
     peakCtx_.efMinSep           = efMinSep;
+    peakCtx_.efNoise            = efNoise;
+    peakCtx_.efProminence       = efProminence;
     peakCtx_.ddFitModel         = ddFitModel;
     peakCtx_.peakTable          = peakTable;
     peakCtx_.btnManualPeak      = btnManualPeak;
@@ -2317,7 +2320,10 @@ function varargout = BosonPlotter(options)
     chkShowFit.ValueChangedFcn               = @onToggleFitCurves;
     btnReflFFT.ButtonPushedFcn               = @onReflectivityFFT;
     btnFringeThick.ButtonPushedFcn           = @onArmFringeThickness;
-    btnMorePeak.ButtonPushedFcn              = @(~,~) onToggleAdvancedPeakTools();
+    % btnMorePeak is a hidden no-op handle in the new Peak Workshop layout
+    % (kept for back-compat with the destructure list above). The legacy
+    % "▶ Advanced..." collapse no longer exists — W-H / Lattice / Phases
+    % are always visible in the workshop main pane.
     btnWHPlot.ButtonPushedFcn                = @onWilliamsonHallPlot;
     btnFFTThickness.ButtonPushedFcn          = @onFFTThickness;
     btnRefineLattice.ButtonPushedFcn         = @onRefineLattice;
@@ -2328,6 +2334,8 @@ function varargout = BosonPlotter(options)
     peakFig.KeyPressFcn = peakCb.onKeyPress;
     efKFactor.ValueChangedFcn                = @onKFactorChanged;
     efInstBroadening.ValueChangedFcn         = @onInstBroadeningChanged;
+    efNoise.ValueChangedFcn                  = @(s,~) setPeakDetectField('peakSNR',        s.Value);
+    efProminence.ValueChangedFcn             = @(s,~) setPeakDetectField('peakProminence', s.Value);
     ddXraySource.ValueChangedFcn             = @onXraySourceChanged;
     chkShowBG.ValueChangedFcn                = @onToggleShowBG;
 
@@ -3733,27 +3741,25 @@ function varargout = BosonPlotter(options)
         if ~isvalid(peakFig), return; end
         switch mode
             case 'xrd'
-                peakFig.Name = 'Peak Analysis';
+                peakFig.Name = 'Peak Workshop';
                 % Restore all XRD peak buttons
                 for hh = {ddFitModel, btnFitPeaks, btnFitAllPeaks, btnClearPeaks, ...
                           btnRemovePeak, btnSavePeaks, btnExportPeakXLSX, chkShowFit, ...
                           btnFitColor, btnWHPlot, btnFFTThickness, btnRefineLattice, btnReflFFT, ...
-                          btnCopyPeaksClip, btnMorePeak, btnMatchPhases}
+                          btnCopyPeaksClip, btnMatchPhases}
                     hh{1}.Visible = 'on'; %#ok<FXSET>
                 end
                 btnFringeThick.Visible = 'off';
-                peakBtnGL.RowHeight{7} = 0;
             case 'reflectometry'
-                peakFig.Name = 'Reflectivity Analysis';
+                peakFig.Name = 'Peak Workshop — Reflectometry';
                 for hh = {ddFitModel, btnFitPeaks, btnFitAllPeaks, btnClearPeaks, ...
                           btnRemovePeak, btnSavePeaks, btnExportPeakXLSX, chkShowFit, ...
                           btnFitColor, btnWHPlot, btnFFTThickness, btnRefineLattice, ...
-                          btnCopyPeaksClip, btnMorePeak, btnMatchPhases}
+                          btnCopyPeaksClip, btnMatchPhases}
                     hh{1}.Visible = 'off'; %#ok<FXSET>
                 end
                 btnReflFFT.Visible = 'on';
                 btnFringeThick.Visible = 'on';
-                peakBtnGL.RowHeight{7} = 22;
             otherwise
                 % 'none' — hide the window entirely
                 if isvalid(peakFig), peakFig.Visible = 'off'; end
@@ -3761,20 +3767,11 @@ function varargout = BosonPlotter(options)
     end
 
     function onToggleAdvancedPeakTools()
-    %ONTOGGLEADVANCEDPEAKTOOLS  Toggle W-H Plot, FFT Thickness, Refine Lattice.
-        collapsed = ~appData.sectionCollapsed.advancedPeak;
-        appData.sectionCollapsed.advancedPeak = collapsed;
-        if collapsed
-            btnMorePeak.Text = [char(9654) ' Advanced...'];  % ▶
-            for k = 1:numel(PEAK_ADV_ROWS)
-                peakBtnGL.RowHeight{PEAK_ADV_ROWS(k)} = 0;
-            end
-        else
-            btnMorePeak.Text = [char(9660) ' Advanced'];  % ▼
-            for k = 1:numel(PEAK_ADV_ROWS)
-                peakBtnGL.RowHeight{PEAK_ADV_ROWS(k)} = PEAK_ADV_HEIGHTS(k);
-            end
-        end
+    %ONTOGGLEADVANCEDPEAKTOOLS  No-op stub.
+    %   The legacy "▶ Advanced..." collapse was removed when the Peak
+    %   Workshop layout exposed W-H / Lattice / Phases inline. Kept as a
+    %   stub because a couple of layout tables (peak section visibility
+    %   helpers near line ~3747) still reference btnMorePeak.
     end
 
     % ── Y-translate drag (XRD) ───────────────────────────────────────────
@@ -3849,6 +3846,15 @@ function varargout = BosonPlotter(options)
         v = src.Value;
         appData.instBroadening_deg = guiTernary(isnan(v) || v < 0, 0, v);
         peakCb.refreshPeakTable();
+    end
+
+    function setPeakDetectField(fld, v)
+    %SETPEAKDETECTFIELD  Persist a Peak Workshop sidebar value to appData.
+    %   Used for SNR threshold and minimum prominence so the spinner state
+    %   survives across runs of auto-detect (and future sessions, once
+    %   AppState gains persistence).
+        if ~isfinite(v) || v < 0, return; end
+        appData.(fld) = v;
     end
 
     % ════════════════════════════════════════════════════════════════════

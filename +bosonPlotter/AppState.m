@@ -43,6 +43,10 @@ classdef AppState < handle
         kFactor         double  = 0.9
         instBroadening_deg double = 0
 
+        % ── Peak detection sensitivity (sidebar of Peak Workshop) ──
+        peakSNR         double  = 5
+        peakProminence  double  = 0.02
+
         % ── Axis prefixes ──────────────────────────────────────────
         axisPrefixX     struct = struct('symbol','','factor',1)
         axisPrefixY     struct = struct('symbol','','factor',1)
