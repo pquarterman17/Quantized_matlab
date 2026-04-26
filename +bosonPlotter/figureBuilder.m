@@ -1769,64 +1769,34 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         end
 
         function generateContour()
+        %GENERATECONTOUR  Workshop-pattern thin wrapper.
             dsIdx2 = ctWidgets.ddDS.Value;
             d2 = getPlotData(dsIdx2);
-            fmtOpts = getFormatOpts();
-
             xIdx = ctWidgets.ddXCol.Value;
             yIdx = ctWidgets.ddYCol.Value;
             zIdx = ctWidgets.ddZCol.Value;
-
-            if xIdx == 0, xVec = d2.time(:); else, xVec = d2.values(:, xIdx); end
-            if yIdx == 0, yVec = d2.time(:); else, yVec = d2.values(:, yIdx); end
-            if zIdx == 0, zVec = d2.time(:); else, zVec = d2.values(:, zIdx); end
-
-            valid2 = ~isnan(xVec) & ~isnan(yVec) & ~isnan(zVec);
-            xVec = xVec(valid2); yVec = yVec(valid2); zVec = zVec(valid2);
-
-            if numel(xVec) < 4
-                uialert(bFig, 'Not enough valid data points.', 'Contour Error');
-                return;
-            end
-
-            % Grid scattered data
-            nGrid = min(200, round(sqrt(numel(xVec)) * 2));
-            xLin = linspace(min(xVec), max(xVec), nGrid);
-            yLin = linspace(min(yVec), max(yVec), nGrid);
-            [Xg, Yg] = meshgrid(xLin, yLin);
-            try
-                F2 = scatteredInterpolant(xVec, yVec, zVec, 'linear', 'none');
-                Zg = F2(Xg, Yg);
-            catch
-                Zg = griddata(xVec, yVec, zVec, Xg, Yg, 'linear'); %#ok<GRIDD>
-            end
-
-            outFig = figure('Name', 'Contour / Heatmap', 'NumberTitle', 'off', ...
-                'Units', 'inches', 'Position', [2 2 spBFigW.Value spBFigH.Value]);
-            oAx = axes(outFig);
-
+            % Resolve column-name strings (xIdx=0 means time/index axis)
+            if xIdx == 0, xCh = 'time'; else, xCh = d2.labels{xIdx}; end
+            if yIdx == 0, yCh = 'time'; else, yCh = d2.labels{yIdx}; end
+            if zIdx == 0, zCh = 'time'; else, zCh = d2.labels{zIdx}; end
+            % Map dialog plotStyle dropdown → package style
             switch ctWidgets.ddStyle.Value
-                case 'Filled contour'
-                    contourf(oAx, Xg, Yg, Zg, 20, 'LineStyle', 'none');
-                    colorbar(oAx);
-                case 'Contour lines'
-                    [C2, h2] = contour(oAx, Xg, Yg, Zg, 15);
-                    clabel(C2, h2, 'FontSize', max(6, fmtOpts.fontSize-2));
-                    colorbar(oAx);
-                case 'Pseudocolor (pcolor)'
-                    pcolor(oAx, Xg, Yg, Zg); shading(oAx, 'flat'); colorbar(oAx);
-                case 'Surface (3D)'
-                    surf(oAx, Xg, Yg, Zg, 'EdgeColor', 'none'); colorbar(oAx);
-                    view(oAx, -37.5, 30); rotate3d(outFig, 'on');
+                case 'Contour lines',        styleKey = 'lines';
+                case 'Pseudocolor (pcolor)', styleKey = 'pcolor';
+                case 'Surface (3D)',          styleKey = 'surface3d';
+                otherwise,                    styleKey = 'filled';
             end
-            colormap(oAx, bosonPlotter.colorMaps(ctWidgets.ddCmap.Value, 256));
-
-            allCols = [{'X'}, d2.labels];
-            xlabel(oAx, allCols{xIdx+1}, 'FontSize', fmtOpts.fontSize, 'Interpreter', 'none');
-            ylabel(oAx, allCols{yIdx+1}, 'FontSize', fmtOpts.fontSize, 'Interpreter', 'none');
-            title(oAx, allCols{zIdx+1}, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
-            oAx.FontSize = fmtOpts.fontSize; oAx.FontName = fmtOpts.fontName; oAx.Box = 'on';
-
+            fbModel.figureType = 'Contour / Heatmap';
+            fbModel.contourConfig = struct( ...
+                'datasetIdx', dsIdx2, ...
+                'xChannel',   xCh, ...
+                'yChannel',   yCh, ...
+                'zChannel',   zCh, ...
+                'plotStyle',  styleKey, ...
+                'colormap',   ctWidgets.ddCmap.Value, ...
+                'nGrid',      []);
+            syncGlobalOptsToModel();
+            outFig = fbModel.generate(datasets);
             addRefLineTools(outFig);
             figure(outFig);
             delete(bFig);

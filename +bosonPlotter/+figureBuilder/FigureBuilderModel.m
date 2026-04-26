@@ -54,7 +54,7 @@ classdef FigureBuilderModel < handle
         paramEvolConfig     struct = struct('datasets', [], 'yChannel', '', 'yMetric', 'mean', 'peakIdx', 1, 'xMode', 'index', 'xValues', [], 'xLabel', '', 'connect', true, 'pointLabels', {{}})
         brokenAxisConfig    struct = struct('datasets', [], 'yChannel', '', 'breakAxis', 'X', 'gapLow', [], 'gapHigh', [], 'logY', false, 'ratio', 'Proportional', 'leftRange', [], 'rightRange', [])
         confBandConfig      struct = struct('datasets', [], 'yChannel', '', 'summary', 'mean+std')
-        contourConfig       struct = struct('datasets', [], 'yChannel', '', 'yValues', [], 'yLabel', 'Index', 'colormap', 'parula', 'filled', true)
+        contourConfig       struct = struct('datasetIdx', 1, 'xChannel', 'time', 'yChannel', '', 'zChannel', '', 'plotStyle', 'filled', 'colormap', 'parula', 'nGrid', [])
         colorScatterConfig  struct = struct('datasetIdx', 1, 'xChannel', 'time', 'yChannel', '', 'zChannel', '', 'colormap', 'parula', 'markerSize', 25)
         marginalHistConfig  struct = struct('datasetIdx', 1, 'xChannel', 'time', 'yChannel', '', 'nBins', 30)
         groupedPlotConfig   struct = struct('datasetIdx', 1, 'xChannel', '', 'yChannel', '', 'groupChannel', '', 'plotType', 'line', 'legend', true)
