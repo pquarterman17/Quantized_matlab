@@ -302,6 +302,79 @@ classdef PeakWorkshopModel < handle
                 obj.selectedPeakIdx = idx;
             end
         end
+
+        % ════════════════════════════════════════════════════════════
+        %  Post-fit XRD analysis (delegates to bosonPlotter.peakTools)
+        % ════════════════════════════════════════════════════════════
+        function result = williamsonHall(obj, ds, opts)
+        %WILLIAMSONHALL  Run W-H strain analysis on fitted peaks.
+        %   result = model.williamsonHall(ds)
+        %   result = model.williamsonHall(ds, ParentFig=fig, StatusFcn=@setStatus)
+        %
+        %   ds must contain ds.peaks (the dialog reads them directly so
+        %   the model writes its current peak list back via applyToDataset
+        %   first). Wavelength is taken from obj.wavelength_A; K-factor
+        %   and instrument broadening from obj.kFactor / obj.instBroadening.
+            arguments
+                obj
+                ds                 struct
+                opts.ParentFig                    = []
+                opts.StatusFcn     function_handle = @(~) []
+            end
+            ds = obj.applyToDataset(ds);
+            result = bosonPlotter.peakTools.williamsonHall( ...
+                ds, obj.wavelength_A, obj.kFactor, obj.instBroadening, ...
+                ParentFig=opts.ParentFig, StatusFcn=opts.StatusFcn);
+        end
+
+        function result = refineLattice(obj, ds, opts)
+        %REFINELATTICE  Refine lattice parameters via peakTools dialog.
+            arguments
+                obj
+                ds                 struct
+                opts.ParentFig                    = []
+                opts.StatusFcn     function_handle = @(~) []
+                opts.ButtonColors  struct = struct('primary',[0.18 0.52 0.18],'fg',[1 1 1])
+            end
+            ds = obj.applyToDataset(ds);
+            result = bosonPlotter.peakTools.refineLattice( ...
+                ds, obj.wavelength_A, ...
+                ParentFig=opts.ParentFig, StatusFcn=opts.StatusFcn, ...
+                ButtonColors=opts.ButtonColors);
+        end
+
+        function result = matchPhases(obj, ds, opts)
+        %MATCHPHASES  Match d-spacings against the built-in phase database.
+            arguments
+                obj
+                ds                 struct
+                opts.ParentFig                    = []
+                opts.StatusFcn     function_handle = @(~) []
+                opts.MainAx                       = []
+            end
+            ds = obj.applyToDataset(ds);
+            result = bosonPlotter.peakTools.matchPhases( ...
+                ds, obj.wavelength_A, ...
+                ParentFig=opts.ParentFig, StatusFcn=opts.StatusFcn, ...
+                MainAx=opts.MainAx);
+        end
+
+        function result = fftThickness(obj, ds, opts)
+        %FFTTHICKNESS  Compute film thickness from Laue / Kiessig fringes.
+            arguments
+                obj
+                ds                 struct
+                opts.ParentFig                    = []
+                opts.StatusFcn     function_handle = @(~) []
+                opts.ButtonColors  struct = struct('accent',[0.15 0.37 0.63],'fg',[1 1 1])
+                opts.AxisLimits                   = []
+            end
+            ds = obj.applyToDataset(ds);
+            result = bosonPlotter.peakTools.fftThickness( ...
+                ds, obj.wavelength_A, ...
+                ParentFig=opts.ParentFig, StatusFcn=opts.StatusFcn, ...
+                ButtonColors=opts.ButtonColors, AxisLimits=opts.AxisLimits);
+        end
     end
 
     % ════════════════════════════════════════════════════════════════

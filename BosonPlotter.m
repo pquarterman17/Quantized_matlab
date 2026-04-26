@@ -3898,7 +3898,7 @@ function varargout = BosonPlotter(options)
     % ════════════════════════════════════════════════════════════════════
 
     function onRefineLattice(~, ~)
-    %ONREFINELATTICE  Open a dialog to assign hkl indices and refine lattice parameters.
+    %ONREFINELATTICE  Delegate to PeakWorkshopModel.refineLattice.
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig, 'Load a file first.', 'No data'); return;
         end
@@ -3915,7 +3915,9 @@ function varargout = BosonPlotter(options)
             uialert(fig, 'Fit peaks first (at least one fitted peak required).', ...
                 'No fitted peaks'); return;
         end
-        result = bosonPlotter.peakTools.refineLattice(ds, wl_A, ...
+        appData.peakModel.bindFromDataset(ds);
+        appData.peakModel.wavelength_A = wl_A;
+        result = appData.peakModel.refineLattice(ds, ...
             ParentFig=fig, StatusFcn=@setStatus, ...
             ButtonColors=struct('primary', BTN_PRIMARY, 'fg', BTN_FG));
         if ~isempty(result)
@@ -3930,7 +3932,7 @@ function varargout = BosonPlotter(options)
     % ════════════════════════════════════════════════════════════════════
 
     function onMatchPhases(~, ~)
-    %ONMATCHPHASES  Thin wrapper — delegates to bosonPlotter.peakTools.matchPhases.
+    %ONMATCHPHASES  Delegate to PeakWorkshopModel.matchPhases.
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig, 'Load a file first.', 'No data'); return;
         end
@@ -3942,8 +3944,9 @@ function varargout = BosonPlotter(options)
                 'Wavelength needed'); return;
         end
         try
-            bosonPlotter.peakTools.matchPhases(ds, wl_A, ...
-                ParentFig=fig, StatusFcn=@setStatus, MainAx=ax);
+            appData.peakModel.bindFromDataset(ds);
+            appData.peakModel.wavelength_A = wl_A;
+            appData.peakModel.matchPhases(ds, ParentFig=fig, StatusFcn=@setStatus, MainAx=ax);
         catch ME
             logGUIError('Phase Match Error', ME.message, ME);
             uialert(fig, sprintf('Phase matching failed:\n\n%s', ME.message), 'Error');
@@ -3955,7 +3958,7 @@ function varargout = BosonPlotter(options)
     % ════════════════════════════════════════════════════════════════════
 
     function onFFTThickness(~, ~)
-    %ONFFTTHICKNESS  Thin wrapper — delegates to bosonPlotter.peakTools.fftThickness.
+    %ONFFTTHICKNESS  Delegate to PeakWorkshopModel.fftThickness.
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig, 'Load a file first.', 'No data'); return;
         end
@@ -3966,7 +3969,9 @@ function varargout = BosonPlotter(options)
                           'Enter a value in the ' char(955) ' field.'], ...
                 'No wavelength'); return;
         end
-        result = bosonPlotter.peakTools.fftThickness(ds, wl_A, ...
+        appData.peakModel.bindFromDataset(ds);
+        appData.peakModel.wavelength_A = wl_A;
+        result = appData.peakModel.fftThickness(ds, ...
             ParentFig=fig, StatusFcn=@setStatus, ...
             ButtonColors=struct('accent', BTN_ACCENT, 'fg', BTN_FG), ...
             AxisLimits=ax.XLim);
@@ -4078,7 +4083,7 @@ function varargout = BosonPlotter(options)
     % ════════════════════════════════════════════════════════════════════
 
     function onWilliamsonHallPlot(~, ~)
-    %ONWILLIAMSONHALLPLOT  Williamson-Hall analysis: β·cosθ vs 4·sinθ.
+    %ONWILLIAMSONHALLPLOT  Delegate to PeakWorkshopModel.williamsonHall.
         if isempty(appData.datasets) || appData.activeIdx < 1
             uialert(fig, 'Load a file first.', 'No data'); return;
         end
@@ -4093,9 +4098,11 @@ function varargout = BosonPlotter(options)
             uialert(fig, 'No peaks available.  Find and fit peaks first.', 'No peaks');
             return;
         end
-        result = bosonPlotter.peakTools.williamsonHall(ds, wl_A, ...
-            appData.kFactor, appData.instBroadening_deg, ...
-            ParentFig=fig, StatusFcn=@setStatus);
+        appData.peakModel.bindFromDataset(ds);
+        appData.peakModel.wavelength_A = wl_A;
+        appData.peakModel.kFactor      = appData.kFactor;
+        appData.peakModel.instBroadening = appData.instBroadening_deg;
+        result = appData.peakModel.williamsonHall(ds, ParentFig=fig, StatusFcn=@setStatus);
         if ~isempty(result)
             ds2 = appData.datasets{appData.activeIdx};
             ds2.williamsonHall = result;
