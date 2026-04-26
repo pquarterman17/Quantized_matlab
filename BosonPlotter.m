@@ -721,8 +721,11 @@ function varargout = BosonPlotter(options)
         'ValueChangedFcn', @onTemplateChanged);
     ddTemplate.Layout.Row = 2; ddTemplate.Layout.Column = [2 4];
 
-    % Theme value stored here but UI moved to Settings dialog
-    appData.theme = 'Light';
+    % Theme value stored here but UI moved to Settings dialog. Default
+    % matches the construction-time uxTokens('dark') palette so the
+    % state field agrees with the painted appearance from the very
+    % first frame; toggling via Settings or the toolbar button flips it.
+    appData.theme = 'Dark';
 
     % Row 5: Axis scale dropdowns (3 rows: X, Left Y, Right Y)
     scaleGL = uigridlayout(ctrlGL,[3 2], ...
@@ -976,9 +979,16 @@ function varargout = BosonPlotter(options)
     tbActions(end+1) = struct('id','redo',           'label','Redo', ...
         'tooltip','Redo last undone operation  [Ctrl+Y]', ...
         'callback',@(s,e) appData.undoCb.onRedo(s,e), 'iconOnly',true, 'group','history');
+    % Theme toggle — prominent because plot readability changes with the
+    % active theme. Label updates after each toggle to indicate what
+    % the next click will do (i.e. the *target* theme).
+    tbActions(end+1) = struct('id','themeToggle', ...
+        'label', themeToggleLabel(appData.theme), ...
+        'tooltip','Toggle plot theme between Light and Dark', ...
+        'callback',@(s,e) onToggleTheme(s,e), 'iconOnly',false, 'group','view');
 
     % Build toolbar for the first time
-    buildToolbar(axToolbarGL, appData.toolbarConfig, tbActions, BTN_TOOL);
+    buildToolbar(axToolbarGL, appData.toolbarConfig, tbActions, BTN_TOOL, tk.color.icon);
 
     ax = uiaxes(axGL);
     ax.Layout.Row = 2;
@@ -3217,7 +3227,7 @@ function varargout = BosonPlotter(options)
                 'cfg must be a 1×N cell array of action ID strings.');
         end
         appData.toolbarConfig = cfg;
-        buildToolbar(axToolbarGL, cfg, tbActions, BTN_TOOL);
+        buildToolbar(axToolbarGL, cfg, tbActions, BTN_TOOL, tk.color.icon);
     end
 
     function onSelectDataset(~,~)
@@ -4277,6 +4287,36 @@ function varargout = BosonPlotter(options)
         onPlot([], []);
     end
 
+    function onToggleTheme(~,~)
+    %ONTOGGLETHEME  Toolbar button: flip Light↔Dark and update its label.
+        if strcmpi(appData.theme, 'Dark')
+            setThemeDirect('Light');
+        else
+            setThemeDirect('Dark');
+        end
+        % Update the toolbar button's text to advertise the next state.
+        % Find the button by Tag (set by buildToolbar from action.id).
+        btn = findobj(axToolbarGL, 'Type', 'uibutton', 'Tag', 'themeToggle');
+        if ~isempty(btn)
+            btn(1).Text = themeToggleLabel(appData.theme);
+        end
+        % Keep the registry's stored label in sync so a later toolbar
+        % rebuild (Customise Toolbar...) starts with the right text.
+        idx = find(strcmp({tbActions.id}, 'themeToggle'), 1);
+        if ~isempty(idx)
+            tbActions(idx).label = themeToggleLabel(appData.theme);
+        end
+    end
+
+    function lbl = themeToggleLabel(currentTheme)
+    %THEMETOGGLELABEL  Button text indicating what the toggle goes TO.
+        if strcmpi(currentTheme, 'Dark')
+            lbl = [char(9728) ' Light'];   % ☀ Light
+        else
+            lbl = [char(9790) ' Dark'];    % ☾ Dark
+        end
+    end
+
     function setThemeDirect(name)
     %SETTHEMEDIRECT  Test hook: flip appData.theme and retheme the
     %   main window.  Mirrors what applyThemeFromDialog does via the
@@ -4352,9 +4392,10 @@ function varargout = BosonPlotter(options)
     %  TOOLBAR CUSTOMISATION
     % ════════════════════════════════════════════════════════════════════
 
-    function buildToolbar(parentGL, config, registry, btnColor)
+    function buildToolbar(parentGL, config, registry, btnColor, iconColor)
     %BUILDTOOLBAR  Delegate to extracted +bosonPlotter module.
-        bosonPlotter.buildToolbar(parentGL, config, registry, btnColor);
+        if nargin < 5, iconColor = []; end
+        bosonPlotter.buildToolbar(parentGL, config, registry, btnColor, iconColor);
     end
 
     function cfg = loadToolbarConfig()
@@ -4397,7 +4438,7 @@ function varargout = BosonPlotter(options)
         if ~isempty(newCfg)
             appData.toolbarConfig = newCfg;
             saveToolbarConfig(newCfg);
-            buildToolbar(axToolbarGL, newCfg, tbActions, BTN_TOOL);
+            buildToolbar(axToolbarGL, newCfg, tbActions, BTN_TOOL, tk.color.icon);
         end
     end
 
@@ -4441,9 +4482,21 @@ function varargout = BosonPlotter(options)
     end
 
     function onThemeChanged(~,~)
-    %ONTHEMECHANGED  Delegate to extracted +bosonPlotter module.
+    %ONTHEMECHANGED  Delegate to extracted +bosonPlotter module, then
+    %  rebuild the toolbar so icon tints + theme-toggle label follow
+    %  the new theme.
         otcCb_.onPlot = @() onPlot([],[]);
         bosonPlotter.onThemeChanged(appData, fig, ax, otcCb_);
+        % Refresh the themeToggle action label so the next toolbar
+        % build shows what the next click will do.
+        idx = find(strcmp({tbActions.id}, 'themeToggle'), 1);
+        if ~isempty(idx)
+            tbActions(idx).label = themeToggleLabel(appData.theme);
+        end
+        % Re-tint toolbar icons against the new palette
+        tkNow = bosonPlotter.uxTokens(lower(appData.theme));
+        buildToolbar(axToolbarGL, appData.toolbarConfig, tbActions, ...
+                     tkNow.color.btn.tool, tkNow.color.icon);
     end
 
     % ── Corrections callbacks ─────────────────────────────────────────────

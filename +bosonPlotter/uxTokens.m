@@ -111,6 +111,10 @@ function tk = uxTokens(theme)
         % Button palette: theme-aware members
         tk.color.btn.tool      = [0.28 0.28 0.28];
         tk.color.btn.fg        = [1 1 1];
+
+        % Icon stroke colour — pale grey so Lucide outline icons are
+        % readable on the dark btn.tool / panel backgrounds.
+        tk.color.icon          = [0.90 0.90 0.92];
     else
         % Foreground / text greys (LIGHT)
         tk.color.text          = [0.10 0.10 0.10];
@@ -132,6 +136,10 @@ function tk = uxTokens(theme)
         % Button palette: theme-aware members
         tk.color.btn.tool      = [0.85 0.85 0.85];
         tk.color.btn.fg        = [1 1 1];
+
+        % Icon stroke colour — dark slate so Lucide outline icons stay
+        % readable on the light btn.tool / panel backgrounds.
+        tk.color.icon          = [0.20 0.20 0.22];
     end
 
     % Legacy alias for the input background colour. Many call sites use

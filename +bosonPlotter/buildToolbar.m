@@ -1,8 +1,9 @@
-function buildToolbar(parentGL, config, registry, btnColor)
+function buildToolbar(parentGL, config, registry, btnColor, iconColor)
 %BUILDTOOLBAR  Clear and repopulate a toolbar grid with action buttons.
 %
 % Syntax
 %   bosonPlotter.buildToolbar(parentGL, config, registry, btnColor)
+%   bosonPlotter.buildToolbar(parentGL, config, registry, btnColor, iconColor)
 %
 % Inputs
 %   parentGL  — uigridlayout (1 row) that hosts the toolbar buttons
@@ -19,6 +20,9 @@ function buildToolbar(parentGL, config, registry, btnColor)
 %                 .group     — visual grouping key; transitions between
 %                              groups insert a 6px spacer column
 %   btnColor  — [1×3] RGB background colour for each button
+%   iconColor — [1×3] RGB stroke colour for icons (optional). When omitted
+%               icons render at their source colour. Pass tk.color.icon
+%               for theme-aware tinting via bosonPlotter.loadTintedIcon.
 %
 % Notes
 %   Pure function — no closure or appData dependencies. Sets each button's
@@ -34,6 +38,10 @@ function buildToolbar(parentGL, config, registry, btnColor)
 %   Missing icon PNGs degrade gracefully: the button still renders with
 %   its text label so a stripped clone (or a renamed action) never breaks
 %   the toolbar.
+
+    if nargin < 5 || isempty(iconColor)
+        iconColor = [];   % skip tinting; render source PNG as-is
+    end
 
     if isempty(config)
         config = bosonPlotter.toolbarDefaultConfig();
@@ -101,6 +109,9 @@ function buildToolbar(parentGL, config, registry, btnColor)
 
         iconPath = fullfile(iconDir, [act.id '.png']);
         hasIcon  = isfile(iconPath);
+        if hasIcon && ~isempty(iconColor)
+            iconPath = bosonPlotter.loadTintedIcon(iconPath, iconColor);
+        end
 
         if act.iconOnly
             % 28x28 icon-only button. Falls back to the text label if the
