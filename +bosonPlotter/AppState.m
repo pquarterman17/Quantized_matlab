@@ -23,6 +23,7 @@ classdef AppState < handle
         lastDir         char   = ''
         searchFilter    char   = ''
         model                  = []   % dataWorkspace.WorkspaceModel (shared with DataWorkspace)
+        modelListeners  cell   = {}   % event.listener handles — auto-deleted on figure close
 
         % ── Correction state ───────────────────────────────────────
         style           char   = 'auto'
@@ -145,7 +146,7 @@ classdef AppState < handle
         tableMask       logical = logical([])
         filterMask      logical = logical([])  % [N×1] logical from filter bar; [] = no filter
         tableEdited     logical = false
-        tableRowCap     double  = 500
+        tableRowCap     double  = 5000   % uitable visible-row cap. If scroll feels janky on long scans, lower this (was 500 historically).
         tableSelection  double  = []   % [Nx2] selected cells from CellSelectionCallback
 
         % ── Collapsible sections ───────────────────────────────────

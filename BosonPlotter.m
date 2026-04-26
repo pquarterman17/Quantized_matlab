@@ -307,6 +307,10 @@ function varargout = BosonPlotter(options)
         appData.model = dataWorkspace.WorkspaceModel();
     end
 
+    maskSyncCb_ = struct('refreshTable', @refreshDataTable, 'redraw', @onPlot);
+    appData.modelListeners{end+1} = addlistener(appData.model, 'MaskChanged', ...
+        @(~,~) bosonPlotter.onMaskChangedFromModel(appData, maskSyncCb_));
+
     % Handle to any linked DataWorkspace figure (single-instance enforcement)
     linkedDW = [];
 
@@ -1030,7 +1034,7 @@ function varargout = BosonPlotter(options)
     appData.tableUnits       = {};
     appData.tableMask       = [];
     appData.tableEdited     = false;
-    appData.tableRowCap     = 500;    % max rows displayed in uitable (perf cap)
+    appData.tableRowCap     = 5000;   % uitable visible-row cap. Single revert knob — drop back to 500 if scroll/edit feel janky on very long scans.
     appData.filterMask      = [];     % [N×1] logical from filter bar; [] = no filter
     fig.WindowButtonDownFcn   = @onAxesButtonDown;  % normal mode; special modes overwrite this
     fig.WindowButtonMotionFcn = @onMouseHover;      % idle hover; drags overwrite and restore this
@@ -6516,6 +6520,9 @@ function onSendToOrigin(~,~)
             end
             appData.autoRecalcTimer = [];
         end
+        % Detach shared-model listeners (MaskChanged) before teardown
+        cellfun(@(L) delete(L), appData.modelListeners(cellfun(@(L) isa(L,'event.listener') && isvalid(L), appData.modelListeners)));
+        appData.modelListeners = {};
         % Stop all live file-watch connectors
         for ci = 1:numel(appData.dataConnectors)
             conn = appData.dataConnectors{ci};

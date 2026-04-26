@@ -222,6 +222,7 @@ SUITES = {
     T('templates','test_templateEngine'),  'templates','Template engine: fingerprint, match cascade, apply, save/load/delete round-trip'
     % ── Workspace tests ──────────────────────────────────────────────────
     T('workspace','test_workspaceModel'),  'workspace','WorkspaceModel: add/remove/mask/undo/event firing'
+    T('workspace','test_syncMasksFromModel'), 'workspace','syncMasksFromModel: model→appData mask flow (DataWorkspace ↔ BosonPlotter sync)'
     T('workspace','test_tableWidget'),     'workspace','createTableWidget: version-branched uispreadsheet/uitable factory'
     T('workspace','test_formulaEngine'),   'workspace','FormulaEngine: tokenize, RPN, evaluate, hasCircularRef, WorkspaceModel integration'
     % ── Bug-report tests ─────────────────────────────────────────────────
