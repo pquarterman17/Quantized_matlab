@@ -1499,138 +1499,24 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %  GENERATE: Quick Grid
         % ────────────────────────────────────────────────────────────────
         function generateQuickGrid()
+        %GENERATEQUICKGRID  Workshop-pattern thin wrapper.
             dsIdx = ensureCellNum(qgWidgets.lbDS.Value);
-            selY  = ensureCellStr(qgWidgets.lbY.Value);
-            nR    = qgWidgets.spRows.Value;
-            nC    = qgWidgets.spCols.Value;
-            shareX = qgWidgets.cbShareX.Value;
-            shareY = qgWidgets.cbShareY.Value;
-            logY   = qgWidgets.cbLogY.Value;
-            titleMode = qgWidgets.ddTitleMode.Value;
-            emptyMode = qgWidgets.ddEmpty.Value;
-
-            nPanels = nR * nC;
-            nSel    = numel(dsIdx);
-
-            if nSel == 0
+            if isempty(dsIdx)
                 uialert(bFig,'Select at least one dataset.','No data'); return;
             end
-
-            [outFig, tlo] = makeOutFig(nR, nC, shareX);
-            fmtOpts = getFormatOpts();
-            ls = localLineSpec(ddBStyle.Value);
-
-            allAxes = gobjects(1, nPanels);
-
-            for pi = 1:nPanels
-                tAx = nexttile(tlo, pi);
-
-                % If more panels than datasets, handle empty cells
-                if pi > nSel
-                    if strcmp(emptyMode, 'Hide axes')
-                        tAx.Visible = 'off';
-                    end
-                    allAxes(pi) = tAx;
-                    continue;
-                end
-
-                setupAx(tAx);
-                allAxes(pi) = tAx;
-
-                di = dsIdx(pi);
-                d  = getPlotData(di);
-                xVec = d.time;
-                xLbl = guiLabel(guiXName(d.metadata), guiXUnit(d.metadata));
-
-                nTraces = max(numel(selY), 1);
-                if fmtOpts.grayscale
-                    clrs = repmat(linspace(0, 0.7, nTraces)', 1, 3);
-                else
-                    clrs = getColorsFromMap('lines (MATLAB default)', nTraces);
-                end
-
-                yLbl = '';
-                for ki = 1:numel(selY)
-                    yName = selY{ki};
-                    idx = find(strcmp(d.labels, yName), 1);
-                    if isempty(idx), continue; end
-
-                    yVec = d.values(:, idx);
-                    good = ~isnan(xVec) & ~isnan(yVec);
-                    if isdatetime(xVec), good = ~isnat(xVec) & ~isnan(yVec); end
-
-                    if isempty(yLbl) && idx <= numel(d.units)
-                        yLbl = guiLabel(yName, d.units{idx});
-                    end
-
-                    dName = yName;
-
-                    % Error handling
-                    errIdx = findErrorColumn(d.labels, yName);
-                    if ~isempty(errIdx) && ~strcmp(fmtOpts.errorStyle, 'None')
-                        yErr = d.values(:, errIdx);
-                        yErrG = yErr(good);
-                        xG = xVec(good); yG = yVec(good);
-
-                        if strcmp(fmtOpts.errorStyle, 'Error Band')
-                            fill(tAx, [xG; flipud(xG)], ...
-                                [yG + yErrG; flipud(yG - yErrG)], ...
-                                clrs(ki,:), 'FaceAlpha', 0.2, ...
-                                'EdgeColor', 'none', 'HandleVisibility', 'off');
-                            plot(tAx, xG, yG, ls{:}, ...
-                                'Color', clrs(ki,:), ...
-                                'LineWidth', fmtOpts.lineWidth, ...
-                                'DisplayName', dName);
-                        else
-                            errorbar(tAx, xG, yG, yErrG, ...
-                                'Color', clrs(ki,:), ...
-                                'LineWidth', max(fmtOpts.lineWidth-0.5, 0.75), ...
-                                'CapSize', 3, 'DisplayName', dName);
-                        end
-                    else
-                        plot(tAx, xVec(good), yVec(good), ls{:}, ...
-                            'Color', clrs(ki,:), ...
-                            'LineWidth', fmtOpts.lineWidth, ...
-                            'DisplayName', dName);
-                    end
-                end
-
-                if logY, tAx.YScale = 'log'; end
-
-                % Labels — suppress X on non-bottom rows when sharing
-                [panelRow, ~] = ind2sub([nR, nC], pi);
-                if shareX && panelRow < nR
-                    xlabel(tAx, '');
-                else
-                    xlabel(tAx, xLbl, 'FontSize', fmtOpts.fontSize);
-                end
-
-                % Suppress Y on non-left columns when sharing
-                [~, panelCol] = ind2sub([nR, nC], pi);
-                if shareY && panelCol > 1
-                    ylabel(tAx, '');
-                else
-                    ylabel(tAx, yLbl, 'FontSize', fmtOpts.fontSize);
-                end
-
-                % Title
-                switch titleMode
-                    case 'Filename'
-                        title(tAx, dsNames{di}, 'FontSize', fmtOpts.fontSize, 'Interpreter', 'none');
-                    case 'Channel name'
-                        if ~isempty(selY)
-                            title(tAx, strjoin(selY, ', '), 'FontSize', fmtOpts.fontSize, 'Interpreter', 'none');
-                        end
-                    % 'None' — no title
-                end
-
-                % Legend only if multiple Y channels
-                if numel(selY) > 1
-                    legend(tAx,'Interpreter','none','FontSize',max(fmtOpts.fontSize-2,6),'Location','best');
-                end
-            end
-
-            linkIfNeeded(allAxes(1:min(nSel,nPanels)), shareX, shareY);
+            fbModel.figureType = 'Quick Grid';
+            fbModel.quickGridConfig = struct( ...
+                'datasets',   dsIdx, ...
+                'yChannels',  {ensureCellStr(qgWidgets.lbY.Value)}, ...
+                'rows',       qgWidgets.spRows.Value, ...
+                'cols',       qgWidgets.spCols.Value, ...
+                'shareX',     qgWidgets.cbShareX.Value, ...
+                'shareY',     qgWidgets.cbShareY.Value, ...
+                'logY',       qgWidgets.cbLogY.Value, ...
+                'titleMode',  qgWidgets.ddTitleMode.Value, ...
+                'emptyMode',  qgWidgets.ddEmpty.Value);
+            syncGlobalOptsToModel();
+            outFig = fbModel.generate(datasets);
             addRefLineTools(outFig);
             addLinkedCursor(outFig);
             figure(outFig);

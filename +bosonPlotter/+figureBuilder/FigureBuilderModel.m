@@ -46,7 +46,7 @@ classdef FigureBuilderModel < handle
     % type. Today only multiPanelConfig is consumed by generate().
     properties
         multiPanelConfig    struct = bosonPlotter.figureBuilder.FigureBuilderModel.defaultMultiPanelConfig()
-        quickGridConfig     struct = struct('datasets', [], 'yChannels', {{}}, 'cols', 2, 'shareX', true)
+        quickGridConfig     struct = struct('datasets', [], 'yChannels', {{}}, 'rows', 2, 'cols', 2, 'shareX', true, 'shareY', false, 'logY', false, 'titleMode', 'Filename', 'emptyMode', 'Leave blank')
         waterfallConfig     struct = struct('datasets', [], 'yChannel', '', 'spacing', NaN, 'reverse', false)
         overlayResConfig    struct = struct('datasets', [], 'yChannel', '', 'referenceIdx', 1, 'residualMode', 'difference')
         normOverlayConfig   struct = struct('datasets', [], 'yChannel', '', 'normMethod', 'Peak (0-1)', 'alignMode', 'None', 'logY', false)
