@@ -250,6 +250,44 @@ catch ex
 end
 
 % ════════════════════════════════════════════════════════════════════
+%  REGRESSION — fitAll on legacy 11-field peaks must not throw
+%  ("Subscripted assignment between dissimilar structures")
+% ════════════════════════════════════════════════════════════════════
+fprintf('\n--- fitAll() against legacy 11-field peaks (regression) ---\n');
+try
+    x = linspace(20, 80, 1500)';
+    y = 50 + makeLorentzian(x, 30.0, 0.4, 800) + ...
+             makeLorentzian(x, 60.0, 0.5, 600) + 0.2*randn(size(x));
+
+    % Synthesize a legacy dataset whose ds.peaks is missing
+    % asymmetry / fitParams (the shape saved before the canonical
+    % schema was extended in MASTERPLAN W5 #59 fix commit).
+    legacyPeaks = struct('center',{30.0, 60.0}, 'fwhm',{0.4, 0.5}, ...
+        'height',{800, 600}, 'area',{NaN, NaN}, 'xRange',{[],[]}, ...
+        'status',{'manual','manual'}, 'bg',{NaN, NaN}, 'model',{'',''}, ...
+        'eta',{NaN, NaN}, 'prominence',{NaN, NaN}, 'localSNR',{NaN, NaN});
+    ds = struct('peaks', legacyPeaks, 'snipBackground', struct());
+
+    m = bosonPlotter.peak.PeakWorkshopModel();
+    m.bindFromDataset(ds);
+    % bindFromDataset normalises: every peak now has 13 fields.
+    assert(isfield(m.peaks, 'asymmetry') && isfield(m.peaks, 'fitParams'), ...
+        'normalize must add asymmetry + fitParams');
+
+    % This would have thrown "dissimilar structures" before the fix.
+    failures = m.fitAll(x, y);
+    fittedCount = sum(strcmp({m.peaks.status}, 'fitted'));
+    assert(fittedCount >= 1, ...
+        sprintf('expected ≥1 fitted on legacy peaks; got %d (failures: %d)', ...
+            fittedCount, numel(failures)));
+    fprintf('  PASS: legacy peaks fit without struct-shape error (%d fitted, %d failed)\n', ...
+        fittedCount, numel(failures));
+    passed = passed + 1;
+catch ex
+    fprintf('  FAIL: %s\n', ex.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════
 %  Summary
 % ════════════════════════════════════════════════════════════════════
 fprintf('\n=== test_peakWorkshopModel: %d passed, %d failed ===\n', passed, failed);

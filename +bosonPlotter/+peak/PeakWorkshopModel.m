@@ -62,8 +62,11 @@ classdef PeakWorkshopModel < handle
         % ── Bind to / write back to a dataset struct ──────────────────
         function bindFromDataset(obj, ds)
         %BINDFROMDATASET  Copy peaks + snipBackground from a dataset onto the model.
+        %   Normalises the peak struct shape so legacy peaks (saved before
+        %   asymmetry/fitParams were canonical) get upgraded — otherwise
+        %   the next fitOne would fail with "dissimilar structures".
             if isfield(ds, 'peaks') && ~isempty(ds.peaks)
-                obj.peaks = ds.peaks;
+                obj.peaks = bosonPlotter.peak.PeakWorkshopModel.normalizePeaks(ds.peaks);
             else
                 obj.peaks = bosonPlotter.peak.PeakWorkshopModel.emptyPeakStruct();
             end
@@ -112,6 +115,11 @@ classdef PeakWorkshopModel < handle
                 'MaxPeaks',      50, ...
                 'MaxWindowDeg',  2.0);
             obj.snipBackground = struct('x', xv, 'bg', bgEst);
+
+            % findPeaksRobust returns 11-field peaks (no asymmetry/fitParams).
+            % Normalise so the array shape matches manualSeeds (13 fields)
+            % and any subsequent fitOne can assign without struct mismatch.
+            merged = bosonPlotter.peak.PeakWorkshopModel.normalizePeaks(merged);
 
             % Pass 2: re-detect at any manual seed not covered by pass 1
             minSepLocal = xSpan * PEAK_SEP_TOL_FRAC;
@@ -323,9 +331,15 @@ classdef PeakWorkshopModel < handle
     methods (Static, Access = public)
         function s = emptyPeakStruct()
         %EMPTYPEAKSTRUCT  Canonical empty peak struct (matches dataset .peaks shape).
+        %   ALL peaks share this 13-field shape regardless of fit model.
+        %   asymmetry / fitParams are populated by Split Pearson VII and
+        %   TCH-pV fits; for other models they remain NaN / [] but the
+        %   fields exist so struct-array assignment never fails with
+        %   "dissimilar structures".
             s = struct('center',{},'fwhm',{},'height',{},'area',{}, ...
                        'xRange',{},'status',{},'bg',{},'model',{},'eta',{}, ...
-                       'prominence',{},'localSNR',{});
+                       'prominence',{},'localSNR',{}, ...
+                       'asymmetry',{},'fitParams',{});
         end
 
         function pk = makePeak(center, fwhm, height, area, xRange, status)
@@ -344,23 +358,50 @@ classdef PeakWorkshopModel < handle
             pk.eta        = NaN;
             pk.prominence = NaN;
             pk.localSNR   = NaN;
+            pk.asymmetry  = NaN;
+            pk.fitParams  = [];
         end
 
         function pk = applyFitToPk(pk, r)
         %APPLYFITTOPK  Merge a fitSinglePeak result struct into a peak struct.
-            pk.center = r.center;
-            pk.fwhm   = r.fwhm;
-            pk.height = r.height;
-            pk.bg     = r.bg;
-            pk.eta    = r.eta;
-            pk.area   = r.area;
-            pk.model  = r.model;
-            pk.status = 'fitted';
+        %   Every peak ends up with the same 13-field shape — extra fields
+        %   like asymmetry / fitParams are ALWAYS set (NaN / []) so that
+        %   `obj.peaks(idx) = applyFitToPk(...)` never errors with
+        %   "dissimilar structures" across mixed-model peak arrays.
+            pk.center     = r.center;
+            pk.fwhm       = r.fwhm;
+            pk.height     = r.height;
+            pk.bg         = r.bg;
+            pk.eta        = r.eta;
+            pk.area       = r.area;
+            pk.model      = r.model;
+            pk.status     = 'fitted';
+            pk.asymmetry  = NaN;
+            pk.fitParams  = [];
             if strcmp(r.model, 'Split Pearson VII')
                 pk.asymmetry = abs(r.params(3)) / abs(r.params(4));
                 pk.fitParams = r.params;
             elseif strcmp(r.model, 'TCH-pV')
                 pk.fitParams = r.params;
+            end
+        end
+
+        function peaks = normalizePeaks(peaks)
+        %NORMALIZEPEAKS  Ensure every element has the canonical 13 fields.
+        %   Used by bindFromDataset to upgrade peaks loaded from sessions
+        %   saved before the canonical shape included asymmetry/fitParams.
+            if isempty(peaks), return; end
+            canonical = {'center','fwhm','height','area','xRange','status', ...
+                         'bg','model','eta','prominence','localSNR', ...
+                         'asymmetry','fitParams'};
+            defaults  = {NaN, NaN, NaN, NaN, [], 'manual', ...
+                         NaN, '', NaN, NaN, NaN, ...
+                         NaN, []};
+            for fi = 1:numel(canonical)
+                f = canonical{fi};
+                if ~isfield(peaks, f)
+                    [peaks.(f)] = deal(defaults{fi});
+                end
             end
         end
     end
