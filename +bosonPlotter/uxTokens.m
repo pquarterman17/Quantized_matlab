@@ -19,8 +19,11 @@ function tk = uxTokens()
 %
 %   tk.font.title    = 12   panel titles
 %   tk.font.label    = 11   form labels (right-aligned, ":" terminator)
-%   tk.font.body     = 10   default control text + button labels
-%   tk.font.caption  =  9   dense tables, footnotes, "fmt" tick labels
+%   tk.font.body     = 12   default control text + typed inputs (matches label
+%                            on purpose: typed-in values shouldn't be smaller
+%                            than the label that introduces them)
+%   tk.font.caption  = 11   dense tables, footnotes, "fmt" tick labels
+%                            (bumped from 9 — was unreadable in filter / step inputs)
 %   tk.font.hero     = 22   figure-builder splash only
 %
 % ── Colour ─────────────────────────────────────────────────────────────
@@ -69,8 +72,8 @@ function tk = uxTokens()
     % Typography
     tk.font.title    = 12;
     tk.font.label    = 11;
-    tk.font.body     = 10;
-    tk.font.caption  =  9;
+    tk.font.body     = 12;
+    tk.font.caption  = 11;
     tk.font.hero     = 22;
 
     % Foreground / text greys

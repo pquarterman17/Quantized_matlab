@@ -147,7 +147,7 @@ function updateControlsForActiveDataset(appData, ui, callbacks)
 
     % Show Y2 rows/columns only when a right-axis channel is active
     y2Active = ~all(strcmp(callbacks.ensureCell(ui.lbY2.Value), '(none)'));
-    ui.limGL.RowHeight{3}  = 20 * y2Active;
+    ui.limGL.RowHeight{3}  = 26 * y2Active;
     callbacks.toggleY2Appearance(y2Active);
 
     [fp2, fn2, ~] = fileparts(ds.filepath);

@@ -644,7 +644,7 @@ function varargout = BosonPlotter(options)
     ctrlPanel.Layout.Column = 2;
 
     ctrlGL = uigridlayout(ctrlPanel,[9 1], ...
-        'RowHeight', {24,'2x','1x',44,66,110,22,22,20}, ...
+        'RowHeight', {28,'2x','1x',44,66,120,22,22,20}, ...
         'Padding',   tk.pad.normal, ...
         'RowSpacing', 2);
 
@@ -760,7 +760,7 @@ function varargout = BosonPlotter(options)
     AXLIM_FG = [0.92 0.92 0.92];
     limGL = uigridlayout(ctrlGL,[4 4], ...
         'Padding', tk.pad.flush,'RowSpacing',2,'ColumnSpacing',3, ...
-        'RowHeight',{20,20,20,22},'ColumnWidth',{18,'1x','1x',60});
+        'RowHeight',{26,26,26,28},'ColumnWidth',{20,'1x','1x',64});
     limGL.Layout.Row = 6;
 
     % Row 1: X limits + format
@@ -1774,7 +1774,7 @@ function varargout = BosonPlotter(options)
 
     % ── Data Table contents (toolbar + filter bar + units + editable table) ──
     dataTableInnerGL = uigridlayout(dataTablePanel, [5 1], ...
-        'RowHeight', {22, 22, 14, 26, '1x'}, 'Padding', tk.pad.tight, 'RowSpacing', 1);
+        'RowHeight', {28, 28, 18, 26, '1x'}, 'Padding', tk.pad.tight, 'RowSpacing', 1);
 
     % Toolbar row
     tableBarGL = uigridlayout(dataTableInnerGL, [1 8], ...

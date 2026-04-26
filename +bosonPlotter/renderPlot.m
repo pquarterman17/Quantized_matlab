@@ -864,7 +864,7 @@ function renderPlot(targetAx, ctx)
 
         % ── Right Y-axis (Y2) limits ──────────────────────────────────────
         if ctx.isMainAx
-            ctx.limGL.RowHeight{3} = 20 * hasY2;
+            ctx.limGL.RowHeight{3} = 26 * hasY2;
             ctx.toggleY2Appearance(hasY2);
         end
         if hasY2
