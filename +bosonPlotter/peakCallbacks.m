@@ -468,16 +468,14 @@ cb.onKeyPress            = @onKeyPress;
 
             % ── Retry pass: widen window 1.5× and subtract SNIP bg ──
             if ~r.success
+                % Retry once with a 1.5x widened window and SNIP-bg subtraction.
+                % We keep the retry result either way: success → fitted; failure
+                % → the second-pass reason and window are more informative for
+                % the diagnostic dialog than the first pass would be.
                 hw2  = 1.5 * (xHi - xLo) / 2;
                 xLo2 = pk.center - hw2;
                 xHi2 = pk.center + hw2;
-                r2 = fitSinglePeak(xv, yv, xLo2, xHi2, seed, modelName, snipBg);
-                if r2.success
-                    r = r2;
-                else
-                    % Use whichever window we last tried for the failure overlay
-                    r = r2;  % keeps reason from second attempt
-                end
+                r = fitSinglePeak(xv, yv, xLo2, xHi2, seed, modelName, snipBg);
             end
 
             if r.success
