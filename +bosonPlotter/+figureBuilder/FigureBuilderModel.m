@@ -46,21 +46,21 @@ classdef FigureBuilderModel < handle
     % type. Today only multiPanelConfig is consumed by generate().
     properties
         multiPanelConfig    struct = bosonPlotter.figureBuilder.FigureBuilderModel.defaultMultiPanelConfig()
-        quickGridConfig     struct = struct()
-        waterfallConfig     struct = struct()
-        overlayResConfig    struct = struct()
-        normOverlayConfig   struct = struct()
-        beforeAfterConfig   struct = struct()
-        paramEvolConfig     struct = struct()
-        brokenAxisConfig    struct = struct()
-        confBandConfig      struct = struct()
-        contourConfig       struct = struct()
-        colorScatterConfig  struct = struct()
-        marginalHistConfig  struct = struct()
-        groupedPlotConfig   struct = struct()
-        fftSpectralConfig   struct = struct()
-        ternaryConfig       struct = struct()
-        boxViolinConfig     struct = struct()
+        quickGridConfig     struct = struct('datasets', [], 'yChannels', {{}}, 'cols', 2, 'shareX', true)
+        waterfallConfig     struct = struct('datasets', [], 'yChannel', '', 'spacing', NaN, 'reverse', false)
+        overlayResConfig    struct = struct('datasets', [], 'yChannel', '', 'referenceIdx', 1, 'residualMode', 'difference')
+        normOverlayConfig   struct = struct('datasets', [], 'yChannel', '', 'normMethod', 'Peak (0-1)', 'alignMode', 'None', 'logY', false)
+        beforeAfterConfig   struct = struct('datasetIdx', 1, 'yChannels', {{}}, 'logY', false, 'linkY', true)
+        paramEvolConfig     struct = struct('datasets', [], 'yChannel', '', 'summary', 'mean', 'xValues', [], 'xLabel', 'Index')
+        brokenAxisConfig    struct = struct('datasets', [], 'yChannel', '', 'leftRange', [], 'rightRange', [])
+        confBandConfig      struct = struct('datasets', [], 'yChannel', '', 'summary', 'mean+std')
+        contourConfig       struct = struct('datasets', [], 'yChannel', '', 'yValues', [], 'yLabel', 'Index', 'colormap', 'parula', 'filled', true)
+        colorScatterConfig  struct = struct('datasetIdx', 1, 'xChannel', 'time', 'yChannel', '', 'zChannel', '', 'colormap', 'parula', 'markerSize', 25)
+        marginalHistConfig  struct = struct('datasetIdx', 1, 'xChannel', 'time', 'yChannel', '', 'nBins', 30)
+        groupedPlotConfig   struct = struct('datasets', [], 'yChannel', '', 'groups', {{}})
+        fftSpectralConfig   struct = struct('datasetIdx', 1, 'yChannel', '', 'fs', 0, 'logY', true)
+        ternaryConfig       struct = struct('datasetIdx', 1, 'channels', {{}}, 'markerSize', 25)
+        boxViolinConfig     struct = struct('datasets', [], 'yChannel', '', 'mode', 'box')
     end
 
     methods
@@ -126,15 +126,59 @@ classdef FigureBuilderModel < handle
                 obj
                 datasets cell
             end
+            G = @bosonPlotter.figureBuilder.generateMultiPanel;  %#ok<NASGU> for clarity
             switch obj.figureType
                 case 'Multi-Panel'
                     outFig = bosonPlotter.figureBuilder.generateMultiPanel( ...
                         datasets, obj.multiPanelConfig, obj.globalOpts);
+                case 'Quick Grid'
+                    outFig = bosonPlotter.figureBuilder.generateQuickGrid( ...
+                        datasets, obj.quickGridConfig, obj.globalOpts);
+                case 'Waterfall'
+                    outFig = bosonPlotter.figureBuilder.generateWaterfall( ...
+                        datasets, obj.waterfallConfig, obj.globalOpts);
+                case 'Overlay + Residual'
+                    outFig = bosonPlotter.figureBuilder.generateOverlayResidual( ...
+                        datasets, obj.overlayResConfig, obj.globalOpts);
+                case 'Normalized Overlay'
+                    outFig = bosonPlotter.figureBuilder.generateNormOverlay( ...
+                        datasets, obj.normOverlayConfig, obj.globalOpts);
+                case 'Before / After'
+                    outFig = bosonPlotter.figureBuilder.generateBeforeAfter( ...
+                        datasets, obj.beforeAfterConfig, obj.globalOpts);
+                case 'Parameter Evolution'
+                    outFig = bosonPlotter.figureBuilder.generateParamEvol( ...
+                        datasets, obj.paramEvolConfig, obj.globalOpts);
+                case 'Broken Axis'
+                    outFig = bosonPlotter.figureBuilder.generateBrokenAxis( ...
+                        datasets, obj.brokenAxisConfig, obj.globalOpts);
+                case 'Confidence Band'
+                    outFig = bosonPlotter.figureBuilder.generateConfidenceBand( ...
+                        datasets, obj.confBandConfig, obj.globalOpts);
+                case 'Contour / Heatmap'
+                    outFig = bosonPlotter.figureBuilder.generateContour( ...
+                        datasets, obj.contourConfig, obj.globalOpts);
+                case 'Color Scatter (Z)'
+                    outFig = bosonPlotter.figureBuilder.generateColorScatterZ( ...
+                        datasets, obj.colorScatterConfig, obj.globalOpts);
+                case 'Marginal Histogram'
+                    outFig = bosonPlotter.figureBuilder.generateMarginalHistogram( ...
+                        datasets, obj.marginalHistConfig, obj.globalOpts);
+                case 'Grouped Plot'
+                    outFig = bosonPlotter.figureBuilder.generateGroupedPlot( ...
+                        datasets, obj.groupedPlotConfig, obj.globalOpts);
+                case 'FFT / Spectral'
+                    outFig = bosonPlotter.figureBuilder.generateFFTSpectral( ...
+                        datasets, obj.fftSpectralConfig, obj.globalOpts);
+                case 'Ternary'
+                    outFig = bosonPlotter.figureBuilder.generateTernary( ...
+                        datasets, obj.ternaryConfig, obj.globalOpts);
+                case 'Box / Violin'
+                    outFig = bosonPlotter.figureBuilder.generateBoxViolin( ...
+                        datasets, obj.boxViolinConfig, obj.globalOpts);
                 otherwise
-                    error('FigureBuilderModel:notMigrated', ...
-                        ['Figure type "%s" has not been migrated to the model yet. ' ...
-                         'Use the dialog (bosonPlotter.figureBuilder) until the ' ...
-                         'migration completes.'], obj.figureType);
+                    error('FigureBuilderModel:unknownType', ...
+                        'Figure type "%s" is not recognised.', obj.figureType);
             end
         end
     end

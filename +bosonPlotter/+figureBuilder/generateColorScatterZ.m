@@ -1,0 +1,52 @@
+function outFig = generateColorScatterZ(datasets, cfg, globalOpts)
+%GENERATECOLORSCATTERZ  Scatter of (x, y) coloured by a third channel z.
+%   All from the SAME dataset (channel triplet). Useful for state diagrams,
+%   parameter-coloured plots.
+%
+%   cfg fields:
+%     .datasetIdx  single dataset index
+%     .xChannel    X channel name (default: 'time' = ds.data.time)
+%     .yChannel    Y channel name
+%     .zChannel    Z channel name (drives the colour)
+%     .colormap    'parula' (default) | 'viridis' | etc.
+%     .markerSize  numeric (default 25)
+    arguments
+        datasets   cell
+        cfg        struct
+        globalOpts struct
+    end
+    if ~isfield(cfg,'datasetIdx') || isempty(cfg.datasetIdx), cfg.datasetIdx = 1; end
+    ds = datasets{cfg.datasetIdx};
+    labels = ds.data.labels;
+    if ~isfield(cfg,'yChannel') || isempty(cfg.yChannel), cfg.yChannel = labels{1}; end
+    if ~isfield(cfg,'zChannel') || isempty(cfg.zChannel)
+        if numel(labels) >= 2, cfg.zChannel = labels{2}; else, cfg.zChannel = labels{1}; end
+    end
+    if ~isfield(cfg,'xChannel') || isempty(cfg.xChannel), cfg.xChannel = 'time'; end
+    if ~isfield(cfg,'colormap'),   cfg.colormap   = 'parula'; end
+    if ~isfield(cfg,'markerSize'), cfg.markerSize = 25; end
+
+    if strcmpi(cfg.xChannel, 'time')
+        xv = double(ds.data.time);
+    else
+        xi = find(strcmp(labels, cfg.xChannel), 1);
+        if isempty(xi), error('CSZ:badX','X channel "%s" not found', cfg.xChannel); end
+        xv = ds.data.values(:, xi);
+    end
+    yi = find(strcmp(labels, cfg.yChannel), 1);
+    zi = find(strcmp(labels, cfg.zChannel), 1);
+    if isempty(yi) || isempty(zi)
+        error('CSZ:badChannel','Y or Z channel not found in dataset.');
+    end
+    yv = ds.data.values(:, yi);
+    zv = ds.data.values(:, zi);
+    valid = ~isnan(xv) & ~isnan(yv) & ~isnan(zv);
+
+    outFig = bosonPlotter.figureBuilder.createOutFig('Color Scatter (Z)', globalOpts);
+    tAx = axes(outFig); hold(tAx,'on'); tAx.Box = 'on'; grid(tAx,'on');
+    tAx.FontSize = globalOpts.fontSize; tAx.FontName = globalOpts.fontName;
+    scatter(tAx, xv(valid), yv(valid), cfg.markerSize, zv(valid), 'filled');
+    try, colormap(tAx, cfg.colormap); catch, colormap(tAx, 'parula'); end
+    cb = colorbar(tAx); cb.Label.String = cfg.zChannel;
+    xlabel(tAx, cfg.xChannel); ylabel(tAx, cfg.yChannel);
+end

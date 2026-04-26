@@ -131,20 +131,96 @@ catch ex
 end
 
 % ════════════════════════════════════════════════════════════════════
-%  GENERATE — non-migrated type raises clear error
+%  GENERATE — all 16 figure types dispatch and return valid figures
 % ════════════════════════════════════════════════════════════════════
-fprintf('\n--- generate() rejects non-migrated figure types ---\n');
+fprintf('\n--- generate() across all 16 figure types ---\n');
+try
+    x = linspace(0, 10, 100)';
+    ds1 = makeDS('A', x, [sin(x), cos(x), x.^2], {'sin', 'cos', 'sq'});
+    ds2 = makeDS('B', x, [sin(x)+0.1, cos(x)+0.1, x.^2 + 1], {'sin', 'cos', 'sq'});
+    ds3 = makeDS('C', x, [sin(x)+0.2, cos(x)+0.2, x.^2 + 2], {'sin', 'cos', 'sq'});
+    datasets = {ds1, ds2, ds3};
+
+    m = bosonPlotter.figureBuilder.FigureBuilderModel();
+    typesToTest = { ...
+        'Multi-Panel',  ...
+        'Quick Grid', ...
+        'Waterfall', ...
+        'Overlay + Residual', ...
+        'Normalized Overlay', ...
+        'Before / After', ...
+        'Parameter Evolution', ...
+        'Broken Axis', ...
+        'Confidence Band', ...
+        'Contour / Heatmap', ...
+        'Color Scatter (Z)', ...
+        'Marginal Histogram', ...
+        'Grouped Plot', ...
+        'FFT / Spectral', ...
+        'Ternary', ...
+        'Box / Violin'};
+
+    % Pre-populate the y/z channel fields each type needs.
+    m.waterfallConfig.yChannel    = 'sin';
+    m.overlayResConfig.yChannel   = 'sin';
+    m.normOverlayConfig.yChannel  = 'sin';
+    m.paramEvolConfig.yChannel    = 'sin';
+    m.brokenAxisConfig.yChannel   = 'sin';
+    m.confBandConfig.yChannel     = 'sin';
+    m.contourConfig.yChannel      = 'sin';
+    m.colorScatterConfig.yChannel = 'sin';
+    m.colorScatterConfig.zChannel = 'cos';
+    m.marginalHistConfig.yChannel = 'sin';
+    m.groupedPlotConfig.yChannel  = 'sin';
+    m.fftSpectralConfig.yChannel  = 'sin';
+    m.ternaryConfig.channels      = {'sin','cos','sq'};
+    m.boxViolinConfig.yChannel    = 'sin';
+    m.beforeAfterConfig.yChannels = {'sin'};
+    m.quickGridConfig.yChannels   = {'sin'};
+    m.ensurePanelCount(2);
+    m.multiPanelConfig.panels(1).yChannels = {'sin'};
+    m.multiPanelConfig.panels(2).yChannels = {'cos'};
+
+    okCount = 0;  errCount = 0;  errs = {};
+    for k = 1:numel(typesToTest)
+        m.figureType = typesToTest{k};
+        try
+            f = m.generate(datasets);
+            assert(isgraphics(f), sprintf('%s returned non-figure', typesToTest{k}));
+            close(f);
+            okCount = okCount + 1;
+        catch ex
+            errCount = errCount + 1;
+            errs{end+1} = sprintf('%s: %s', typesToTest{k}, ex.message); %#ok<AGROW>
+        end
+    end
+    if errCount == 0
+        fprintf('  PASS: all %d types generated figures cleanly\n', okCount);
+    else
+        fprintf('  FAIL: %d/%d types failed:\n', errCount, numel(typesToTest));
+        for ei = 1:numel(errs), fprintf('    - %s\n', errs{ei}); end
+        error('one or more types failed');
+    end
+    passed = passed + 1;
+catch ex
+    fprintf('  FAIL: %s\n', ex.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════
+%  GENERATE — unknown type raises clear error
+% ════════════════════════════════════════════════════════════════════
+fprintf('\n--- generate() rejects unknown figure types ---\n');
 try
     m = bosonPlotter.figureBuilder.FigureBuilderModel();
-    m.figureType = 'Waterfall';
+    m.figureType = 'NotARealType';
     threw = false;
     try
         m.generate({});
     catch ex
-        threw = strcmp(ex.identifier, 'FigureBuilderModel:notMigrated');
+        threw = strcmp(ex.identifier, 'FigureBuilderModel:unknownType');
     end
-    assert(threw, 'generate() must throw notMigrated for unmigrated types');
-    fprintf('  PASS: Waterfall raises FigureBuilderModel:notMigrated\n');
+    assert(threw, 'generate() must throw unknownType for unrecognised names');
+    fprintf('  PASS: unknown type raises FigureBuilderModel:unknownType\n');
     passed = passed + 1;
 catch ex
     fprintf('  FAIL: %s\n', ex.message); failed = failed + 1;
