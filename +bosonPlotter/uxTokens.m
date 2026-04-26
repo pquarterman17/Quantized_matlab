@@ -17,10 +17,10 @@ function tk = uxTokens()
 % A 4-tier scale carries every recurring text role. The hero size is for
 % one-off splash text only.
 %
-%   tk.font.title    = 11   panel titles
-%   tk.font.label    = 10   form labels (right-aligned, ":" terminator)
-%   tk.font.body     =  9   default control text + button labels
-%   tk.font.caption  =  8   dense tables, footnotes, "fmt" tick labels
+%   tk.font.title    = 12   panel titles
+%   tk.font.label    = 11   form labels (right-aligned, ":" terminator)
+%   tk.font.body     = 10   default control text + button labels
+%   tk.font.caption  =  9   dense tables, footnotes, "fmt" tick labels
 %   tk.font.hero     = 22   figure-builder splash only
 %
 % ── Colour ─────────────────────────────────────────────────────────────
@@ -67,10 +67,10 @@ function tk = uxTokens()
 %   tk.gap.col      = 3;  tk.gap.colTight = 2;  tk.gap.colComfy = 6;
 
     % Typography
-    tk.font.title    = 11;
-    tk.font.label    = 10;
-    tk.font.body     =  9;
-    tk.font.caption  =  8;
+    tk.font.title    = 12;
+    tk.font.label    = 11;
+    tk.font.body     = 10;
+    tk.font.caption  =  9;
     tk.font.hero     = 22;
 
     % Foreground / text greys
