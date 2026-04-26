@@ -64,7 +64,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 
 useSpreadsheet = ~isMATLABReleaseOlderThan('R2025a') && ...
-                 exist('uispreadsheet', 'builtin') ~= 0;
+                 (exist('uispreadsheet', 'builtin') ~= 0 || ...
+                  exist('uispreadsheet', 'file')    ~= 0);
 
 if useSpreadsheet
     % ────────────────────────────────────────────────────────────────────
@@ -98,9 +99,9 @@ if useSpreadsheet
     isSpreadsheet = true;
 else
     % ────────────────────────────────────────────────────────────────────
-    %  R2022b–R2024b: uitable fallback
+    %  uitable path (used in all currently shipping releases — uispreadsheet
+    %  branch above is in place for future MATLAB releases that introduce it)
     % ────────────────────────────────────────────────────────────────────
-    printFallbackNotice();
 
     widget = uitable(parent);
     widget.Data           = opts.Data;
@@ -147,11 +148,3 @@ function dispatchShim(src, evt, shimProp, ~)
 end
 
 
-function printFallbackNotice()
-%PRINTFALLBACKNOTICE  Print a one-time notice that the uitable fallback is active.
-    persistent noticeShown
-    if isempty(noticeShown) || ~noticeShown
-        fprintf('Note: Using uitable fallback. Upgrade to R2025a+ for built-in sort/filter.\n');
-        noticeShown = true;
-    end
-end

@@ -1318,7 +1318,12 @@ end
             linkedBP = bpApi.fig;
             setStatusBar('Opened BosonPlotter with shared model.');
         catch ME
-            uialert(fig, ME.message, 'BosonPlotter failed to open');
+            if isvalid(fig)
+                uialert(fig, ME.message, 'BosonPlotter failed to open');
+            else
+                warning('DataWorkspace:bosonPlotterFailed', ...
+                    'BosonPlotter failed to open: %s', ME.message);
+            end
         end
     end
 
@@ -1327,7 +1332,12 @@ end
         try
             BosonPlotter(Model=model, Visible='on');
         catch ME
-            uialert(fig, ME.message, 'BosonPlotter failed to open');
+            if isvalid(fig)
+                uialert(fig, ME.message, 'BosonPlotter failed to open');
+            else
+                warning('DataWorkspace:bosonPlotterFailed', ...
+                    'BosonPlotter failed to open: %s', ME.message);
+            end
         end
     end
 
