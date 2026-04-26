@@ -54,7 +54,7 @@ classdef AppState < handle
         panelResizeDir    char   = ''
         panelResizeStart  double = []
         panelResizeOrig   double = []
-        corrPanelWidth    double = 300
+        corrPanelWidth    double = 357
         axLimPanelWidth   double = 200
 
         % ── Min panel dimensions ───────────────────────────────────
