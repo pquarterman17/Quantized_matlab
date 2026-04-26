@@ -81,6 +81,15 @@ activeModel = catalog(1);
 customFcn   = [];       % function handle from parseEquation
 customNames = {};       % parameter names from parseEquation
 
+% ── Workshop model (MASTERPLAN W5 #60) ─────────────────────────────────
+% CurveFitWorkshopModel owns the algorithmic state. The dialog widgets
+% remain canonical for input (uitable, dropdowns) but doCurveFit/the
+% custom-equation parser write through the model so its `result` is
+% always current. Allows scripted batch curve fits + isolation tests
+% without a GUI.
+cfModel = bosonPlotter.curveFit.CurveFitWorkshopModel();
+cfModel.bindFromDataset(ds);
+
 % ════════════════════════════════════════════════════════════════════════
 % Build dialog
 % ════════════════════════════════════════════════════════════════════════
@@ -573,14 +582,24 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
 
         cfFig.Pointer = 'watch'; drawnow;
         try
-            if hasConstraints
-                res = fitting.curveFit(xSeg, ySeg, fcn, p0, ...
-                    Lower=lb, Upper=ub, Fixed=fixedMask, Weights=w, ...
-                    Constraints=constraintExprs, ParamNames=pNames);
-            else
-                res = fitting.curveFit(xSeg, ySeg, fcn, p0, ...
-                    Lower=lb, Upper=ub, Fixed=fixedMask, Weights=w);
+            % Sync dialog state into the workshop model so model.fit is
+            % the canonical entry point (testable + scriptable). The
+            % model holds its own copy of params/result; dialog widgets
+            % keep their existing data for now.
+            cfModel.modelName = ddCFModel.Value;
+            if strcmp(cfModel.modelName, 'Custom Equation')
+                cfModel.customFcn   = customFcn;
+                cfModel.customNames = customNames;
             end
+            cfModel.params = bosonPlotter.curveFit.CurveFitWorkshopModel.makeParamArray(pNames);
+            for pi = 1:numel(pNames)
+                cfModel.params(pi).p0         = p0(pi);
+                cfModel.params(pi).lb         = lb(pi);
+                cfModel.params(pi).ub         = ub(pi);
+                cfModel.params(pi).fixed      = fixedMask(pi);
+                cfModel.params(pi).constraint = constraintExprs{pi};
+            end
+            res = cfModel.fit(xSeg, ySeg, w);
 
             % Dense x grid for smooth fit curve display
             xFit = linspace(min(xSeg), max(xSeg), 500)';
