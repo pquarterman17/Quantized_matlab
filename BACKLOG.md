@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-04-26 (W5 #59 Peak Workshop shipped + bug fix `4bf82b8` capturing two contract rules; W5 #61 Hysteresis Workshop shipped `e7d22ef`. Remaining workshops: W5 #60 Curve Fit, W5 #62 Reflectivity. See `plans/workshop-conversion-plan.md`.)
+**Last regenerated:** 2026-04-26 (ALL FOUR W5 workshop conversions shipped: #59 Peak `6d39eef` + bug fix `4bf82b8`, #61 Hysteresis `e7d22ef`, #60 Curve Fit `00c57af`, #62 Reflectivity `ef2ff6e`. Pattern proven across all heavy BosonPlotter features. Follow-ups: full dialog migration for Curve Fit + Reflectivity; subfolder reorg of remaining +bosonPlotter/ cross-cutters #64.)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -18,9 +18,9 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 ### MASTERPLAN (MATLAB consolidated) — `plans/MASTERPLAN.md`
 - [ ] **#22** W5 Decomposition → Continue `+bosonPlotter/` extraction — drive parent below 8k lines
 - [ ] **#59** W5 Decomposition → Convert Peak subsystem to PeakWorkshop pattern (workshop reference impl)
-- [ ] **#60** W5 Decomposition → Convert Curve Fit to CurveFitWorkshop pattern
+- ~~[ ] **#60** W5 Decomposition → Convert Curve Fit to CurveFitWorkshop pattern~~ (2026-04-26 commit `00c57af` — model + tests + minimal cutover at doCurveFit; full dialog migration is follow-up work)
 - ~~[ ] **#61** W5 Decomposition → Convert Hysteresis to HysteresisWorkshop pattern~~ (2026-04-26 commit `e7d22ef`)
-- [ ] **#62** W5 Decomposition → Convert Reflectivity to ReflectivityWorkshop pattern
+- ~~[ ] **#62** W5 Decomposition → Convert Reflectivity to ReflectivityWorkshop pattern~~ (2026-04-26 commit `ef2ff6e` — model + tests; dialog cutover is follow-up work)
 
 ### Origin parity (Python port, MATLAB side complete) — `plans/origin-feature-gap.md`
 - [ ] **#1** AIC/BIC/F-test fit comparison → Python
