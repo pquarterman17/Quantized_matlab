@@ -729,97 +729,38 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %  GENERATE: Overlay + Residual
         % ────────────────────────────────────────────────────────────────
         function generateOverlayResidual()
+        %GENERATEOVERLAYRESIDUAL  Workshop-pattern thin wrapper.
             idxA = orWidgets.ddA.Value;
             idxB = orWidgets.ddB.Value;
-            yName = orWidgets.ddY.Value;
-
             if idxA == idxB
                 uialert(bFig,'Select two different datasets.','Same dataset'); return;
             end
-
-            dA = getPlotData(idxA);
-            dB = getPlotData(idxB);
-            ciA = find(strcmp(dA.labels, yName), 1);
-            ciB = find(strcmp(dB.labels, yName), 1);
-            if isempty(ciA) || isempty(ciB)
-                uialert(bFig, sprintf('Channel "%s" not found in both datasets.', yName), 'Missing channel');
-                return;
-            end
-
-            xA = dA.time; yA = dA.values(:, ciA);
-            xB = dB.time; yB = dB.values(:, ciB);
-
-            % Interpolate B onto A's X grid
-            goodA = ~isnan(xA) & ~isnan(yA);
-            goodB = ~isnan(xB) & ~isnan(yB);
-            xCommon = xA(goodA);
-            yAc = yA(goodA);
-            yBi = interp1(double(xB(goodB)), yB(goodB), double(xCommon), 'linear', NaN);
-
-            % Residual
+            % Map dialog's residual mode → package mode names
             residMode = orWidgets.ddResidMode.Value;
             if contains(residMode, '%')
-                resid = (yAc - yBi) ./ yAc * 100;
-                residLabel = 'Residual (%)';
+                pkgMode = 'percent';
             else
-                resid = yAc - yBi;
-                residLabel = 'A - B';
+                pkgMode = 'difference';
             end
-
-            % Height ratio
-            ratioStr = orWidgets.ddRatio.Value;
-            switch ratioStr
-                case '3:1', heights = [3 1];
-                case '2:1', heights = [2 1];
-                otherwise,  heights = [1 1];
-            end
-
-            fmtOpts = getFormatOpts();
-            ls = localLineSpec(ddBStyle.Value);
-
-            outFig = figure('Name','Overlay + Residual','NumberTitle','off', ...
-                'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
-            tlo = tiledlayout(outFig, 2, 1, ...
-                'TileSpacing','compact','Padding','compact');
-            tlo.TileIndexing = 'columnmajor';
-
-            % — Top panel: overlay
-            ax1 = nexttile(tlo); setupAx(ax1);
-            plot(ax1, xCommon, yAc, ls{:}, 'Color', [0.12 0.47 0.71], ...
-                'LineWidth', fmtOpts.lineWidth, 'DisplayName', dsNames{idxA});
-            plot(ax1, xCommon, yBi, ls{:}, 'Color', [0.84 0.15 0.16], ...
-                'LineWidth', fmtOpts.lineWidth, 'DisplayName', dsNames{idxB});
-
-            if orWidgets.cbLogOverlay.Value, ax1.YScale = 'log'; end
-            yLbl = guiLabel(yName, dA.units{ciA});
-            ylabel(ax1, yLbl, 'FontSize', fmtOpts.fontSize);
-            legend(ax1, 'Interpreter','none','FontSize', max(fmtOpts.fontSize-2,6), 'Location','best');
-
+            fbModel.figureType = 'Overlay + Residual';
+            fbModel.overlayResConfig = struct( ...
+                'datasets',     [idxA idxB], ...
+                'yChannel',     orWidgets.ddY.Value, ...
+                'referenceIdx', 1, ...
+                'residualMode', pkgMode, ...
+                'logOverlay',   orWidgets.cbLogOverlay.Value, ...
+                'heightRatio',  orWidgets.ddRatio.Value, ...
+                'traceLabels',  {{dsNames{idxA}, dsNames{idxB}}});
+            syncGlobalOptsToModel();
+            outFig = fbModel.generate(datasets);
             ttl = orWidgets.efTitle.Value;
             if ~isempty(ttl)
-                title(ax1, ttl, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
+                axes_ = findobj(outFig,'Type','axes');
+                if ~isempty(axes_)
+                    title(axes_(end), ttl, ...
+                        'FontSize', spFont.Value+1, 'Interpreter', 'none');
+                end
             end
-
-            % — Bottom panel: residual
-            ax2 = nexttile(tlo); setupAx(ax2);
-            plot(ax2, xCommon, resid, ls{:}, 'Color', [0.3 0.3 0.3], ...
-                'LineWidth', fmtOpts.lineWidth);
-            yline(ax2, 0, '--', 'Color', [0.6 0.6 0.6], 'LineWidth', 0.75);
-
-            xLbl = guiLabel(guiXName(dA.metadata), guiXUnit(dA.metadata));
-            xlabel(ax2, xLbl, 'FontSize', fmtOpts.fontSize);
-            ylabel(ax2, residLabel, 'FontSize', fmtOpts.fontSize);
-
-            linkaxes([ax1, ax2], 'x');
-
-            % Adjust height ratio via TileSpan workaround — set InnerPosition
-            try
-                totalH = heights(1) + heights(2);
-                ax1.InnerPosition(4) = ax1.InnerPosition(4) * heights(1) / totalH * 1.6;
-            catch
-                % tiledlayout manages sizing — skip if InnerPosition not settable
-            end
-
             addRefLineTools(outFig);
             figure(outFig);
             delete(bFig);
