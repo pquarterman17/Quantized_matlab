@@ -451,7 +451,7 @@ function varargout = BosonPlotter(options)
 
     % ── File list panel (contentGL col 1, scrollable) ──────────────────────
     % Wrapped in a scrollable panel so buttons + listbox are never clipped.
-    fileListPanel = uipanel(contentGL, 'BorderType', 'none', 'Scrollable', 'on');
+    fileListPanel = uipanel(contentGL, 'Scrollable', 'on');
     fileListPanel.Layout.Row = 1; fileListPanel.Layout.Column = 1;
 
     % Stacked vertically: Add | Batch | Remove | Filter | Merge | Up/Down | Groups | Animate/Shortcuts | Settings | Listbox
