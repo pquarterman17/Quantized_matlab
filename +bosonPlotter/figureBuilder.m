@@ -936,173 +936,37 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %  GENERATE: Broken Axis
         % ────────────────────────────────────────────────────────────────
         function generateBrokenAxis()
+        %GENERATEBROKENAXIS  Workshop-pattern thin wrapper.
             di    = brWidgets.ddDS.Value;
-            yName = brWidgets.ddY.Value;
             gapLo = str2double(brWidgets.efGapLo.Value);
             gapHi = str2double(brWidgets.efGapHi.Value);
-            logY  = brWidgets.cbLogY.Value;
-            breakAxis = brWidgets.ddBreakAxis.Value;
-
             if isnan(gapLo) || isnan(gapHi) || gapLo >= gapHi
                 uialert(bFig, 'Enter valid Gap min < Gap max.', 'Invalid gap'); return;
             end
-
-            d = getPlotData(di);
-            idx = find(strcmp(d.labels, yName), 1);
-            if isempty(idx)
-                uialert(bFig, sprintf('Channel "%s" not found.', yName), 'Missing channel'); return;
+            switch brWidgets.ddBreakAxis.Value
+                case 'Y axis', breakKey = 'Y';
+                otherwise,     breakKey = 'X';
             end
-
-            xAll = d.time;
-            yAll = d.values(:, idx);
-            good = ~isnan(xAll) & ~isnan(yAll);
-            xAll = xAll(good); yAll = yAll(good);
-
-            fmtOpts = getFormatOpts();
-            ls = localLineSpec(ddBStyle.Value);
-            xLbl = guiLabel(guiXName(d.metadata), guiXUnit(d.metadata));
-            yLbl = guiLabel(yName, d.units{min(idx, numel(d.units))});
-
-            if strcmp(breakAxis, 'Y axis')
-                % ── Y-axis break ────────────────────────────────────────
-                bottomMask = yAll < gapLo;
-                topMask    = yAll > gapHi;
-
-                if ~any(bottomMask) || ~any(topMask)
-                    uialert(bFig, 'Gap range leaves no data on one side.', 'Empty segment'); return;
+            fbModel.figureType = 'Broken Axis';
+            fbModel.brokenAxisConfig = struct( ...
+                'datasets',  di, ...
+                'yChannel',  brWidgets.ddY.Value, ...
+                'breakAxis', breakKey, ...
+                'gapLow',    gapLo, ...
+                'gapHigh',   gapHi, ...
+                'logY',      brWidgets.cbLogY.Value, ...
+                'ratio',     brWidgets.ddRatio.Value, ...
+                'leftRange', [], ...
+                'rightRange',[]);
+            syncGlobalOptsToModel();
+            outFig = fbModel.generate(datasets);
+            ttl = brWidgets.efTitle.Value;
+            if ~isempty(ttl)
+                axes_ = findobj(outFig,'Type','axes');
+                if ~isempty(axes_)
+                    title(axes_(end), ttl, 'FontSize', spFont.Value+1, 'Interpreter', 'none');
                 end
-
-                % Height ratio
-                ratioStr = brWidgets.ddRatio.Value;
-                switch ratioStr
-                    case 'Proportional'
-                        rangeB = gapLo - min(yAll(bottomMask));
-                        rangeT = max(yAll(topMask)) - gapHi;
-                        hRatio = [rangeB rangeT];
-                    case '1:1', hRatio = [1 1];
-                    case '2:1', hRatio = [2 1];
-                    case '1:2', hRatio = [1 2];
-                    otherwise,  hRatio = [1 1];
-                end
-                hFrac = hRatio / sum(hRatio);
-
-                outFig = figure('Name','Broken Y-Axis','NumberTitle','off', ...
-                    'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
-
-                gap = 0.03;
-                bot_h  = (1 - gap) * hFrac(1) * 0.72;
-                top_h  = (1 - gap) * hFrac(2) * 0.72;
-                bot_y  = 0.14;
-                top_y  = bot_y + bot_h + gap;
-
-                ax1 = axes(outFig, 'Position', [0.14 bot_y 0.78 bot_h]);
-                ax2 = axes(outFig, 'Position', [0.14 top_y 0.78 top_h]);
-
-                % Plot full data in both axes
-                hold(ax1, 'on'); box(ax1, 'on'); grid(ax1, 'on');
-                plot(ax1, xAll, yAll, ls{:}, 'Color', [0.12 0.47 0.71], ...
-                    'LineWidth', fmtOpts.lineWidth);
-                ax1.FontSize = fmtOpts.fontSize; ax1.FontName = fmtOpts.fontName;
-                ax1.TickDir = 'in';
-                ax1.YLim = [min(yAll(bottomMask))*0.95, gapLo];
-
-                hold(ax2, 'on'); box(ax2, 'on'); grid(ax2, 'on');
-                plot(ax2, xAll, yAll, ls{:}, 'Color', [0.12 0.47 0.71], ...
-                    'LineWidth', fmtOpts.lineWidth);
-                ax2.FontSize = fmtOpts.fontSize; ax2.FontName = fmtOpts.fontName;
-                ax2.TickDir = 'in';
-                ax2.YLim = [gapHi, max(yAll(topMask))*1.05];
-                ax2.XTickLabel = {};
-
-                linkaxes([ax1, ax2], 'x');
-
-                if logY
-                    ax1.YScale = 'log'; ax2.YScale = 'log';
-                end
-
-                xlabel(ax1, xLbl, 'FontSize', fmtOpts.fontSize);
-                ylabel(ax1, yLbl, 'FontSize', fmtOpts.fontSize);
-
-                ttl = brWidgets.efTitle.Value;
-                if ~isempty(ttl)
-                    title(ax2, ttl, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
-                end
-
-                % Draw break marks on top of bottom axes and bottom of top axes
-                drawBreakMarks(ax1, 'top');
-                drawBreakMarks(ax2, 'bottom');
-
-            else
-                % ── X-axis break (original behavior) ───────────────────
-                leftMask  = xAll < gapLo;
-                rightMask = xAll > gapHi;
-
-                if ~any(leftMask) || ~any(rightMask)
-                    uialert(bFig, 'Gap range leaves no data on one side.', 'Empty segment'); return;
-                end
-
-                xLeft = xAll(leftMask);  yLeft = yAll(leftMask);
-                xRight = xAll(rightMask); yRight = yAll(rightMask);
-
-                ratioStr = brWidgets.ddRatio.Value;
-                switch ratioStr
-                    case 'Proportional'
-                        rangeL = max(xLeft) - min(xLeft);
-                        rangeR = max(xRight) - min(xRight);
-                        wRatio = [rangeL rangeR];
-                    case '1:1', wRatio = [1 1];
-                    case '2:1', wRatio = [2 1];
-                    case '1:2', wRatio = [1 2];
-                    otherwise,  wRatio = [1 1];
-                end
-                wFrac = wRatio / sum(wRatio);
-
-                outFig = figure('Name','Broken Axis','NumberTitle','off', ...
-                    'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
-
-                gap  = 0.03;
-                left_w  = (1 - gap) * wFrac(1) * 0.75;
-                right_w = (1 - gap) * wFrac(2) * 0.75;
-                left_x  = 0.12;
-                right_x = left_x + left_w + gap;
-
-                ax1 = axes(outFig, 'Position', [left_x  0.15 left_w  0.75]);
-                ax2 = axes(outFig, 'Position', [right_x 0.15 right_w 0.75]);
-
-                hold(ax1, 'on'); box(ax1, 'on'); grid(ax1, 'on');
-                plot(ax1, xLeft, yLeft, ls{:}, 'Color', [0.12 0.47 0.71], ...
-                    'LineWidth', fmtOpts.lineWidth);
-                ax1.FontSize = fmtOpts.fontSize; ax1.FontName = fmtOpts.fontName;
-                ax1.TickDir  = 'in';
-                ax1.XLim = [min(xLeft) max(xLeft)];
-
-                hold(ax2, 'on'); box(ax2, 'on'); grid(ax2, 'on');
-                plot(ax2, xRight, yRight, ls{:}, 'Color', [0.12 0.47 0.71], ...
-                    'LineWidth', fmtOpts.lineWidth);
-                ax2.FontSize = fmtOpts.fontSize; ax2.FontName = fmtOpts.fontName;
-                ax2.TickDir  = 'in';
-                ax2.XLim = [min(xRight) max(xRight)];
-                ax2.YTickLabel = {};
-
-                linkaxes([ax1, ax2], 'y');
-
-                if logY
-                    ax1.YScale = 'log'; ax2.YScale = 'log';
-                end
-
-                xlabel(ax1, xLbl, 'FontSize', fmtOpts.fontSize);
-                xlabel(ax2, xLbl, 'FontSize', fmtOpts.fontSize);
-                ylabel(ax1, yLbl, 'FontSize', fmtOpts.fontSize);
-
-                ttl = brWidgets.efTitle.Value;
-                if ~isempty(ttl)
-                    title(ax1, ttl, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
-                end
-
-                drawBreakMarks(ax1, 'right');
-                drawBreakMarks(ax2, 'left');
             end
-
             addRefLineTools(outFig);
             figure(outFig);
             delete(bFig);
