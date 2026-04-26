@@ -126,6 +126,33 @@ function outFig = generateMultiPanel(datasets, cfg, globalOpts)
             end
         end
 
+        % ── Right Y axis (Y2) — channels listed in pSpec.y2Channels ─
+        hasY2 = isfield(pSpec, 'y2Channels') && ~isempty(pSpec.y2Channels);
+        if hasY2
+            yyaxis(tAx, 'right'); hold(tAx, 'on');
+            y2Lbl = '';
+            for di = 1:numel(pSpec.datasets)
+                dsIdx = pSpec.datasets(di);
+                if dsIdx < 1 || dsIdx > numel(datasets), continue; end
+                ds = datasets{dsIdx};
+                xv = double(ds.data.time);
+                for yi = 1:numel(pSpec.y2Channels)
+                    yLabel = pSpec.y2Channels{yi};
+                    yIdx = find(strcmp(ds.data.labels, yLabel), 1);
+                    if isempty(yIdx), continue; end
+                    yv = ds.data.values(:, yIdx);
+                    ci = ci + 1;
+                    col = pickColor(ci, globalOpts.grayscale);
+                    plot(tAx, xv, yv, lineSpec, ...
+                        'Color', col, 'LineWidth', 1.0, 'MarkerSize', 4, ...
+                        'DisplayName', sprintf('%d: %s (y2)', dsIdx, yLabel));
+                    if isempty(y2Lbl), y2Lbl = yLabel; end
+                end
+            end
+            ylabel(tAx, y2Lbl, 'FontSize', globalOpts.fontSize);
+            yyaxis(tAx, 'left');
+        end
+
         if pSpec.logY
             tAx.YScale = 'log';
         end
@@ -142,7 +169,7 @@ function outFig = generateMultiPanel(datasets, cfg, globalOpts)
             title(tAx, pSpec.title, ...
                 'FontSize', globalOpts.fontSize+1, 'Interpreter', 'none');
         end
-        if ci > 1
+        if ci > 1 || hasY2
             legend(tAx, 'Interpreter','none', ...
                 'FontSize', max(globalOpts.fontSize-2, 6), 'Location','best');
         end

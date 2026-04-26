@@ -605,76 +605,35 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %  GENERATE: Multi-Panel
         % ────────────────────────────────────────────────────────────────
         function generateMultiPanel()
+        %GENERATEMULTIPANEL  Workshop-pattern thin wrapper.
             nR = mpWidgets.spRows.Value;
             nC = mpWidgets.spCols.Value;
             nPanels = nR * nC;
-            shareX = mpWidgets.cbShareX.Value;
-            shareY = mpWidgets.cbShareY.Value;
-            [outFig, tlo] = makeOutFig(nR, nC, shareX);
 
-            ls = localLineSpec(ddBStyle.Value);
-            fmtOpts = getFormatOpts();
-
-            % Track which tiles are occupied (for span support)
-            occupied = false(nR, nC);
-            axList = gobjects(0);
-
+            % Build per-panel specs from the dialog's panel-card widgets
+            panels = bosonPlotter.figureBuilder.FigureBuilderModel.defaultPanelArray(nPanels);
             for pi = 1:nPanels
                 pw = mpWidgets.panelCards{pi};
-                [r, c] = ind2sub([nR, nC], pi);
-
-                % Skip tiles already occupied by a previous span
-                if occupied(r, c), continue; end
-
-                rSpan = min(pw.spRowSpan.Value, nR - r + 1);
-                cSpan = min(pw.spColSpan.Value, nC - c + 1);
-
-                % Mark spanned tiles as occupied
-                occupied(r:r+rSpan-1, c:c+cSpan-1) = true;
-
-                dsIdx = ensureCellNum(pw.lbDS.Value);
-                selY  = ensureCellStr(pw.lbY.Value);
-
-                % Y2 (right axis) channels
                 selY2Raw = ensureCellStr(pw.lbY2.Value);
                 selY2 = selY2Raw(~strcmp(selY2Raw, '(none)'));
-                hasY2 = ~isempty(selY2);
-
-                tAx = nexttile(tlo, pi, [rSpan cSpan]);
-                setupAx(tAx);
-                axList(end+1) = tAx; %#ok<AGROW>
-
-                [ci, xLbl, yLbl] = plotTraces(tAx, dsIdx, selY, ls, fmtOpts);
-
-                % Right Y-axis
-                if hasY2
-                    yyaxis(tAx, 'right');
-                    hold(tAx, 'on');
-                    [~, ~, y2Lbl] = plotTraces(tAx, dsIdx, selY2, ls, fmtOpts);
-                    ylabel(tAx, y2Lbl, 'FontSize', fmtOpts.fontSize);
-                    yyaxis(tAx, 'left');
-                end
-
-                if pw.cbLog.Value, tAx.YScale = 'log'; end
-
-                % Only show X label on bottom-most row of this panel's span
-                if shareX && (r + rSpan - 1) < nR
-                    xlabel(tAx, '');
-                else
-                    xlabel(tAx, xLbl, 'FontSize', fmtOpts.fontSize);
-                end
-                ylabel(tAx, yLbl, 'FontSize', fmtOpts.fontSize);
-
-                ttl = pw.efTitle.Value;
-                if ~isempty(ttl)
-                    title(tAx, ttl, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
-                end
-                if ci > 1 || hasY2
-                    legend(tAx, 'Interpreter','none','FontSize', max(fmtOpts.fontSize-2,6), 'Location','best');
-                end
+                panels(pi).datasets   = ensureCellNum(pw.lbDS.Value);
+                panels(pi).yChannels  = ensureCellStr(pw.lbY.Value);
+                panels(pi).y2Channels = selY2;
+                panels(pi).rowSpan    = pw.spRowSpan.Value;
+                panels(pi).colSpan    = pw.spColSpan.Value;
+                panels(pi).logY       = pw.cbLog.Value;
+                panels(pi).title      = pw.efTitle.Value;
             end
 
-            linkIfNeeded(axList, shareX, shareY);
+            fbModel.figureType = 'Multi-Panel';
+            fbModel.multiPanelConfig = struct( ...
+                'rows',   nR, ...
+                'cols',   nC, ...
+                'shareX', mpWidgets.cbShareX.Value, ...
+                'shareY', mpWidgets.cbShareY.Value, ...
+                'panels', panels);
+            syncGlobalOptsToModel();
+            outFig = fbModel.generate(datasets);
             addRefLineTools(outFig);
             addLinkedCursor(outFig);
             figure(outFig);
