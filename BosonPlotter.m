@@ -7628,34 +7628,6 @@ function [idxLo, idxHi] = findAsymmetricErrorColumns(labels, yLabel)
     end
 end
 
-function merged = deduplicatePeaks(peaks, minSep)
-%DEDUPLICATEPEAKS  Remove peaks within minSep of each other.
-%  When two peaks overlap, keep the one with greater height.
-%  Priority: 'auto' status is preferred over 'manual' at equal height.
-    if numel(peaks) <= 1, merged = peaks; return; end
-    centers = [peaks.center];
-    heights = [peaks.height];
-    keep    = true(1, numel(peaks));
-    for i = 1:numel(peaks)
-        if ~keep(i), continue; end
-        for j = (i+1):numel(peaks)
-            if ~keep(j), continue; end
-            if abs(centers(i) - centers(j)) < minSep
-                % Prefer higher peak; break ties in favour of 'auto'
-                iWins = heights(i) > heights(j) || ...
-                        (heights(i) == heights(j) && strcmp(peaks(i).status,'auto'));
-                if iWins
-                    keep(j) = false;
-                else
-                    keep(i) = false;
-                    break;   % i is gone — move to next i
-                end
-            end
-        end
-    end
-    merged = peaks(keep);
-end
-
 function ds = buildDs(fp, data, parserName)
 %BUILDDS  Assemble the standard dataset struct from a parsed data struct.
     ds.data        = data;
@@ -8220,43 +8192,6 @@ function colors = getColorsFromMap(colormapName, nColors)
 %GETCOLORSFROMMPA  Generate nColors colors from a named colormap.
 %   Delegates to bosonPlotter.colorMaps for the actual implementation.
     colors = bosonPlotter.colorMaps(colormapName, nColors);
-end
-
-
-function y = evalMultiPeak(p, x, nP, isGauss)
-%EVALMULTIPEAK  Evaluate a composite multi-peak model at x.
-%  p layout: [H1, x0_1, fwhm1,  H2, x0_2, fwhm2, …,  HnP, x0_nP, fwhmNP,  m, b]
-%  where m and b are the shared linear background slope and intercept.
-%  isGauss=true uses Gaussian peaks; false uses Lorentzian peaks.
-    y = p(end-1) .* x + p(end);   % linear background
-    for k = 1:nP
-        H    = p((k-1)*3 + 1);
-        x0   = p((k-1)*3 + 2);
-        fwhm = p((k-1)*3 + 3);
-        if isGauss
-            y = y + H .* exp(-4.*log(2) .* ((x - x0) ./ fwhm).^2);
-        else
-            y = y + H ./ (1 + 4.*((x - x0) ./ fwhm).^2);
-        end
-    end
-end
-
-function y = evalMultiPeakPV(p, x, nP)
-%EVALMULTIPEAKPV  Evaluate a composite pseudo-Voigt multi-peak model at x.
-%  p layout: [H1, x0_1, fwhm1, eta1,  H2, x0_2, fwhm2, eta2, …,  m, b]
-%  where eta_k in [0,1] is the Lorentzian fraction for peak k,
-%  and m, b are the shared linear background slope and intercept.
-    y = p(end-1) .* x + p(end);   % linear background
-    for k = 1:nP
-        H    = p((k-1)*4 + 1);
-        x0   = p((k-1)*4 + 2);
-        fwhm = p((k-1)*4 + 3);
-        eta  = max(0, min(1, p((k-1)*4 + 4)));
-        u    = (x - x0) ./ fwhm;
-        L    = 1 ./ (1 + 4.*u.^2);
-        G    = exp(-4.*log(2) .* u.^2);
-        y    = y + H .* (eta .* L + (1 - eta) .* G);
-    end
 end
 
 
