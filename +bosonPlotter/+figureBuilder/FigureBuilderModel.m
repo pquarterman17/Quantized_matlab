@@ -51,7 +51,7 @@ classdef FigureBuilderModel < handle
         overlayResConfig    struct = struct('datasets', [], 'yChannel', '', 'referenceIdx', 1, 'residualMode', 'difference', 'logOverlay', false, 'heightRatio', '1:1', 'traceLabels', {{}})
         normOverlayConfig   struct = struct('datasets', [], 'yChannel', '', 'normMethod', 'Peak (0-1)', 'alignMode', 'None', 'logY', false)
         beforeAfterConfig   struct = struct('datasetIdx', 1, 'yChannels', {{}}, 'logY', false, 'linkY', true)
-        paramEvolConfig     struct = struct('datasets', [], 'yChannel', '', 'summary', 'mean', 'xValues', [], 'xLabel', 'Index')
+        paramEvolConfig     struct = struct('datasets', [], 'yChannel', '', 'yMetric', 'mean', 'peakIdx', 1, 'xMode', 'index', 'xValues', [], 'xLabel', '', 'connect', true, 'pointLabels', {{}})
         brokenAxisConfig    struct = struct('datasets', [], 'yChannel', '', 'leftRange', [], 'rightRange', [])
         confBandConfig      struct = struct('datasets', [], 'yChannel', '', 'summary', 'mean+std')
         contourConfig       struct = struct('datasets', [], 'yChannel', '', 'yValues', [], 'yLabel', 'Index', 'colormap', 'parula', 'filled', true)

@@ -892,105 +892,41 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %  GENERATE: Parameter Evolution
         % ────────────────────────────────────────────────────────────────
         function generateParamEvol()
-            dsIdx   = ensureCellNum(peWidgets.lbDS.Value);
-            xMode   = peWidgets.ddXMode.Value;
-            yMetric = peWidgets.ddYMetric.Value;
-            peakIdx = peWidgets.spPeakIdx.Value;
-            connect = peWidgets.cbConnect.Value;
-
+        %GENERATEPARAMEVOL  Workshop-pattern thin wrapper.
+            dsIdx = ensureCellNum(peWidgets.lbDS.Value);
             if isempty(dsIdx)
                 uialert(bFig,'Select at least one dataset.','No data'); return;
             end
-
-            fmtOpts = getFormatOpts();
-
-            xVals = NaN(1, numel(dsIdx));
-            yVals = NaN(1, numel(dsIdx));
-            labels = cell(1, numel(dsIdx));
-
-            for si = 1:numel(dsIdx)
-                di = dsIdx(si);
-                ds = datasets{di};
-                d  = getPlotData(di);
-                labels{si} = dsNames{di};
-
-                % X value
-                switch xMode
-                    case 'File index'
-                        xVals(si) = si;
-                    case 'Temperature (K)'
-                        xVals(si) = extractMetaField(d.metadata, {'temperature','temp','Temperature'});
-                    case 'Field (Oe)'
-                        xVals(si) = extractMetaField(d.metadata, {'field','magneticField','Field'});
-                end
-
-                % Y value
-                switch yMetric
-                    case 'Integrated Y'
-                        % Sum of first Y channel
-                        if ~isempty(d.values)
-                            col = d.values(:, 1);
-                            yVals(si) = trapz(d.time(~isnan(col)), col(~isnan(col)));
-                        end
-                    otherwise
-                        % Peak-based metrics
-                        if isempty(ds.peaks) || numel(ds.peaks) < peakIdx
-                            continue;
-                        end
-                        % Sort peaks by center
-                        centers = [ds.peaks.center];
-                        [~, sortIdx] = sort(centers);
-                        pk = ds.peaks(sortIdx(peakIdx));
-
-                        switch yMetric
-                            case 'Peak center', yVals(si) = pk.center;
-                            case 'Peak FWHM',   yVals(si) = pk.fwhm;
-                            case 'Peak area',   yVals(si) = pk.area;
-                            case 'Peak height', yVals(si) = pk.height;
-                        end
-                end
+            % Map dialog xMode dropdown → package xMode key
+            switch peWidgets.ddXMode.Value
+                case 'Temperature (K)'
+                    xModeKey = 'metadata:temperature,temp,Temperature';
+                case 'Field (Oe)'
+                    xModeKey = 'metadata:field,magneticField,Field';
+                otherwise
+                    xModeKey = 'index';
             end
-
-            % Plot
-            outFig = figure('Name','Parameter Evolution','NumberTitle','off', ...
-                'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
-            tAx = axes(outFig);
-            hold(tAx, 'on'); box(tAx, 'on'); grid(tAx, 'on');
-            tAx.FontSize = fmtOpts.fontSize;
-            tAx.FontName = fmtOpts.fontName;
-            tAx.TickDir  = 'in';
-
-            valid = ~isnan(xVals) & ~isnan(yVals);
-            if connect
-                plot(tAx, xVals(valid), yVals(valid), '-o', ...
-                    'Color', [0.12 0.47 0.71], ...
-                    'MarkerFaceColor', [0.12 0.47 0.71], ...
-                    'MarkerSize', 6, 'LineWidth', 1.5);
-            else
-                scatter(tAx, xVals(valid), yVals(valid), 50, ...
-                    [0.12 0.47 0.71], 'filled');
-            end
-
-            % Label points with filenames if few enough
-            if sum(valid) <= 15 && strcmp(xMode, 'File index')
-                validIdx = find(valid);
-                for vi = 1:numel(validIdx)
-                    text(tAx, xVals(validIdx(vi)), yVals(validIdx(vi)), ...
-                        ['  ' labels{validIdx(vi)}], ...
-                        'FontSize', max(fmtOpts.fontSize-3, 6), ...
-                        'Interpreter', 'none', 'Rotation', 20);
-                end
-            end
-
-            % Axis labels
-            xlabel(tAx, xMode, 'FontSize', fmtOpts.fontSize);
-            ylabel(tAx, yMetric, 'FontSize', fmtOpts.fontSize);
-
+            % Map dialog Y metric → package yMetric (one extra rename: Integrated Y → integrated)
+            yMetricVal = peWidgets.ddYMetric.Value;
+            if strcmp(yMetricVal, 'Integrated Y'), yMetricVal = 'integrated'; end
+            fbModel.figureType = 'Parameter Evolution';
+            fbModel.paramEvolConfig = struct( ...
+                'datasets',    dsIdx, ...
+                'yChannel',    '', ...                  % default: first channel
+                'yMetric',     yMetricVal, ...
+                'peakIdx',     peWidgets.spPeakIdx.Value, ...
+                'xMode',       xModeKey, ...
+                'xValues',     [], ...
+                'xLabel',      peWidgets.ddXMode.Value, ...
+                'connect',     peWidgets.cbConnect.Value, ...
+                'pointLabels', {dsNames(dsIdx)});
+            syncGlobalOptsToModel();
+            outFig = fbModel.generate(datasets);
             ttl = peWidgets.efTitle.Value;
             if ~isempty(ttl)
-                title(tAx, ttl, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
+                title(findobj(outFig,'Type','axes'), ttl, ...
+                    'FontSize', spFont.Value+1, 'Interpreter', 'none');
             end
-
             addRefLineTools(outFig);
             figure(outFig);
             delete(bFig);
