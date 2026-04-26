@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-04-26 (added W5 workshop conversions #59-#65 reflecting the workshop-pattern strategy decided this session — see `plans/workshop-conversion-plan.md` and CLAUDE.md "Workshop pattern" entry. Peak Workshop is the reference implementation; pattern decided over a class-ify-orchestrator alternative.)
+**Last regenerated:** 2026-04-26 (W5 #59 Peak Workshop shipped + bug fix `4bf82b8` capturing two contract rules; W5 #61 Hysteresis Workshop shipped `e7d22ef`. Remaining workshops: W5 #60 Curve Fit, W5 #62 Reflectivity. See `plans/workshop-conversion-plan.md`.)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -19,7 +19,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#22** W5 Decomposition → Continue `+bosonPlotter/` extraction — drive parent below 8k lines
 - [ ] **#59** W5 Decomposition → Convert Peak subsystem to PeakWorkshop pattern (workshop reference impl)
 - [ ] **#60** W5 Decomposition → Convert Curve Fit to CurveFitWorkshop pattern
-- [ ] **#61** W5 Decomposition → Convert Hysteresis to HysteresisWorkshop pattern
+- ~~[ ] **#61** W5 Decomposition → Convert Hysteresis to HysteresisWorkshop pattern~~ (2026-04-26 commit `e7d22ef`)
 - [ ] **#62** W5 Decomposition → Convert Reflectivity to ReflectivityWorkshop pattern
 
 ### Origin parity (Python port, MATLAB side complete) — `plans/origin-feature-gap.md`
