@@ -122,7 +122,20 @@ function addItem(parent, label, callback, varargin)
     if isempty(callback) || ~isa(callback, 'function_handle')
         return;
     end
-    args = {parent, 'Text', label, 'MenuSelectedFcn', callback};
+    % MenuSelectedFcn always invokes the callback as f(src, event), but
+    % some target nested functions (e.g. onOpenSettings) are declared
+    % with zero arguments. Adapt automatically based on nargin so both
+    % shapes work without each caller having to wrap with @(~,~) ...
+    try
+        if nargin(callback) == 0
+            wrapped = @(~,~) callback();
+        else
+            wrapped = callback;
+        end
+    catch
+        wrapped = callback;  % anonymous handles — nargin can throw
+    end
+    args = {parent, 'Text', label, 'MenuSelectedFcn', wrapped};
     if ~isempty(varargin)
         % MATLAB's Separator wants 'on'/'off' string, not logical
         for k = 1:2:numel(varargin)
