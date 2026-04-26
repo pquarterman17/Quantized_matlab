@@ -1,11 +1,18 @@
 function outFig = generateFFTSpectral(datasets, cfg, globalOpts)
-%GENERATEFFTSPECTRAL  Power spectrum (FFT) of a single Y channel from one dataset.
+%GENERATEFFTSPECTRAL  Power spectrum / FFT of a single Y channel.
+%   Routes through utilities.fftSpectral for window functions (hanning,
+%   hamming, blackman, flattop, kaiser, none), detrend modes, and
+%   output choice (psd / magnitude / phase).
 %
 %   cfg fields:
 %     .datasetIdx  single dataset index
 %     .yChannel    Y channel name
-%     .fs          sampling rate in Hz; if 0/empty, derived from x spacing
-%     .logY        logical (default: true)
+%     .window      'hanning' (default) | 'hamming' | 'blackman' | 'flattop'
+%                  | 'kaiser' | 'none'
+%     .output      'psd' (default) | 'magnitude' | 'phase'
+%     .detrend     'mean' (default) | 'linear' | 'none'
+%     .logY        logical (default true)
+%     .logX        logical (default false)
     arguments
         datasets   cell
         cfg        struct
@@ -14,32 +21,41 @@ function outFig = generateFFTSpectral(datasets, cfg, globalOpts)
     if ~isfield(cfg,'datasetIdx'), cfg.datasetIdx = 1; end
     ds = datasets{cfg.datasetIdx};
     if ~isfield(cfg,'yChannel') || isempty(cfg.yChannel), cfg.yChannel = ds.data.labels{1}; end
-    if ~isfield(cfg,'fs'),    cfg.fs = 0; end
-    if ~isfield(cfg,'logY'),  cfg.logY = true; end
+    if ~isfield(cfg,'window'),  cfg.window  = 'hanning'; end
+    if ~isfield(cfg,'output'),  cfg.output  = 'psd';     end
+    if ~isfield(cfg,'detrend'), cfg.detrend = 'mean';    end
+    if ~isfield(cfg,'logY'),    cfg.logY    = true;      end
+    if ~isfield(cfg,'logX'),    cfg.logX    = false;     end
 
     [xv, yv] = bosonPlotter.figureBuilder.extractXY(ds, cfg.yChannel);
-    if numel(yv) < 4
+    if numel(yv) < 8
         outFig = bosonPlotter.figureBuilder.createOutFig('FFT / Spectral', globalOpts);
         return;
     end
-    if cfg.fs <= 0
-        dx = median(diff(xv));
-        if dx <= 0, dx = 1; end
-        cfg.fs = 1 / dx;
-    end
 
-    yv = yv - mean(yv);
-    N  = numel(yv);
-    Y  = fft(yv);
-    P  = abs(Y(1:floor(N/2)+1)).^2 / (cfg.fs * N);
-    P(2:end-1) = 2 * P(2:end-1);
-    f  = (0:floor(N/2))' * cfg.fs / N;
+    result = utilities.fftSpectral(xv, yv, ...
+        Window=cfg.window, OutputType=cfg.output, Detrend=cfg.detrend);
+    switch cfg.output
+        case 'magnitude', ySpec = result.magnitude;
+        case 'phase',     ySpec = result.phase;
+        otherwise,        ySpec = result.psd;
+    end
 
     outFig = bosonPlotter.figureBuilder.createOutFig('FFT / Spectral', globalOpts);
     tAx = axes(outFig); hold(tAx,'on'); tAx.Box = 'on'; grid(tAx,'on');
     tAx.FontSize = globalOpts.fontSize; tAx.FontName = globalOpts.fontName;
-    plot(tAx, f, P, '-', 'LineWidth', 1.0);
+    plot(tAx, result.freq, ySpec, '-', 'LineWidth', 1.0, 'Color', [0.12 0.47 0.71]);
     if cfg.logY, tAx.YScale = 'log'; end
-    xlabel(tAx, 'Frequency'); ylabel(tAx, 'PSD');
-    title(tAx, sprintf('FFT: %s', cfg.yChannel), 'Interpreter','none');
+    if cfg.logX, tAx.XScale = 'log'; end
+
+    xlabel(tAx, 'Frequency', 'FontSize', globalOpts.fontSize);
+    switch cfg.output
+        case 'magnitude', yLbl = ['|FFT| of ' cfg.yChannel];
+        case 'phase',     yLbl = 'Phase (deg)';
+        otherwise,        yLbl = [cfg.yChannel '^2 / Hz'];
+    end
+    ylabel(tAx, yLbl, 'Interpreter','none');
+    title(tAx, sprintf('Spectral: %s (%s window, %s)', ...
+        cfg.yChannel, cfg.window, cfg.output), ...
+        'FontSize', globalOpts.fontSize + 1, 'Interpreter', 'none');
 end

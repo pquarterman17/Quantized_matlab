@@ -2100,83 +2100,27 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %  GENERATE: FFT / Spectral
         % ────────────────────────────────────────────────────────────────
         function generateFFTSpectral()
-            di         = fsWidgets.ddDS.Value;
-            ySel       = fsWidgets.ddY.Value;
-            winType    = fsWidgets.ddWindow.Value;
-            outType    = fsWidgets.ddOutput.Value;
-            detrendMode = fsWidgets.ddDetrend.Value;
-            logY       = fsWidgets.cbLogY.Value;
-            logX       = fsWidgets.cbLogX.Value;
-
+        %GENERATEFFTSPECTRAL  Workshop-pattern thin wrapper.
+            di = fsWidgets.ddDS.Value;
             if di < 1 || di > nDS
                 uialert(bFig,'No valid dataset selected.','No data'); return;
             end
-
-            d = getPlotData(di);
-            fmtOpts = getFormatOpts();
-
-            ci = find(strcmp(d.labels, ySel), 1);
-            if isempty(ci)
-                uialert(bFig,sprintf('Channel "%s" not found.', ySel),'Missing'); return;
-            end
-
-            xVec = double(d.time(:));
-            yVec = d.values(:, ci);
-            good = ~isnan(xVec) & ~isnan(yVec);
-            xVec = xVec(good); yVec = yVec(good);
-
-            if numel(xVec) < 8
-                uialert(bFig,'Need at least 8 valid data points for FFT.','Insufficient data'); return;
-            end
-
-            % Call fftSpectral
-            result = utilities.fftSpectral(xVec, yVec, ...
-                Window=winType, OutputType=outType, Detrend=detrendMode);
-
-            % Extract output vector
-            switch outType
-                case 'psd',       ySpec = result.psd;
-                case 'magnitude', ySpec = result.magnitude;
-                case 'phase',     ySpec = result.phase;
-                otherwise,        ySpec = result.psd;
-            end
-
-            outFig = figure('Name','FFT / Spectral Analysis','NumberTitle','off', ...
-                'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
-            oAx = axes(outFig);
-            hold(oAx,'on'); box(oAx,'on'); grid(oAx,'on');
-            oAx.FontSize = fmtOpts.fontSize;
-            oAx.FontName = fmtOpts.fontName;
-            oAx.TickDir  = 'in';
-
-            plot(oAx, result.freq, ySpec, '-', ...
-                'Color', [0.12 0.47 0.71], 'LineWidth', fmtOpts.lineWidth);
-
-            if logY, oAx.YScale = 'log'; end
-            if logX, oAx.XScale = 'log'; end
-
-            xUnits = guiXUnit(d.metadata);
-            if isempty(xUnits)
-                freqLbl = 'Frequency';
-            else
-                freqLbl = ['Frequency (1/' xUnits ')'];
-            end
-            xlabel(oAx, freqLbl, 'FontSize', fmtOpts.fontSize);
-
-            switch outType
-                case 'psd',       yLbl = [guiLabel(ySel, d.units{min(ci,numel(d.units))}) '^2 / Hz'];
-                case 'magnitude', yLbl = ['|FFT| of ' ySel];
-                case 'phase',     yLbl = 'Phase (deg)';
-                otherwise,        yLbl = outType;
-            end
-            ylabel(oAx, yLbl, 'FontSize', fmtOpts.fontSize);
-
+            fbModel.figureType = 'FFT / Spectral';
+            fbModel.fftSpectralConfig = struct( ...
+                'datasetIdx', di, ...
+                'yChannel',   fsWidgets.ddY.Value, ...
+                'window',     fsWidgets.ddWindow.Value, ...
+                'output',     fsWidgets.ddOutput.Value, ...
+                'detrend',    fsWidgets.ddDetrend.Value, ...
+                'logY',       fsWidgets.cbLogY.Value, ...
+                'logX',       fsWidgets.cbLogX.Value);
+            syncGlobalOptsToModel();
+            outFig = fbModel.generate(datasets);
             ttl = fsWidgets.efTitle.Value;
-            if isempty(ttl)
-                ttl = ['Spectral Analysis — ' ySel ' (' winType ' window, ' outType ')'];
+            if ~isempty(ttl)
+                title(findobj(outFig,'Type','axes'), ttl, ...
+                    'FontSize', spFont.Value+1, 'Interpreter', 'none');
             end
-            title(oAx, ttl, 'FontSize', fmtOpts.fontSize+1, 'Interpreter', 'none');
-
             addRefLineTools(outFig);
             figure(outFig);
             delete(bFig);
