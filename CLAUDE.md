@@ -107,7 +107,8 @@ machine; BACKLOG.md is shared.
 
 ## Key Design Decisions
 
-- **Functional approach** — pure functions returning structs; no heavy OOP
+- **Functional approach** — pure functions returning structs; no heavy OOP for orchestrators (BosonPlotter, FermiViewer, DiraCulator stay procedural). `handle` classes ARE used for state containers (`AppState`, `UndoManager`, `WorkspaceModel`, future `*WorkshopModel`). The rule prohibits class-ifying the orchestrator script, not all classes.
+- **Workshop pattern** — heavy GUI features (Peak, Curve Fit, Hysteresis, Reflectivity) live in their own `+bosonPlotter/+<feature>/` subpackage with three pieces: a `<Feature>WorkshopModel` handle class owning the feature's state, a functional view builder (e.g. `buildPeakWindow.m`), and callbacks that operate on `(model, hook)` rather than the parent's closure. The parent passes a small **hook API** (~9 named function handles for getActiveData / setStatus / drawOverlay / etc.) so the workshop never reaches into the parent's state directly. Active conversion plan: `plans/workshop-conversion-plan.md`. Reference implementation: `+bosonPlotter/+peak/` (in progress 2026-04-26).
 - **Auto-detection heuristics** — delimiter, header row, data start, units all inferred
 - **Unified data struct** — parser-agnostic GUI and plotting code
 - **Peak fitting** — Lorentzian model (appropriate for XRD Bragg peaks)

@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-04-25 (W5 #22 progress: 5 extractions today — applyMaskInBox, buildToolbar, full fringe subsystem, saveAxisLimsToActiveDataset, onAsymmetryToggle, updateSmoothPreview. BosonPlotter.m 8650 → 8348 (302-line drop, 46% to <8k target). Earlier same day: W3 #15, W3 #14, W3 #16, W2 #5/#6/#7 all shipped.)
+**Last regenerated:** 2026-04-26 (added W5 workshop conversions #59-#65 reflecting the workshop-pattern strategy decided this session — see `plans/workshop-conversion-plan.md` and CLAUDE.md "Workshop pattern" entry. Peak Workshop is the reference implementation; pattern decided over a class-ify-orchestrator alternative.)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -17,6 +17,10 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 ### MASTERPLAN (MATLAB consolidated) — `plans/MASTERPLAN.md`
 - [ ] **#22** W5 Decomposition → Continue `+bosonPlotter/` extraction — drive parent below 8k lines
+- [ ] **#59** W5 Decomposition → Convert Peak subsystem to PeakWorkshop pattern (workshop reference impl)
+- [ ] **#60** W5 Decomposition → Convert Curve Fit to CurveFitWorkshop pattern
+- [ ] **#61** W5 Decomposition → Convert Hysteresis to HysteresisWorkshop pattern
+- [ ] **#62** W5 Decomposition → Convert Reflectivity to ReflectivityWorkshop pattern
 
 ### Origin parity (Python port, MATLAB side complete) — `plans/origin-feature-gap.md`
 - [ ] **#1** AIC/BIC/F-test fit comparison → Python
@@ -43,6 +47,8 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#4** W2 UX → Toolbar metrics consistent across all four GUIs (deferred)
 - [ ] **#9** W3 Features → Small-angle scattering (Guinier / Porod / IFT)
 - [ ] **#24** W5 Decomposition → Documentation coverage — package READMEs
+- [ ] **#63** W5 Decomposition → Cross-workshop test harness (after #59-#62)
+- [ ] **#64** W5 Decomposition → Subfolder reorg of remaining `+bosonPlotter/` cross-cutters (after workshops carve out their pieces)
 - [ ] **#47** W7 Parsers → `importOxford` (paused — awaiting example file)
 - [ ] **#48** W7 Parsers → `importOpus` (paused — awaiting example file)
 - [ ] **#50** W8 DataWorkspace → Shared model migration (PARTIAL)
@@ -71,6 +77,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 ### MASTERPLAN (MATLAB consolidated) — `plans/MASTERPLAN.md`
 - [ ] **#13** W3 Features → Connect batch fitting to multi-peak + reflectivity
 - [ ] **#28** W5 Decomposition → Extract FermiViewer measurement subsystem
+- [ ] **#65** W5 Decomposition → Apply workshop pattern to FermiViewer heavy features (deferred)
 - [ ] **#49** W7 Parsers → `importSPC` (paused — awaiting example file)
 - [ ] **#51** W8 DataWorkspace → Multi-dataset operations
 - [ ] **#52** W8 DataWorkspace → Remove legacy table from BosonPlotter (~400–500 line cleanup)
