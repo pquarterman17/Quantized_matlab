@@ -44,8 +44,23 @@ classdef AppState < handle
         instBroadening_deg double = 0
 
         % ── Peak detection sensitivity (sidebar of Peak Workshop) ──
+        % MIRROR fields: AppState retains these for back-compat with code
+        % that reads appData.peakSNR / .peakProminence directly. The
+        % canonical owner is peakModel (a PeakWorkshopModel handle).
+        % Sidebar widgets write to BOTH the model and these fields.
         peakSNR         double  = 5
         peakProminence  double  = 0.02
+
+        % ── Peak Workshop model (workshop pattern, MASTERPLAN W5 #59) ──
+        % Handle class owning peak feature state. Constructed in
+        % BosonPlotter just after AppState. Methods like detect(),
+        % fitAll(), addManual() drive the production peak pipeline.
+        peakModel              = []   % bosonPlotter.peak.PeakWorkshopModel
+
+        % Handle for the most recently shown Fit-Issues dialog. The
+        % workshop hook reuses this slot so re-running Fit Peaks closes
+        % the prior dialog before opening a new one.
+        peakFailuresDialog     = []
 
         % ── Axis prefixes ──────────────────────────────────────────
         axisPrefixX     struct = struct('symbol','','factor',1)

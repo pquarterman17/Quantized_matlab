@@ -259,6 +259,20 @@ function varargout = BosonPlotter(options)
     % appData.X references work unchanged (same dot-syntax as struct).
     appData = bosonPlotter.AppState();
 
+    % ── Peak Workshop model (MASTERPLAN W5 #59) ────────────────────────
+    % The model is the canonical owner of peak feature state. AppState
+    % keeps mirror fields (peakSNR/peakProminence/kFactor/etc.) for back-
+    % compat with sites that still read appData.* directly; sidebar
+    % handlers below write to BOTH. Cleanup of the mirrors is a follow-up.
+    appData.peakModel = bosonPlotter.peak.PeakWorkshopModel();
+    appData.peakModel.peakSNR        = appData.peakSNR;
+    appData.peakModel.peakProminence = appData.peakProminence;
+    appData.peakModel.kFactor        = appData.kFactor;
+    appData.peakModel.instBroadening = appData.instBroadening_deg;
+    appData.peakModel.fitCurveColor  = appData.fitCurveColor;
+    appData.peakModel.showFitCurves  = appData.showFitCurves;
+    appData.peakModel.showSnipBg     = appData.showSnipBg;
+
     % Log-scale axes emit "Negative data ignored" from the axes layout
     % manager on every repaint (resize, pan, zoom, hover) when the data
     % contains zeros / negatives — typical for XRD counts. The transparent
@@ -2278,6 +2292,23 @@ function varargout = BosonPlotter(options)
     ddXraySource      = pw.ddXraySource;
     chkShowBG         = pw.chkShowBG;
 
+    % ── Peak Workshop hook (MASTERPLAN W5 #59) ──────────────────────────
+    % Bounded contract between BosonPlotter (owner of fig/ax/datasets)
+    % and the peak workshop. Replaces the giant peakCtx_ struct for any
+    % callback that has been migrated to the model + hook pattern.
+    % Hook fields are named function handles that close over the parent
+    % scope, so they always see the latest peakCb / appData state.
+    peakHook.getActiveData    = @() bosonPlotter.peak.getActiveData(appData, ddX, lbY, efXMin, efXMax);
+    peakHook.setStatus        = @(msg) setStatus(msg);
+    peakHook.drawOverlay      = @(xLo, xHi, label) bosonPlotter.peak.drawFitWindowOverlay(ax, xLo, xHi, label);
+    peakHook.clearOverlays    = @(varargin) bosonPlotter.peak.clearFitWindowOverlays(ax);
+    peakHook.replot           = @() onPlot([],[]);
+    peakHook.afterPeakChange  = @afterPeakChangeHook;
+    peakHook.showFailures     = @showPeakFailuresViaHook;
+    peakHook.logError         = @(ME) logGUIError(ME);
+    peakHook.fig              = fig;
+    peakHook.ax               = ax;
+
     % ── Initialize extracted peak-callbacks module ──────────────────────
     peakCtx_.appData            = appData;
     peakCtx_.fig                = fig;
@@ -2299,6 +2330,8 @@ function varargout = BosonPlotter(options)
     peakCtx_.setStatus          = @setStatus;
     peakCtx_.logGUIError        = @logGUIError;
     peakCtx_.getPlotData        = @getPlotData;
+    peakCtx_.model              = appData.peakModel;
+    peakCtx_.hook               = peakHook;
     peakCb = bosonPlotter.peakCallbacks(peakCtx_);
 
     % Rewire peak buttons created earlier (before peakCb existed)
@@ -3849,12 +3882,15 @@ function varargout = BosonPlotter(options)
     end
 
     function setPeakDetectField(fld, v)
-    %SETPEAKDETECTFIELD  Persist a Peak Workshop sidebar value to appData.
-    %   Used for SNR threshold and minimum prominence so the spinner state
-    %   survives across runs of auto-detect (and future sessions, once
-    %   AppState gains persistence).
+    %SETPEAKDETECTFIELD  Persist a Peak Workshop sidebar value to BOTH the
+    %   peakModel (canonical) and appData (mirror for back-compat). Used
+    %   for SNR threshold and minimum prominence so the spinner state
+    %   survives across runs of auto-detect.
         if ~isfinite(v) || v < 0, return; end
         appData.(fld) = v;
+        if ~isempty(appData.peakModel)
+            appData.peakModel.(fld) = v;
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -7550,6 +7586,36 @@ function onSendToOrigin(~,~)
             xV   = xV(valid);
         end
         yV = yV(valid);
+    end
+
+    % ── Peak Workshop hook helpers (nested fns; named for stable closures) ──
+    % getActiveData lives in +peak/getActiveData.m (called via the hook).
+    % afterPeakChangeHook stays nested because it closes over peakCb.
+
+    function showPeakFailuresViaHook(failures)
+    %SHOWPEAKFAILURESVIAHOOK  Open the rich Fit-Issues dialog, replacing any
+    %   prior one from the previous Fit Peaks run. Stores the new handle
+    %   on appData so the next call can close it cleanly.
+        prior = appData.peakFailuresDialog;
+        appData.peakFailuresDialog = bosonPlotter.peak.showFitFailuresDialog(fig, failures, prior);
+    end
+
+    function afterPeakChangeHook()
+    %AFTERPEAKCHANGEHOOK  Mirror peak model state to active dataset, refresh, replot.
+    %   Called by callbacks after model.detect / fitAll / addManual /
+    %   removePeak / clearPeaks. Writes model.peaks + model.snipBackground
+    %   onto the active dataset, refreshes the peak table, and triggers a
+    %   replot.
+        if isempty(appData.datasets) || appData.activeIdx < 1, return; end
+        if isempty(appData.peakModel), return; end
+        ds = appData.datasets{appData.activeIdx};
+        ds = appData.peakModel.applyToDataset(ds);
+        appData.datasets{appData.activeIdx} = ds;
+        if exist('peakCb','var') == 1 && isstruct(peakCb) ...
+                && isfield(peakCb, 'refreshPeakTable')
+            peakCb.refreshPeakTable();
+        end
+        onPlot([],[]);
     end
 
     % ── Analysis callbacks — stubs delegate to anaCb (analysisCallbacks.m) ─

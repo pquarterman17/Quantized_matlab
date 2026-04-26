@@ -65,127 +65,35 @@ cb.onKeyPress            = @onKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function onAutoPeak(~,~)
-    %ONAUTOPEAK  SNIP-based peak detection with manual seed preservation.
-    %
-    %  Uses utilities.findPeaksRobust for background-aware peak finding.
-    %  Manual seeds from previous runs are preserved via Pass 2 re-detection.
-    %  Output  — ds.peaks is REPLACED with deduplicated, centre-sorted result.
+    %ONAUTOPEAK  Workshop-pattern Auto Peaks: hook → model.detect → hook.afterPeakChange.
+    %   Bulk of the algorithm lives in the model and pure-math helpers.
+    %   This callback is now a thin orchestrator: pull data via the hook,
+    %   sync sidebar params onto the model, run detect, write back.
         if isempty(ctx.appData.datasets) || ctx.appData.activeIdx < 1
-            uialert(ctx.fig,'Load a file first.','No data'); return;
+            uialert(ctx.fig, 'Load a file first.', 'No data'); return;
         end
+
+        data = ctx.hook.getActiveData();
+        if isempty(data.x) || isempty(data.y)
+            uialert(ctx.fig, 'Select a Y channel and load a dataset first.', 'Auto Peaks');
+            return;
+        end
+        if numel(data.x) < 5
+            uialert(ctx.fig, 'Too few valid data points for peak detection.', 'Auto Peaks');
+            return;
+        end
+
+        % Bind the model to the active dataset, then refresh detection
+        % parameters from the sidebar widgets (canonical owners until 1d).
         ds = ctx.appData.datasets{ctx.appData.activeIdx};
-        d  = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
+        ctx.model.bindFromDataset(ds);
+        ctx.model.peakSNR        = readSidebar(ctx, 'efNoise',      ctx.model.peakSNR);
+        ctx.model.peakProminence = readSidebar(ctx, 'efProminence', ctx.model.peakProminence);
+        ctx.model.minSep         = ctx.efMinSep.Value;
+        ctx.model.fitModel       = ctx.ddFitModel.Value;
 
-        % ── Resolve x / y vectors ─────────────────────────────────────────
-        xSel  = ctx.ddX.Value;
-        xName = guiXName(d.metadata);
-        if strcmp(xSel, xName)
-            xv = double(d.time);
-        else
-            idx2 = find(strcmp(d.labels, xSel), 1);
-            xv   = guiTernary(isempty(idx2), double(d.time), d.values(:,idx2));
-        end
-        ySel = ensureCell(ctx.lbY.Value);
-        yIdx = find(strcmp(d.labels, ySel{1}), 1);
-        if isempty(yIdx)
-            uialert(ctx.fig,'Could not find selected Y channel.','Auto Peaks'); return;
-        end
-        yv    = d.values(:, yIdx);
-        dmask = buildDisplayMask(ds);
-        valid = ~isnan(xv) & ~isnan(yv) & dmask;
-        xv = xv(valid);  yv = yv(valid);
-        if numel(xv) < 5
-            uialert(ctx.fig,'Too few valid data points for peak detection.','Auto Peaks'); return;
-        end
-
-        % ── Restrict to visible x-range if limits are set ─────────────────
-        xMinLim = str2double(ctx.efXMin.Value);
-        xMaxLim = str2double(ctx.efXMax.Value);
-        if ~isnan(xMinLim) && ~isnan(xMaxLim) && xMinLim < xMaxLim
-            inView = xv >= xMinLim & xv <= xMaxLim;
-            if sum(inView) >= 5
-                xv = xv(inView);
-                yv = yv(inView);
-            end
-        end
-
-        xSpan = diff([min(xv), max(xv)]);
-
-        PEAK_SEP_TOL_FRAC   = 0.005;  % seeds closer than this are merged
-        PEAK_LOCAL_WIN_FRAC = 0.02;   % ±fraction of x-span for missed-seed search
-
-        % ── User-configurable detection params (sidebar of Peak Workshop) ──
-        userMinSep = ctx.efMinSep.Value;
-        userSNR    = readSidebar(ctx, 'efNoise',      5);
-        userProm   = readSidebar(ctx, 'efProminence', 0.02);
-
-        % ── Save existing manual seeds BEFORE rebuilding the list ─────────
-        if ~isempty(ds.peaks) && isfield(ds.peaks, 'status')
-            isManual     = strcmp({ds.peaks.status}, 'manual');
-            manualSeeds  = ds.peaks(isManual);
-        else
-            manualSeeds  = struct('center',{},'fwhm',{},'height',{},'area',{}, ...
-                                  'xRange',{},'status',{},'bg',{},'model',{},'eta',{}, ...
-                                  'prominence',{},'localSNR',{});
-        end
-
-        % ── SNIP-based peak detection ───────────────────────────────────
-        [merged, bgEst] = utilities.findPeaksRobust(xv(:), yv(:), ...
-            'SNRThreshold',  userSNR, ...
-            'MinProminence', userProm, ...
-            'MinSeparation', guiTernary(userMinSep > 0, userMinSep, 0), ...
-            'MaxPeaks',      50, ...
-            'MaxWindowDeg',  2.0);
-
-        % Store background estimate for overlay plotting
-        ds.snipBackground = struct('x', xv(:), 'bg', bgEst(:));
-
-        % ── Pass 2: force local search at missed manual seeds ────────────
-        minSep  = xSpan * PEAK_SEP_TOL_FRAC;
-        halfWin = xSpan * PEAK_LOCAL_WIN_FRAC;
-
-        for si = 1:numel(manualSeeds)
-            seedX = manualSeeds(si).center;
-            if ~isempty(merged)
-                if any(abs([merged.center] - seedX) <= minSep)
-                    continue;
-                end
-            end
-
-            inWin = xv >= (seedX - halfWin) & xv <= (seedX + halfWin);
-            if ~any(inWin)
-                merged(end+1) = manualSeeds(si);  %#ok<AGROW>
-                continue;
-            end
-            xWin = xv(inWin);  yWin = yv(inWin);
-
-            try
-                [lH, lX, lW, ~] = findpeaks(yWin, xWin, 'SortStr', 'none');
-                if isempty(lX)
-                    [lH, mi] = max(yWin);  lX = xWin(mi);  lW = halfWin * 0.5;
-                else
-                    [~, ci] = min(abs(lX - seedX));
-                    lH = lH(ci);  lX = lX(ci);  lW = lW(ci);
-                end
-            catch
-                [lH, mi] = max(yWin);  lX = xWin(mi);  lW = halfWin * 0.5;
-            end
-
-            newPk.center     = lX;
-            newPk.fwhm       = lW;
-            newPk.height     = lH;
-            newPk.area       = NaN;
-            newPk.xRange     = [];
-            newPk.status     = 'manual';
-            newPk.bg         = NaN;
-            newPk.model      = '';
-            newPk.eta        = NaN;
-            newPk.prominence = NaN;
-            newPk.localSNR   = NaN;
-            merged(end+1) = newPk;  %#ok<AGROW>
-        end
-
-        if isempty(merged)
+        ctx.model.detect(data.x, data.y);
+        if isempty(ctx.model.peaks)
             uialert(ctx.fig, ...
                 ['No peaks found. ' ...
                  'Add manual seeds with the Add Peak button, or adjust ' ...
@@ -194,14 +102,7 @@ cb.onKeyPress            = @onKeyPress;
             return;
         end
 
-        % ── Deduplicate and sort by centre position ───────────────────────
-        merged = bosonPlotter.peak.deduplicatePeaks(merged, minSep);
-        [~, ord] = sort([merged.center]);
-        ds.peaks = merged(ord);
-
-        ctx.appData.datasets{ctx.appData.activeIdx} = ds;
-        refreshPeakTable();
-        ctx.onPlot();
+        ctx.hook.afterPeakChange();
         ctx.showPeakWindow();
     end
 
@@ -226,7 +127,7 @@ cb.onKeyPress            = @onKeyPress;
     end
 
     function onManualPeakClick(~,~)
-    %ONMANUALPEAKCLICK  Record a click on the plot as a peak seed.
+    %ONMANUALPEAKCLICK  Workshop-pattern Add Peak: hook → model.addManual → hook.afterPeakChange.
         cp     = ctx.ax.CurrentPoint;
         xClick = cp(1,1);  yClick = cp(1,2);
         if xClick < ctx.ax.XLim(1) || xClick > ctx.ax.XLim(2) || ...
@@ -234,113 +135,19 @@ cb.onKeyPress            = @onKeyPress;
             return;
         end
 
+        data = ctx.hook.getActiveData();
+        if isempty(data.x) || numel(data.x) < 5
+            return;
+        end
+
         ds = ctx.appData.datasets{ctx.appData.activeIdx};
-        d  = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
+        ctx.model.bindFromDataset(ds);
+        ctx.model.fitModel = ctx.ddFitModel.Value;
+        ctx.model.addManual(xClick, data.x, data.y);
 
-        % Resolve x/y vectors (same logic as onAutoPeak)
-        xSel  = ctx.ddX.Value;
-        xName = guiXName(d.metadata);
-        if strcmp(xSel, xName)
-            xv = double(d.time);
-        else
-            idx2 = find(strcmp(d.labels, xSel), 1);
-            xv   = guiTernary(isempty(idx2), double(d.time), d.values(:,idx2));
-        end
-        ySel = ensureCell(ctx.lbY.Value);
-        yIdx = find(strcmp(d.labels, ySel{1}), 1);
-        if isempty(yIdx), return; end
-        yv = d.values(:, yIdx);
-        dmask = buildDisplayMask(ds);
-
-        % Search within 3 % of x-axis range of click for the NEAREST local
-        % maximum (not the global max — which misses the smaller of two close peaks).
-        xWin  = diff(ctx.ax.XLim) * 0.03;
-        inWin = xv >= (xClick - xWin) & xv <= (xClick + xWin) & ~isnan(yv) & dmask;
-        if any(inWin)
-            xInWin = xv(inWin);
-            yInWin = yv(inWin);
-            % Find all local maxima in the window
-            nW = numel(yInWin);
-            if nW >= 3
-                isLMax = false(nW,1);
-                isLMax(2:end-1) = yInWin(2:end-1) > yInWin(1:end-2) & ...
-                                  yInWin(2:end-1) > yInWin(3:end);
-                if any(isLMax)
-                    % Pick the local max nearest to the click x-position
-                    lmX = xInWin(isLMax);
-                    lmH = yInWin(isLMax);
-                    [~, nearI] = min(abs(lmX - xClick));
-                    pkX = lmX(nearI);
-                    pkH = lmH(nearI);
-                else
-                    % No local max — fall back to nearest point
-                    [~, nearI] = min(abs(xInWin - xClick));
-                    pkX = xInWin(nearI);
-                    pkH = yInWin(nearI);
-                end
-            else
-                [~, nearI] = min(abs(xInWin - xClick));
-                pkX = xInWin(nearI);
-                pkH = yInWin(nearI);
-            end
-        else
-            pkX = xClick;
-            pkH = yClick;
-        end
-
-        newPk.center     = pkX;
-        newPk.fwhm       = NaN;
-        newPk.height     = pkH;
-        newPk.area       = NaN;
-        newPk.xRange     = [];
-        newPk.status     = 'manual';
-        newPk.bg         = NaN;
-        newPk.model      = '';
-        newPk.eta        = NaN;
-        newPk.prominence = NaN;
-        newPk.localSNR   = NaN;
-
-        % ── Auto-fit on add: estimate local FWHM, then run a quick local
-        %    fit so the user sees a result immediately. Failures are quiet
-        %    here — peak stays as 'manual' and the user can press Fit Peaks
-        %    later (which will surface a rich diagnostic dialog).
-        xvAll = double(d.time);  yvAll = d.values(:, yIdx);
-        validAll = ~isnan(xvAll) & ~isnan(yvAll) & dmask;
-        xvSorted = xvAll(validAll);  yvSorted = yvAll(validAll);
-        [xvSorted, sortIdx] = sort(xvSorted);
-        yvSorted = yvSorted(sortIdx);
-        if numel(xvSorted) >= 5
-            xSpanAll = diff([min(xvSorted), max(xvSorted)]);
-            fwhmEst  = bosonPlotter.peak.estimateLocalFWHM(xvSorted, yvSorted, pkX, xSpanAll);
-            seed = struct('center', pkX, 'fwhm', fwhmEst);
-            if isfinite(fwhmEst)
-                hw  = 3.0 * fwhmEst;
-            else
-                hw  = xSpanAll * 0.03;
-            end
-            xLo = pkX - hw;  xHi = pkX + hw;
-            r = bosonPlotter.peak.fitSinglePeak(xvSorted, yvSorted, xLo, xHi, seed, ctx.ddFitModel.Value, []);
-            if r.success
-                newPk.center = r.center;
-                newPk.fwhm   = r.fwhm;
-                newPk.height = r.height;
-                newPk.bg     = r.bg;
-                newPk.eta    = r.eta;
-                newPk.area   = r.area;
-                newPk.model  = r.model;
-                newPk.status = 'fitted';
-            elseif isfinite(fwhmEst)
-                newPk.fwhm = fwhmEst;  % still useful as a seed for later Fit Peaks
-            end
-        end
-
-        ds.peaks(end+1) = newPk;
-        ctx.appData.datasets{ctx.appData.activeIdx} = ds;
-
-        refreshPeakTable();
-        ctx.onPlot();
+        ctx.hook.afterPeakChange();
         % Auto-open peak window on first peak
-        if isscalar(ds.peaks), ctx.showPeakWindow(); end
+        if isscalar(ctx.model.peaks), ctx.showPeakWindow(); end
         % Stay in pick mode — user presses button again to stop
     end
 
@@ -401,12 +208,11 @@ cb.onKeyPress            = @onKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function onFitPeaks(~,~)
-    %ONFITPEAKS  Fit each entry in ds.peaks via fitSinglePeak, with retry pass.
-    %  First pass: window from pk.xRange | ±3·FWHM | fallback ±3% of x-span.
-    %  Second pass (failed peaks only): widen window 1.5× and subtract the
-    %  SNIP background if available. Failures are collected with a reason
-    %  per peak and presented in a rich diagnostic dialog plus translucent
-    %  fit-window overlays on the main plot.
+    %ONFITPEAKS  Workshop-pattern Fit Peaks: hook → model.fitAll → hook.afterPeakChange.
+    %   Algorithmic core (per-peak fit + retry pass + failure-reason
+    %   tagging) lives in PeakWorkshopModel.fitAll. This callback handles
+    %   only the orchestration: pull data, run fitAll, draw failure
+    %   overlays + show the rich diagnostic dialog.
         if isempty(ctx.appData.datasets) || ctx.appData.activeIdx < 1
             uialert(ctx.fig,'Load a file first.','No data'); return;
         end
@@ -415,105 +221,33 @@ cb.onKeyPress            = @onKeyPress;
             uialert(ctx.fig,'No peaks to fit.  Use Auto Find Peaks or Add Peak first.','No peaks'); return;
         end
 
-        d    = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
-        xSel = ctx.ddX.Value;
-        xName = guiXName(d.metadata);
-        if strcmp(xSel, xName)
-            xv = double(d.time);
-        else
-            idx2 = find(strcmp(d.labels, xSel), 1);
-            xv   = guiTernary(isempty(idx2), double(d.time), d.values(:,idx2));
-        end
-        ySel = ensureCell(ctx.lbY.Value);
-        yIdx = find(strcmp(d.labels, ySel{1}), 1);
-        if isempty(yIdx), uialert(ctx.fig,'Could not find Y channel.','Fit Peaks'); return; end
-        yv = d.values(:, yIdx);
-
-        dmask = buildDisplayMask(ds);
-        valid = ~isnan(xv) & ~isnan(yv) & dmask;
-        xv = xv(valid);  yv = yv(valid);
-        % Ensure monotone-increasing xv for fitSinglePeak
-        [xv, sortIdx] = sort(xv);
-        yv = yv(sortIdx);
-        xSpan = diff([min(xv), max(xv)]);
-
-        % Cached SNIP background aligned to xv (used in retry pass)
-        snipBg = bosonPlotter.peak.alignSnipBackground(ds, xv);
-
-        % Clear any prior fit-window overlays before this run.
-        bosonPlotter.peak.clearFitWindowOverlays(ctx.ax);
-
-        modelName = ctx.ddFitModel.Value;
-        failures = struct('idx', {}, 'center', {}, 'reason', {}, ...
-                          'suggestion', {}, 'window', {});
-
-        for pki = 1:numel(ds.peaks)
-            pk = ds.peaks(pki);
-
-            % ── First-pass window ─────────────────────────────────────
-            if ~isempty(pk.xRange) && numel(pk.xRange) == 2
-                xLo = pk.xRange(1);  xHi = pk.xRange(2);
-            elseif ~isnan(pk.fwhm) && pk.fwhm > 0
-                hw   = 3.0 * pk.fwhm;
-                xLo  = pk.center - hw;
-                xHi  = pk.center + hw;
-            else
-                hw   = xSpan * 0.03;
-                xLo  = pk.center - hw;
-                xHi  = pk.center + hw;
-            end
-
-            seed = struct('center', pk.center, 'fwhm', pk.fwhm);
-            r = bosonPlotter.peak.fitSinglePeak(xv, yv, xLo, xHi, seed, modelName, []);
-
-            % ── Retry pass: widen window 1.5× and subtract SNIP bg ──
-            if ~r.success
-                % Retry once with a 1.5x widened window and SNIP-bg subtraction.
-                % We keep the retry result either way: success → fitted; failure
-                % → the second-pass reason and window are more informative for
-                % the diagnostic dialog than the first pass would be.
-                hw2  = 1.5 * (xHi - xLo) / 2;
-                xLo2 = pk.center - hw2;
-                xHi2 = pk.center + hw2;
-                r = bosonPlotter.peak.fitSinglePeak(xv, yv, xLo2, xHi2, seed, modelName, snipBg);
-            end
-
-            if r.success
-                ds.peaks(pki).center = r.center;
-                ds.peaks(pki).fwhm   = r.fwhm;
-                ds.peaks(pki).height = r.height;
-                ds.peaks(pki).bg     = r.bg;
-                ds.peaks(pki).eta    = r.eta;
-                ds.peaks(pki).area   = r.area;
-                ds.peaks(pki).status = 'fitted';
-                ds.peaks(pki).model  = r.model;
-                if strcmp(r.model, 'Split Pearson VII')
-                    ds.peaks(pki).asymmetry = abs(r.params(3)) / abs(r.params(4));
-                    ds.peaks(pki).fitParams = r.params;
-                elseif strcmp(r.model, 'TCH-pV')
-                    ds.peaks(pki).fitParams = r.params;
-                end
-            else
-                bosonPlotter.peak.drawFitWindowOverlay(ctx.ax, r.window(1), r.window(2), sprintf('#%d', pki));
-                failures(end+1) = struct(...
-                    'idx',        pki, ...
-                    'center',     pk.center, ...
-                    'reason',     r.reason, ...
-                    'suggestion', bosonPlotter.peak.suggestNextStep(r.reason, modelName), ...
-                    'window',     r.window); %#ok<AGROW>
-            end
+        data = ctx.hook.getActiveData();
+        if isempty(data.x) || isempty(data.y)
+            uialert(ctx.fig, 'Could not resolve active X / Y channel.', 'Fit Peaks');
+            return;
         end
 
-        ctx.appData.datasets{ctx.appData.activeIdx} = ds;
-        refreshPeakTable();
-        ctx.onPlot();
+        ctx.hook.clearOverlays();
+        ctx.model.bindFromDataset(ds);
+        ctx.model.fitModel = ctx.ddFitModel.Value;
+
+        failures = ctx.model.fitAll(data.x, data.y);
+
+        % Draw failure overlays + status update before writeback so the user
+        % sees the red windows immediately.
+        for fi = 1:numel(failures)
+            f = failures(fi);
+            ctx.hook.drawOverlay(f.window(1), f.window(2), sprintf('#%d', f.idx));
+        end
+
+        ctx.hook.afterPeakChange();
 
         if ~isempty(failures)
             ctx.setStatus(sprintf('%d of %d peak(s) failed to fit — see dialog and red windows on plot.', ...
-                numel(failures), numel(ds.peaks)));
-            bosonPlotter.peak.showFitFailuresDialog(ctx.fig, failures);
+                numel(failures), numel(ctx.model.peaks)));
+            ctx.hook.showFailures(failures);
         else
-            ctx.setStatus(sprintf('Fitted %d peak(s).', numel(ds.peaks)));
+            ctx.setStatus(sprintf('Fitted %d peak(s).', numel(ctx.model.peaks)));
         end
     end
 
@@ -773,9 +507,10 @@ cb.onKeyPress            = @onKeyPress;
 % ════════════════════════════════════════════════════════════════════════
 
     function onClearPeaks(~,~)
+    %ONCLEARPEAKS  Workshop-pattern Clear: hook → model.clearPeaks → afterPeakChange.
         if isempty(ctx.appData.datasets) || ctx.appData.activeIdx < 1, return; end
         ctx.cancelInteractions();
-        ds       = ctx.appData.datasets{ctx.appData.activeIdx};
+        ds = ctx.appData.datasets{ctx.appData.activeIdx};
         if ~isempty(ds.peaks)
             nFitted = sum(strcmp({ds.peaks.status},'fitted') | strcmp({ds.peaks.status},'fitted(global)'));
             if nFitted > 0
@@ -786,25 +521,24 @@ cb.onKeyPress            = @onKeyPress;
                 if ~strcmp(sel, 'Clear'), return; end
             end
         end
-        ds.peaks = struct('center',{},'fwhm',{},'height',{},'area',{},'xRange',{},'status',{},'bg',{},'model',{},'eta',{},'prominence',{},'localSNR',{});
-        ctx.appData.datasets{ctx.appData.activeIdx} = ds;
-        ctx.appData.selectedPeakIdx = 0;
-        refreshPeakTable();
-        ctx.onPlot();
+        ctx.model.bindFromDataset(ds);
+        ctx.model.clearPeaks();
+        ctx.appData.selectedPeakIdx = 0;     % mirror for back-compat
+        ctx.hook.afterPeakChange();
     end
 
     function onRemoveSelectedPeak(~,~)
+    %ONREMOVESELECTEDPEAK  Workshop-pattern Remove: model.removePeak → afterPeakChange.
         if isempty(ctx.appData.datasets) || ctx.appData.activeIdx < 1, return; end
         pki = ctx.appData.selectedPeakIdx;
         if pki < 1, return; end
         ctx.cancelInteractions();
         ds = ctx.appData.datasets{ctx.appData.activeIdx};
         if pki > numel(ds.peaks), return; end
-        ds.peaks(pki) = [];
-        ctx.appData.datasets{ctx.appData.activeIdx} = ds;
-        ctx.appData.selectedPeakIdx = 0;
-        refreshPeakTable();
-        ctx.onPlot();
+        ctx.model.bindFromDataset(ds);
+        ctx.model.removePeak(pki);
+        ctx.appData.selectedPeakIdx = 0;     % mirror for back-compat
+        ctx.hook.afterPeakChange();
     end
 
     function onPeakTableSelect(~, evt)

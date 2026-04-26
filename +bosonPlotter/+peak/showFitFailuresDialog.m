@@ -1,12 +1,34 @@
-function showFitFailuresDialog(parentFig, failures)
+function dlg = showFitFailuresDialog(parentFig, failures, prior)
 %SHOWFITFAILURESDIALOG  Rich dialog listing failed peaks + actionable hints.
-%   failures: struct array with .idx .center .reason .suggestion .window
-    if isempty(failures), return; end
+%
+%   dlg = showFitFailuresDialog(parentFig, failures)
+%   dlg = showFitFailuresDialog(parentFig, failures, prior)
+%
+%   If `prior` is a handle to an earlier dialog still open from a previous
+%   Fit Peaks run, it is closed before the new one appears. Pass the
+%   previous return value here on each subsequent call to avoid stacking
+%   dialogs across fits.
+%
+%   Returns the new uifigure handle so the caller can store it for the
+%   next call. If `failures` is empty, no dialog is created and `dlg`
+%   is returned as `[]` (and any prior dialog is still closed cleanly).
+
+    if nargin < 3, prior = []; end
+
+    % ── Close any prior dialog from an earlier fit ───────────────────
+    if ~isempty(prior) && isgraphics(prior) && isvalid(prior)
+        delete(prior);
+    end
+
+    if isempty(failures)
+        dlg = []; return;
+    end
     nF = numel(failures);
 
     dlg = uifigure('Name', sprintf('Fit Issues (%d peak%s)', nF, plural(nF)), ...
         'Position', [300 250 540 min(420, 110 + 64*nF)], ...
-        'Resize', 'off');
+        'Resize', 'off', ...
+        'CloseRequestFcn', @(src,~) delete(src));
     rootGL = uigridlayout(dlg, [3 1], ...
         'RowHeight', {26, '1x', 32}, ...
         'Padding', [12 10 12 10], 'RowSpacing', 6);
@@ -39,8 +61,21 @@ function showFitFailuresDialog(parentFig, failures)
         'ButtonPushedFcn', @(~,~) delete(dlg));
     btnOK.Layout.Column = 2;
 
-    if ~isempty(parentFig) && isvalid(parentFig) && ~strcmpi(parentFig.Visible, 'off')
-        figure(dlg);
+    % If the parent BosonPlotter figure dies, close the dialog with it so
+    % we don't leak orphaned uifigures across MATLAB sessions.
+    if ~isempty(parentFig) && isgraphics(parentFig) && isvalid(parentFig)
+        addlistener(parentFig, 'ObjectBeingDestroyed', ...
+            @(~,~) tryDelete(dlg));
+        if ~strcmpi(parentFig.Visible, 'off')
+            figure(dlg);
+        end
+    end
+end
+
+function tryDelete(h)
+    try
+        if isgraphics(h) && isvalid(h), delete(h); end
+    catch
     end
 end
 
