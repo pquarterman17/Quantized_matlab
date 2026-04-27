@@ -1675,8 +1675,10 @@ end
 %  J. Miscellaneous
 % ════════════════════════════════════════════════════════════════════════
 
-% ── J52. Settings dialog ─────────────────────────────────────────────────
-fprintf('\n══ TEST J52: Settings dialog ══\n');
+% ── J52. Settings menu entry ─────────────────────────────────────────────
+% Settings is now reached from the File menu (the panel button was removed
+% in the corrections-panel UX pass — discoverability lives in the menu bar).
+fprintf('\n══ TEST J52: Settings menu entry ══\n');
 if ~canPopup
     fprintf('  SKIP (headless — popup uifigures not available)\n'); skipped = skipped + 1;
 else
@@ -1685,22 +1687,22 @@ try
     closePopups(api.fig);
     showTestFig(api.fig);
 
-    % Settings button text is char(9881) + '  Settings...'
-    allBtns = findobj(api.fig, 'Type', 'uibutton');
-    settBtn = [];
-    for k = 1:numel(allBtns)
-        if contains(allBtns(k).Text, 'Settings', 'IgnoreCase', true)
-            settBtn = allBtns(k); break;
+    allMenus = findobj(api.fig, 'Type', 'uimenu');
+    settMenu = [];
+    for k = 1:numel(allMenus)
+        if startsWith(allMenus(k).Text, 'Settings', 'IgnoreCase', true)
+            settMenu = allMenus(k); break;
         end
     end
-    assert(~isempty(settBtn), 'Settings button not found');
+    assert(~isempty(settMenu), 'Settings menu entry not found');
+    assert(~isempty(settMenu.MenuSelectedFcn), 'Settings menu entry has no callback');
 
-    settBtn.ButtonPushedFcn(settBtn, []);
+    settMenu.MenuSelectedFcn(settMenu, []);
     drawnow; pause(0.2);
 
     settFig = findall(groot, 'Type', 'figure', 'Name', 'Settings');
     assert(~isempty(settFig) && isvalid(settFig), 'Settings dialog did not open');
-    fprintf('  Settings dialog opened\n');
+    fprintf('  Settings dialog opened from menu\n');
 
     delete(settFig); drawnow;
     hideTestFig(api.fig);
@@ -1712,25 +1714,24 @@ catch ME
 end
 end
 
-% ── J53. Shortcuts button present with callback ───────────────────────────
-fprintf('\n══ TEST J53: Shortcuts button ══\n');
+% ── J53. Shortcuts menu entry present with callback ──────────────────────
+% Like Settings, the panel-side Shortcuts button was removed; users reach
+% it from the Help menu now.
+fprintf('\n══ TEST J53: Shortcuts menu entry ══\n');
 try
     api.reset(); drawnow;
     showTestFig(api.fig);
 
-    allBtns = findobj(api.fig, 'Type', 'uibutton');
-    btn = [];
-    for k = 1:numel(allBtns)
-        if contains(allBtns(k).Text, 'Shortcuts', 'IgnoreCase', true)
-            btn = allBtns(k); break;
+    allMenus = findobj(api.fig, 'Type', 'uimenu');
+    item = [];
+    for k = 1:numel(allMenus)
+        if contains(allMenus(k).Text, 'Shortcut', 'IgnoreCase', true)
+            item = allMenus(k); break;
         end
     end
-    assert(~isempty(btn), 'Shortcuts button not found');
-
-    % onShowShortcuts fires a uialert — cannot auto-dismiss in headless mode.
-    % Verify the button has a callback registered.
-    assert(~isempty(btn.ButtonPushedFcn), 'Shortcuts button has no callback');
-    fprintf('  Shortcuts button found: "%s", callback set\n', btn.Text);
+    assert(~isempty(item), 'Shortcuts menu entry not found');
+    assert(~isempty(item.MenuSelectedFcn), 'Shortcuts menu entry has no callback');
+    fprintf('  Shortcuts menu entry found: "%s", callback set\n', item.Text);
 
     hideTestFig(api.fig);
     fprintf('  PASS\n'); passed = passed + 1;
@@ -1960,13 +1961,15 @@ function btn = findButtonByTag(fig, tagStr)
 end
 
 function btn = findAdvancedAnalysisButton(fig)
-%FINDADVANCEDANALYSISBUTTON  Find the Advanced Analysis popup button.
-%   Checks both sidebar (corrPanel) and savePanel versions.
+%FINDADVANCEDANALYSISBUTTON  Find the Tools-menu popup button (formerly
+%   "Advanced Analysis" — relabelled to "Tools ▾" in the corrections-
+%   panel UX pass).
     allBtns = findobj(fig, 'Type', 'uibutton');
     btn = [];
     for k = 1:numel(allBtns)
         txt = allBtns(k).Text;
-        if contains(txt, 'Advanced Analysis', 'IgnoreCase', true)
+        if contains(txt, 'Tools ', 'IgnoreCase', false) || ...
+                contains(txt, 'Advanced Analysis', 'IgnoreCase', true)
             btn = allBtns(k); return;
         end
     end

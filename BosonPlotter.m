@@ -492,8 +492,6 @@ function varargout = BosonPlotter(options)
         'onGroupChanged',            @onGroupChanged, ...
         'onAddToGroup',              @onAddToGroup, ...
         'onRemoveFromGroup',         @onRemoveFromGroup, ...
-        'onShowShortcuts',           @onShowShortcuts, ...
-        'onOpenSettings',            @(~,~) onOpenSettings(), ...
         'onSelectDataset',           @onSelectDataset, ...
         'onDuplicateDataset',        @onDuplicateDataset, ...
         'onToggleDatasetVisibility', @onToggleDatasetVisibility, ...
@@ -522,8 +520,6 @@ function varargout = BosonPlotter(options)
     ddGroup             = flUI_.ddGroup;
     btnAddToGroup       = flUI_.btnAddToGroup;      %#ok<NASGU>
     btnRemoveFromGroup  = flUI_.btnRemoveFromGroup; %#ok<NASGU>
-    btnShortcuts        = flUI_.btnShortcuts;       %#ok<NASGU>
-    btnSettings         = flUI_.btnSettings;        %#ok<NASGU>
     lbDatasets          = flUI_.lbDatasets;
     cmDatasets          = flUI_.cmDatasets;         %#ok<NASGU>
 
@@ -1129,7 +1125,7 @@ function varargout = BosonPlotter(options)
     corrGL                = corrUI_.corrGL;
     CROW                  = corrUI_.CROW;
     ddCorrStyle           = corrUI_.ddCorrStyle;
-    cbLivePreview         = corrUI_.cbLivePreview;
+    ddApplyMode           = corrUI_.ddApplyMode;          %#ok<NASGU>
     btnAdvancedCorr       = corrUI_.btnAdvancedCorr;       %#ok<NASGU>
     lblSecOffsets         = corrUI_.lblSecOffsets;
     appData.sectionHeaders.offsets    = lblSecOffsets;
@@ -1192,7 +1188,6 @@ function varargout = BosonPlotter(options)
     btnAutoMagCorr      = corrUI_.btnAutoMagCorr;       %#ok<NASGU>
     ddAutoMagScope      = corrUI_.ddAutoMagScope;       %#ok<NASGU>
     btnApply            = corrUI_.btnApply;
-    cbAutoRecalc        = corrUI_.cbAutoRecalc;         %#ok<NASGU>
     btnReset            = corrUI_.btnReset;
     cbShowRaw           = corrUI_.cbShowRaw;            %#ok<NASGU>
     btnApplyAll         = corrUI_.btnApplyAll;
@@ -1825,7 +1820,7 @@ function varargout = BosonPlotter(options)
     ui.ddYFmt           = ddYFmt;
     % CorrStyle / LivePreview selectors
     ui.ddCorrStyle      = ddCorrStyle;
-    ui.cbLivePreview    = cbLivePreview;
+    ui.ddApplyMode      = ddApplyMode;
     % Cursor readout panel
     ui.cursorPanel      = cursorPanelObj;
 
@@ -3815,29 +3810,36 @@ function varargout = BosonPlotter(options)
 
     function markCorrectionsDirty()
     %MARKCORRECTIONSDIRTY  Visually indicate that correction fields have
-    %  changed and the plot may be stale.  If live-preview is enabled (#2),
-    %  immediately apply corrections and redraw instead.  If auto-recalc is
-    %  enabled, schedule a debounced recalculation instead.
-        if cbLivePreview.Value
+    %  changed and the plot may be stale.  Routes through the Apply Mode
+    %  dropdown: Live → apply immediately; Auto → debounce 0.3 s; Manual →
+    %  just mark Apply as dirty and wait for click.
+        mode = applyMode_();
+        if strcmp(mode, 'Live')
             onApplyCorrections([], []);
             return;
         end
-        scheduleAutoRecalc();
+        if strcmp(mode, 'Auto'), scheduleAutoRecalc(); end
         if isvalid(btnApply)
             btnApply.Text      = 'Apply  *';
             btnApply.FontColor = [1 0.85 0.2];
         end
     end
 
+    function m = applyMode_()
+    %APPLYMODE_  Read the Apply Mode dropdown safely (returns 'Live' if
+    %   the dropdown is gone — matches the historical default).
+        if isvalid(corrUI_.ddApplyMode)
+            m = corrUI_.ddApplyMode.Value;
+        else
+            m = 'Live';
+        end
+    end
+
     function scheduleAutoRecalc()
     %SCHEDULEAUTORECALC  Debounced auto-recalculate trigger.
-    %   If the Auto checkbox is off, returns immediately.  Otherwise stops
-    %   any pending timer and starts a new 0.3 s single-shot timer whose
-    %   callback fires onApplyCorrections.  Rapid successive changes restart
-    %   the delay, so recalculation happens once the user pauses.
-        if ~isvalid(cbAutoRecalc) || ~cbAutoRecalc.Value
-            return;
-        end
+    %   Stops any pending timer and starts a new 0.3 s single-shot timer
+    %   whose callback fires onApplyCorrections.  Rapid successive changes
+    %   restart the delay, so recalculation happens once the user pauses.
         % Stop and discard any pending timer
         if ~isempty(appData.autoRecalcTimer) && isvalid(appData.autoRecalcTimer)
             stop(appData.autoRecalcTimer);
@@ -3860,12 +3862,12 @@ function varargout = BosonPlotter(options)
     end
 
     function updateApplyButtonStyle()
-    %UPDATEAPPLYBUTTONSTYLE  Style the Apply button based on Live Preview / Auto state.
-    %   When Live Preview or Auto is ON, Apply is redundant — show it as muted.
-    %   When both are OFF, highlight it as the primary action the user needs to click.
+    %UPDATEAPPLYBUTTONSTYLE  Style the Apply button based on Apply Mode.
+    %   Live / Auto → Apply is redundant, show it muted. Manual → highlight
+    %   it as the primary action the user needs to click.
         if ~isvalid(btnApply), return; end
-        autoActive = isvalid(cbAutoRecalc) && cbAutoRecalc.Value;
-        if cbLivePreview.Value || autoActive
+        m = applyMode_();
+        if strcmp(m, 'Live') || strcmp(m, 'Auto')
             btnApply.BackgroundColor = BTN_TOOL;
             btnApply.FontColor       = tk.color.textMuted;
             btnApply.FontWeight      = 'normal';
