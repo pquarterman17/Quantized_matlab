@@ -32,15 +32,14 @@ function test_bosonPlotterSize
     % ════════════════════════════════════════════════════════════════════
     %  TEST 1: Line-count ratchet
     % ════════════════════════════════════════════════════════════════════
-    % Current: 8,373 lines (2026-04-25 — added theme-toggle toolbar
-    % button + onToggleTheme/themeToggleLabel helpers; small bump for
-    % the new feature. Earlier same day: Axes panel consolidation
-    % removed axLimGL/axLimPanel/axAdvGL and reparented limit widgets).
+    % Current: 8,230 lines (2026-04-26 — extracted Save/Export panel to
+    % +bosonPlotter/buildExportPanel.m; -170 lines net. First UI-construction
+    % extraction; previous extractions targeted callbacks only).
     % Target per W5 #22: < 8,000.
-    % Ceiling carries a small buffer (~30 lines) so one in-flight edit
+    % Ceiling carries a small buffer (~20 lines) so one in-flight edit
     % won't fail the build before an extraction commit lands. Ratchet
     % DOWN whenever an extraction lowers the baseline.
-    LINE_CEILING = 8400;
+    LINE_CEILING = 8250;
 
     fprintf('\n== TEST 1: BosonPlotter.m line-count ratchet ==\n');
     try
