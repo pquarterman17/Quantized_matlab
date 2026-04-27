@@ -29,12 +29,30 @@ function btn = sectionHeader(parent, label, callback, varargin)
 %   Layout.Column, and update Text on subsequent toggles.
 
     p = inputParser;
-    tk = bosonPlotter.uxTokens();
+    p.addParameter('Theme', '');           % '', 'dark', 'light' — '' uses default
     p.addParameter('Tooltip', '');
-    p.addParameter('FontColor', tk.color.textMuted);
-    p.addParameter('BackgroundColor', tk.color.bgPanel);
+    p.addParameter('FontColor', []);
+    p.addParameter('BackgroundColor', []);
     p.parse(varargin{:});
     opts = p.Results;
+
+    % Resolve theme tokens from the requested theme so headers built in
+    % light mode start with light colours. Without this argument, every
+    % section header was painted with dark-theme tokens at construction
+    % regardless of the active theme — the runtime walker had to fix it
+    % later, leaving a flash of wrong-colour headers for callers that
+    % build under a non-default theme.
+    if isempty(opts.Theme)
+        tk = bosonPlotter.uxTokens();
+    else
+        tk = bosonPlotter.uxTokens(opts.Theme);
+    end
+    if isempty(opts.FontColor)
+        opts.FontColor = tk.color.textMuted;
+    end
+    if isempty(opts.BackgroundColor)
+        opts.BackgroundColor = tk.color.bgPanel;
+    end
 
     btn = uibutton(parent, ...
         'Text',                 label, ...

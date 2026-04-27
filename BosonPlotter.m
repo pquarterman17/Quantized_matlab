@@ -366,14 +366,12 @@ function varargout = BosonPlotter(options)
                              'Position',[-9999 -9999 initW initH]}];
     end
     fig = uifigure(figArgs{:});
-    % MATLAB R2024b+ figure-level theme — controls how built-in widget
-    % chrome (uitable empty viewports, scrollbars, dropdown overlays)
-    % renders. Without this, uitable's empty-data area renders with
-    % MATLAB's default dark-IDE chrome regardless of our manual
-    % BackgroundColor writes. Wrapped in try/catch for older MATLAB.
-    try, theme(fig, 'dark'); catch, end
-    % UX design tokens — see +bosonPlotter/uxTokens.m for the scale.
-    tk = bosonPlotter.uxTokens();
+    % R2024b+ figure-level theme + persisted preference (Dark/Light).
+    % Both theme() and uxTokens() must see the same value, and so must
+    % appData.theme below — see +bosonPlotter/themePref.m.
+    persistedTheme_ = bosonPlotter.themePref('read');
+    try, theme(fig, lower(persistedTheme_)); catch, end
+    tk = bosonPlotter.uxTokens(lower(persistedTheme_));
     % Expose the macro log on the figure so `bosonPlotter.exportScript(fig, ...)`
     % and other free-function helpers can find it without an `api` reference.
     setappdata(fig, 'macroLog', appData.macroLog);
@@ -613,11 +611,9 @@ function varargout = BosonPlotter(options)
         'ValueChangedFcn', @onTemplateChanged);
     ddTemplate.Layout.Row = 2; ddTemplate.Layout.Column = [2 4];
 
-    % Theme value stored here but UI moved to Settings dialog. Default
-    % matches the construction-time uxTokens('dark') palette so the
-    % state field agrees with the painted appearance from the very
-    % first frame; toggling via Settings or the toolbar button flips it.
-    appData.theme = 'Dark';
+    % Theme: read from prefdir at startup (see persistedTheme_ above);
+    % toggling via Settings/toolbar writes back via themePref('write').
+    appData.theme = persistedTheme_;
 
     % Row 5: Axis scale dropdowns (3 rows: X, Left Y, Right Y)
     scaleGL = uigridlayout(ctrlGL,[3 2], ...
@@ -3613,13 +3609,12 @@ function varargout = BosonPlotter(options)
     end
 
     function setThemeDirect(name)
-    %SETTHEMEDIRECT  Test hook: flip appData.theme and retheme the
-    %   main window.  Mirrors what applyThemeFromDialog does via the
-    %   Settings dialog, minus the settings-dialog side-effects.
+    %SETTHEMEDIRECT  Flip appData.theme, retheme, persist to prefdir.
         name = char(name);
         if ~any(strcmp({'Light','Dark'}, name)), return; end
         appData.theme = name;
         onThemeChanged([], []);
+        try, bosonPlotter.themePref('write', name); catch, end
     end
 
     function ds = getActiveDatasetSafe()
@@ -3679,8 +3674,8 @@ function varargout = BosonPlotter(options)
     %APPLYTHEMEFROMDIALOG  Apply theme change from the settings dialog.
         appData.theme = themeName;
         onThemeChanged([], []);
-        % Update dialog colours to match new theme
         bosonPlotter.applyDialogTheme(settingsFig, themeName);
+        try, bosonPlotter.themePref('write', themeName); catch, end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3792,6 +3787,16 @@ function varargout = BosonPlotter(options)
         tkNow = bosonPlotter.uxTokens(lower(appData.theme));
         buildToolbar(axToolbarGL, appData.toolbarConfig, tbActions, ...
                      tkNow.color.btn.tool, tkNow.color.icon);
+        % Propagate to the Peak Workshop popup (sibling uifigure that
+        % fig.Children doesn't reach). Reuse the dialog themer.
+        try
+            if exist('peakFig','var') && ~isempty(peakFig) ...
+                    && isgraphics(peakFig) && isvalid(peakFig)
+                bosonPlotter.applyDialogTheme(peakFig, appData.theme);
+                try, theme(peakFig, lower(appData.theme)); catch, end
+            end
+        catch
+        end
     end
 
     % ── Corrections callbacks ─────────────────────────────────────────────
