@@ -32,14 +32,14 @@ function test_bosonPlotterSize
     % ════════════════════════════════════════════════════════════════════
     %  TEST 1: Line-count ratchet
     % ════════════════════════════════════════════════════════════════════
-    % Current: 8,102 lines (2026-04-26 — extracted file-list panel to
-    % +bosonPlotter/buildFileListPanel.m; -128 lines. Combined with the
-    % Save/Export panel extraction earlier today: 8,400 → 8,102 (-298 lines).
-    % Target per W5 #22: < 8,000 — within reach now).
+    % Current: 7,641 lines (2026-04-26 — extracted Analysis & Corrections
+    % panel to +bosonPlotter/buildCorrectionsPanel.m; -461 lines.
+    % Three UI-construction extractions same day: 8,400 → 7,641 (-759 lines,
+    % -9.0%). W5 #22 target of <8,000 reached and beaten).
     % Ceiling carries a small buffer (~20 lines) so one in-flight edit
     % won't fail the build before an extraction commit lands. Ratchet
     % DOWN whenever an extraction lowers the baseline.
-    LINE_CEILING = 8120;
+    LINE_CEILING = 7660;
 
     fprintf('\n== TEST 1: BosonPlotter.m line-count ratchet ==\n');
     try
