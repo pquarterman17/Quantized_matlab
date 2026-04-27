@@ -177,7 +177,8 @@ classdef AppState < handle
         autoRecalcTimer           = []
 
         % ── Theme ──────────────────────────────────────────────────
-        theme            char   = 'dark'
+        theme            char   = 'dark'   % resolved concrete value (Dark|Light)
+        themePref        char   = 'Dark'   % user preference (Dark|Light|Auto)
 
         % ── Neutron asymmetry ──────────────────────────────────────
         asymmetryPrevLogY logical = false

@@ -29,12 +29,24 @@ INPUT_BG    = [0.18 0.18 0.18];   % dark input background
 INPUT_FG    = [0.90 0.90 0.90];   % light input text
 
 % ════════════════════════════════════════════════════════════════════════
-% DARK THEME COLORS
+% THEME COLORS — honor shared bosonPlotter.themePref (Dark | Light | Auto)
 % ════════════════════════════════════════════════════════════════════════
-FIG_BG      = [0.13 0.13 0.13];   % figure / panel background
-SIDEBAR_BG  = [0.10 0.10 0.10];   % slightly darker sidebar
-LABEL_FG    = [0.85 0.85 0.85];   % label text on dark backgrounds
-STATUSBAR_BG = [0.10 0.10 0.10];  % status bar background
+diracTheme_ = 'Dark';
+try
+    diracTheme_ = bosonPlotter.resolveTheme(bosonPlotter.themePref('read'));
+catch
+end
+if strcmpi(diracTheme_, 'Light')
+    FIG_BG       = [0.96 0.96 0.96];   % figure / panel background
+    SIDEBAR_BG   = [0.92 0.92 0.92];   % slightly darker sidebar
+    LABEL_FG     = [0.15 0.15 0.15];   % label text on light backgrounds
+    STATUSBAR_BG = [0.92 0.92 0.92];   % status bar background
+else
+    FIG_BG       = [0.13 0.13 0.13];   % figure / panel background
+    SIDEBAR_BG   = [0.10 0.10 0.10];   % slightly darker sidebar
+    LABEL_FG     = [0.85 0.85 0.85];   % label text on dark backgrounds
+    STATUSBAR_BG = [0.10 0.10 0.10];   % status bar background
+end
 
 % ════════════════════════════════════════════════════════════════════════
 % MAIN FIGURE
@@ -44,6 +56,9 @@ fig = uifigure('Name', 'DiraCulator — Thin Film Toolkit', ...
     'Resize', 'on', ...
     'Visible', 'off', ...
     'Color', FIG_BG);
+% MATLAB built-in chrome (uitable empty viewport, scrollbars, dropdown
+% overlays) — must be set in addition to the per-widget BackgroundColor.
+try, theme(fig, lower(diracTheme_)); catch, end
 fig.CloseRequestFcn = @onFigureClose;
 
 % ── Help menu (Report a Bug) ─────────────────────────────────────────────

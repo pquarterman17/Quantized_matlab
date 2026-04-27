@@ -115,6 +115,7 @@ SUITES = {
     T('gui','test_reflSplineMode'),         'gui',    'reflFitting Spline mode: reflBuildSplineLayers helper + headless dialog smoke test (MASTERPLAN W3 #11 GUI)'
     T('gui','test_annotationColorDropdown'),'gui',    'FermiViewer annotation-colour dropdown: items, default, 5-way RGB lookup'
     T('gui','test_themeConformance'),       'gui',    'Theme conformance: every widget BG/FG comes from uxTokens palette in both dark and light'
+    T('gui','test_resolveTheme'),           'gui',    'resolveTheme: Auto-mode resolution + Dark/Light passthrough (themePref Auto support)'
     T('gui','test_noNewColorLiterals'),     'gui',    'Static linter: no new hardcoded RGB literals in BosonPlotter.m / +bosonPlotter/ above the baseline ratchet'
     T('gui','test_contour_features'),       'contour','Contour/heatmap: gridding, plot styles, edge cases, export'
     T('gui','test_diraculator'),            'calcgui','DiraCulator GUI API'

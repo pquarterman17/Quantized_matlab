@@ -1,9 +1,12 @@
 function out = themePref(action, value)
-%THEMEPREF  Read or write the persisted theme preference (Dark/Light).
+%THEMEPREF  Read or write the persisted theme preference (Dark/Light/Auto).
 %
 % Syntax
-%   t = bosonPlotter.themePref('read')          % returns 'Dark' or 'Light'
-%   bosonPlotter.themePref('write', 'Light')    % persists choice
+%   t = bosonPlotter.themePref('read')          % returns 'Dark' | 'Light' | 'Auto'
+%   bosonPlotter.themePref('write', 'Auto')     % persists choice
+%
+% 'Auto' means "follow OS appearance"; resolve via bosonPlotter.resolveTheme
+% to get a concrete 'Dark'/'Light' value at apply time.
 %
 % Behaviour
 %   The preference is stored as a tiny .mat file in `prefdir` so it is
@@ -30,10 +33,12 @@ function out = themePref(action, value)
                 if isfile(CACHED_PATH)
                     s = load(CACHED_PATH, 'themeName');
                     if isfield(s, 'themeName') && ischar(s.themeName) ...
-                            && any(strcmpi(s.themeName, {'Dark','Light'}))
+                            && any(strcmpi(s.themeName, {'Dark','Light','Auto'}))
                         % Normalise to canonical capitalisation.
                         if strcmpi(s.themeName, 'Dark')
                             out = 'Dark';
+                        elseif strcmpi(s.themeName, 'Auto')
+                            out = 'Auto';
                         else
                             out = 'Light';
                         end
@@ -47,12 +52,14 @@ function out = themePref(action, value)
                 return;
             end
             value = char(value);
-            if ~any(strcmpi(value, {'Dark','Light'}))
+            if ~any(strcmpi(value, {'Dark','Light','Auto'}))
                 return;
             end
             % Normalise.
             if strcmpi(value, 'Dark')
                 themeName = 'Dark'; %#ok<NASGU>
+            elseif strcmpi(value, 'Auto')
+                themeName = 'Auto'; %#ok<NASGU>
             else
                 themeName = 'Light'; %#ok<NASGU>
             end

@@ -366,12 +366,13 @@ function varargout = BosonPlotter(options)
                              'Position',[-9999 -9999 initW initH]}];
     end
     fig = uifigure(figArgs{:});
-    % R2024b+ figure-level theme + persisted preference (Dark/Light).
-    % Both theme() and uxTokens() must see the same value, and so must
-    % appData.theme below — see +bosonPlotter/themePref.m.
-    persistedTheme_ = bosonPlotter.themePref('read');
-    try, theme(fig, lower(persistedTheme_)); catch, end
-    tk = bosonPlotter.uxTokens(lower(persistedTheme_));
+    % R2024b+ figure-level theme + persisted preference (Dark/Light/Auto).
+    % themePref keeps the literal user choice; resolveTheme maps 'Auto'
+    % to a concrete Dark/Light value for theme() / uxTokens() / appData.theme.
+    persistedTheme_ = bosonPlotter.themePref('read');     % may be 'Auto'
+    resolvedTheme_  = bosonPlotter.resolveTheme(persistedTheme_);
+    try, theme(fig, lower(resolvedTheme_)); catch, end
+    tk = bosonPlotter.uxTokens(lower(resolvedTheme_));
     % Expose the macro log on the figure so `bosonPlotter.exportScript(fig, ...)`
     % and other free-function helpers can find it without an `api` reference.
     setappdata(fig, 'macroLog', appData.macroLog);
@@ -611,9 +612,11 @@ function varargout = BosonPlotter(options)
         'ValueChangedFcn', @onTemplateChanged);
     ddTemplate.Layout.Row = 2; ddTemplate.Layout.Column = [2 4];
 
-    % Theme: read from prefdir at startup (see persistedTheme_ above);
-    % toggling via Settings/toolbar writes back via themePref('write').
-    appData.theme = persistedTheme_;
+    % appData.theme is the resolved concrete value (Dark|Light) that every
+    % consumer reads; appData.themePref carries the user pref for the
+    % Settings dropdown to round-trip 'Auto' correctly.
+    appData.theme     = resolvedTheme_;
+    appData.themePref = persistedTheme_;
 
     % Row 5: Axis scale dropdowns (3 rows: X, Left Y, Right Y)
     scaleGL = uigridlayout(ctrlGL,[3 2], ...
@@ -3609,10 +3612,14 @@ function varargout = BosonPlotter(options)
     end
 
     function setThemeDirect(name)
-    %SETTHEMEDIRECT  Flip appData.theme, retheme, persist to prefdir.
+    %SETTHEMEDIRECT  Apply a new theme preference (Dark/Light/Auto),
+    %   retheme, and persist to prefdir. 'Auto' is resolved to a concrete
+    %   value before applying; appData.themePref keeps the literal choice
+    %   so it round-trips through the Settings dropdown.
         name = char(name);
-        if ~any(strcmp({'Light','Dark'}, name)), return; end
-        appData.theme = name;
+        if ~any(strcmpi({'Light','Dark','Auto'}, name)), return; end
+        appData.themePref = name;
+        appData.theme     = bosonPlotter.resolveTheme(name);
         onThemeChanged([], []);
         try, bosonPlotter.themePref('write', name); catch, end
     end
@@ -3672,9 +3679,12 @@ function varargout = BosonPlotter(options)
 
     function applyThemeFromDialog(themeName, settingsFig)
     %APPLYTHEMEFROMDIALOG  Apply theme change from the settings dialog.
-        appData.theme = themeName;
+    %   Accepts Dark/Light/Auto; Auto resolves to a concrete value at
+    %   apply time. The dialog itself only needs the resolved value.
+        appData.themePref = themeName;
+        appData.theme     = bosonPlotter.resolveTheme(themeName);
         onThemeChanged([], []);
-        bosonPlotter.applyDialogTheme(settingsFig, themeName);
+        bosonPlotter.applyDialogTheme(settingsFig, appData.theme);
         try, bosonPlotter.themePref('write', themeName); catch, end
     end
 
