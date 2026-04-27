@@ -167,6 +167,15 @@ MATLAB silently allows `uigridlayout` clipping: if a parent row allocates 22 px 
 - **Workflow:** after editing any `uigridlayout` `RowHeight` / `ColumnWidth` in BosonPlotter.m or `+bosonPlotter/*.m`, run `runAllTests(Group="gui")` before assuming the layout works.  The `ux-frontend-expert` agent should invoke `checkClippedLayouts(fig)` during any GUI layout review.
 - **Common fix:** if the detector reports `Nested grid needs N px but parent row allocates M px`, bump the parent `uigridlayout` `RowHeight{row}` entry from M to at least N.
 
+### Cross-GUI theme system (Dark / Light / Auto)
+All four GUIs (BosonPlotter, FermiViewer, DiraCulator, DataWorkspace) share a single theme preference via `+bosonPlotter/themePref.m` (read/write, persisted to `prefdir/boson_theme.mat`). `+bosonPlotter/resolveTheme.m` turns `'Auto'` into a concrete `'Dark'` or `'Light'` value at apply time (MATLAB R2025a+ `MATLABTheme` setting → Windows registry → macOS defaults → Dark fallback). Toolbar/menu quick toggles flip Dark↔Light explicitly (clearing Auto); the Settings dropdown round-trips Auto.
+
+Two layers always need updating together (see `feedback_matlab_two_theme_layers`):
+1. `theme(fig, 'dark'|'light')` — built-in MATLAB chrome (uitable empty viewport, scrollbars, dropdown overlays)
+2. Per-widget `BackgroundColor` / `FontColor` — cells, panels, buttons
+
+BosonPlotter uses `+bosonPlotter/uxTokens.m` as the single colour-token source; FermiViewer's `applyTheme` also reads from `uxTokens(themeName)`. DiraCulator + DataWorkspace branch local FIG_BG/etc constants on the resolved value at startup. Adding a new GUI: see `memory/reference_theme_system.md` for the four-step recipe.
+
 ### BosonPlotter
 - `cla()` alone does not remove `HandleVisibility='off'` objects — use `delete(ax.Children)` before `cla()`
 - Each dataset stores axis limits in `ds.axLims` (persisted across switches)
