@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-05-01 (Reconciliation pass: struck #22 W5 (BosonPlotter at 7,658 lines, target reached) + struck the four shipped workshop conversions #59-#62 that were still in the open list. Added #66 Curve Fit dialog cutover + #67 Reflectivity dialog cutover as tracked follow-ups. W5 Tier 1 is now empty.)
+**Last regenerated:** 2026-05-01 (Goal revision: added W5 #68 (BosonPlotter <6k, replaces achieved #22 <8k milestone) + W5 #69 (FermiViewer <6k, net-new). Items #28 + #65 promoted T3 → T2 to drive #69. Earlier today: closed shipped W5 #22/#59-#62 and added #66/#67 dialog cutover follow-ups.)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -16,8 +16,8 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 ## Tier 1 — High Impact (open)
 
 ### MASTERPLAN (MATLAB consolidated) — `plans/MASTERPLAN.md`
-
-*(W5 Tier 1 is empty as of 2026-05-01 — #22 reached its <8k target and #59-#62 all shipped 2026-04-26. See MASTERPLAN Completed for outcomes.)*
+- [ ] **#68** W5 Decomposition → Drive `BosonPlotter.m` below **6,000 lines** (current 7,658, -22% to go). Replaces achieved #22 <8k milestone.
+- [ ] **#69** W5 Decomposition → Drive `FermiViewer.m` below **6,000 lines** (current 13,985, **-57% to go** — largest decomposition workstream in the toolbox)
 
 ### Origin parity (Python port, MATLAB side complete) — `plans/origin-feature-gap.md`
 - [ ] **#1** AIC/BIC/F-test fit comparison → Python
@@ -46,8 +46,10 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#24** W5 Decomposition → Documentation coverage — package READMEs
 - [ ] **#63** W5 Decomposition → Cross-workshop test harness (unblocked 2026-04-26)
 - [ ] **#64** W5 Decomposition → Subfolder reorg of remaining `+bosonPlotter/` cross-cutters (after workshops carve out their pieces)
-- [ ] **#66** W5 Decomposition → Curve Fit dialog cutover to CurveFitWorkshopModel (model+tests shipped `00c57af`; full dialog migration remaining)
-- [ ] **#67** W5 Decomposition → Reflectivity dialog cutover to ReflWorkshopModel (model+tests shipped `ef2ff6e`; full dialog migration remaining)
+- [ ] **#66** W5 Decomposition → Curve Fit dialog cutover to CurveFitWorkshopModel (model+tests shipped `00c57af`; full dialog migration remaining) — drives #68
+- [ ] **#67** W5 Decomposition → Reflectivity dialog cutover to ReflWorkshopModel (model+tests shipped `ef2ff6e`; full dialog migration remaining) — drives #68
+- [ ] **#28** W5 Decomposition → Extract FermiViewer measurement subsystem (~10 nested fns; partial via `+emViewer/measurements.m`) — promoted T3 → T2 2026-05-01, drives #69
+- [ ] **#65** W5 Decomposition → Apply workshop pattern to FermiViewer heavy features (measurements / EELS / EDS / annotations / contrast) — promoted T3 → T2 2026-05-01, unblocked 2026-04-26, drives #69
 - [ ] **#47** W7 Parsers → `importOxford` (paused — awaiting example file)
 - [ ] **#48** W7 Parsers → `importOpus` (paused — awaiting example file)
 - [ ] **#50** W8 DataWorkspace → Shared model migration (PARTIAL)
@@ -75,8 +77,6 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 ### MASTERPLAN (MATLAB consolidated) — `plans/MASTERPLAN.md`
 - [ ] **#13** W3 Features → Connect batch fitting to multi-peak + reflectivity
-- [ ] **#28** W5 Decomposition → Extract FermiViewer measurement subsystem
-- [ ] **#65** W5 Decomposition → Apply workshop pattern to FermiViewer heavy features (deferred)
 - [ ] **#49** W7 Parsers → `importSPC` (paused — awaiting example file)
 - [ ] **#51** W8 DataWorkspace → Multi-dataset operations
 - [ ] **#52** W8 DataWorkspace → Remove legacy table from BosonPlotter (~400–500 line cleanup)
@@ -99,7 +99,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 | Plan | Status | Open items | Notes |
 |------|--------|------------|-------|
-| MASTERPLAN (MATLAB consolidated) | Active | 0 T1 / 14 T2 / 9+4 T3 | 9 source plans consolidated 2026-04-19; W4 Physics shipped 2026-04-19; W3 #11 + W3 #8 + W6 theory-docs sweep + tutorials shipped 2026-04-24; W2 #5/#6/#7 + W3 #14/#15/#16 shipped 2026-04-25; **W5 #22 ratchet target reached + workshop conversions #59-#62 all shipped 2026-04-26**; reconciliation 2026-05-01 closed those five items and added #66/#67 dialog cutover follow-ups. W5 Tier 1 now empty. |
+| MASTERPLAN (MATLAB consolidated) | Active | 2 T1 / 16 T2 / 7+4 T3 | 9 source plans consolidated 2026-04-19; W4 Physics shipped 2026-04-19; W3 #11 + W3 #8 + W6 theory-docs sweep + tutorials shipped 2026-04-24; W2 #5/#6/#7 + W3 #14/#15/#16 shipped 2026-04-25; **W5 #22 ratchet target reached + workshop conversions #59-#62 all shipped 2026-04-26**. **2026-05-01 goal revision:** added #68 BosonPlotter <6k + #69 FermiViewer <6k as new T1 size goals (replaces shipped #22); promoted #28 + #65 T3 → T2 to drive #69. |
 | origin-feature-gap | Active (Python) | 6 T1 / 7 T2 / 1 T3 | MATLAB side complete; Python port pending — excluded from MASTERPLAN |
 | dataworkspace-python-port | Active (Python) | 3 T1 / 3 T2 / 2 T3 | Python-port architecture; excluded from MASTERPLAN |
 | porting_plan | Active (Python) | 7 phase-level items | Thin film toolkit architecture; excluded from MASTERPLAN |

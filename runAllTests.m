@@ -141,6 +141,7 @@ SUITES = {
     T('gui','test_measurementLabelDefaults'), 'emgui','EM Viewer distance label defaults: font size, transparent background, perpendicular offset, tilt tooltip'
     T('imaging','test_transformToolbar'),     'emgui','EM Viewer icon transform toolbar: rotate/flip/zoom/fit/reset/crop wiring + capital-T geometry'
     T('imaging','test_em_clear_overlays_diff_rings'), 'emgui','EM Viewer Clear Overlays removes diff_ring + diff_spot tagged handles (regression)'
+    T('imaging','test_fermiViewerSize'),    'emgui',  'Size ratchet: FermiViewer.m line count + nested-fn count stay under their ceilings (target <6,000 lines, MASTERPLAN W5)'
     T('imaging','test_em_box_profile'),       'emgui','EM Viewer Box Profile: rotated-box overlay + runWidthAveragedProfile engine + clearOverlays cleanup'
     T('imaging','test_em_zoom_toggle_marquee'),'emgui','EM Viewer zoom toggle + marquee multi-select: default drag selects, zoom toggle on reverts to box-zoom'
     T('imaging','test_histogram_overlay'),   'emgui',  'FermiViewer histogram overlay: lo/hi handles, gamma midpoint, transfer ramp, clipping indicators (W2 #5/#7)'

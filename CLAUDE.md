@@ -181,15 +181,18 @@ BosonPlotter uses `+bosonPlotter/uxTokens.m` as the single colour-token source; 
 - Each dataset stores axis limits in `ds.axLims` (persisted across switches)
 - Peak Analysis window: see [docs/gui_bosonplotter.md](docs/gui_bosonplotter.md)
 
-### BosonPlotter — where new code goes
-MASTERPLAN W5 #22 targets `BosonPlotter.m` under 8,000 lines. Without a policy, new features tend to land inside the monolith as fast as extractions pull lines out and the target never arrives. Rule for any new BosonPlotter code:
+### BosonPlotter & FermiViewer — where new code goes
+MASTERPLAN W5 #68 (BosonPlotter) and #69 (FermiViewer) target each file under **6,000 lines**. Without a policy, new features tend to land inside the monolith as fast as extractions pull lines out and the target never arrives. Rule for any new BosonPlotter or FermiViewer code:
 
-- **Default to `+bosonPlotter/<feature>.m`** — implement the feature as a public package function that takes the handles/state it needs (typically the `ui` struct + callback structs like `corrCb_`, `ptCb_`, `anaCb_`). Call it from a minimal nested dispatcher in `BosonPlotter.m`.
-- **Do not add new nested functions to `BosonPlotter.m`** unless they are one- or two-liners that merely forward to a `+bosonPlotter/` helper. The legacy nested-function pattern is closed for new code.
-- **Never add doubly-nested functions** (8-space indent) to `BosonPlotter.m` — see `matlab-gui-complexity.md` for why (parser-slot cost and worse refactorability).
-- **Enforcement:** `tests/gui/test_bosonPlotterSize.m` asserts `BosonPlotter.m <= 8,650 lines` and nested-fn total `<= 290`. Runs via `runAllTests(Group="gui")`. **Ratchet the ceiling downward** as extractions lower the baseline; never raise it to accept growth. Current baseline: 8,609 lines / 270 nested fns (2026-04-21).
+- **Default to `+bosonPlotter/<feature>.m`** (or `+emViewer/<feature>.m` for FermiViewer) — implement the feature as a public package function that takes the handles/state it needs (typically the `ui` struct + callback structs like `corrCb_`, `ptCb_`, `anaCb_`). Call it from a minimal nested dispatcher in the parent file.
+- **Do not add new nested functions to `BosonPlotter.m` or `FermiViewer.m`** unless they are one- or two-liners that merely forward to a package helper. The legacy nested-function pattern is closed for new code.
+- **Never add doubly-nested functions** (8-space indent) to either file — see `matlab-gui-complexity.md` for why (parser-slot cost and worse refactorability).
+- **Enforcement:**
+  - `tests/gui/test_bosonPlotterSize.m` — `BosonPlotter.m <= 7,660 lines` and nested-fn total `<= 290`. Current baseline: 7,658 lines / 280 nested fns (2026-05-01).
+  - `tests/imaging/test_fermiViewerSize.m` — `FermiViewer.m <= 14,010 lines` and nested-fn total `<= 332` (doubly-nested `<= 16`). Current baseline: 13,985 lines / 330 nested fns (2026-05-01). Runs via `runAllTests(Group="emgui")`.
+  - **Ratchet the ceiling downward** as extractions lower the baseline; never raise it to accept growth.
 
-This policy applies to `BosonPlotter.m` specifically. `FermiViewer.m` and `DiraCulator.m` have separate cap-tracking memories — apply the same pattern if they grow unchecked.
+`DiraCulator.m` does not yet have a size ratchet — apply the same pattern if it grows unchecked.
 
 ### DataWorkspace
 - BosonPlotter creates `appData.model` (a `WorkspaceModel`) at startup; both the toolbar "Workspace" button and the "Open in DataWorkspace" button pass `Model=appData.model` so both windows share the same instance
