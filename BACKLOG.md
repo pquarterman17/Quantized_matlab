@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-04-26 (ALL FOUR W5 workshop conversions shipped: #59 Peak `6d39eef` + bug fix `4bf82b8`, #61 Hysteresis `e7d22ef`, #60 Curve Fit `00c57af`, #62 Reflectivity `ef2ff6e`. Pattern proven across all heavy BosonPlotter features. Follow-ups: full dialog migration for Curve Fit + Reflectivity; subfolder reorg of remaining +bosonPlotter/ cross-cutters #64.)
+**Last regenerated:** 2026-05-01 (Reconciliation pass: struck #22 W5 (BosonPlotter at 7,658 lines, target reached) + struck the four shipped workshop conversions #59-#62 that were still in the open list. Added #66 Curve Fit dialog cutover + #67 Reflectivity dialog cutover as tracked follow-ups. W5 Tier 1 is now empty.)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -16,11 +16,8 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 ## Tier 1 — High Impact (open)
 
 ### MASTERPLAN (MATLAB consolidated) — `plans/MASTERPLAN.md`
-- [ ] **#22** W5 Decomposition → Continue `+bosonPlotter/` extraction — drive parent below 8k lines
-- [ ] **#59** W5 Decomposition → Convert Peak subsystem to PeakWorkshop pattern (workshop reference impl)
-- ~~[ ] **#60** W5 Decomposition → Convert Curve Fit to CurveFitWorkshop pattern~~ (2026-04-26 commit `00c57af` — model + tests + minimal cutover at doCurveFit; full dialog migration is follow-up work)
-- ~~[ ] **#61** W5 Decomposition → Convert Hysteresis to HysteresisWorkshop pattern~~ (2026-04-26 commit `e7d22ef`)
-- ~~[ ] **#62** W5 Decomposition → Convert Reflectivity to ReflectivityWorkshop pattern~~ (2026-04-26 commit `ef2ff6e` — model + tests; dialog cutover is follow-up work)
+
+*(W5 Tier 1 is empty as of 2026-05-01 — #22 reached its <8k target and #59-#62 all shipped 2026-04-26. See MASTERPLAN Completed for outcomes.)*
 
 ### Origin parity (Python port, MATLAB side complete) — `plans/origin-feature-gap.md`
 - [ ] **#1** AIC/BIC/F-test fit comparison → Python
@@ -47,8 +44,10 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#4** W2 UX → Toolbar metrics consistent across all four GUIs (deferred)
 - [ ] **#9** W3 Features → Small-angle scattering (Guinier / Porod / IFT)
 - [ ] **#24** W5 Decomposition → Documentation coverage — package READMEs
-- [ ] **#63** W5 Decomposition → Cross-workshop test harness (after #59-#62)
+- [ ] **#63** W5 Decomposition → Cross-workshop test harness (unblocked 2026-04-26)
 - [ ] **#64** W5 Decomposition → Subfolder reorg of remaining `+bosonPlotter/` cross-cutters (after workshops carve out their pieces)
+- [ ] **#66** W5 Decomposition → Curve Fit dialog cutover to CurveFitWorkshopModel (model+tests shipped `00c57af`; full dialog migration remaining)
+- [ ] **#67** W5 Decomposition → Reflectivity dialog cutover to ReflWorkshopModel (model+tests shipped `ef2ff6e`; full dialog migration remaining)
 - [ ] **#47** W7 Parsers → `importOxford` (paused — awaiting example file)
 - [ ] **#48** W7 Parsers → `importOpus` (paused — awaiting example file)
 - [ ] **#50** W8 DataWorkspace → Shared model migration (PARTIAL)
@@ -100,7 +99,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 | Plan | Status | Open items | Notes |
 |------|--------|------------|-------|
-| MASTERPLAN (MATLAB consolidated) | Active | 1 T1 / 10 T2 / 8+4 T3 | 9 source plans consolidated 2026-04-19; W4 Physics (4 items) shipped 2026-04-19; W5 #23/#25/#26/#27 reconciled as already done; W1 #59, W3 #17, W6 #41, W6 #43 shipped 2026-04-19; W2 #2 + #3 reconciled 2026-04-21; W3 #10 + W3 #12 shipped 2026-04-21; W3 #8 shipped 2026-04-24; W6 theory-docs sweep #29-34 + tutorials #35-40 shipped 2026-04-24; W3 #11 fully shipped 2026-04-24; W6 #42/#44/#45/#46 deprioritized 2026-04-25; W2 #5/#6/#7 + W3 #16 + **W3 #14 (action-log macro replay)** all shipped 2026-04-25 |
+| MASTERPLAN (MATLAB consolidated) | Active | 0 T1 / 14 T2 / 9+4 T3 | 9 source plans consolidated 2026-04-19; W4 Physics shipped 2026-04-19; W3 #11 + W3 #8 + W6 theory-docs sweep + tutorials shipped 2026-04-24; W2 #5/#6/#7 + W3 #14/#15/#16 shipped 2026-04-25; **W5 #22 ratchet target reached + workshop conversions #59-#62 all shipped 2026-04-26**; reconciliation 2026-05-01 closed those five items and added #66/#67 dialog cutover follow-ups. W5 Tier 1 now empty. |
 | origin-feature-gap | Active (Python) | 6 T1 / 7 T2 / 1 T3 | MATLAB side complete; Python port pending — excluded from MASTERPLAN |
 | dataworkspace-python-port | Active (Python) | 3 T1 / 3 T2 / 2 T3 | Python-port architecture; excluded from MASTERPLAN |
 | porting_plan | Active (Python) | 7 phase-level items | Thin film toolkit architecture; excluded from MASTERPLAN |
