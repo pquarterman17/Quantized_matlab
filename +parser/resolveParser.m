@@ -399,7 +399,7 @@ function tf = looksLikeRefl1dDat(filepath)
     try
         fid = fopen(filepath, 'r');
         if fid == -1, return; end
-        cleanObj = onCleanup(@() fclose(fid)); %#ok<NASGU>
+        cleanObj = onCleanup(@() fclose(fid));
         lines = cell(1, 20);
         for i = 1:20
             ln = fgetl(fid);

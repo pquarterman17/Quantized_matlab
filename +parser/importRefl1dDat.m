@@ -29,7 +29,7 @@ function data = importRefl1dDat(filepath, options)
         error('parser:importRefl1dDat:openFail', ...
             'Cannot open file: %s', filepath);
     end
-    cleanObj = onCleanup(@() fclose(fid)); %#ok<NASGU>
+    cleanObj = onCleanup(@() fclose(fid));
 
     lines = {};
     while true
