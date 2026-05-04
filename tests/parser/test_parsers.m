@@ -561,6 +561,68 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  11e. importRefl1dDat — refl1d fitting output (.dat with refl1d columns)
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 11e: importRefl1dDat (.dat refl1d output) ══\n');
+REFL1D_REFL_FILE = fullfile(ROOT, '+test_datasets', 'NCNR', 'NR_Nickelate', 'fitted_data_refl1d', 'J395_dsf01-refl-fix.dat');
+REFL1D_PROF_FILE = fullfile(ROOT, '+test_datasets', 'NCNR', 'NR_Nickelate', 'fitted_data_refl1d', 'J395_dsf01-profile-edit.dat');
+
+if ~isfile(REFL1D_REFL_FILE)
+    fprintf('  SKIP refl1d -refl.dat – file not found\n');
+else
+    try
+        d = parser.importRefl1dDat(REFL1D_REFL_FILE);
+
+        assert(isstruct(d),                            'output must be a struct');
+        assert(isfield(d, 'time'),                     'missing field: time');
+        assert(isfield(d, 'values'),                   'missing field: values');
+        assert(~isempty(d.time),                       'time must not be empty');
+        assert(~isempty(d.values),                     'values must not be empty');
+        assert(size(d.values, 2) >= 4,                 'expected >=5 columns (Q + dQ,R,dR,theory,fresnel)');
+        assert(strcmp(d.metadata.parserSpecific.variant, 'reflectivity'), ...
+            'variant should be reflectivity');
+        fprintf('        PASS  -refl.dat: %d rows × %d cols\n', ...
+            numel(d.time), size(d.values, 2));
+        passed = passed + 1;
+    catch ME
+        fprintf('        FAIL: %s\n', ME.message);
+        failed = failed + 1;
+    end
+end
+
+if ~isfile(REFL1D_PROF_FILE)
+    fprintf('  SKIP refl1d -profile.dat – file not found\n');
+else
+    try
+        d = parser.importRefl1dDat(REFL1D_PROF_FILE);
+
+        assert(isstruct(d),                            'output must be a struct');
+        assert(~isempty(d.time),                       'time must not be empty');
+        assert(strcmp(d.metadata.parserSpecific.variant, 'profile'), ...
+            'variant should be profile');
+        fprintf('        PASS  -profile.dat: %d rows × %d cols\n', ...
+            numel(d.time), size(d.values, 2));
+        passed = passed + 1;
+    catch ME
+        fprintf('        FAIL: %s\n', ME.message);
+        failed = failed + 1;
+    end
+end
+
+% Test that resolveParser sniffs .dat refl1d files correctly
+fprintf('  [resolveParser] Testing .dat sniff for refl1d:\n');
+try
+    r = parser.resolveParser(REFL1D_REFL_FILE);
+    assert(strcmp(r.name, 'importRefl1dDat'), ...
+        sprintf('expected importRefl1dDat, got %s', r.name));
+    fprintf('        PASS  -refl.dat → %s\n', r.name);
+    passed = passed + 1;
+catch ME
+    fprintf('        FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  12. importExcel  –  blank separator row between headers and data
 %      Regression test for vendor SIMS xlsx files that place a blank row
 %      between the column header row and the numeric data block.

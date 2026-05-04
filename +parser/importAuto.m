@@ -22,8 +22,9 @@ function [data, parserName] = importAuto(filepath, varargin)
 %     .pnr              → parser.importNCNRPNR (PNR polychromatic variants)
 %     .data/.datb/
 %       .datc/.datd     → parser.importNCNRDat (refl1d fit output, polarization-encoded)
-%     .dat              → tries parser.importQDVSM ([Header]/[Data] format)
-%                         falls back to parser.importPPMS (legacy CSV)
+%     .dat              → content-sniffed:
+%                         refl1d output → parser.importRefl1dDat
+%                         otherwise     → parser.importQDVSM / importPPMS
 %
 %   INPUTS:
 %       filepath  - Path to the data file (string or char).
@@ -126,6 +127,7 @@ function data = dispatchParser(parserName, filepath, varargin)
         case 'importNCNRRefl',   data = parser.importNCNRRefl(filepath, varargin{:});
         case 'importNCNRPNR',    data = parser.importNCNRPNR(filepath, varargin{:});
         case 'importNCNRDat',    data = parser.importNCNRDat(filepath, varargin{:});
+        case 'importRefl1dDat',  data = parser.importRefl1dDat(filepath, varargin{:});
         case 'importQDVSM',      data = parser.importQDVSM(filepath, varargin{:});
         case 'importPPMS',       data = parser.importPPMS(filepath, varargin{:});
         case 'importMPMS',       data = parser.importMPMS(filepath, varargin{:});

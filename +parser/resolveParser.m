@@ -156,6 +156,8 @@ function result = resolveParser(filepath)
                 % back to PPMS legacy CSV if the QD block is malformed.
                 result.name     = 'importMPMS';
                 result.fallback = 'importPPMS';
+            elseif looksLikeRefl1dDat(filepath)
+                result.name = 'importRefl1dDat';
             else
                 % Default: QD VSM primary, fall back to legacy PPMS CSV.
                 result.name     = 'importQDVSM';
@@ -382,6 +384,57 @@ function s = cellToText(v)
         end
     else
         s = '';
+    end
+end
+
+
+% ────────────────────────────────────────────────────────────────────
+function tf = looksLikeRefl1dDat(filepath)
+%LOOKSLIKEREFL1DDAT  Quick content scan for refl1d fitting output.
+%   Checks the first ~20 lines for refl1d column signatures:
+%   Q (1/A), dQ, R, dR, theory, fresnel (reflectivity variant) or
+%   z (A), rho (1e-6/A2), irho (reflectivity profile/steps/slabs).
+%   Also matches # intensity: / # background: metadata lines.
+    tf = false;
+    try
+        fid = fopen(filepath, 'r');
+        if fid == -1, return; end
+        cleanObj = onCleanup(@() fclose(fid)); %#ok<NASGU>
+        lines = cell(1, 20);
+        for i = 1:20
+            ln = fgetl(fid);
+            if ~ischar(ln), break; end
+            lines{i} = ln;
+        end
+    catch
+        return;
+    end
+
+    nonEmpty = lines(~cellfun(@isempty, lines));
+    if isempty(nonEmpty), return; end
+
+    firstNonBlank = strtrim(nonEmpty{1});
+    if strcmpi(firstNonBlank, '[Header]') || strcmpi(firstNonBlank, '[Data]')
+        return;
+    end
+
+    allLower = lower(strjoin(nonEmpty, ' '));
+
+    hasReflCols = contains(allLower, 'q (1/a') ...
+        && (contains(allLower, 'theory') || contains(allLower, 'fresnel') ...
+            || contains(allLower, ' r ') || contains(allLower, ' dr '));
+
+    hasProfileCols = contains(allLower, 'z (a)') ...
+        && contains(allLower, 'rho (1e-6');
+
+    hasSlabCols = contains(allLower, 'thickness (a)') ...
+        && contains(allLower, 'interface (a)');
+
+    hasRefl1dMeta = contains(allLower, '# intensity:') ...
+        || contains(allLower, '# background:');
+
+    if hasReflCols || hasProfileCols || hasSlabCols || hasRefl1dMeta
+        tf = true;
     end
 end
 

@@ -7078,6 +7078,9 @@ function [data, parserName] = guiImport(fp)
             % NCNR refl1d output: polarization encoded in extension
             data = parser.importNCNRDat(fp);
 
+        case 'importRefl1dDat'
+            data = parser.importRefl1dDat(fp);
+
         case 'importQDVSM'
             % Load every available channel so the user can explore them in the GUI.
             try

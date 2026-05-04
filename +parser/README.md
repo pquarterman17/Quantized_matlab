@@ -18,6 +18,7 @@ All parsers return the same **unified data struct** via `parser.createDataStruct
 | NCNR reflectometry | `importNCNRRefl` | `.refl` | Polarized neutron R vs Q with error bars |
 | NCNR PNR | `importNCNRPNR` | `.pnr` | Cross-section resolved (R+, R−) |
 | NCNR fit output | `importNCNRDat` | `.datA`–`.datD` | refl1d theory + data overlay |
+| refl1d output | `importRefl1dDat` | `.dat` (sniffed) | Reflectivity, SLD profile, slabs, steps |
 | SIMS depth profile | `importSIMS` | `.csv` | Paired/shared-depth columns; grid merging |
 | TIFF image | `importTIFF` | `.tif`, `.tiff` | 8/16/32-bit; multi-page; FEI metadata |
 | RAW image | `importRawImage` | `.raw` | Headerless binary (not auto-dispatchable) |
@@ -488,7 +489,7 @@ strings for `XAxis` / `YAxis` parameters instead of full column names:
 `importAuto` selects a parser using this priority order:
 
 1. **Magic bytes** — `.raw` files: reads first 7 bytes; `"FI"` → Rigaku, `"RAW1.01"` → Bruker
-2. **Extension** — `.xrdml` → `importXRDML`; `.brml` → `importBruker`; `.refl` → `importNCNRRefl`; `.pnr` → `importNCNRPNR`; `.datA`/`.datB`/`.datC`/`.datD` → `importNCNRDat`; `.dat` → `importQDVSM` (falls back to `importPPMS` then `importCSV` on error); `.xlsx`/`.xls`/`.ods` → `importExcel`; `.csv`/`.tsv`/`.txt` → `importCSV`
-3. **Content heuristic** — for `.dat`: presence of `[Header]` / `[Data]` markers selects `importQDVSM`
+2. **Extension** — `.xrdml` → `importXRDML`; `.brml` → `importBruker`; `.refl` → `importNCNRRefl`; `.pnr` → `importNCNRPNR`; `.datA`/`.datB`/`.datC`/`.datD` → `importNCNRDat`; `.dat` → content-sniffed (see below); `.xlsx`/`.xls`/`.ods` → `importExcel`; `.csv`/`.tsv`/`.txt` → `importCSV`
+3. **Content heuristic** — for `.dat`: Lake Shore → `importLakeShore`; MPMS → `importMPMS`; refl1d output → `importRefl1dDat`; otherwise `importQDVSM` (falls back to `importPPMS`)
 
 The same logic is used by the GUI's `guiImport()` dispatcher (via `resolveParser`).
