@@ -45,9 +45,9 @@ function test_bp_smoke
     % ════════════════════════════════════════════════════════════════════
     fprintf('\n── A. Toolbar buttons ──\n');
 
-    sr.fireButtonByTooltip('Zoom in');
-    sr.fireButtonByTooltip('Zoom out');
-    sr.fireButtonByTooltip('Reset View');
+    sr.fireButtonByTag('zoomIn');
+    sr.fireButtonByTag('zoomOut');
+    sr.fireButtonByTag('autoscale');
 
     % ════════════════════════════════════════════════════════════════════
     %  B. Dataset management
