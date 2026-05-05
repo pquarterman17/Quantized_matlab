@@ -622,6 +622,45 @@ catch ME
     failed = failed + 1;
 end
 
+% 11f: X-ray refl1d output (same format, different test dataset)
+XRAY_REFL1D_DIR = fullfile(ROOT, '+test_datasets', 'Ref1ld Xray with Model', 'NbAl_XRR');
+XRAY_REFL_FILE  = fullfile(XRAY_REFL1D_DIR, 'NbAl_XRR-refl.dat');
+XRAY_PROF_FILE  = fullfile(XRAY_REFL1D_DIR, 'NbAl_XRR-profile.dat');
+
+if isfile(XRAY_REFL_FILE)
+    try
+        d = parser.importRefl1dDat(XRAY_REFL_FILE);
+        assert(any(strcmp(d.labels, 'R')),       'missing R column');
+        assert(any(strcmp(d.labels, 'theory')),  'missing theory column');
+        assert(any(strcmp(d.labels, 'dR')),      'missing dR column');
+        assert(strcmp(d.metadata.parserSpecific.variant, 'reflectivity'), ...
+            'variant should be reflectivity');
+        fprintf('        PASS  X-ray -refl.dat: %d rows, has R+theory+dR\n', numel(d.time));
+        passed = passed + 1;
+    catch ME
+        fprintf('        FAIL  X-ray -refl.dat: %s\n', ME.message);
+        failed = failed + 1;
+    end
+else
+    fprintf('  SKIP X-ray refl1d -refl.dat – file not found\n');
+end
+
+if isfile(XRAY_PROF_FILE)
+    try
+        d = parser.importRefl1dDat(XRAY_PROF_FILE);
+        assert(any(strcmp(d.labels, 'rho')),  'missing rho column');
+        assert(strcmp(d.metadata.parserSpecific.variant, 'profile'), ...
+            'variant should be profile');
+        fprintf('        PASS  X-ray -profile.dat: %d rows, has rho\n', numel(d.time));
+        passed = passed + 1;
+    catch ME
+        fprintf('        FAIL  X-ray -profile.dat: %s\n', ME.message);
+        failed = failed + 1;
+    end
+else
+    fprintf('  SKIP X-ray refl1d -profile.dat – file not found\n');
+end
+
 % ════════════════════════════════════════════════════════════════════════
 %  12. importExcel  –  blank separator row between headers and data
 %      Regression test for vendor SIMS xlsx files that place a blank row

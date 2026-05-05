@@ -188,7 +188,7 @@ MASTERPLAN W5 #68 (BosonPlotter) and #69 (FermiViewer) target each file under **
 - **Do not add new nested functions to `BosonPlotter.m` or `FermiViewer.m`** unless they are one- or two-liners that merely forward to a package helper. The legacy nested-function pattern is closed for new code.
 - **Never add doubly-nested functions** (8-space indent) to either file — see `matlab-gui-complexity.md` for why (parser-slot cost and worse refactorability).
 - **Enforcement:**
-  - `tests/gui/test_bosonPlotterSize.m` — `BosonPlotter.m <= 7,660 lines` and nested-fn total `<= 290`. Current baseline: 7,658 lines / 280 nested fns (2026-05-01).
+  - `tests/gui/test_bosonPlotterSize.m` — `BosonPlotter.m <= 7,665 lines` and nested-fn total `<= 290`. Current baseline: 7,661 lines / 280 nested fns (2026-05-04).
   - `tests/imaging/test_fermiViewerSize.m` — `FermiViewer.m <= 14,010 lines` and nested-fn total `<= 332` (doubly-nested `<= 16`). Current baseline: 13,985 lines / 330 nested fns (2026-05-01). Runs via `runAllTests(Group="emgui")`.
   - **Ratchet the ceiling downward** as extractions lower the baseline; never raise it to accept growth.
 

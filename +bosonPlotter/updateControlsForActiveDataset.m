@@ -168,7 +168,9 @@ function updateControlsForActiveDataset(appData, ui, callbacks)
 
     % Parser-aware Y-scale default — used only when the user has not
     % explicitly chosen a scale for this dataset (ps.yScale is '').
-    if callbacks.isNeutronParser(ds.parserName)
+    hasRCol      = any(strcmp(d.labels, 'R'));
+    hasTheoryCol = any(strcmpi(d.labels, 'theory'));
+    if callbacks.isNeutronParser(ds.parserName) || (hasRCol && hasTheoryCol)
         rIdx = find(strcmp(d.labels, 'R'), 1);
         if ~isempty(rIdx)
             ui.lbY.Value = d.labels(rIdx);

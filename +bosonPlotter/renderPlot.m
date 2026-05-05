@@ -487,7 +487,7 @@ function renderPlot(targetAx, ctx)
                             if wfLogMode, yTheory = yTheory * effectiveSpacing^(wfGroupIdx(si) - 1);
                             else, yTheory = yTheory + (wfGroupIdx(si) - 1) * effectiveSpacing; end
                         end
-                        theoryColor = 0.55 * baseColor + 0.45 * [1 1 1];
+                        theoryColor = 0.50 * baseColor + 0.50 * [1 1 1];
                         goodT = ~isnan(xVecPrimary) & ~isnan(yTheory);
                         if any(goodT)
                             plot(targetAx, xVecPrimary(goodT), yTheory(goodT), '-', ...
@@ -558,6 +558,27 @@ function renderPlot(targetAx, ctx)
                     else
                         plot(targetAx, xVecPrimary(good), yPrimary(good), lsPrimary{:}, ...
                             'Color', baseColor, 'HitTest', 'off', 'DisplayName', dispName);
+                    end
+
+                    % Theory overlay for reflectivity data
+                    if strcmp(ySel{k}, 'R')
+                        iTheory = find(strcmpi(primaryD.labels, 'theory'), 1);
+                        if isempty(iTheory), iTheory = find(strcmpi(primaryD.labels, 'model'), 1); end
+                        if ~isempty(iTheory)
+                            yTheory = primaryD.values(:, iTheory);
+                            if ctFactor > 0, yTheory = yTheory / ctFactor; end
+                            if effectiveSpacing ~= 0
+                                if wfLogMode, yTheory = yTheory * effectiveSpacing^wfOffset;
+                                else, yTheory = yTheory + wfOffset * effectiveSpacing; end
+                            end
+                            theoryColor = 0.50 * baseColor + 0.50 * [1 1 1];
+                            goodT = ~isnan(xVecPrimary) & ~isnan(yTheory) & displayMask;
+                            if any(goodT)
+                                plot(targetAx, xVecPrimary(goodT), yTheory(goodT), '-', ...
+                                    'Color', theoryColor, 'LineWidth', max(a.lineWidth, 1.5), ...
+                                    'HitTest', 'off', 'DisplayName', [dispName ' theory']);
+                            end
+                        end
                     end
                 end
             end
