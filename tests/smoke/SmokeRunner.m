@@ -94,6 +94,67 @@ classdef SmokeRunner < handle
             ok = obj.safeCall(label, @() obj.invokeCallback(btn, 'ButtonPushedFcn'));
         end
 
+        function ok = fireButtonByTooltip(obj, tooltipFragment, options)
+        %FIREBUTTONBYTOOLTIP  Find a uibutton by Tooltip substring, fire it.
+        %   Use for icon-only buttons (empty Text) that have a Tooltip.
+            arguments
+                obj
+                tooltipFragment char
+                options.Scope = []
+            end
+            label = sprintf('fireButton(tooltip~"%s")', tooltipFragment);
+            scope = obj.resolveScope(options.Scope);
+            allBtns = findall(scope, 'Type', 'uibutton');
+            btn = [];
+            for k = 1:numel(allBtns)
+                tip = allBtns(k).Tooltip;
+                if ischar(tip) || isstring(tip)
+                    if contains(string(tip), tooltipFragment, 'IgnoreCase', true)
+                        btn = allBtns(k); break;
+                    end
+                end
+            end
+            if isempty(btn)
+                ok = obj.recordFail(label, 'button not found');
+                return;
+            end
+            if ~strcmp(btn.Enable, 'on')
+                ok = obj.recordFail(label, sprintf('Enable=%s', btn.Enable));
+                return;
+            end
+            if isempty(btn.ButtonPushedFcn)
+                ok = obj.recordFail(label, 'callback is empty');
+                return;
+            end
+            ok = obj.safeCall(label, @() obj.invokeCallback(btn, 'ButtonPushedFcn'));
+        end
+
+        function ok = fireButtonByTag(obj, tag, options)
+        %FIREBUTTONBYTAG  Find a uibutton by Tag, fire it.
+            arguments
+                obj
+                tag char
+                options.Scope = []
+            end
+            label = sprintf('fireButton(tag="%s")', tag);
+            scope = obj.resolveScope(options.Scope);
+            btn = findobj(scope, 'Type', 'uibutton', 'Tag', tag);
+            if numel(btn) > 1, btn = btn(1); end
+            if isempty(btn)
+                ok = obj.recordFail(label, 'button not found');
+                return;
+            end
+            if ~strcmp(btn.Enable, 'on')
+                ok = obj.recordFail(label, sprintf('Enable=%s', btn.Enable));
+                return;
+            end
+            if isempty(btn.ButtonPushedFcn)
+                ok = obj.recordFail(label, 'callback is empty');
+                return;
+            end
+            ok = obj.safeCall(label, @() obj.invokeCallback(btn, 'ButtonPushedFcn'));
+        end
+
         function ok = fireStateButton(obj, text, value, options)
         %FIRESTATEBUTTON  Toggle a uistatebutton and fire its callback.
             arguments
@@ -373,6 +434,10 @@ classdef SmokeRunner < handle
                 switch action
                     case 'button'
                         obj.fireButton(args{:});
+                    case 'tooltipBtn'
+                        obj.fireButtonByTooltip(args{:});
+                    case 'tagBtn'
+                        obj.fireButtonByTag(args{:});
                     case 'state'
                         obj.fireStateButton(args{:});
                     case 'dropdown'

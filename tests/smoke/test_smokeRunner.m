@@ -9,7 +9,8 @@ function test_smokeRunner
 
     thisDir = fileparts(mfilename('fullpath'));
     rootDir = fileparts(fileparts(thisDir));
-    if ~contains(path, rootDir), addpath(rootDir); end
+    addpath(rootDir);
+    addpath(fullfile(rootDir, 'tests', 'smoke'));
 
     passed = 0;
     failed = 0;

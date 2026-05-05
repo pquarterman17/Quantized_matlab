@@ -16,7 +16,7 @@ function test_string_snapshots
 
     thisDir = fileparts(mfilename('fullpath'));
     rootDir = fileparts(fileparts(thisDir));
-    if ~contains(path, rootDir), addpath(rootDir); end
+    addpath(rootDir);
 
     passed = 0;
     failed = 0;
