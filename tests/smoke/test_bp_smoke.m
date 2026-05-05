@@ -45,9 +45,13 @@ function test_bp_smoke
     % ════════════════════════════════════════════════════════════════════
     fprintf('\n── A. Toolbar buttons ──\n');
 
-    sr.fireButtonByTag('zoomIn');
-    sr.fireButtonByTag('zoomOut');
     sr.fireButtonByTag('autoscale');
+    sr.fireButtonByTag('clearOverlays');
+    sr.fireButtonByTag('grid');
+    sr.fireButtonByTag('themeToggle');
+    drawnow;
+    sr.fireButtonByTag('themeToggle');
+    drawnow;
 
     % ════════════════════════════════════════════════════════════════════
     %  B. Dataset management
@@ -107,21 +111,6 @@ function test_bp_smoke
 
     sr.fireButton('Copy Plot');
     sr.captureSnapshot('bp_06_after_copy');
-
-    % ════════════════════════════════════════════════════════════════════
-    %  G. Theme toggle
-    % ════════════════════════════════════════════════════════════════════
-    fprintf('\n── G. Theme toggle ──\n');
-
-    % Theme toggle may recreate widgets. Fire via Tag to avoid
-    % stale handle issues — and catch the "deleted object" crash.
-    sr.fireButtonByTag('themeToggle');
-    drawnow;
-    sr.captureSnapshot('bp_07_theme_toggled');
-
-    % Toggle back — re-find since the button text changed
-    sr.fireButtonByTag('themeToggle');
-    drawnow;
 
     % ════════════════════════════════════════════════════════════════════
     %  H. File list panel buttons
