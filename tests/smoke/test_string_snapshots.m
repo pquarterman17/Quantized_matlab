@@ -29,8 +29,9 @@ function test_string_snapshots
     % ════════════════════════════════════════════════════════════════════
     fprintf('\n== TEST 1: BosonPlotter button labels ==\n');
     try
+        preFigs1 = findall(groot, 'Type', 'figure');
         api = BosonPlotter('Visible', 'off');
-        cleanupBP = onCleanup(@() safeClose(api));
+        cleanupBP = onCleanup(@() closeTestFigures(preFigs1));
         drawnow;
 
         allBtns = findall(api.fig, 'Type', 'uibutton');
@@ -69,8 +70,10 @@ function test_string_snapshots
     % ════════════════════════════════════════════════════════════════════
     fprintf('\n== TEST 2: FermiViewer button labels ==\n');
     try
+        preFigs2 = findall(groot, 'Type', 'figure');
         api = FermiViewer();
-        cleanupFV = onCleanup(@() safeClose(api));
+        api.fig.Visible = 'off';
+        cleanupFV = onCleanup(@() closeTestFigures(preFigs2));
         drawnow;
 
         allBtns = findall(api.fig, 'Type', 'uibutton');
@@ -187,12 +190,12 @@ function test_string_snapshots
         fprintf('  CRASH %s: %s\n', testName, ME.message);
     end
 
-    function safeClose(a)
-        try
-            if isfield(a, 'close')
-                a.close();
+    function closeTestFigures(preFigs)
+        allFigs = findall(groot, 'Type', 'figure');
+        for fi = 1:numel(allFigs)
+            if ~any(allFigs(fi) == preFigs) && isvalid(allFigs(fi))
+                try, delete(allFigs(fi)); catch, end
             end
-        catch
         end
     end
 end

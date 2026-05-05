@@ -23,9 +23,11 @@ function test_bp_smoke
 
     fprintf('\n=== test_bp_smoke ===\n');
 
+    preExistingFigs = findall(groot, 'Type', 'figure');
+
     % ── Launch BosonPlotter headless ────────────────────────────────────
     api = BosonPlotter('Visible', 'off');
-    cleanupApi = onCleanup(@() safeClose(api)); %#ok<NASGU>
+    cleanupApi = onCleanup(@() closeAllTestFigures(preExistingFigs)); %#ok<NASGU>
     drawnow;
 
     sr = SmokeRunner(api.fig);
@@ -130,12 +132,12 @@ function test_bp_smoke
     sr.summary();
     sr.assertAllPassed();
 
-    function safeClose(a)
-        try
-            if isfield(a, 'close')
-                a.close();
+    function closeAllTestFigures(preFigs)
+        allFigs = findall(groot, 'Type', 'figure');
+        for fi = 1:numel(allFigs)
+            if ~any(allFigs(fi) == preFigs) && isvalid(allFigs(fi))
+                try, delete(allFigs(fi)); catch, end
             end
-        catch
         end
     end
 end
