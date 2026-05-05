@@ -36,6 +36,7 @@ function runAllTests(options)
 %       templates — dataset template engine (fingerprint, match, apply, save/load)
 %       workspace — DataWorkspace model (WorkspaceModel add/remove/mask/undo/events)
 %       physics3 — Tier-3 physics: BCS gap, Debye/Einstein, FORC, Kissinger, relaxation
+%       smoke    — full interaction sequences: fire every button, capture screenshots
 %       all      — all of the above, in order
 %
 %   Examples:
@@ -62,7 +63,7 @@ options.Group = validatestring(options.Group, ...
      "xrayneutron", "superconductor", "cif", "optics", "vacuum", "electrochemistry", ...
      "eels", "eels_adv", "diffindex", "diff_sim", "edsquant", "contour", "fitting", "plotting", ...
      "spectral", "sigproc", "interp2d", "baseline", "errorprop", "utilities", "templates", ...
-     "workspace", "transport", "magnetic", "physics3", "bugReport"]);
+     "workspace", "transport", "magnetic", "physics3", "bugReport", "smoke"]);
 
 % Build absolute paths to test scripts so `run` works regardless of CWD.
 % Tests are organized into subdirectories: parser/, gui/, imaging/, calc/, batch/
@@ -229,6 +230,11 @@ SUITES = {
     T('workspace','test_formulaEngine'),   'workspace','FormulaEngine: tokenize, RPN, evaluate, hasCircularRef, WorkspaceModel integration'
     % ── Bug-report tests ─────────────────────────────────────────────────
     T('bugReport','test_reportBug'),       'bugReport','Bug report: buildReport, formatReportMarkdown, URL encoding'
+    % ── Smoke tests (full interaction sequences) ──────────────────────
+    T('smoke','test_smokeRunner'),           'smoke',  'SmokeRunner framework self-test: widget lookup, callback invocation, snapshots, sequences'
+    T('smoke','test_bp_smoke'),             'smoke',  'BosonPlotter smoke: fire every button + interaction sequences with real data'
+    T('smoke','test_fv_smoke'),             'smoke',  'FermiViewer smoke: fire every button + interaction sequences with real image'
+    T('smoke','test_string_snapshots'),     'smoke',  'String snapshots: button labels, tooltips match expected values (catch refactoring regressions)'
 };
 
 % Filter by group

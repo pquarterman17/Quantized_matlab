@@ -19,3 +19,6 @@ data/crystal_cache.mat
 # Test runner logs
 calctest.log
 *.log
+
+# Smoke test screenshots (ephemeral CI artifacts)
+tests/smoke/screenshots/
