@@ -419,6 +419,12 @@ classdef SmokeRunner < handle
             fprintf('%s\n', repmat('=', 1, 60));
         end
 
+        function ok = manualCheck(obj, label, fcn)
+        %MANUALCHECK  Run a custom check that doesn't fit the standard patterns.
+        %   fcn is a zero-arg function that should not throw on success.
+            ok = obj.safeCall(label, fcn);
+        end
+
         function assertAllPassed(obj)
         %ASSERTALLPASSED  Error if any test failed.
             if obj.failed > 0
