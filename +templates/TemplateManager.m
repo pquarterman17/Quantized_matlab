@@ -101,10 +101,10 @@ function TemplateManager(parentFig)
     lbl = uilabel(btnGrid, 'Text', '');
     lbl.Layout.Row = 1; lbl.Layout.Column = 1;
 
-    btnEdit   = uibutton(btnGrid, 'push', 'Text', 'Edit...',    'ButtonPushedFcn', @onEdit);
+    btnEdit   = uibutton(btnGrid, 'push', 'Text', 'Edit',    'ButtonPushedFcn', @onEdit);
     btnDelete = uibutton(btnGrid, 'push', 'Text', 'Delete',     'ButtonPushedFcn', @onDelete);
-    btnImport = uibutton(btnGrid, 'push', 'Text', 'Import...', 'ButtonPushedFcn', @onImport);
-    btnExport = uibutton(btnGrid, 'push', 'Text', 'Export...', 'ButtonPushedFcn', @onExport);
+    btnImport = uibutton(btnGrid, 'push', 'Text', 'Import', 'ButtonPushedFcn', @onImport);
+    btnExport = uibutton(btnGrid, 'push', 'Text', 'Export', 'ButtonPushedFcn', @onExport);
     btnClose  = uibutton(btnGrid, 'push', 'Text', 'Close',      'ButtonPushedFcn', @(~,~) close(fig));
 
     btnEdit.Layout.Row   = 1; btnEdit.Layout.Column   = 2;

@@ -138,7 +138,7 @@ classdef SmokeRunner < handle
             end
             label = sprintf('fireButton(tag="%s")', tag);
             scope = obj.resolveScope(options.Scope);
-            btn = findobj(scope, 'Type', 'uibutton', 'Tag', tag);
+            btn = findall(scope, 'Type', 'uibutton', 'Tag', tag);
             if numel(btn) > 1, btn = btn(1); end
             if isempty(btn)
                 ok = obj.recordFail(label, 'button not found');
@@ -197,7 +197,7 @@ classdef SmokeRunner < handle
             scope = obj.resolveScope(options.Scope);
 
             if startsWith(identifier, '#')
-                dd = findobj(scope, 'Type', 'uidropdown', 'Tag', identifier(2:end));
+                dd = findall(scope, 'Type', 'uidropdown', 'Tag', identifier(2:end));
                 if numel(dd) > 1, dd = dd(1); end
             else
                 dd = obj.findDropdownByItem(identifier, scope);
@@ -228,9 +228,9 @@ classdef SmokeRunner < handle
             scope = obj.resolveScope(options.Scope);
 
             if startsWith(identifier, '#')
-                ef = findobj(scope, 'Type', 'uieditfield', 'Tag', identifier(2:end));
+                ef = findall(scope, 'Type', 'uieditfield', 'Tag', identifier(2:end));
                 if isempty(ef)
-                    ef = findobj(scope, 'Type', 'uinumericeditfield', 'Tag', identifier(2:end));
+                    ef = findall(scope, 'Type', 'uinumericeditfield', 'Tag', identifier(2:end));
                 end
                 if numel(ef) > 1, ef = ef(1); end
             else
@@ -526,7 +526,7 @@ classdef SmokeRunner < handle
         end
 
         function dd = findDropdownByItem(~, itemText, scope)
-            allDd = findobj(scope, 'Type', 'uidropdown');
+            allDd = findall(scope, 'Type', 'uidropdown');
             dd = [];
             for k = 1:numel(allDd)
                 if any(strcmp(allDd(k).Items, itemText))

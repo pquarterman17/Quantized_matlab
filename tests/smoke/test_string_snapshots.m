@@ -109,19 +109,19 @@ function test_string_snapshots
         filesToScan = {
             fullfile(rootDir, 'BosonPlotter.m')
             fullfile(rootDir, 'FermiViewer.m')
+            fullfile(rootDir, 'DiraCulator.m')
+            fullfile(rootDir, 'DataWorkspace.m')
+            fullfile(rootDir, 'xrdConvertGUI.m')
         };
-        bpDir = fullfile(rootDir, '+bosonPlotter');
-        if isfolder(bpDir)
-            d = dir(fullfile(bpDir, '*.m'));
-            for ii = 1:numel(d)
-                filesToScan{end+1} = fullfile(bpDir, d(ii).name); %#ok<AGROW>
-            end
-        end
-        emDir = fullfile(rootDir, '+emViewer');
-        if isfolder(emDir)
-            d = dir(fullfile(emDir, '*.m'));
-            for ii = 1:numel(d)
-                filesToScan{end+1} = fullfile(emDir, d(ii).name); %#ok<AGROW>
+        pkgDirs = {'+bosonPlotter', '+emViewer', '+templates', ...
+                   '+dataWorkspace'};
+        for pi = 1:numel(pkgDirs)
+            pkgDir = fullfile(rootDir, pkgDirs{pi});
+            if isfolder(pkgDir)
+                d = dir(fullfile(pkgDir, '**', '*.m'));
+                for ii = 1:numel(d)
+                    filesToScan{end+1} = fullfile(d(ii).folder, d(ii).name); %#ok<AGROW>
+                end
             end
         end
 
@@ -129,17 +129,22 @@ function test_string_snapshots
         for ii = 1:numel(filesToScan)
             src = fileread(filesToScan{ii});
             [~, fname] = fileparts(filesToScan{ii});
-            % Match: 'Text', '...' where the text value ends with ...
-            % Pattern: uibutton(..., 'Text', 'Something...'
-            matches = regexp(src, '''Text''\s*,\s*''[^'']*\.\.\.''', 'match');
-            for jj = 1:numel(matches)
-                % Exclude false positives: 'Text', '' (empty) and menu items
-                m = matches{jj};
-                if contains(m, 'Loading') || contains(m, 'running') || ...
-                        contains(m, 'Decompos') || contains(m, 'progress')
-                    continue;  % status messages are allowed
+            srcLines = splitlines(src);
+            for li = 1:numel(srcLines)
+                ln = srcLines{li};
+                if isempty(regexp(ln, '''Text''\s*,\s*''[^'']*\.\.\.''', 'once'))
+                    continue;
                 end
-                fprintf('  WARN  %s: %s\n', fname, m);
+                % uimenu items are allowed to have "..."
+                if contains(ln, 'uimenu')
+                    continue;
+                end
+                % Status/progress strings are allowed
+                if contains(ln, 'Loading') || contains(ln, 'running') || ...
+                        contains(ln, 'Decompos') || contains(ln, 'progress')
+                    continue;
+                end
+                fprintf('  WARN  %s:%d: %s\n', fname, li, strtrim(ln));
                 violations = violations + 1;
             end
         end

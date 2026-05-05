@@ -128,7 +128,6 @@ function test_bp_smoke
     % ════════════════════════════════════════════════════════════════════
     fprintf('\n── H. File list panel ──\n');
 
-    sr.fireButton('Select All');
     sr.fireButton('Remove Selected');
     sr.captureSnapshot('bp_08_after_remove');
 
