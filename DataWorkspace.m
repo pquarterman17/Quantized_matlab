@@ -91,6 +91,11 @@ helpMenu = uimenu(fig, 'Text', '&Help');
 uimenu(helpMenu, 'Text', 'Report a Bug...', ...
     'MenuSelectedFcn', @(~,~) onReportBug());
 
+% ── Help menu (Report a Bug) ─────────────────────────────────────────────
+helpMenu = uimenu(fig, 'Text', '&Help');
+uimenu(helpMenu, 'Text', 'Report a Bug...', ...
+    'MenuSelectedFcn', @(~,~) onReportBug());
+
 % ════════════════════════════════════════════════════════════════════════
 %  Root grid: [toolbar ; content]
 % ════════════════════════════════════════════════════════════════════════
@@ -1209,7 +1214,6 @@ end
 
     function html = buildCompatText(idxA, idxB, mode)
     %BUILDCOMPATTEXT  HTML status line previewing A vs B compatibility.
-    %   mode is 'math' or 'merge' — both interpolate B onto A's X grid.
         if isempty(idxA) || isempty(idxB)
             html = ''; return;
         end
@@ -1246,7 +1250,6 @@ end
     end
 
     function lab = localFirstLabel(ds)
-    %LOCALFIRSTLABEL  Best-effort X-axis label from metadata or first Y column.
         if isfield(ds, 'metadata') && isfield(ds.metadata, 'xColumnName') ...
                 && ~isempty(ds.metadata.xColumnName)
             lab = ds.metadata.xColumnName;
