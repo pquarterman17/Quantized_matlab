@@ -189,7 +189,7 @@ MASTERPLAN W5 #68 (BosonPlotter) and #69 (FermiViewer) target each file under **
 - **Never add doubly-nested functions** (8-space indent) to either file — see `matlab-gui-complexity.md` for why (parser-slot cost and worse refactorability).
 - **Enforcement:**
   - `tests/gui/test_bosonPlotterSize.m` — `BosonPlotter.m <= 7,665 lines` and nested-fn total `<= 290`. Current baseline: 7,661 lines / 280 nested fns (2026-05-04).
-  - `tests/imaging/test_fermiViewerSize.m` — `FermiViewer.m <= 13,850 lines` and nested-fn total `<= 332` (doubly-nested `<= 16`). Current baseline: 13,807 lines / 331 nested fns (2026-05-06). Runs via `runAllTests(Group="emgui")`.
+  - `tests/imaging/test_fermiViewerSize.m` — `FermiViewer.m <= 13,780 lines` and nested-fn total `<= 332` (doubly-nested `<= 16`). Current baseline: 13,735 lines / 331 nested fns (2026-05-06). Runs via `runAllTests(Group="emgui")`.
   - **Ratchet the ceiling downward** as extractions lower the baseline; never raise it to accept growth.
 
 `DiraCulator.m` does not yet have a size ratchet — apply the same pattern if it grows unchecked.
