@@ -135,6 +135,7 @@ SUITES = {
     T('imaging','test_annotationWorkshop'), 'em', 'AnnotationWorkshop: model + facade for text annotations CRUD, sync, selection (workshop pattern, W5 #69 task 8)'
     T('imaging','test_eelsWorkshop'),       'em', 'EELSWorkshop: model + facade for EELS state, spectrum, cube, analysis results (workshop pattern, W5 #69 task 3)'
     T('imaging','test_edsWorkshop'),        'em', 'EDSWorkshop: model + facade for EDS channels, composite, quantification (workshop pattern, W5 #69 task 4)'
+    T('imaging','test_processingWorkshop'),'em', 'ProcessingWorkshop: model + facade for FFT/Particle/Align state (workshop pattern, W5 #69 task 7)'
     T('imaging','test_em_gui_harness'),     'emgui',  'EM Viewer GUI API: load, contrast, filter, FFT, profile, export'
     T('imaging','test_em_gui_phase2'),      'emgui',  'EM Viewer GUI Phase 2: stack nav, session, compare, EDS, EELS, diffraction, annotations'
     T('imaging','test_em_measurements'),    'emgui',  'EM Viewer measurement/ROI API: measureDistance, dSpacing, ellipse/polygon ROI, annotRect'
