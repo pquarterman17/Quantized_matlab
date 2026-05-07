@@ -131,6 +131,7 @@ SUITES = {
     T('imaging','test_measurementWorkshopModel'), 'em', 'MeasurementWorkshopModel: handle-class state container for FermiViewer distance/angle/polyline/lineprofile measurements (workshop pattern, W5 #28)'
     T('imaging','test_measurementWorkshop'), 'em', 'MeasurementWorkshop facade: hook contract + bind/select/clear lifecycle (workshop pattern, W5 #69 task 1b)'
     T('imaging','test_diffractionWorkshop'), 'em', 'DiffractionWorkshop: model + facade for spot detection, indexing, GPA state (workshop pattern, W5 #69 task 2)'
+    T('imaging','test_contrastWorkshop'),   'em', 'ContrastWorkshop: model + facade for contrast limits, transform, gamma, invert (workshop pattern, W5 #69 task 4)'
     T('imaging','test_em_gui_harness'),     'emgui',  'EM Viewer GUI API: load, contrast, filter, FFT, profile, export'
     T('imaging','test_em_gui_phase2'),      'emgui',  'EM Viewer GUI Phase 2: stack nav, session, compare, EDS, EELS, diffraction, annotations'
     T('imaging','test_em_measurements'),    'emgui',  'EM Viewer measurement/ROI API: measureDistance, dSpacing, ellipse/polygon ROI, annotRect'
