@@ -34,7 +34,7 @@ function test_noNewColorLiterals
     % refactor with a small in-flight buffer (~10). Ratchet DOWN as
     % literals are tokenised. NEVER raise the cap without a documented
     % reason in the commit message — that's the whole point.
-    BASELINE_COUNT = 215;
+    BASELINE_COUNT = 206;
 
     files = collectMatlabFiles(rootDir);
     totalHits = 0;

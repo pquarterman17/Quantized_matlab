@@ -17,7 +17,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 ### MASTERPLAN (MATLAB consolidated) — `plans/MASTERPLAN.md`
 - [ ] **#68** W5 Decomposition → Drive `BosonPlotter.m` below **6,000 lines** (current 7,658, -22% to go). Replaces achieved #22 <8k milestone.
-- [ ] **#69** W5 Decomposition → Drive `FermiViewer.m` below **6,000 lines** (current 13,985, **-57% to go** — largest decomposition workstream in the toolbox)
+- [ ] **#69** W5 Decomposition → Drive `FermiViewer.m` below **6,000 lines** (current 13,188 / 326 nested fns, **-54% to go** — 8 workshop models shipped, callback extraction ongoing)
 
 ### Origin parity (Python port, MATLAB side complete) — `plans/origin-feature-gap.md`
 - [ ] **#1** AIC/BIC/F-test fit comparison → Python
