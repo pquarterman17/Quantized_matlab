@@ -945,28 +945,36 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
         end
     end
 
+    cfPickState = struct('which', '', 'savedWBDF', '');
+    mainFig     = ancestor(mainAx, 'matlab.ui.Figure');
+
     function cfPickXRange(which)
     %CFPICKXRANGE  Click on the main axes to set X min or max.
     %   Temporarily hides cfFig so the main plot is accessible.
         cfFig.Visible = 'off';
-        mainAx.Parent.Pointer = 'crosshair';
+        mainFig.Pointer = 'crosshair';
         options.StatusFcn(sprintf('Click on the plot to set X %s...', which));
-        oldBDF = mainAx.ButtonDownFcn;
-        mainAx.ButtonDownFcn = @(~,~) cfCaptureX(which, oldBDF);
+        cfPickState.which     = which;
+        cfPickState.savedWBDF = mainFig.WindowButtonDownFcn;
+        mainFig.WindowButtonDownFcn = @(~,~) cfCaptureX();
+    end
 
-        function cfCaptureX(wh, restoreFcn)
-            cp = mainAx.CurrentPoint;
-            xClick = cp(1,1);
-            switch wh
-                case 'min', efCFXmin.Value = xClick;
-                case 'max', efCFXmax.Value = xClick;
-            end
-            mainAx.ButtonDownFcn = restoreFcn;
-            mainAx.Parent.Pointer = 'arrow';
-            cfFig.Visible = 'on';
-            figure(cfFig);
-            options.StatusFcn(sprintf('X %s set to %.4g', wh, xClick));
+    function cfCaptureX()
+        cp = mainAx.CurrentPoint;
+        xClick = cp(1,1);  yClick = cp(1,2);
+        xl = mainAx.XLim;  yl = mainAx.YLim;
+        if xClick < xl(1) || xClick > xl(2) || yClick < yl(1) || yClick > yl(2)
+            return;
         end
+        switch cfPickState.which
+            case 'min', efCFXmin.Value = xClick;
+            case 'max', efCFXmax.Value = xClick;
+        end
+        mainFig.WindowButtonDownFcn = cfPickState.savedWBDF;
+        mainFig.Pointer = 'arrow';
+        cfFig.Visible = 'on';
+        figure(cfFig);
+        options.StatusFcn(sprintf('X %s set to %.4g', cfPickState.which, xClick));
     end
 
     function onCompareModels()

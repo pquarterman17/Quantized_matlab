@@ -123,6 +123,7 @@ cb.onKeyPress            = @onKeyPress;
         ctx.appData.peakPickMode          = true;
         ctx.btnManualPeak.Text            = 'Done Adding (click again)';
         ctx.btnManualPeak.BackgroundColor = [0.65 0.10 0.65];
+        ctx.fig.Pointer                   = 'crosshair';
         ctx.fig.WindowButtonDownFcn       = @onManualPeakClick;
     end
 
@@ -172,6 +173,7 @@ cb.onKeyPress            = @onKeyPress;
         ctx.appData.peakRemoveMode          = true;
         ctx.btnRemovePeakClick.Text            = 'Done Removing (click again)';
         ctx.btnRemovePeakClick.BackgroundColor = [0.80 0.10 0.10];
+        ctx.fig.Pointer                        = 'crosshair';
         ctx.fig.WindowButtonDownFcn            = @onRemovePeakClick;
     end
 

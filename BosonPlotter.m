@@ -4363,7 +4363,8 @@ function onLoadBackground(~,~)
             return;
         end
         cp = ax.CurrentPoint;
-        x1 = cp(1,1);   y1 = cp(1,2);
+        x1 = max(ax.XLim(1), min(ax.XLim(2), cp(1,1)));
+        y1 = max(ax.YLim(1), min(ax.YLim(2), cp(1,2)));
         x0 = appData.bgStartPt(1);
         y0 = appData.bgStartPt(2);
         set(appData.bgRectPatch, ...
@@ -4490,7 +4491,8 @@ function onLoadBackground(~,~)
             return;
         end
         cp = ax.CurrentPoint;
-        x1 = cp(1,1);  y1 = cp(1,2);
+        x1 = max(ax.XLim(1), min(ax.XLim(2), cp(1,1)));
+        y1 = max(ax.YLim(1), min(ax.YLim(2), cp(1,2)));
         x0 = appData.maskStartPt(1);
         y0 = appData.maskStartPt(2);
         set(appData.maskRectPatch, ...
@@ -4554,18 +4556,15 @@ function onLoadBackground(~,~)
             uialert(fig,'Load a file first.','No data'); return;
         end
 
-        % Cancel any in-progress BG box-fit before arming this interaction
         cancelInteractions();
-
-        % Arm y-origin interaction (cancelInteractions re-enabled btnPickY — disable)
         btnPickY.Text   = 'Click point 1 of 2 on plot...';
         btnPickY.Enable = 'off';
         btnFitBG.Enable = 'off';
 
         appData.yOriginClickCount = 0;
         appData.yOriginPt1        = [];
-
-        fig.WindowButtonDownFcn = @onYOriginClick;
+        fig.Pointer               = 'crosshair';
+        fig.WindowButtonDownFcn   = @onYOriginClick;
     end
 
     function onYOriginClick(~,~)

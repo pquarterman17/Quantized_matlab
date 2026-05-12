@@ -20,7 +20,8 @@ function onBoxIntMove(appData, ax)
 
     if isempty(appData.boxIntStartPt), return; end
     cp = ax.CurrentPoint;
-    x1 = cp(1,1);  y1 = cp(1,2);
+    x1 = max(ax.XLim(1), min(ax.XLim(2), cp(1,1)));
+    y1 = max(ax.YLim(1), min(ax.YLim(2), cp(1,2)));
     x0 = appData.boxIntStartPt(1);
     y0 = appData.boxIntStartPt(2);
     xLo = min(x0, x1);  xHi = max(x0, x1);

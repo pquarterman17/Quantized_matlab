@@ -45,7 +45,7 @@ function onFigureKeyPress(appData, widgets, callbacks, e)
 %   e         - KeyPressedData event struct (Key, Modifier)
 
     hasMod   = ~isempty(e.Modifier);
-    hasCtrl  = hasMod && any(strcmp(e.Modifier, 'control'));
+    hasCtrl  = hasMod && any(ismember(e.Modifier, {'control', 'command'}));
     hasShift = hasMod && any(strcmp(e.Modifier, 'shift'));
     hasAlt   = hasMod && any(strcmp(e.Modifier, 'alt'));
 

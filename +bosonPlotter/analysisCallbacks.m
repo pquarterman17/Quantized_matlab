@@ -202,29 +202,36 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
 
         bosonPlotter.applyDialogTheme(intFig, appData.theme);
 
+        intPickState = struct('which', '', 'savedWBDF', '');
+
         function pickEdgePoint(which)
         %PICKEDGEPOINT  Click on the main axes to set an edge point.
             intFig.Visible = 'off';
             setStatus(sprintf('Click on the plot to set %s...', upper(which)));
             fig.Pointer = 'crosshair';
-            oldBDF = ax.ButtonDownFcn;
-            ax.ButtonDownFcn = @(~, ~) captureClick(which, oldBDF);
+            intPickState.which     = which;
+            intPickState.savedWBDF = fig.WindowButtonDownFcn;
+            fig.WindowButtonDownFcn = @(~,~) captureIntClick();
+        end
 
-            function captureClick(wh, restoreFcn)
-                cp     = ax.CurrentPoint;
-                xClick = cp(1, 1);
-                switch wh
-                    case 'x1', efIntX1.Value = xClick;
-                    case 'x2', efIntX2.Value = xClick;
-                end
-                ax.ButtonDownFcn = restoreFcn;
-                fig.Pointer = 'arrow';
-                if ~headless
-                    intFig.Visible = 'on';
-                    figure(intFig);
-                end
-                setStatus(sprintf('%s set to %.4g', upper(wh), xClick));
+        function captureIntClick()
+            cp = ax.CurrentPoint;
+            xClick = cp(1,1);  yClick = cp(1,2);
+            xl = ax.XLim;  yl = ax.YLim;
+            if xClick < xl(1) || xClick > xl(2) || yClick < yl(1) || yClick > yl(2)
+                return;
             end
+            switch intPickState.which
+                case 'x1', efIntX1.Value = xClick;
+                case 'x2', efIntX2.Value = xClick;
+            end
+            fig.WindowButtonDownFcn = intPickState.savedWBDF;
+            fig.Pointer = 'arrow';
+            if ~headless
+                intFig.Visible = 'on';
+                figure(intFig);
+            end
+            setStatus(sprintf('%s set to %.4g', upper(intPickState.which), xClick));
         end
 
         function doComputeIntegral()
