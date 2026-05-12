@@ -46,7 +46,8 @@ function [ds, bgOrder, p] = onBGMouseUp(ax, appData, fig, wgts)
     end
 
     cp    = ax.CurrentPoint;
-    endPt = [cp(1,1), cp(1,2)];
+    endPt = [max(ax.XLim(1), min(ax.XLim(2), cp(1,1))), ...
+             max(ax.YLim(1), min(ax.YLim(2), cp(1,2)))];
 
     if ~isempty(appData.bgRectPatch) && isvalid(appData.bgRectPatch)
         delete(appData.bgRectPatch);

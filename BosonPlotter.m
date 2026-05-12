@@ -4518,7 +4518,8 @@ function onLoadBackground(~,~)
 
         if isempty(appData.maskStartPt), return; end
         cp    = ax.CurrentPoint;
-        endPt = [cp(1,1), cp(1,2)];
+        endPt = [max(ax.XLim(1), min(ax.XLim(2), cp(1,1))), ...
+                 max(ax.YLim(1), min(ax.YLim(2), cp(1,2)))];
 
         xMin = min(appData.maskStartPt(1), endPt(1));
         xMax = max(appData.maskStartPt(1), endPt(1));
