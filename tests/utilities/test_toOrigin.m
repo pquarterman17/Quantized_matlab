@@ -339,15 +339,13 @@ function test_toOrigin
             fprintf('  PASS  %s\n', label);
         else
             failed = failed + 1;
-            failures{end+1} = label; %#ok<AGROW>
-            fprintf('  FAIL  %s\n', label);
+            failures{end+1} = label;            fprintf('  FAIL  %s\n', label);
         end
     end
 
     function recordCrash(testName, ME)
         failed = failed + 1;
-        failures{end+1} = sprintf('%s crashed: %s', testName, ME.message); %#ok<AGROW>
-        fprintf('  CRASH %s: %s\n', testName, ME.message);
+        failures{end+1} = sprintf('%s crashed: %s', testName, ME.message);        fprintf('  CRASH %s: %s\n', testName, ME.message);
     end
 end
 
