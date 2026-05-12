@@ -208,8 +208,7 @@ digState.markers    = {};       % graphics handles for point markers
         btnDigCollect.Enable = 'off';
         title(digAx, 'Click X1 (left axis reference point)', 'Color', [0.8 0.4 0]);
 
-        digAx.ButtonDownFcn = @digOnAxesClick;
-        % Make image click-through so axes gets the click
+        digFig.WindowButtonDownFcn = @digOnAxesClick;
         imgs = findobj(digAx, 'Type', 'image');
         for ii = 1:numel(imgs)
             imgs(ii).HitTest = 'off';
@@ -224,7 +223,7 @@ digState.markers    = {};       % graphics handles for point markers
         digState.mode = 'collect';
         title(digAx, 'Click on data points (Esc to stop)', 'Color', [0.2 0.5 0.8]);
 
-        digAx.ButtonDownFcn = @digOnAxesClick;
+        digFig.WindowButtonDownFcn = @digOnAxesClick;
         imgs = findobj(digAx, 'Type', 'image');
         for ii = 1:numel(imgs)
             imgs(ii).HitTest = 'off';
@@ -233,8 +232,12 @@ digState.markers    = {};       % graphics handles for point markers
 
     function digOnAxesClick(~, ~)
         cp = digAx.CurrentPoint;
-        px = cp(1, 1);   % pixel x
-        py = cp(1, 2);   % pixel y
+        px = cp(1, 1);
+        py = cp(1, 2);
+        xl = digAx.XLim;  yl = digAx.YLim;
+        if px < xl(1) || px > xl(2) || py < yl(1) || py > yl(2)
+            return;
+        end
 
         switch digState.mode
             case 'calibrate'
@@ -258,7 +261,7 @@ digState.markers    = {};       % graphics handles for point markers
                     % Calibration done
                     digState.calibrated = true;
                     digState.mode       = 'idle';
-                    digAx.ButtonDownFcn = [];
+                    digFig.WindowButtonDownFcn = '';
                     btnDigCollect.Enable = 'on';
                     title(digAx, 'Calibrated — click "Collect Points" to begin', ...
                         'Color', [0.2 0.7 0.2]);

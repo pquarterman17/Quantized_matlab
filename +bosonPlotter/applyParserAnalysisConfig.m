@@ -55,7 +55,7 @@ function applyParserAnalysisConfig(pName, appData, ui, CROW, peakFig, callbacks)
             % Peak window mode — XRD
             appData.peakMode = 'xrd';
             callbacks.configurePeakWindowForMode('xrd');
-            ui.analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 210};
+            ui.analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 230};
             % Hide asymmetry; respect BG file collapse state
             ui.corrGL.RowHeight{CROW.BGFILE}  = bgFileH;
             ui.corrGL.RowHeight{CROW.BGSUBTR} = bgFileH;
@@ -101,7 +101,7 @@ function applyParserAnalysisConfig(pName, appData, ui, CROW, peakFig, callbacks)
             ui.btnRemovePeakClick.Visible = 'off';
             ui.btnPeakWindow.Visible      = 'off';
             appData.peakMode = 'none';
-            ui.analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 210};
+            ui.analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 230};
             % Hide asymmetry; respect BG file collapse state; show mag section
             ui.corrGL.RowHeight{CROW.BGFILE}  = bgFileH;
             ui.corrGL.RowHeight{CROW.BGSUBTR} = bgFileH;
@@ -135,7 +135,7 @@ function applyParserAnalysisConfig(pName, appData, ui, CROW, peakFig, callbacks)
             % Peak window mode — reflectometry
             appData.peakMode = 'reflectometry';
             callbacks.configurePeakWindowForMode('reflectometry');
-            ui.analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 210};
+            ui.analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 230};
             % Hide BG file rows; asymmetry is now in Advanced Analysis popup
             ui.corrGL.RowHeight{CROW.BGFILE}  = 0;
             ui.corrGL.RowHeight{CROW.BGSUBTR} = 0;
@@ -168,7 +168,7 @@ function applyParserAnalysisConfig(pName, appData, ui, CROW, peakFig, callbacks)
             ui.btnRemovePeakClick.Visible = 'off';
             ui.btnPeakWindow.Visible      = 'off';
             appData.peakMode = 'none';
-            ui.analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 210};
+            ui.analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 230};
             % Hide asymmetry; respect BG file collapse state
             ui.corrGL.RowHeight{CROW.BGFILE}  = bgFileH;
             ui.corrGL.RowHeight{CROW.BGSUBTR} = bgFileH;
@@ -202,7 +202,7 @@ function applyParserAnalysisConfig(pName, appData, ui, CROW, peakFig, callbacks)
             ui.btnRemovePeakClick.Visible = 'off';
             ui.btnPeakWindow.Visible      = 'off';
             appData.peakMode = 'none';
-            ui.analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 210};
+            ui.analysisGL.ColumnWidth     = {appData.corrPanelWidth, '1x', 0, 230};
             % Hide asymmetry; respect BG file collapse state
             ui.corrGL.RowHeight{CROW.BGFILE}  = bgFileH;
             ui.corrGL.RowHeight{CROW.BGSUBTR} = bgFileH;
