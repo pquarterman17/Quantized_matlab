@@ -43,6 +43,10 @@ function test_toOrigin
         check('rename BEFORE PutWorksheet',   renameIdx   < putIdx);
         check('activate BEFORE rename',       activateIdx < renameIdx);
 
+        % No option:=lsname — name:= sets the short name directly
+        lsnameIdx = mock.findCall('Execute', 'option:=lsname');
+        check('no option:=lsname in newbook command', lsnameIdx == 0);
+
         putCall = mock.Calls{putIdx};
         check('PutWorksheet range is [TestBook]TestSheet!', ...
             strcmp(putCall{2}, '[TestBook]TestSheet!'));
@@ -72,9 +76,9 @@ function test_toOrigin
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  TEST 3: yErr column designation
+    %  TEST 3: Correct Origin column type codes (X=3, Y=0, yErr=2)
     % ════════════════════════════════════════════════════════════════════
-    fprintf('\n== TEST 3: error column -> yErr designation ==\n');
+    fprintf('\n== TEST 3: column type codes ==\n');
     try
         mock = MockOriginCom();
         data = struct();
@@ -87,11 +91,13 @@ function test_toOrigin
         utilities.toOrigin(data, 'OriginObj', mock, ...
             'BookName', 'B', 'SheetName', 'S');
 
-        yIdx    = mock.findCall('Execute', 'wks\.col2\.type\s*=\s*1');
-        yErrIdx = mock.findCall('Execute', 'wks\.col3\.type\s*=\s*3');
+        xIdx    = mock.findCall('Execute', 'wks\.col1\.type\s*=\s*3');
+        yIdx    = mock.findCall('Execute', 'wks\.col2\.type\s*=\s*0');
+        yErrIdx = mock.findCall('Execute', 'wks\.col3\.type\s*=\s*2');
 
-        check('col2 designated as Y (type 1)',     yIdx > 0);
-        check('col3 designated as yErr (type 3)',  yErrIdx > 0);
+        check('col1 designated as X (type 3)',     xIdx > 0);
+        check('col2 designated as Y (type 0)',     yIdx > 0);
+        check('col3 designated as yErr (type 2)',  yErrIdx > 0);
     catch ME
         recordCrash('TEST 3', ME);
     end
@@ -136,7 +142,7 @@ function test_toOrigin
         utilities.toOrigin(data, 'OriginObj', mock, ...
             'BookName', 'FailBook', 'SheetName', 'FailSheet');
 
-        [warnMsg, warnId] = lastwarn();
+        [~, warnId] = lastwarn();
 
         nPut = sum(cellfun(@(c) strcmp(c{1}, 'PutWorksheet'), mock.Calls));
         check('PutWorksheet called 3 times (qualified + sheet + Sheet1 fallback)', nPut == 3);
@@ -219,21 +225,21 @@ function test_toOrigin
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  TEST 8: Sheet name truncated to 31 chars
+    %  TEST 8: Sheet name truncated to 32 chars
     % ════════════════════════════════════════════════════════════════════
-    fprintf('\n== TEST 8: sheet name truncation to 31 chars ==\n');
+    fprintf('\n== TEST 8: sheet name truncation to 32 chars ==\n');
     try
         mock = MockOriginCom();
         data = makeData(3, 1);
-        longSheet = 'MTRL_159_BLKT_slot07_refl1d_script_refl';
-        truncSheet = longSheet(1:31);
+        longSheet = 'MTRL_159_BLKT_slot07_refl1d_script_reflx';
+        truncSheet = longSheet(1:32);
 
         utilities.toOrigin(data, 'OriginObj', mock, ...
             'BookName', 'TFT', 'SheetName', longSheet);
 
         renameIdx = mock.findCall('Execute', ...
             sprintf('wks\\.name\\$\\s*=\\s*"%s"', truncSheet));
-        check('sheet name truncated to 31 chars', renameIdx > 0);
+        check('sheet name truncated to 32 chars', renameIdx > 0);
 
         putIdx  = mock.findCall('PutWorksheet');
         putCall = mock.Calls{putIdx};
@@ -241,6 +247,76 @@ function test_toOrigin
             strcmp(putCall{2}, sprintf('[TFT]%s!', truncSheet)));
     catch ME
         recordCrash('TEST 8', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  TEST 9: Empty data rejected before COM
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 9: empty data rejected ==\n');
+    try
+        mock = MockOriginCom();
+        emptyData = struct('time', [], 'values', [], ...
+            'labels', {{}}, 'units', {{}}, ...
+            'metadata', struct('source', 'empty.dat'));
+
+        lastwarn('');
+        warnState = warning('off', 'toOrigin:emptyData');
+        cleanup = onCleanup(@() warning(warnState)); %#ok<NASGU>
+        ok = utilities.toOrigin(emptyData, 'OriginObj', mock);
+
+        [~, warnId] = lastwarn();
+        check('toOrigin returned false on empty data', ok == false);
+        check('toOrigin:emptyData warning raised', strcmp(warnId, 'toOrigin:emptyData'));
+        check('no COM calls on empty data', isempty(mock.Calls));
+    catch ME
+        recordCrash('TEST 9', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  TEST 10: datetime time vector handled correctly
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 10: datetime time vector ==\n');
+    try
+        mock = MockOriginCom();
+        data = struct();
+        data.time   = datetime(2024, 1, 1) + days(0:4).';
+        data.values = rand(5, 1);
+        data.labels = {'Signal'};
+        data.units  = {'V'};
+        data.metadata = struct('source', 'dt.dat');
+
+        ok = utilities.toOrigin(data, 'OriginObj', mock, ...
+            'BookName', 'DT', 'SheetName', 'S');
+
+        check('toOrigin succeeded with datetime input', ok == true);
+
+        putIdx = mock.findCall('PutWorksheet');
+        check('PutWorksheet was called', putIdx > 0);
+        putCall = mock.Calls{putIdx};
+        check('matrix is 5x2', isequal(putCall{3}, [5 2]));
+    catch ME
+        recordCrash('TEST 10', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  TEST 11: escapeLT handles %, ;, and newlines
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 11: LabTalk escape sequences ==\n');
+    try
+        mock = MockOriginCom();
+        data = makeData(3, 1);
+        data.labels = {'100% Signal'};
+        data.units  = {'a;b'};
+
+        utilities.toOrigin(data, 'OriginObj', mock, ...
+            'BookName', 'B', 'SheetName', 'S');
+
+        pctIdx = mock.findCall('Execute', '100\\%');
+        semiIdx = mock.findCall('Execute', 'a\\;');
+        check('% escaped in label', pctIdx > 0);
+        check('; escaped in unit',  semiIdx > 0);
+    catch ME
+        recordCrash('TEST 11', ME);
     end
 
     % ════════════════════════════════════════════════════════════════════

@@ -10,7 +10,6 @@ classdef MockOriginCom < handle
 
     properties
         Visible           = int32(0)
-        WorksheetPages    MockWorksheetPages
         Calls             cell
         PutResult         logical = true
         ActiveBookName    char = ''
@@ -19,47 +18,29 @@ classdef MockOriginCom < handle
 
     methods
         function obj = MockOriginCom()
-            obj.WorksheetPages = MockWorksheetPages();
-            obj.Calls          = {};
+            obj.Calls = {};
         end
 
         function result = Execute(obj, cmd)
         %EXECUTE  Record a LabTalk command, simulate key commands.
             obj.Calls{end+1} = {'Execute', cmd}; %#ok<*AGROW>
-            result = '';
+            result = 0;
 
-            % Detect `newbook name:="X"` and track the book name
             tok = regexp(cmd, 'newbook\s+name:="([^"]+)"', 'tokens', 'once');
             if ~isempty(tok)
                 obj.ActiveBookName = tok{1};
-                obj.WorksheetPages.add(tok{1});
                 obj.ActiveSheetName = 'Sheet1';
             end
 
-            % Detect `wks.name$ = "X"` and track sheet rename
             tok = regexp(cmd, 'wks\.name\$\s*=\s*"([^"]+)"', 'tokens', 'once');
             if ~isempty(tok)
                 obj.ActiveSheetName = tok{1};
-            end
-
-            % Return active book name for `%H=` query
-            if contains(cmd, '%H=')
-                result = obj.ActiveBookName;
-            end
-
-            % Return active sheet name for `wks.name$=` query
-            if contains(cmd, 'wks.name$=') && ~contains(cmd, 'wks.name$ =')
-                result = obj.ActiveSheetName;
             end
         end
 
         function r = PutWorksheet(obj, range, mat, r0, c0)
             obj.Calls{end+1} = {'PutWorksheet', range, size(mat), r0, c0};
             r = obj.PutResult;
-        end
-
-        function result = GetWorksheetPage(obj)
-            result = obj.ActiveBookName;
         end
 
         function release(obj)

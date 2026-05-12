@@ -47,6 +47,20 @@ function success = toOrigin(data, options)
         return;
     end
 
+    % ── Validate data is non-empty ────────────────────────────────────
+    if isempty(data.time) || isempty(data.values)
+        warning('toOrigin:emptyData', 'Data struct has empty time or values.');
+        utilities.logError('toOrigin:emptyData', ...
+            'Data struct has empty time or values — nothing to export.', []);
+        return;
+    end
+
+    % ── Convert datetime to datenum for matrix concatenation ──────────
+    timeVec = data.time(:);
+    if isdatetime(timeVec)
+        timeVec = datenum(timeVec); %#ok<DATNM>
+    end
+
     % ── Obtain Origin handle (real COM or injected mock) ──────────────
     weOwnHandle = false;
     if isempty(options.OriginObj)
@@ -63,7 +77,7 @@ function success = toOrigin(data, options)
     end
 
     if weOwnHandle
-        cleanupObj = onCleanup(@() safeRelease(origin));
+        cleanupObj = onCleanup(@() safeRelease(origin)); %#ok<NASGU>
     end
 
     try
@@ -83,41 +97,23 @@ function success = toOrigin(data, options)
         bookName  = sanitiseLTName(bookName);
         sheetName = sanitiseLTName(sheetName);
 
-        % Origin worksheet names are limited to 31 characters
-        if numel(sheetName) > 31
-            sheetName = sheetName(1:31);
+        if isempty(bookName),  bookName  = 'MatlabExport'; end
+        if isempty(sheetName), sheetName = 'Sheet1'; end
+
+        % Origin worksheet names are limited to 32 characters
+        if numel(sheetName) > 32
+            sheetName = sheetName(1:32);
         end
 
         % ── Create workbook ───────────────────────────────────────────
-        origin.Execute(sprintf('newbook name:="%s" sheet:=1 option:=lsname;', bookName));
+        % `name:=` without `option:=lsname` sets the short name directly,
+        % which is what range references like [BookName]Sheet! require.
+        origin.Execute(sprintf('newbook name:="%s" sheet:=1;', bookName));
 
-        % Read back the actual short name via %H (active window name)
-        % after activating the book — more reliable than WorksheetPages
-        % collection introspection across Origin versions.
-        actualBookName = bookName;
-        try
-            origin.Execute(sprintf('win -a %s;', bookName));
-            rb = strtrim(char(origin.Execute('%%H=')));
-            if isempty(rb)
-                rb = strtrim(char(origin.GetWorksheetPage()));
-            end
-            if ~isempty(rb), actualBookName = rb; end
-        catch
-        end
-
-        origin.Execute(sprintf('win -a %s;', actualBookName));
+        origin.Execute(sprintf('win -a %s;', bookName));
 
         % ── Rename the default sheet ──────────────────────────────────
         origin.Execute(sprintf('wks.name$ = "%s";', escapeLT(sheetName)));
-
-        % Read back the actual sheet name (may have been truncated or
-        % suffixed by Origin to avoid collisions).
-        actualSheetName = sheetName;
-        try
-            sn = strtrim(char(origin.Execute('wks.name$=')));
-            if ~isempty(sn), actualSheetName = sn; end
-        catch
-        end
 
         % ── Set up columns ────────────────────────────────────────────
         nYCols = size(data.values, 2);
@@ -127,8 +123,8 @@ function success = toOrigin(data, options)
             origin.Execute(sprintf('wks.nCols = %d;', totalCols));
         end
 
-        % Column 1 = X
-        origin.Execute('wks.col1.type = 4;');
+        % Column 1 = X  (Origin type code: 3 = X)
+        origin.Execute('wks.col1.type = 3;');
         xName = 'X';
         xUnit = '';
         if isfield(data, 'metadata')
@@ -145,33 +141,30 @@ function success = toOrigin(data, options)
         origin.Execute(sprintf('wks.col1.lname$ = "%s";', escapeLT(xName)));
         origin.Execute(sprintf('wks.col1.unit$ = "%s";', escapeLT(xUnit)));
 
-        % Y columns
+        % Y columns (Origin type codes: 0 = Y, 2 = yErr)
         for k = 1:nYCols
             cn = k + 1;
             lbl = char(data.labels{k});
             unt = char(data.units{k});
 
             if contains(lower(lbl), {'err', 'dr', 'std', 'sigma'})
-                origin.Execute(sprintf('wks.col%d.type = 3;', cn));   % yErr
+                origin.Execute(sprintf('wks.col%d.type = 2;', cn));
             else
-                origin.Execute(sprintf('wks.col%d.type = 1;', cn));   % Y
+                origin.Execute(sprintf('wks.col%d.type = 0;', cn));
             end
             origin.Execute(sprintf('wks.col%d.lname$ = "%s";', cn, escapeLT(lbl)));
             origin.Execute(sprintf('wks.col%d.unit$ = "%s";', cn, escapeLT(unt)));
         end
 
         % ── Write data ────────────────────────────────────────────────
-        mat = [data.time(:), data.values];
-        rangePath = sprintf('[%s]%s!', actualBookName, actualSheetName);
+        mat = [timeVec, data.values];
+        rangePath = sprintf('[%s]%s!', bookName, sheetName);
         wrote = origin.PutWorksheet(rangePath, mat, 0, 0);
         if ~wroteOk(wrote)
-            % Fallback 1: try with just the sheet name (works when only
-            % one book is open)
-            wrote = origin.PutWorksheet(actualSheetName, mat, 0, 0);
+            wrote = origin.PutWorksheet(sheetName, mat, 0, 0);
         end
         if ~wroteOk(wrote)
-            % Fallback 2: try the default "Sheet1" in case rename failed
-            wrote = origin.PutWorksheet(sprintf('[%s]Sheet1!', actualBookName), mat, 0, 0);
+            wrote = origin.PutWorksheet(sprintf('[%s]Sheet1!', bookName), mat, 0, 0);
         end
         if ~wroteOk(wrote)
             msg = sprintf(['Origin.PutWorksheet failed for range %s ' ...
@@ -220,6 +213,9 @@ end
 
 function s = escapeLT(str)
     s = strrep(str, '"', '\"');
+    s = strrep(s, '%', '\%');
+    s = strrep(s, ';', '\;');
+    s = regexprep(s, '[\r\n]', ' ');
 end
 
 function name = sanitiseLTName(name)
