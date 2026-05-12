@@ -24,13 +24,6 @@ function success = toOrigin(data, options)
 %
 %   OUTPUTS:
 %       success — true if data was sent; false if Origin not available
-%
-%   EXAMPLES:
-%       data = parser.importAuto('sample.dat');
-%       ok = utilities.toOrigin(data, 'SheetName', 'M_vs_H');
-%       if ~ok
-%           warning('Origin not available; use CSV export instead.');
-%       end
 
     arguments
         data                  (1,1) struct
@@ -40,7 +33,7 @@ function success = toOrigin(data, options)
         options.LogY          (1,1) logical = false
         options.LogX          (1,1) logical = false
         options.Visible       (1,1) logical = true
-        options.OriginObj                   = []   % DI hook: pre-built COM-like obj for tests
+        options.OriginObj                   = []
     end
 
     success = false;
@@ -55,16 +48,12 @@ function success = toOrigin(data, options)
     end
 
     % ── Obtain Origin handle (real COM or injected mock) ──────────────
-    % The OriginObj name-value lets tests inject a record-and-replay mock so
-    % the call sequence can be verified without OriginPro being installed.
     weOwnHandle = false;
     if isempty(options.OriginObj)
         try
             origin = actxserver('Origin.Application');
             weOwnHandle = true;
         catch ME
-            % Origin not installed or COM registration missing — soft-fail
-            % but record *why* so users with intermittent issues have a trail.
             utilities.logError('toOrigin:noCom', ...
                 sprintf('actxserver(''Origin.Application'') failed: %s', ME.message), ME);
             return;
@@ -73,10 +62,8 @@ function success = toOrigin(data, options)
         origin = options.OriginObj;
     end
 
-    % Only release the handle if we created it ourselves — never release a
-    % caller-provided object, the caller owns its lifecycle.
     if weOwnHandle
-        cleanupObj = onCleanup(@() safeRelease(origin)); %#ok<NASGU>
+        cleanupObj = onCleanup(@() safeRelease(origin));
     end
 
     try
@@ -93,53 +80,49 @@ function success = toOrigin(data, options)
         end
         if isempty(sheetName), sheetName = 'Sheet1'; end
 
-        % Sanitise names for LabTalk (remove special chars)
-        bookName  = regexprep(bookName,  '[^\w]', '_');
-        sheetName = regexprep(sheetName, '[^\w]', '_');
+        bookName  = sanitiseLTName(bookName);
+        sheetName = sanitiseLTName(sheetName);
 
-        % ── Create workbook ───────────────────────────────────────────
-        % Use `newbook bk:=...` (the canonical LabTalk command for creating
-        % a workbook with an explicit short name).  Avoid `win -t data X` —
-        % that form interprets X as a *template* name, not the new book's
-        % name, so the resulting book ends up auto-named (Book1, Book2, …)
-        % and PutWorksheet can no longer address it by name.
-        origin.Execute(sprintf('newbook bk:="%s" name:="%s" sheet:=1 option:=lsname;', ...
-            bookName, bookName));
-
-        % Read back the *actual* short name Origin assigned (it may have
-        % suffixed it on collision, e.g. ThinFilmToolkit2).  Fall back to
-        % the requested name on any COM-introspection failure.
-        actualBookName = bookName;
-        try
-            pages = origin.WorksheetPages;
-            nPages = pages.Count;
-            if nPages > 0
-                lastPage = pages.Item(int32(nPages - 1));
-                rb = char(lastPage.Name);
-                if ~isempty(rb), actualBookName = rb; end
-            end
-        catch
-            % Pages collection not available — keep the requested name
+        % Origin worksheet names are limited to 31 characters
+        if numel(sheetName) > 31
+            sheetName = sheetName(1:31);
         end
 
-        % Make sure our new book is the active window before any LabTalk
-        % `wks.*` commands run (they target the *active* worksheet).
+        % ── Create workbook ───────────────────────────────────────────
+        origin.Execute(sprintf('newbook name:="%s" sheet:=1 option:=lsname;', bookName));
+
+        % Read back the actual short name via %H (active window name)
+        % after activating the book — more reliable than WorksheetPages
+        % collection introspection across Origin versions.
+        actualBookName = bookName;
+        try
+            origin.Execute(sprintf('win -a %s;', bookName));
+            rb = strtrim(char(origin.Execute('%%H=')));
+            if isempty(rb)
+                rb = strtrim(char(origin.GetWorksheetPage()));
+            end
+            if ~isempty(rb), actualBookName = rb; end
+        catch
+        end
+
         origin.Execute(sprintf('win -a %s;', actualBookName));
 
-        % ── Rename the default sheet *now* ────────────────────────────
-        % This must happen BEFORE PutWorksheet — PutWorksheet addresses
-        % the sheet by name via the [Book]Sheet! range syntax, so the
-        % sheet must already have its final name when we write data.
+        % ── Rename the default sheet ──────────────────────────────────
         origin.Execute(sprintf('wks.name$ = "%s";', escapeLT(sheetName)));
+
+        % Read back the actual sheet name (may have been truncated or
+        % suffixed by Origin to avoid collisions).
+        actualSheetName = sheetName;
+        try
+            sn = strtrim(char(origin.Execute('wks.name$=')));
+            if ~isempty(sn), actualSheetName = sn; end
+        catch
+        end
 
         % ── Set up columns ────────────────────────────────────────────
         nYCols = size(data.values, 2);
         totalCols = 1 + nYCols;
 
-        % Ensure enough columns exist (worksheet starts with 2).
-        % `wks.nCols` sets the total column count directly — more reliable
-        % than `wks.addcol(N)`, which is not valid LabTalk (the real form
-        % is `wks.addCol()` and adds ONE column per call).
         if totalCols > 2
             origin.Execute(sprintf('wks.nCols = %d;', totalCols));
         end
@@ -168,7 +151,6 @@ function success = toOrigin(data, options)
             lbl = char(data.labels{k});
             unt = char(data.units{k});
 
-            % Column designation: yErr for error-like columns
             if contains(lower(lbl), {'err', 'dr', 'std', 'sigma'})
                 origin.Execute(sprintf('wks.col%d.type = 3;', cn));   % yErr
             else
@@ -179,26 +161,24 @@ function success = toOrigin(data, options)
         end
 
         % ── Write data ────────────────────────────────────────────────
-        % PutWorksheet's first argument MUST be a fully-qualified range:
-        % `[BookShortName]SheetShortName!`.  Passing only a sheet name is
-        % undocumented and fails silently when Origin can't resolve it
-        % (which is exactly the case the original code hit — it produced
-        % "headers but no data").  We also check the boolean return value
-        % so we can warn instead of pretending it worked.
         mat = [data.time(:), data.values];
-        rangePath = sprintf('[%s]%s!', actualBookName, sheetName);
+        rangePath = sprintf('[%s]%s!', actualBookName, actualSheetName);
         wrote = origin.PutWorksheet(rangePath, mat, 0, 0);
-        if (isnumeric(wrote) || islogical(wrote)) && ~wrote
-            % Last-ditch fallback: some Origin builds resolve a bare
-            % sheet name when there's only one open book.
-            wrote = origin.PutWorksheet(sheetName, mat, 0, 0);
-            if (isnumeric(wrote) || islogical(wrote)) && ~wrote
-                msg = sprintf(['Origin.PutWorksheet failed for range %s ' ...
-                    '(matrix %dx%d, %d Y columns) — workbook is likely empty.'], ...
-                    rangePath, size(mat,1), size(mat,2), nYCols);
-                warning('toOrigin:putWorksheetFailed', '%s', msg);
-                utilities.logError('toOrigin:putWorksheetFailed', msg, []);
-            end
+        if ~wroteOk(wrote)
+            % Fallback 1: try with just the sheet name (works when only
+            % one book is open)
+            wrote = origin.PutWorksheet(actualSheetName, mat, 0, 0);
+        end
+        if ~wroteOk(wrote)
+            % Fallback 2: try the default "Sheet1" in case rename failed
+            wrote = origin.PutWorksheet(sprintf('[%s]Sheet1!', actualBookName), mat, 0, 0);
+        end
+        if ~wroteOk(wrote)
+            msg = sprintf(['Origin.PutWorksheet failed for range %s ' ...
+                '(matrix %dx%d, %d Y columns) — workbook is likely empty.'], ...
+                rangePath, size(mat,1), size(mat,2), nYCols);
+            warning('toOrigin:putWorksheetFailed', '%s', msg);
+            utilities.logError('toOrigin:putWorksheetFailed', msg, []);
         end
 
         % ── Optional: axis scales ─────────────────────────────────────
@@ -232,16 +212,26 @@ end
 % ════════════════════════════════════════════════════════════════════════
 
 function safeRelease(origin)
-%SAFERELEASE  Release COM object without throwing.
     try
         origin.release();
     catch
-        % Ignore release errors
     end
 end
 
-
 function s = escapeLT(str)
-%ESCAPELT  Escape double-quotes for LabTalk string literals.
     s = strrep(str, '"', '\"');
+end
+
+function name = sanitiseLTName(name)
+    name = regexprep(name, '[^\w]', '_');
+end
+
+function tf = wroteOk(wrote)
+    if isempty(wrote)
+        tf = true;
+    elseif (isnumeric(wrote) || islogical(wrote))
+        tf = logical(wrote);
+    else
+        tf = true;
+    end
 end

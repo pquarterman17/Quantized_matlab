@@ -7,23 +7,14 @@ classdef MockOriginCom < handle
 %
 %   The mock records every Execute() and PutWorksheet() call into a
 %   .Calls cell array.  Tests then assert on call ordering and arguments.
-%
-%   Behavior modeled:
-%   - Visible property accepts int32 assignment (no-op)
-%   - Execute(cmd) records the command and, if it parses as a `newbook`,
-%     adds a corresponding page to the WorksheetPages collection so that
-%     production code reading back the actual book name still works.
-%   - PutWorksheet(range, mat, r0, c0) records the call and returns
-%     .PutResult (default true) so failure paths can be exercised.
-%   - release() records the call (no-op).
-%
-%   See also tests/utilities/MockWorksheetPages, tests/utilities/test_toOrigin.
 
     properties
-        Visible           = int32(0)            % settable, ignored
-        WorksheetPages    MockWorksheetPages    % collection of mock pages
-        Calls             cell                  % {{name, args...}, ...}
-        PutResult         logical = true        % what PutWorksheet returns
+        Visible           = int32(0)
+        WorksheetPages    MockWorksheetPages
+        Calls             cell
+        PutResult         logical = true
+        ActiveBookName    char = ''
+        ActiveSheetName   char = ''
     end
 
     methods
@@ -32,38 +23,52 @@ classdef MockOriginCom < handle
             obj.Calls          = {};
         end
 
-        function Execute(obj, cmd)
-        %EXECUTE  Record a LabTalk command and react to newbook commands.
+        function result = Execute(obj, cmd)
+        %EXECUTE  Record a LabTalk command, simulate key commands.
             obj.Calls{end+1} = {'Execute', cmd}; %#ok<*AGROW>
+            result = '';
 
-            % Detect `newbook bk:="X"` and add a corresponding page so that
-            % the production code's WorksheetPages.Item(end-1).Name lookup
-            % returns a sane value.
-            tok = regexp(cmd, 'newbook\s+bk:="([^"]+)"', 'tokens', 'once');
+            % Detect `newbook name:="X"` and track the book name
+            tok = regexp(cmd, 'newbook\s+name:="([^"]+)"', 'tokens', 'once');
             if ~isempty(tok)
+                obj.ActiveBookName = tok{1};
                 obj.WorksheetPages.add(tok{1});
+                obj.ActiveSheetName = 'Sheet1';
+            end
+
+            % Detect `wks.name$ = "X"` and track sheet rename
+            tok = regexp(cmd, 'wks\.name\$\s*=\s*"([^"]+)"', 'tokens', 'once');
+            if ~isempty(tok)
+                obj.ActiveSheetName = tok{1};
+            end
+
+            % Return active book name for `%H=` query
+            if contains(cmd, '%H=')
+                result = obj.ActiveBookName;
+            end
+
+            % Return active sheet name for `wks.name$=` query
+            if contains(cmd, 'wks.name$=') && ~contains(cmd, 'wks.name$ =')
+                result = obj.ActiveSheetName;
             end
         end
 
         function r = PutWorksheet(obj, range, mat, r0, c0)
-        %PUTWORKSHEET  Record a data write and return the configured result.
             obj.Calls{end+1} = {'PutWorksheet', range, size(mat), r0, c0};
             r = obj.PutResult;
         end
 
+        function result = GetWorksheetPage(obj)
+            result = obj.ActiveBookName;
+        end
+
         function release(obj)
-        %RELEASE  Record a release call.  Production code never calls this
-        %on injected mocks (lifecycle is owned by the caller), but we
-        %implement it for safety.
             obj.Calls{end+1} = {'release'};
         end
 
         % ── Test helpers ──────────────────────────────────────────────
 
         function idx = findCall(obj, methodName, pattern)
-        %FINDCALL  Return the index of the first call matching method+pattern.
-        %   idx = mock.findCall('Execute', 'newbook bk:=')
-        %   idx = mock.findCall('PutWorksheet')   % pattern optional
             for i = 1:numel(obj.Calls)
                 c = obj.Calls{i};
                 if ~strcmp(c{1}, methodName), continue; end
