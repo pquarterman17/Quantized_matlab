@@ -333,6 +333,7 @@ function onInsetButtonDown(insetAx, parentAx, connH, parentFig, ~)
     ud.prevUp     = parentFig.WindowButtonUpFcn;
     insetAx.UserData = ud;
 
+    parentFig.Pointer = 'fleur';
     parentFig.WindowButtonMotionFcn = @(~,~) onInsetDragMotion(insetAx, parentAx, connH, parentFig);
     parentFig.WindowButtonUpFcn     = @(~,~) onInsetDragUp(insetAx, parentFig);
 end
@@ -370,7 +371,7 @@ function onInsetDragUp(insetAx, parentFig)
     ud.dragging = false;
     insetAx.UserData = ud;
 
-    % Restore figure callbacks
+    parentFig.Pointer = 'arrow';
     try
         parentFig.WindowButtonMotionFcn = ud.prevMotion;
         parentFig.WindowButtonUpFcn     = ud.prevUp;
