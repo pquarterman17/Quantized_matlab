@@ -42,11 +42,9 @@ xR = xMax;
 % Track which cursor is being dragged
 dragging = '';          % 'left' | 'right' | ''
 
-% Save the figure's original WindowButtonMotionFcn and WindowButtonUpFcn
-% so they can be restored after a drag ends.
 fig = ancestor(ax, 'figure');
-savedMotionFcn = fig.WindowButtonMotionFcn;
-savedUpFcn     = fig.WindowButtonUpFcn;
+savedMotionFcn = '';
+savedUpFcn     = '';
 
 % ════════════════════════════════════════════════════════════════════════
 % Draw cursor lines
@@ -86,8 +84,11 @@ cursors.getRange = @getRange;
     function startDrag(side)
     %STARTDRAG  Attach motion/up handlers and begin dragging.
         dragging = side;
+        savedMotionFcn = fig.WindowButtonMotionFcn;
+        savedUpFcn     = fig.WindowButtonUpFcn;
         fig.WindowButtonMotionFcn = @onDragMotion;
         fig.WindowButtonUpFcn     = @onDragRelease;
+        fig.Pointer = 'left';
     end
 
     function onDragMotion(~, ~)
@@ -119,6 +120,7 @@ cursors.getRange = @getRange;
         dragging = '';
         fig.WindowButtonMotionFcn = savedMotionFcn;
         fig.WindowButtonUpFcn     = savedUpFcn;
+        fig.Pointer = 'arrow';
         if isvalid(ax)
             onRangeChanged(xL, xR);
         end
@@ -154,6 +156,7 @@ cursors.getRange = @getRange;
         if isvalid(fig) && ~isempty(dragging)
             fig.WindowButtonMotionFcn = savedMotionFcn;
             fig.WindowButtonUpFcn     = savedUpFcn;
+            fig.Pointer = 'arrow';
         end
         dragging = '';
     end

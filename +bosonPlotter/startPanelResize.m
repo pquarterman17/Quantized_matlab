@@ -79,6 +79,12 @@ function localMove(appData, fig, widgets)
     if isempty(appData.panelResizeStart), return; end
     mp = fig.CurrentPoint;
 
+    if strcmp(appData.panelResizeDir, 'h_row12')
+        fig.Pointer = 'top';
+    else
+        fig.Pointer = 'left';
+    end
+
     switch appData.panelResizeDir
         case 'h_row12'
             delta_y = mp(2) - appData.panelResizeStart(2);
@@ -126,6 +132,7 @@ end
 function localUp(appData, fig, callbacks)
     fig.WindowButtonMotionFcn = callbacks.onMouseHover;
     fig.WindowButtonUpFcn     = '';
+    fig.Pointer = 'arrow';
     appData.panelResizeStart  = [];
     appData.panelResizeOrig   = [];
 end

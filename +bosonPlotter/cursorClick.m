@@ -52,7 +52,7 @@ function cursorClick(appData, fig, ax, callbacks)
 
     % Ctrl+click → pin a persistent marker
     ctrlHeld = ~isempty(fig.CurrentModifier) && ...
-               any(strcmp(fig.CurrentModifier, 'control'));
+               any(ismember(fig.CurrentModifier, {'control', 'command'}));
     if ctrlHeld
         hold(ax, 'on');
         pinColors = [0.00 0.60 0.30; 0.80 0.40 0.00; 0.50 0.00 0.50; ...

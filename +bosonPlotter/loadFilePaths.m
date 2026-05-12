@@ -60,6 +60,12 @@ function loadFilePaths(appData, fpaths, fig, headless, callbacks)
     fig.Pointer = 'watch';
     nTotal = numel(fpaths);
 
+    prog = [];
+    if nTotal > 3
+        prog = uiprogressdlg(fig, 'Title', 'Importing files...', ...
+            'Message', 'Starting...', 'Value', 0, 'Cancelable', true);
+    end
+
     % ── Excel "Apply to all" state ──
     excelApplyAll    = false;
     excelSavedSheets = {};
@@ -67,8 +73,15 @@ function loadFilePaths(appData, fpaths, fig, headless, callbacks)
     excelExts = {'.xlsx','.xls','.xlsm','.xlsb','.ods'};
     nLoaded = 0;
     for fi = 1:numel(fpaths)
+        if ~isempty(prog) && prog.CancelRequested
+            break;
+        end
         fp = fpaths{fi};
         [~, fnBase, fExt] = fileparts(fp);
+        if ~isempty(prog)
+            prog.Value   = (fi - 1) / nTotal;
+            prog.Message = sprintf('File %d of %d: %s%s', fi, nTotal, fnBase, fExt);
+        end
         if nTotal > 1
             callbacks.setStatus(sprintf('Loading file %d of %d: %s%s...', fi, nTotal, fnBase, fExt));
         else
@@ -207,6 +220,7 @@ function loadFilePaths(appData, fpaths, fig, headless, callbacks)
         end
     end
 
+    if ~isempty(prog), close(prog); end
     fig.Pointer = 'arrow';
     callbacks.cancelInteractions();
     drawnow;

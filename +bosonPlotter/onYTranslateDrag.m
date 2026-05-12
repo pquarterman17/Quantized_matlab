@@ -59,6 +59,7 @@ function localDown(appData, fig, ax, widgets, callbacks)
     end
     appData.yTranslateY0   = y0;
     appData.yTranslateOff0 = widgets.efYOffset.Value;
+    fig.Pointer = 'fleur';
     fig.WindowButtonMotionFcn = @(s,e) localMove(appData, ax, widgets, callbacks);
     fig.WindowButtonUpFcn     = @(s,e) localUp(appData, fig, widgets, callbacks);
 end
@@ -67,16 +68,18 @@ function localMove(appData, ax, widgets, callbacks)
     if isempty(appData.yTranslateY0), return; end
     cp = ax.CurrentPoint;
     dy = cp(1,2) - appData.yTranslateY0;
-    % Moving data UP (dy > 0 in axes units) -> subtract more -> yOff decreases
-    % y_corrected = yRaw - BG - yOff   =>   increase y_corr by dy => reduce yOff by dy
     widgets.efYOffset.Value = appData.yTranslateOff0 - dy;
-    callbacks.onApplyCorrections([],[]);
+    try
+        callbacks.onApplyCorrections([],[]);
+    catch
+    end
 end
 
 function localUp(appData, fig, widgets, callbacks)
     fig.WindowButtonDownFcn   = callbacks.onAxesButtonDown;
     fig.WindowButtonMotionFcn = callbacks.onMouseHover;
     fig.WindowButtonUpFcn     = '';
+    fig.Pointer = 'arrow';
     appData.yTranslateY0 = [];
     widgets.btnYTranslate.Text            = 'Y Translate (drag)';
     widgets.btnYTranslate.BackgroundColor = widgets.BTN_ACCENT;

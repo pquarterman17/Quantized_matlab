@@ -4332,6 +4332,7 @@ function onLoadBackground(~,~)
         btnFitBG.BackgroundColor = [0.80 0.45 0.00];
         btnFitBG.Enable          = 'off';
 
+        fig.Pointer = 'crosshair';
         fig.WindowButtonDownFcn = @onBGMouseDown;
     end
 
@@ -5547,7 +5548,7 @@ function onSendToOrigin(~,~)
             if ismember('shift', mod)
                 extract2DLineCut(x0, y0, true);
                 return;
-            elseif ismember('control', mod)
+            elseif any(ismember({'control', 'command'}, mod))
                 extract2DLineCut(x0, y0, false);
                 return;
             elseif ismember('alt', mod) || appData.boxIntMode
@@ -5593,6 +5594,7 @@ function onSendToOrigin(~,~)
         % Single click — begin drag-zoom if data is loaded
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
         appData.zoomStartPt       = [x0, y0];
+        fig.Pointer = 'crosshair';
         fig.WindowButtonMotionFcn = @(~,~) bosonPlotter.onZoomMouseMove(appData, ax);
         fig.WindowButtonUpFcn     = @onZoomMouseUp;
     end
@@ -5814,6 +5816,7 @@ function onSendToOrigin(~,~)
         ofkpCb_.updateControlsForActiveDataset = @updateControlsForActiveDataset;
         ofkpCb_.onPlot                    = @() onPlot([],[]);
         ofkpCb_.setStatus                 = @setStatus;
+        ofkpCb_.onApplyCorrections        = @onApplyCorrections;
         bosonPlotter.onFigureKeyPress(appData, ofkpWidgets_, ofkpCb_, e);
     end
 

@@ -16,6 +16,7 @@ function onFigureKeyPress(appData, widgets, callbacks, e)
 %   Ctrl+Shift+Y    — focus Y channel selector
 %   Left/Right      — switch active dataset
 %   Space           — toggle dataset visibility
+%   Ctrl+Enter      — apply corrections (useful in Manual apply mode)
 %   Ctrl+Up         — move dataset up
 %   Ctrl+Down       — move dataset down
 %   Alt+Up/Down     — cycle SI prefix on Y (Alt+Shift = X)
@@ -52,6 +53,12 @@ function onFigureKeyPress(appData, widgets, callbacks, e)
         case 'f5'
             callbacks.refreshState();
             return;
+
+        case 'return'
+            if hasCtrl && isfield(callbacks, 'onApplyCorrections')
+                callbacks.onApplyCorrections([], []);
+            end
+
         case 'delete'
             if ~isempty(widgets.lbDatasets.Value) && ~isempty(appData.datasets)
                 callbacks.onRemoveDataset([], []);

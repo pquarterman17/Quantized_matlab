@@ -28,6 +28,7 @@ function onZoomMouseUp(appData, fig, ax, ui, callbacks)
 
     fig.WindowButtonMotionFcn = callbacks.onMouseHover;
     fig.WindowButtonUpFcn     = '';
+    fig.Pointer = 'arrow';
     if isempty(appData.zoomStartPt)
         return;
     end

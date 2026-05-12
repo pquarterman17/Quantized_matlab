@@ -56,6 +56,7 @@ anchorY     = zeros(0, 1);   % anchor y-positions
 markerHandles = gobjects(0); % one diamond marker per anchor
 splineLine  = gobjects(0);   % the spline preview line
 active      = false;         % in placement mode?
+dragState   = struct('src', [], 'idx', 0, 'savedM', '', 'savedU', '', 'savedD', '');
 
 xData = xData(:);
 yData = yData(:);
@@ -184,51 +185,51 @@ ctrl.getAnchors = @getAnchors;
 
     function startMarkerDrag(src, idx)
     %STARTMARKERDRAG  Enter per-marker drag mode.
-        savedM = fig.WindowButtonMotionFcn;
-        savedU = fig.WindowButtonUpFcn;
-        savedD = fig.WindowButtonDownFcn;
-        fig.WindowButtonMotionFcn = @onDragMotion;
-        fig.WindowButtonUpFcn     = @onDragRelease;
-        % Swallow window-level click while dragging
+        dragState.src    = src;
+        dragState.idx    = idx;
+        dragState.savedM = fig.WindowButtonMotionFcn;
+        dragState.savedU = fig.WindowButtonUpFcn;
+        dragState.savedD = fig.WindowButtonDownFcn;
+        fig.Pointer = 'hand';
+        fig.WindowButtonMotionFcn = @anchorDragMotion;
+        fig.WindowButtonUpFcn     = @anchorDragRelease;
         fig.WindowButtonDownFcn   = @(~,~) [];
+    end
 
-        function onDragMotion(~, ~)
-            cp = ax.CurrentPoint;
-            xNow = cp(1, 1);
-            yNow = cp(1, 2);
-            % Clamp to axes limits
-            xl = ax.XLim; yl = ax.YLim;
-            xNow = max(xl(1), min(xl(2), xNow));
-            yNow = max(yl(1), min(yl(2), yNow));
-            anchorX(idx) = xNow;
-            anchorY(idx) = yNow;
-            if isvalid(src)
-                src.XData = xNow;
-                src.YData = yNow;
-            end
-            redrawSpline();
-            drawnow limitrate
+    function anchorDragMotion(~, ~)
+        cp = ax.CurrentPoint;
+        xNow = cp(1, 1);
+        yNow = cp(1, 2);
+        xl = ax.XLim; yl = ax.YLim;
+        xNow = max(xl(1), min(xl(2), xNow));
+        yNow = max(yl(1), min(yl(2), yNow));
+        anchorX(dragState.idx) = xNow;
+        anchorY(dragState.idx) = yNow;
+        if isvalid(dragState.src)
+            dragState.src.XData = xNow;
+            dragState.src.YData = yNow;
         end
+        redrawSpline();
+        drawnow limitrate
+    end
 
-        function onDragRelease(~, ~)
-            % Re-sort anchors by x after drag
-            [anchorX, ord] = sort(anchorX);
-            anchorY = anchorY(ord);
-            markerHandles = markerHandles(ord);
-            % Reassign ButtonDownFcns to match new indices
-            for ki = 1:numel(markerHandles)
-                ki2 = ki;   % capture loop var
-                if isvalid(markerHandles(ki))
-                    markerHandles(ki).ButtonDownFcn = ...
-                        @(s,e) onMarkerClick(s, e, ki2);
-                end
+    function anchorDragRelease(~, ~)
+        [anchorX, ord] = sort(anchorX);
+        anchorY = anchorY(ord);
+        markerHandles = markerHandles(ord);
+        for ki = 1:numel(markerHandles)
+            ki2 = ki;
+            if isvalid(markerHandles(ki))
+                markerHandles(ki).ButtonDownFcn = ...
+                    @(s,e) onMarkerClick(s, e, ki2);
             end
-            fig.WindowButtonMotionFcn = savedM;
-            fig.WindowButtonUpFcn     = savedU;
-            fig.WindowButtonDownFcn   = savedD;
-            redrawSpline();
-            options.StatusFcn(sprintf('Anchor BG: %d anchors.', numel(anchorX)));
         end
+        fig.WindowButtonMotionFcn = dragState.savedM;
+        fig.WindowButtonUpFcn     = dragState.savedU;
+        fig.WindowButtonDownFcn   = dragState.savedD;
+        fig.Pointer = 'crosshair';
+        redrawSpline();
+        options.StatusFcn(sprintf('Anchor BG: %d anchors.', numel(anchorX)));
     end
 
 % ════════════════════════════════════════════════════════════════════════

@@ -166,15 +166,21 @@ updateROI();
         roiFig.Visible = 'off';
         clickMode = true;
         clickCount = 0;
-        mainAx.Parent.Pointer = 'crosshair';
-        oldBDF = mainAx.ButtonDownFcn;
-        mainAx.ButtonDownFcn = @(~,~) onAxesClick();
+        parentFig = mainAx.Parent;
+        while ~isa(parentFig, 'matlab.ui.Figure')
+            parentFig = parentFig.Parent;
+        end
+        parentFig.Pointer = 'crosshair';
+        oldBDF = parentFig.WindowButtonDownFcn;
+        parentFig.WindowButtonDownFcn = @(~,~) onAxesClick(parentFig);
         options.StatusFcn('Click the LEFT edge of the region...');
     end
 
-    function onAxesClick()
+    function onAxesClick(parentFig)
         cp = mainAx.CurrentPoint;
         xClick = cp(1,1);
+        xl = mainAx.XLim;
+        if xClick < xl(1) || xClick > xl(2), return; end
         clickCount = clickCount + 1;
 
         if clickCount == 1
@@ -182,15 +188,13 @@ updateROI();
             options.StatusFcn('Click the RIGHT edge of the region...');
         elseif clickCount >= 2
             efXmax.Value = xClick;
-            % Ensure min < max
             if efXmin.Value > efXmax.Value
                 tmp = efXmin.Value;
                 efXmin.Value = efXmax.Value;
                 efXmax.Value = tmp;
             end
-            % Restore axes
-            mainAx.ButtonDownFcn = oldBDF;
-            mainAx.Parent.Pointer = 'arrow';
+            parentFig.WindowButtonDownFcn = oldBDF;
+            parentFig.Pointer = 'arrow';
             clickMode = false;
             roiFig.Visible = 'on';
             figure(roiFig);
@@ -381,8 +385,12 @@ updateROI();
     %CLEANUP  Close the panel and remove overlay.
         clearOverlay();
         if clickMode && ~isempty(oldBDF)
-            mainAx.ButtonDownFcn = oldBDF;
-            mainAx.Parent.Pointer = 'arrow';
+            parentFig = mainAx.Parent;
+            while ~isa(parentFig, 'matlab.ui.Figure')
+                parentFig = parentFig.Parent;
+            end
+            parentFig.WindowButtonDownFcn = oldBDF;
+            parentFig.Pointer = 'arrow';
         end
         delete(roiFig);
     end
