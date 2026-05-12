@@ -137,7 +137,7 @@ function test_toOrigin
 
         lastwarn('');
         warnState = warning('off', 'toOrigin:putWorksheetFailed');
-        cleanup = onCleanup(@() warning(warnState)); %#ok<NASGU>
+        cleanup = onCleanup(@() warning(warnState));
 
         utilities.toOrigin(data, 'OriginObj', mock, ...
             'BookName', 'FailBook', 'SheetName', 'FailSheet');
@@ -213,7 +213,7 @@ function test_toOrigin
 
         lastwarn('');
         warnState = warning('off', 'toOrigin:badStruct');
-        cleanup = onCleanup(@() warning(warnState)); %#ok<NASGU>
+        cleanup = onCleanup(@() warning(warnState));
         ok = utilities.toOrigin(badData, 'OriginObj', mock);
 
         [~, warnId] = lastwarn();
@@ -261,7 +261,7 @@ function test_toOrigin
 
         lastwarn('');
         warnState = warning('off', 'toOrigin:emptyData');
-        cleanup = onCleanup(@() warning(warnState)); %#ok<NASGU>
+        cleanup = onCleanup(@() warning(warnState));
         ok = utilities.toOrigin(emptyData, 'OriginObj', mock);
 
         [~, warnId] = lastwarn();

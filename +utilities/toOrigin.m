@@ -77,7 +77,7 @@ function success = toOrigin(data, options)
     end
 
     if weOwnHandle
-        cleanupObj = onCleanup(@() safeRelease(origin)); %#ok<NASGU>
+        cleanupObj = onCleanup(@() safeRelease(origin));
     end
 
     try
