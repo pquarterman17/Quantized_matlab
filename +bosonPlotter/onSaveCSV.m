@@ -112,7 +112,7 @@ function mode = askExportMode(fig, nSel)
     end
 end
 
-function fp = pickSaveFile(fig, appData, dsIdx, suffix)
+function fp = pickSaveFile(~, appData, dsIdx, suffix)
 %PICKSAVEFILE  Show a Save As dialog with a suggested filename.
     if nargin < 4, suffix = ''; end
     ds = appData.datasets{dsIdx};
@@ -135,7 +135,7 @@ function fp = pickSaveFile(fig, appData, dsIdx, suffix)
     drawnow;  % flush dialog on some MATLAB versions
 end
 
-function exportSingleDataset(appData, dsIdx, fp, fmt, fig, callbacks)
+function exportSingleDataset(appData, dsIdx, fp, fmt, ~, callbacks)
 %EXPORTSINGLEDATASET  Prepare and write one dataset to CSV.
     ds = appData.datasets{dsIdx};
     if isfield(ds, 'parserName') && isNeutronParser(ds.parserName)
@@ -170,7 +170,7 @@ function exportSingleDataset(appData, dsIdx, fp, fmt, fig, callbacks)
     end
 end
 
-function exportCombined(appData, selIdx, fp, fmt, callbacks)
+function exportCombined(appData, selIdx, fp, fmt, ~)
 %EXPORTCOMBINED  Write multiple datasets side-by-side into one CSV.
     allHdrs = {};
     allCols = {};
@@ -190,11 +190,7 @@ function exportCombined(appData, selIdx, fp, fmt, callbacks)
             xName = d.metadata.xName;
         end
         allHdrs{end+1} = sprintf('%s [%s]', xName, tag); %#ok<AGROW>
-        if isdatetime(d.time)
-            allCols{end+1} = d.time(:); %#ok<AGROW>
-        else
-            allCols{end+1} = d.time(:); %#ok<AGROW>
-        end
+        allCols{end+1} = d.time(:); %#ok<AGROW>
 
         for ci = 1:numel(d.labels)
             lbl = d.labels{ci};
@@ -215,7 +211,7 @@ function exportCombined(appData, selIdx, fp, fmt, callbacks)
     if fid < 0
         error('exportCombined:cannotOpen', 'Cannot open file for writing:\n%s', fp);
     end
-    closeGuard = onCleanup(@() fclose(fid)); %#ok<NASGU>
+    closeGuard = onCleanup(@() fclose(fid));
 
     if strcmp(fmt, 'origin')
         longNames = cellfun(@(h) strtrim(regexprep(h, '\s*\([^)]+\)', '')), ...
