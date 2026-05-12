@@ -847,8 +847,8 @@ function varargout = BosonPlotter(options)
     tbActions(end+1) = struct('id','save',           'label','Save', ...
         'tooltip','Export figure as PNG / PDF / SVG / EPS', ...
         'callback',@(~,~) onExportFigure([],[]),     'iconOnly',false, 'group','output');
-    tbActions(end+1) = struct('id','export',         'label','Export Data', ...
-        'tooltip','Export active dataset data to CSV  [Ctrl+E]', ...
+    tbActions(end+1) = struct('id','export',         'label','Save As', ...
+        'tooltip','Export data to CSV (Save As dialog)  [Ctrl+E]', ...
         'callback',@(~,~) onSaveCSV([],[]),          'iconOnly',false, 'group','output');
     tbActions(end+1) = struct('id','figBuilder',     'label','Figure Builder', ...
         'tooltip','Open the Figure Builder for publication-quality figures', ...
@@ -4640,6 +4640,7 @@ function onLoadBackground(~,~)
         oscsvCb_.recordAction            = @recordAction;
         oscsvCb_.logGUIError             = @logGUIError;
         oscsvCb_.guiSaveCSV              = @guiSaveCSV;
+        oscsvCb_.setStatus               = @setStatus;
         bosonPlotter.onSaveCSV(appData, fig, ui, oscsvCb_);
     end
 
@@ -7340,37 +7341,42 @@ function guiSaveCSV(d, fp, dRaw, asymData, fmt)
         fprintf(fid, '%s\n', strjoin(allHdrs, ','));
     end
 
-    % ── Data rows ─────────────────────────────────────────────────────
+    % ── Data rows (vectorized for performance) ──────────────────────
     nRows = numel(d.time);
-    for r = 1:nRows
-        % Corrected x
-        if isdatetime(d.time)
-            fprintf(fid, '%s', datestr(d.time(r), 'yyyy-mm-dd HH:MM:SS')); %#ok<DATST>
+    isDateX = isdatetime(d.time);
+
+    numBlocks = {d.values};
+    if ~isDateX
+        numBlocks = {d.time(:), d.values};
+    end
+    if hasRaw
+        nRawRows = numel(dRaw.time);
+        rawPad   = max(0, nRows - nRawRows);
+        if isdatetime(dRaw.time)
+            numBlocks{end+1} = [dRaw.values; NaN(rawPad, size(dRaw.values, 2))];
         else
-            fprintf(fid, '%.10g', d.time(r));
+            numBlocks{end+1} = [dRaw.time(:); NaN(rawPad, 1)];
+            numBlocks{end+1} = [dRaw.values; NaN(rawPad, size(dRaw.values, 2))];
         end
-        % Corrected y channels
-        for c = 1:size(d.values, 2)
-            fprintf(fid, ',%.10g', d.values(r, c));
+    end
+    if hasAsym
+        nAsymRows = size(asymData.values, 1);
+        asymPad   = max(0, nRows - nAsymRows);
+        numBlocks{end+1} = [asymData.values; NaN(asymPad, size(asymData.values, 2))];
+    end
+    mat = horzcat(numBlocks{:});
+    nCols = size(mat, 2);
+
+    if isDateX
+        dtStrs = datestr(d.time, 'yyyy-mm-dd HH:MM:SS'); %#ok<DATST>
+        numFmt = [repmat(',%.10g', 1, nCols), '\n'];
+        for r = 1:nRows
+            fprintf(fid, '%s', dtStrs(r, :));
+            fprintf(fid, numFmt, mat(r, :));
         end
-        % Raw columns (appended when available and row index is in range)
-        if hasRaw && r <= numel(dRaw.time)
-            if isdatetime(dRaw.time)
-                fprintf(fid, ',%s', datestr(dRaw.time(r), 'yyyy-mm-dd HH:MM:SS')); %#ok<DATST>
-            else
-                fprintf(fid, ',%.10g', dRaw.time(r));
-            end
-            for c = 1:size(dRaw.values, 2)
-                fprintf(fid, ',%.10g', dRaw.values(r, c));
-            end
-        end
-        % Asymmetry columns (appended for paired neutron data)
-        if hasAsym && r <= size(asymData.values, 1)
-            for c = 1:size(asymData.values, 2)
-                fprintf(fid, ',%.10g', asymData.values(r, c));
-            end
-        end
-        fprintf(fid, '\n');
+    else
+        rowFmt = ['%.10g', repmat(',%.10g', 1, nCols - 1), '\n'];
+        fprintf(fid, rowFmt, mat.');
     end
 end
 
