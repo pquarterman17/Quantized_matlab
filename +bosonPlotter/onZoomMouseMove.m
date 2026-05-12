@@ -22,6 +22,9 @@ function onZoomMouseMove(appData, ax)
     if isempty(appData.zoomStartPt), return; end
     cp = ax.CurrentPoint;
     x1 = cp(1,1);  y1 = cp(1,2);
+    xl = ax.XLim;  yl = ax.YLim;
+    x1 = max(xl(1), min(xl(2), x1));
+    y1 = max(yl(1), min(yl(2), y1));
     x0 = appData.zoomStartPt(1);
     y0 = appData.zoomStartPt(2);
     xLo = min(x0, x1);  xHi = max(x0, x1);
