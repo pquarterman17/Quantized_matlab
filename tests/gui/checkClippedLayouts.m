@@ -252,7 +252,7 @@ end
 
 function tf = isInCollapsedSection(node)
 %ISINCOLLAPEDSECTION  True if any ancestor uigridlayout allocates 0 px to node's section.
-%   Mirrors the PASS 1 exemption: RowHeight = 0 is an intentional hide, not a bug.
+%   Mirrors the PASS 1 exemption: RowHeight/ColumnWidth = 0 is an intentional hide.
     tf = false;
     cur = node;
     while ~isempty(cur) && isvalid(cur)
@@ -260,12 +260,22 @@ function tf = isInCollapsedSection(node)
         if isempty(parent) || ~isvalid(parent), break; end
         if isa(parent, 'matlab.ui.container.GridLayout') && isprop(cur, 'Layout')
             lay = cur.Layout;
-            if ~isempty(lay) && ~isempty(lay.Row)
-                rowRng = lay.Row;
-                rowIdx = rowRng(1):rowRng(end);
-                allocated = sumFixedSlots(parent.RowHeight, rowIdx);
-                if isfinite(allocated) && allocated <= 0
-                    tf = true; return;
+            if ~isempty(lay)
+                if ~isempty(lay.Row)
+                    rowRng = lay.Row;
+                    rowIdx = rowRng(1):rowRng(end);
+                    allocated = sumFixedSlots(parent.RowHeight, rowIdx);
+                    if isfinite(allocated) && allocated <= 0
+                        tf = true; return;
+                    end
+                end
+                if ~isempty(lay.Column)
+                    colRng = lay.Column;
+                    colIdx = colRng(1):colRng(end);
+                    allocated = sumFixedSlots(parent.ColumnWidth, colIdx);
+                    if isfinite(allocated) && allocated <= 0
+                        tf = true; return;
+                    end
                 end
             end
         end
