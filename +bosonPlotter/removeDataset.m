@@ -43,11 +43,28 @@ function removeDataset(appData, fig, ax, ui, headless, callbacks)
     indicesToRemove(indicesToRemove < 1 | indicesToRemove > numel(appData.datasets)) = [];
     if isempty(indicesToRemove), return; end
 
-    % Confirm when removing multiple datasets
-    if numel(indicesToRemove) > 1 && ~headless
-        answer = uiconfirm(fig, ...
-            sprintf('Remove %d selected datasets?', numel(indicesToRemove)), ...
-            'Confirm Remove', 'Options', {'Remove', 'Cancel'}, ...
+    % Confirm when removing multiple datasets, or when a single dataset
+    % has corrections/peaks/smoothing that would be lost.
+    needConfirm = numel(indicesToRemove) > 1;
+    if ~needConfirm && numel(indicesToRemove) == 1
+        ds = appData.datasets{indicesToRemove};
+        hasPeaks = isfield(ds, 'peaks') && ~isempty(ds.peaks);
+        hasCorr  = (isfield(ds,'bgSlope') && ds.bgSlope ~= 0) || ...
+                   (isfield(ds,'bgInt')   && ds.bgInt   ~= 0) || ...
+                   (isfield(ds,'bgPoly')  && ~isempty(ds.bgPoly)) || ...
+                   (isfield(ds,'xOff')    && ds.xOff    ~= 0) || ...
+                   (isfield(ds,'smoothEnabled') && ds.smoothEnabled) || ...
+                   (isfield(ds,'normMethod') && ~strcmp(ds.normMethod, 'None'));
+        needConfirm = hasPeaks || hasCorr;
+    end
+    if needConfirm && ~headless
+        if numel(indicesToRemove) > 1
+            msg = sprintf('Remove %d selected datasets?', numel(indicesToRemove));
+        else
+            msg = 'This dataset has corrections or peaks applied. Remove anyway?';
+        end
+        answer = uiconfirm(fig, msg, 'Confirm Remove', ...
+            'Options', {'Remove', 'Cancel'}, ...
             'DefaultOption', 'Remove', 'CancelOption', 'Cancel');
         if strcmp(answer, 'Cancel'), return; end
     end

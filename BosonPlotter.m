@@ -914,7 +914,6 @@ function varargout = BosonPlotter(options)
                              1e-3,  1e-6,      1e-9];
     try
         cmAxes = uicontextmenu(fig);
-
         smX = uimenu(cmAxes, 'Text', 'X-Axis Prefix');
         smY = uimenu(cmAxes, 'Text', 'Y-Axis Prefix');
         for ip = 1:numel(appData.prefixNames)
@@ -924,7 +923,6 @@ function varargout = BosonPlotter(options)
                 'MenuSelectedFcn', @(src,~) onSetAxisPrefixFromMenu(src, 'y'));
         end
 
-        % Quick toggles
         uimenu(cmAxes, 'Text', 'Toggle Log X', 'Separator', 'on', ...
             'MenuSelectedFcn', @(~,~) onContextToggle('logX'));
         uimenu(cmAxes, 'Text', 'Toggle Log Y', ...
@@ -934,7 +932,6 @@ function varargout = BosonPlotter(options)
         uimenu(cmAxes, 'Text', 'Invert X-Axis', ...
             'MenuSelectedFcn', @(~,~) onContextToggle('invertX'));
 
-        % Reference lines
         smRef = uimenu(cmAxes, 'Text', 'Reference Lines', 'Separator', 'on');
         uimenu(smRef, 'Text', 'Add Horizontal Line Here', ...
             'MenuSelectedFcn', @(~,~) onAddRefLineAtCursor('horizontal'));
@@ -965,7 +962,6 @@ function varargout = BosonPlotter(options)
         uimenu(cmAxes, 'Text', 'Set Tick Spacing...', ...
             'MenuSelectedFcn', @(~,~) onSetTickSpacingMenu());
 
-        % Legend Location ▸ submenu — replaces the deleted in-panel dropdown.
         smLegLoc = uimenu(cmAxes, 'Text', 'Legend Location');
         LEG_LOCS = {'best','NE','NW','SE','SW','EastOutside','off'};
         for il_ = 1:numel(LEG_LOCS)
@@ -973,20 +969,20 @@ function varargout = BosonPlotter(options)
                 'MenuSelectedFcn', @(s,~) onContextSetLegendLoc(s.Text));
         end
 
-        % Dataset Color ▸ submenu — replaces the deleted in-panel dropdown.
         smDsColor = uimenu(cmAxes, 'Text', 'Dataset Color');
         for ic_ = 1:numel(DS_COLOR_NAMES)
             uimenu(smDsColor, 'Text', DS_COLOR_NAMES{ic_}, ...
                 'MenuSelectedFcn', @(s,~) onContextSetDatasetColor(s.Text));
         end
 
-        uimenu(cmAxes, 'Text', 'Copy Plot (Vector)', ...
+        smCopy = uimenu(cmAxes, 'Text', 'Copy / Export');
+        uimenu(smCopy, 'Text', 'Copy Plot (Vector)  [Ctrl+C]', ...
             'MenuSelectedFcn', @(~,~) onCopyPlotToClipboard());
-        uimenu(cmAxes, 'Text', 'Copy as PNG', ...
+        uimenu(smCopy, 'Text', 'Copy as PNG', ...
             'MenuSelectedFcn', @(~,~) onCopyToClipboardAsPNG([], []));
-        uimenu(cmAxes, 'Text', 'Copy Data to Clipboard', ...
+        uimenu(smCopy, 'Text', 'Copy Data to Clipboard', ...
             'MenuSelectedFcn', @(~,~) onCopyDataToClipboard([], []));
-        uimenu(cmAxes, 'Text', 'Export Visible Range...', ...
+        uimenu(smCopy, 'Text', 'Export Visible Range...', 'Separator', 'on', ...
             'MenuSelectedFcn', @(~,~) bosonPlotter.onExportVisibleRange(appData, fig, ax));
         uimenu(cmAxes, 'Text', 'Toggle Waterfall Gradient', 'Separator', 'on', ...
             'MenuSelectedFcn', @(~,~) toggleWfGradient());
@@ -4814,9 +4810,9 @@ function onSendToOrigin(~,~)
 
     function onPlot(~,~)
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
-        % Fix B1: collapse Y2 listbox row when no right-axis channel is selected
         y2IsActive = ~all(strcmp(ensureCell(lbY2.Value), '(none)'));
         ctrlGL.RowHeight{3} = guiTernary(y2IsActive, '1x', 0);
+        limGL.RowHeight{3}  = guiTernary(y2IsActive, 26, 0);
         drawToAxes(ax);
         % Re-apply grid and axis-direction from the active dataset's plot
         % state — these are axes properties (not dropdowns) and would
