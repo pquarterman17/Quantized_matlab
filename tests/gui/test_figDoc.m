@@ -168,6 +168,49 @@ function test_figDoc()
     delete(outPath);
     fprintf('  PASS\n'); passed = passed + 1;
 
+    % ── TEST 11: Annotations add/remove ────────────────────────────────
+    fprintf('\n== TEST 11: Annotations add/remove ==\n');
+    m7 = bosonPlotter.figDoc.FigDocModel();
+    a1 = struct('type','text','position',[1 2],'text','label A','style',struct('fontSize',12,'color',[1 0 0]));
+    a2 = struct('type','text','position',[3 4],'text','label B','style',struct('fontSize',10,'color',[0 0 0]));
+    m7.addAnnotation(a1);
+    m7.addAnnotation(a2);
+    assert(numel(m7.annotations) == 2, '2 annotations');
+    m7.removeAnnotation(1);
+    assert(numel(m7.annotations) == 1, '1 after remove');
+    assert(strcmp(m7.annotations{1}.text, 'label B'), 'correct one remains');
+    fprintf('  PASS\n'); passed = passed + 1;
+
+    % ── TEST 12: Annotations rendered to axes ────────────────────────────
+    fprintf('\n== TEST 12: Annotations rendered to axes ==\n');
+    fig12 = figure('Visible','off');
+    ax12 = axes(fig12);
+    plot(ax12, 1:10, rand(1,10));
+    m8 = bosonPlotter.figDoc.FigDocModel();
+    m8.addAnnotation(struct('type','text','position',[5 0.5],'text','test note','style',struct('fontSize',11,'color',[0 0 0])));
+    bosonPlotter.figDoc.applyToAxes(ax12, m8);
+    annots = findobj(ax12, 'Tag', 'figDocAnnotation');
+    assert(~isempty(annots), 'annotation object exists on axes');
+    assert(strcmp(annots(1).String, 'test note'), 'annotation text correct');
+    close(fig12);
+    fprintf('  PASS\n'); passed = passed + 1;
+
+    % ── TEST 13: Trace style override persistence ────────────────────────
+    fprintf('\n== TEST 13: Trace style override persistence ==\n');
+    m9 = bosonPlotter.figDoc.FigDocModel();
+    m9.setTraceStyle(1, 'color', [1 0 0]);
+    m9.setTraceStyle(1, 'lineWidth', 3);
+    m9.setTraceStyle(2, 'lineStyle', '--');
+    assert(numel(m9.traceStyles) == 2, 'two trace style entries');
+    assert(isequal(m9.traceStyles{1}.color, [1 0 0]), 'color set');
+    assert(m9.traceStyles{1}.lineWidth == 3, 'lineWidth set');
+    s9 = m9.snapshot();
+    m9b = bosonPlotter.figDoc.FigDocModel();
+    m9b.restore(s9);
+    assert(isequal(m9b.traceStyles{1}.color, [1 0 0]), 'color survives round-trip');
+    assert(strcmp(m9b.traceStyles{2}.lineStyle, '--'), 'lineStyle survives round-trip');
+    fprintf('  PASS\n'); passed = passed + 1;
+
     % ── Summary ──────────────────────────────────────────────────────────
     fprintf('\n====================================================================\n');
     fprintf('  test_figDoc: %d passed, %d failed\n', passed, failed);
