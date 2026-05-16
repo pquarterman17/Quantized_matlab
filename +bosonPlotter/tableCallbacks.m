@@ -37,6 +37,7 @@ cb.onColSetX              = @onColSetX;
 cb.onColPlotY             = @onColPlotY;
 cb.onColStats             = @onColStats;
 cb.onColFormula           = @onColFormula;
+cb.onPasteFromClipboard   = @onPasteFromClipboard;
 
     function applyMaskStyling()
     %APPLYMASKSTYLING  Highlight masked rows in soft red using uistyle/addStyle.
@@ -445,6 +446,87 @@ cb.onColFormula           = @onColFormula;
         tblUnits.Data = appData.tableUnits;
         tblUnits.ColumnEditable = true(1, nCols + 1);
         setStatus(sprintf('Added column "%s" from formula', newName));
+    end
+
+    function onPasteFromClipboard(~, ~)
+    %ONPASTEFROMCLIPBOARD  Parse tab-separated clipboard text into new columns.
+        try
+            raw = clipboard('paste');
+        catch
+            uialert(fig, 'Cannot access clipboard.', 'Paste');
+            return;
+        end
+        if isempty(raw)
+            setStatus('Clipboard is empty.');
+            return;
+        end
+        lines = strsplit(raw, {'\r\n', '\n', '\r'});
+        lines = lines(~cellfun(@isempty, lines));
+        if isempty(lines), setStatus('No data on clipboard.'); return; end
+
+        % Detect delimiter (tab preferred, else comma)
+        if contains(lines{1}, char(9))
+            delim = char(9);
+        elseif contains(lines{1}, ',')
+            delim = ',';
+        else
+            delim = char(9);
+        end
+
+        % Check if first line is a header (non-numeric)
+        firstCells = strsplit(lines{1}, delim);
+        isHeader = any(isnan(str2double(firstCells)));
+        if isHeader
+            colNames = strtrim(firstCells);
+            dataLines = lines(2:end);
+        else
+            colNames = arrayfun(@(i) sprintf('Paste%d', i), ...
+                1:numel(firstCells), 'UniformOutput', false);
+            dataLines = lines;
+        end
+
+        nRows = numel(dataLines);
+        nCols = numel(colNames);
+        mat = NaN(nRows, nCols);
+        for r = 1:nRows
+            cells = strsplit(dataLines{r}, delim);
+            for c = 1:min(numel(cells), nCols)
+                mat(r, c) = str2double(cells{c});
+            end
+        end
+
+        % Append columns to existing data
+        wc = appData.tableWorkingCopy;
+        if isempty(wc)
+            appData.tableWorkingCopy = mat;
+            appData.tableMask = false(nRows, 1);
+            appData.tableUnits = repmat({''}, 1, nCols);
+            tblData.ColumnName = colNames(:);
+            tblData.Data = mat;
+            tblData.ColumnEditable = true(1, nCols);
+            tblUnits.ColumnName = colNames(:);
+            tblUnits.Data = appData.tableUnits;
+            tblUnits.ColumnEditable = true(1, nCols);
+        else
+            nExist = size(wc, 1);
+            if nRows ~= nExist
+                uialert(fig, sprintf('Row count mismatch: table has %d, clipboard has %d.', ...
+                    nExist, nRows), 'Paste');
+                return;
+            end
+            appData.tableWorkingCopy = [wc, mat];
+            appData.tableUnits = [appData.tableUnits, repmat({''}, 1, nCols)];
+            allNames = [tblData.ColumnName; colNames(:)];
+            nAll = size(appData.tableWorkingCopy, 2);
+            tblData.ColumnName = allNames;
+            tblData.Data = appData.tableWorkingCopy;
+            tblData.ColumnEditable = true(1, nAll);
+            tblUnits.ColumnName = allNames;
+            tblUnits.Data = appData.tableUnits;
+            tblUnits.ColumnEditable = true(1, nAll);
+        end
+        appData.tableEdited = true;
+        setStatus(sprintf('Pasted %d rows × %d columns from clipboard.', nRows, nCols));
     end
 
     function onTableSaveAs(~, ~)

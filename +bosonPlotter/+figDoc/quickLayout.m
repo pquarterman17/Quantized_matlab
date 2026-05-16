@@ -45,7 +45,12 @@ function quickLayout(ax, fig, appData, layout, setStatusFcn)
         'Position', [100 100 800 600], 'Resize', 'on');
     movegui(dlg, 'center');
 
-    tl = tiledlayout(dlg, nRows, nCols, 'TileSpacing', 'compact', 'Padding', 'compact');
+    mainGL = uigridlayout(dlg, [2 1], 'RowHeight', {'1x', 28}, ...
+        'Padding', [0 0 0 0], 'RowSpacing', 0);
+    plotPanel = uipanel(mainGL, 'BorderType', 'none');
+    plotPanel.Layout.Row = 1;
+
+    tl = tiledlayout(plotPanel, nRows, nCols, 'TileSpacing', 'compact', 'Padding', 'compact');
 
     axHandles = gobjects(nPanels, 1);
     for k = 1:nPanels
@@ -79,6 +84,18 @@ function quickLayout(ax, fig, appData, layout, setStatusFcn)
             if strcmp(model.yScale, 'log'), axHandles(k).YScale = 'log'; end
         end
     end
+
+    % ── Linked axes controls (row 2 of mainGL) ─────────────────────────────
+    linkGL = uigridlayout(mainGL, [1 4], 'RowHeight', {24}, ...
+        'ColumnWidth', {'1x', 70, 70, 50}, 'Padding', [6 2 6 2]);
+    linkGL.Layout.Row = 2;
+    uilabel(linkGL, 'Text', 'Link axes:', 'FontWeight', 'bold');
+    uibutton(linkGL, 'Text', 'X only', ...
+        'ButtonPushedFcn', @(~,~) linkaxes(axHandles, 'x'));
+    uibutton(linkGL, 'Text', 'X + Y', ...
+        'ButtonPushedFcn', @(~,~) linkaxes(axHandles, 'xy'));
+    uibutton(linkGL, 'Text', 'Off', ...
+        'ButtonPushedFcn', @(~,~) linkaxes(axHandles, 'off'));
 
     setStatusFcn(sprintf('Multi-panel: %d datasets in %s layout.', min(nDs, nPanels), layout));
 end

@@ -24,6 +24,7 @@ classdef FigDocModel < handle
         titleText = ""          % plot title string
         fontSize = 11           % base font size (pt)
         fontName = "Arial"      % font family
+        labelFontWeight = 'normal'  % 'normal' | 'bold'
         gridOn   = false        % major grid lines
         minorTicks = false      % minor tick marks
         tickDir  = 'out'        % 'in' | 'out' | 'both'

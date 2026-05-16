@@ -31,6 +31,11 @@ function dispatchAction(action, fig, appData, overlayOn, ax, setStatusFcn)
         case 'applyStyleToAll'
             bosonPlotter.figDoc.applyStyleToAll(appData.datasets, appData.activeIdx);
             setStatusFcn(sprintf('Style applied to %d datasets.', numel(appData.datasets)));
+        case 'applyStyleToSelected'
+            targets = 1:numel(appData.datasets);
+            targets(targets == appData.activeIdx) = [];
+            bosonPlotter.figDoc.applyStyleToSelected(appData.datasets, appData.activeIdx, targets);
+            setStatusFcn(sprintf('Style applied to %d selected datasets.', numel(targets)));
         case 'preview'
             bosonPlotter.figDoc.buildPreviewPanel(fig, appData.datasets, ...
                 appData.activeIdx, overlayOn, model);

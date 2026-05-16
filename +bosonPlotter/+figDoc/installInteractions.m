@@ -33,6 +33,12 @@ function installInteractions(ax, fig, appData, applyFcn, setStatusFcn)
         'MenuSelectedFcn', @(~,~) addAxisBreak_(ax, appData, applyFcn, 'y'));
     uimenu(axMenu, 'Text', 'Clear Axis Breaks', ...
         'MenuSelectedFcn', @(~,~) clearAxisBreaks_(appData, applyFcn, setStatusFcn));
+    uimenu(axMenu, 'Text', 'Font Size...', 'Separator', 'on', ...
+        'MenuSelectedFcn', @(~,~) editFontSize_(ax, appData, applyFcn));
+    uimenu(axMenu, 'Text', 'Line Width (all traces)...', ...
+        'MenuSelectedFcn', @(~,~) editAllLineWidth_(ax, appData, applyFcn));
+    uimenu(axMenu, 'Text', 'Bold Labels', ...
+        'MenuSelectedFcn', @(~,~) toggleBoldLabels_(ax, appData, applyFcn));
     uimenu(axMenu, 'Text', 'Reset to Auto', 'Separator', 'on', ...
         'MenuSelectedFcn', @(~,~) resetAuto_(ax, appData, applyFcn, setStatusFcn));
     ax.ContextMenu = axMenu;
@@ -402,6 +408,53 @@ function dragRelease_(fig)
         model.markDirty();
     end
     fig.UserData = rmfield(fig.UserData, 'dragAnnot');
+end
+
+% ═══════════════════════════════════════════════════════════════════════════
+function editFontSize_(ax, appData, applyFcn)
+    model = getModel_(appData);
+    if isempty(model), return; end
+    answer = inputdlg({'Font size (pt):'}, 'Font Size', [1 30], ...
+        {num2str(model.fontSize)});
+    if isempty(answer), return; end
+    sz = str2double(answer{1});
+    if isnan(sz) || sz < 4 || sz > 72, return; end
+    model.pushUndo();
+    model.fontSize = sz;
+    applyFcn();
+end
+
+% ═══════════════════════════════════════════════════════════════════════════
+function editAllLineWidth_(ax, appData, applyFcn)
+    model = getModel_(appData);
+    if isempty(model), return; end
+    lines = findobj(ax.Children, 'Type', 'Line');
+    lines = lines(~startsWith(string({lines.Tag}'), 'figDoc'));
+    curW = 1.5;
+    if ~isempty(lines), curW = lines(1).LineWidth; end
+    answer = inputdlg({'Line width (pt):'}, 'All Traces Width', [1 30], ...
+        {num2str(curW)});
+    if isempty(answer), return; end
+    w = str2double(answer{1});
+    if isnan(w) || w <= 0 || w > 20, return; end
+    model.pushUndo();
+    for k = 1:numel(lines)
+        model.setTraceStyle(k, 'lineWidth', w);
+    end
+    applyFcn();
+end
+
+% ═══════════════════════════════════════════════════════════════════════════
+function toggleBoldLabels_(~, appData, applyFcn)
+    model = getModel_(appData);
+    if isempty(model), return; end
+    model.pushUndo();
+    if strcmp(model.labelFontWeight, 'bold')
+        model.labelFontWeight = 'normal';
+    else
+        model.labelFontWeight = 'bold';
+    end
+    applyFcn();
 end
 
 % ═══════════════════════════════════════════════════════════════════════════

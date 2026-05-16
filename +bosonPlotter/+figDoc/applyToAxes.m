@@ -51,6 +51,11 @@ function applyToAxes(ax, model)
     % ── Font ─────────────────────────────────────────────────────────────
     ax.FontSize = model.fontSize;
     ax.FontName = model.fontName;
+    if isprop(ax.XLabel, 'FontWeight')
+        ax.XLabel.FontWeight = model.labelFontWeight;
+        ax.YLabel.FontWeight = model.labelFontWeight;
+        ax.Title.FontWeight = model.labelFontWeight;
+    end
 
     % ── Grid & ticks ─────────────────────────────────────────────────────
     if model.gridOn

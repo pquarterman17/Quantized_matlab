@@ -223,6 +223,8 @@ function s = buildDataTablePanel(parent, fig, tk, palette, callbacks)
         'MenuSelectedFcn', @(~,~) []);
     s.miUnmaskAll  = uimenu(tblCtxMenu, 'Separator', 'on', 'Text', 'Unmask all', ...
         'MenuSelectedFcn', @(~,~) []);
+    s.miPaste      = uimenu(tblCtxMenu, 'Separator', 'on', 'Text', 'Paste from Clipboard', ...
+        'MenuSelectedFcn', @(~,~) []);
     s.tblData.ContextMenu = tblCtxMenu;
     s.tblData.Layout.Row = 5;
 end

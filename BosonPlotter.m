@@ -412,7 +412,7 @@ function varargout = BosonPlotter(options)
         'onWilliamsonHallPlot',@onWilliamsonHallPlot, 'onReflectivityFFT',@onReflectivityFFT, 'onFFTThickness',@onFFTThickness, ...
         'onRefineLattice',@onRefineLattice, 'onMatchPhases',@onMatchPhases, ...
         'onPoleFigure',@onPoleFigure, 'onDecomposeRSM',@onDecomposeRSM, 'onAdvAsymmetry',@onAdvAsymmetry, 'onShowAdvancedMenu',@onShowAdvancedMenu, ...
-        'onFigureProperties',@(~,~)figDocDispatch_('properties'), 'onQuickExport',@(~,~)figDocDispatch_('export'), 'onCopyForSlides',@(~,~)figDocDispatch_('copy'), 'onAnnotations',@(~,~)figDocDispatch_('annotations'), 'onTraceStyles',@(~,~)figDocDispatch_('traceStyles'), 'onFigDocTemplates',@(~,~)figDocDispatch_('templates'), 'onApplyStyleToAll',@(~,~)figDocDispatch_('applyStyleToAll'), 'onUndoStyle',@(~,~)figDocDispatch_('undo'), 'onExportPreview',@(~,~)figDocDispatch_('preview'), 'onReExport',@(~,~)figDocDispatch_('reexport'), ...
+        'onFigureProperties',@(~,~)figDocDispatch_('properties'), 'onQuickExport',@(~,~)figDocDispatch_('export'), 'onCopyForSlides',@(~,~)figDocDispatch_('copy'), 'onAnnotations',@(~,~)figDocDispatch_('annotations'), 'onTraceStyles',@(~,~)figDocDispatch_('traceStyles'), 'onFigDocTemplates',@(~,~)figDocDispatch_('templates'), 'onApplyStyleToAll',@(~,~)figDocDispatch_('applyStyleToAll'), 'onApplyStyleToSelected',@(~,~)figDocDispatch_('applyStyleToSelected'), 'onUndoStyle',@(~,~)figDocDispatch_('undo'), 'onExportPreview',@(~,~)figDocDispatch_('preview'), 'onReExport',@(~,~)figDocDispatch_('reexport'), ...
         'onPlotTemplates',@onPlotTemplates, 'onOpenPlotStyleDialog',@onOpenPlotStyleDialog, 'onAdvancedFigureBuilder',@onAdvancedFigureBuilder, ...
         'onComposeFigure',@onComposeFigure, 'onLayout1x2',@(~,~)figDocDispatch_('layout1x2'), 'onLayout2x1',@(~,~)figDocDispatch_('layout2x1'), 'onLayout2x2',@(~,~)figDocDispatch_('layout2x2'), 'onBatchFigureExport',@onBatchFigureExport, 'onPolarPlot',@onPolarPlot, ...
         'onToggleMacroRecord',@onToggleMacroRecord, 'onExportMacro',@onExportMacro, ...
@@ -679,7 +679,6 @@ function varargout = BosonPlotter(options)
     axPanel            = plotCtrlS_.axPanel;
     axGL               = plotCtrlS_.axGL;
     axToolbarGL        = plotCtrlS_.axToolbarGL;
-    % Waterfall gradient coloring (stored in appData, no separate widget)
     appData.wfGradient = false;
 
     % ── Dynamic axes toolbar (right-aligned buttons, order from user prefs) ──
@@ -1055,14 +1054,14 @@ function varargout = BosonPlotter(options)
     miMaskRows        = dtUI_.miMaskRows;
     miUnmaskRows      = dtUI_.miUnmaskRows;
     miUnmaskAll       = dtUI_.miUnmaskAll;
+    miPaste           = dtUI_.miPaste;
     miColSortAsc      = dtUI_.miColSortAsc;
     miColSortDesc     = dtUI_.miColSortDesc;
     miColSetX         = dtUI_.miColSetX;
     miColPlotY        = dtUI_.miColPlotY;
     miColStats        = dtUI_.miColStats;
     miColFormula      = dtUI_.miColFormula;
-    appData.tableSelection = [];  % [Nx2] matrix of [row col] pairs
-    appData.unitsSelection = [];  % [Nx2] from units row selection
+    appData.tableSelection = []; appData.unitsSelection = [];
 
     % ── Hidden floaters: not visible, but read by callbacks ──────────────
     % These were formerly visible widgets in axLimPanel. After the Axes
@@ -1633,6 +1632,7 @@ function varargout = BosonPlotter(options)
     miMaskRows.MenuSelectedFcn        = tblCb.onTableMaskSelected;
     miUnmaskRows.MenuSelectedFcn      = tblCb.onTableUnmaskSelected;
     miUnmaskAll.MenuSelectedFcn       = tblCb.onTableUnmaskAll;
+    miPaste.MenuSelectedFcn           = tblCb.onPasteFromClipboard;
     miColSortAsc.MenuSelectedFcn      = tblCb.onColSortAsc;
     miColSortDesc.MenuSelectedFcn     = tblCb.onColSortDesc;
     miColSetX.MenuSelectedFcn         = tblCb.onColSetX;

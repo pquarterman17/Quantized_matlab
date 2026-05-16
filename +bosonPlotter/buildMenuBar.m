@@ -48,6 +48,7 @@ function buildMenuBar(fig, cb)
     addItem(editMenu, 'Edit Legend...',           cb.onOpenLegendEditor);
     addItem(editMenu, 'Edit Trace Styles...',    cb.onTraceStyles);
     addItem(editMenu, 'Apply Style to All',      cb.onApplyStyleToAll);
+    addItem(editMenu, 'Apply Style to Selected', cb.onApplyStyleToSelected);
     addItem(editMenu, 'Undo Style Change',       cb.onUndoStyle, 'Accelerator','Z');
     addItem(editMenu, 'Edit Column Mapping...',   cb.onEditColumnMapping);
 
