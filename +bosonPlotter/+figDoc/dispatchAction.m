@@ -26,5 +26,7 @@ function dispatchAction(action, fig, appData, overlayOn, ax, setStatusFcn)
             bosonPlotter.figDoc.buildAnnotationDialog(fig, ax, model, applyFcn);
         case 'traceStyles'
             bosonPlotter.figDoc.buildTraceStyleDialog(fig, ax, model, applyFcn);
+        case 'templates'
+            bosonPlotter.figDoc.buildTemplateDialog(fig, model, applyFcn);
     end
 end

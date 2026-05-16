@@ -211,6 +211,30 @@ function test_figDoc()
     assert(strcmp(m9b.traceStyles{2}.lineStyle, '--'), 'lineStyle survives round-trip');
     fprintf('  PASS\n'); passed = passed + 1;
 
+    % ── TEST 14: Template save/load/list/delete ─────────────────────────
+    fprintf('\n== TEST 14: Template save/load/list/delete ==\n');
+    m10 = bosonPlotter.figDoc.FigDocModel();
+    m10.fontSize = 16;
+    m10.xScale = 'log';
+    m10.legendColumns = 3;
+    m10.gridOn = true;
+    tplName = ['test_tpl_' char(java.util.UUID.randomUUID())];
+    tplName = matlab.lang.makeValidName(tplName);
+    bosonPlotter.figDoc.templateManager.save(tplName, m10);
+    names = bosonPlotter.figDoc.templateManager.list();
+    assert(ismember(tplName, names), 'template appears in list');
+    m11 = bosonPlotter.figDoc.FigDocModel();
+    assert(m11.fontSize == 11, 'fresh model has default fontSize');
+    bosonPlotter.figDoc.templateManager.applyTo(tplName, m11);
+    assert(m11.fontSize == 16, 'template applied fontSize');
+    assert(strcmp(m11.xScale, 'log'), 'template applied xScale');
+    assert(m11.legendColumns == 3, 'template applied legendColumns');
+    assert(m11.gridOn == true, 'template applied gridOn');
+    bosonPlotter.figDoc.templateManager.delete(tplName);
+    names2 = bosonPlotter.figDoc.templateManager.list();
+    assert(~ismember(tplName, names2), 'template deleted');
+    fprintf('  PASS\n'); passed = passed + 1;
+
     % ── Summary ──────────────────────────────────────────────────────────
     fprintf('\n====================================================================\n');
     fprintf('  test_figDoc: %d passed, %d failed\n', passed, failed);

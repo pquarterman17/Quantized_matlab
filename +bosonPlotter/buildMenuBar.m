@@ -101,7 +101,8 @@ function buildMenuBar(fig, cb)
     addItem(toolsMenu, 'Figure Properties...',    cb.onFigureProperties);
     addItem(toolsMenu, 'Quick Export...',         cb.onQuickExport);
     addItem(toolsMenu, 'Copy for Slides',         cb.onCopyForSlides,       'Accelerator','P');
-    addItem(toolsMenu, 'Plot Templates...',       cb.onPlotTemplates,       'Separator',true);
+    addItem(toolsMenu, 'FigDoc Templates...',    cb.onFigDocTemplates,    'Separator',true);
+    addItem(toolsMenu, 'Plot Templates...',       cb.onPlotTemplates);
     addItem(toolsMenu, 'Plot Style...',           cb.onOpenPlotStyleDialog);
     addItem(toolsMenu, 'Advanced Figure Builder...', cb.onAdvancedFigureBuilder);
     addItem(toolsMenu, 'Compose Figure...',       cb.onComposeFigure);
