@@ -66,6 +66,20 @@ function installInteractions(ax, fig, appData, applyFcn, setStatusFcn)
 
     % ── Annotation drag ──────────────────────────────────────────────────
     installAnnotationDrag_(ax, appData, applyFcn);
+
+    % ── Double-click axis labels → inline edit ───────────────────────────
+    if ~isempty(ax.XLabel) && isvalid(ax.XLabel)
+        ax.XLabel.ButtonDownFcn = @(~,~) editLabel_(ax, appData, applyFcn, 'x');
+    end
+    if ~isempty(ax.YLabel) && isvalid(ax.YLabel)
+        ax.YLabel.ButtonDownFcn = @(~,~) editLabel_(ax, appData, applyFcn, 'y');
+    end
+    if ~isempty(ax.Title) && isvalid(ax.Title)
+        ax.Title.ButtonDownFcn = @(~,~) editTitle_(ax, appData, applyFcn);
+    end
+
+    % ── Double-click axes whitespace → auto-scale ────────────────────────
+    ax.ButtonDownFcn = @(~, evt) axesDoubleClick_(evt, ax, appData, applyFcn, setStatusFcn);
 end
 
 % ═══════════════════════════════════════════════════════════════════════════
@@ -129,12 +143,12 @@ function editLabel_(~, appData, applyFcn, which)
     if isempty(model), return; end
     if which == 'x'
         cur = char(model.xLabel);
-        title = 'X Label';
+        dlgTitle = 'X Label';
     else
         cur = char(model.yLabel);
-        title = 'Y Label';
+        dlgTitle = 'Y Label';
     end
-    answer = inputdlg({'Label:'}, title, [1 50], {cur});
+    answer = inputdlg({'Label:'}, dlgTitle, [1 50], {cur});
     if isempty(answer), return; end
     model.pushUndo();
     if which == 'x'
@@ -143,6 +157,34 @@ function editLabel_(~, appData, applyFcn, which)
         model.yLabel = string(answer{1});
     end
     applyFcn();
+end
+
+% ═══════════════════════════════════════════════════════════════════════════
+function editTitle_(~, appData, applyFcn)
+    model = getModel_(appData);
+    if isempty(model), return; end
+    cur = char(model.titleText);
+    answer = inputdlg({'Title:'}, 'Plot Title', [1 50], {cur});
+    if isempty(answer), return; end
+    model.pushUndo();
+    model.titleText = string(answer{1});
+    applyFcn();
+end
+
+% ═══════════════════════════════════════════════════════════════════════════
+function axesDoubleClick_(evt, ax, appData, applyFcn, setStatusFcn)
+    if ~isprop(evt, 'EventName') || ~strcmp(evt.EventName, 'Hit')
+        return;
+    end
+    if isprop(evt, 'SelectionType') && strcmp(evt.SelectionType, 'open')
+        model = getModel_(appData);
+        if isempty(model), return; end
+        model.pushUndo();
+        model.xLim = 'auto';
+        model.yLim = 'auto';
+        applyFcn();
+        setStatusFcn('Auto-scaled axes (double-click).');
+    end
 end
 
 % ═══════════════════════════════════════════════════════════════════════════

@@ -345,8 +345,57 @@ function test_figDoc()
     delete(figBrk);
     fprintf('  PASS\n'); passed = passed + 1;
 
-    % ── TEST 21: legend cycle ────────────────────────────────────────────
-    fprintf('\n== TEST 21: legend cycle ==\n');
+    % ── TEST 21: title property and label ButtonDownFcn ─────────────────
+    fprintf('\n== TEST 21: title property ==\n');
+    mTitle = bosonPlotter.figDoc.FigDocModel();
+    mTitle.titleText = "My Plot";
+    assert(strcmp(mTitle.titleText, "My Plot"), 'title set');
+    sT = mTitle.snapshot();
+    mTitle2 = bosonPlotter.figDoc.FigDocModel();
+    mTitle2.restore(sT);
+    assert(strcmp(mTitle2.titleText, "My Plot"), 'title round-trip');
+    figT = uifigure('Visible', 'off');
+    axT = uiaxes(figT);
+    plot(axT, 1:5, 1:5);
+    bosonPlotter.figDoc.applyToAxes(axT, mTitle2);
+    assert(strcmp(axT.Title.String, "My Plot"), 'title applied to axes');
+    delete(figT);
+    fprintf('  PASS\n'); passed = passed + 1;
+
+    % ── TEST 22: lastExportPath stored in model ──────────────────────────
+    fprintf('\n== TEST 22: lastExportPath ==\n');
+    mExp = bosonPlotter.figDoc.FigDocModel();
+    assert(strlength(mExp.lastExportPath) == 0, 'starts empty');
+    mExp.lastExportPath = "C:\tmp\test.png";
+    sExp = mExp.snapshot();
+    mExp2 = bosonPlotter.figDoc.FigDocModel();
+    mExp2.restore(sExp);
+    assert(strcmp(mExp2.lastExportPath, "C:\tmp\test.png"), 'path round-trip');
+    fprintf('  PASS\n'); passed = passed + 1;
+
+    % ── TEST 23: double-click label wiring ───────────────────────────────
+    fprintf('\n== TEST 23: double-click label wiring ==\n');
+    figDC = uifigure('Visible', 'off');
+    axDC = uiaxes(figDC);
+    plot(axDC, 1:5, 1:5);
+    axDC.XLabel.String = 'X';
+    axDC.YLabel.String = 'Y';
+    mDC = bosonPlotter.figDoc.FigDocModel();
+    dsDC = makeFakeDataset((1:5)', (1:5)', 'dc', true);
+    dsDC.figDoc = mDC;
+    appDC = struct('activeIdx', 1, 'datasets', {{dsDC}});
+    bosonPlotter.figDoc.applyToAxes(axDC, mDC);
+    bosonPlotter.figDoc.installInteractions(axDC, figDC, appDC, ...
+        @() bosonPlotter.figDoc.applyToAxes(axDC, mDC), @(s) disp(s));
+    assert(~isempty(axDC.XLabel.ButtonDownFcn), 'XLabel click wired');
+    assert(~isempty(axDC.YLabel.ButtonDownFcn), 'YLabel click wired');
+    assert(~isempty(axDC.Title.ButtonDownFcn), 'Title click wired');
+    assert(~isempty(axDC.ButtonDownFcn), 'Axes double-click wired');
+    delete(figDC);
+    fprintf('  PASS\n'); passed = passed + 1;
+
+    % ── TEST 24: legend cycle ────────────────────────────────────────────
+    fprintf('\n== TEST 24: legend cycle ==\n');
     mC = bosonPlotter.figDoc.FigDocModel();
     mC.legendLocation = 'northeast';
     dsC = makeFakeDataset((1:5)', (1:5)', 'cyc', true);

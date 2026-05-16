@@ -34,6 +34,9 @@ function dispatchAction(action, fig, appData, overlayOn, ax, setStatusFcn)
         case 'preview'
             bosonPlotter.figDoc.buildPreviewPanel(fig, appData.datasets, ...
                 appData.activeIdx, overlayOn, model);
+        case 'reexport'
+            bosonPlotter.figDoc.reExport(appData.datasets, appData.activeIdx, ...
+                overlayOn, model, setStatusFcn);
         case 'undo'
             if model.canUndo()
                 model.undo();

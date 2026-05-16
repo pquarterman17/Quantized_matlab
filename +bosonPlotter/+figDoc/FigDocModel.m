@@ -21,6 +21,7 @@ classdef FigDocModel < handle
         yScale   = 'linear'     % 'linear' | 'log'
         xLabel   = ""           % string
         yLabel   = ""           % string
+        titleText = ""          % plot title string
         fontSize = 11           % base font size (pt)
         fontName = "Arial"      % font family
         gridOn   = false        % major grid lines
@@ -61,6 +62,7 @@ classdef FigDocModel < handle
 
         % ── Export ──────────────────────────────────────────────────────
         lastExportProfile = 'powerpoint'  % 'powerpoint' | 'aps' | 'nature' | 'custom'
+        lastExportPath   = ""           % full path of last successful export
     end
 
     properties (SetAccess = private)

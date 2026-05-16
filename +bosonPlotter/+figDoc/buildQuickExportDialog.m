@@ -92,6 +92,7 @@ function buildQuickExportDialog(fig, datasets, activeIdx, overlayMode, model)
                 overlayMode, model, pName, outFile);
             dlg.Pointer = 'arrow';
             model.lastExportProfile = pName;
+            model.lastExportPath = string(outPath);
             uialert(dlg, sprintf('Saved: %s', outPath), 'Exported', 'Icon', 'success');
         catch ME
             dlg.Pointer = 'arrow';

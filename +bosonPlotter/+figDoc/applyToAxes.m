@@ -42,6 +42,11 @@ function applyToAxes(ax, model)
         ax.YLabel.FontSize = model.fontSize;
         ax.YLabel.FontName = model.fontName;
     end
+    if strlength(model.titleText) > 0
+        ax.Title.String = model.titleText;
+        ax.Title.FontSize = model.fontSize + 1;
+        ax.Title.FontName = model.fontName;
+    end
 
     % ── Font ─────────────────────────────────────────────────────────────
     ax.FontSize = model.fontSize;
