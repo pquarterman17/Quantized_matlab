@@ -4574,6 +4574,8 @@ function onSendToOrigin(~,~)
 
     function applyFigDoc(targetAx)
         bosonPlotter.figDoc.applyAfterRender(targetAx, appData.datasets, appData.activeIdx);
+        bosonPlotter.figDoc.installInteractions(targetAx, fig, appData, ...
+            @() applyFigDoc(targetAx), @setStatus);
     end
     function captureFigDoc()
         bosonPlotter.figDoc.capture(ax, appData.datasets, appData.activeIdx);

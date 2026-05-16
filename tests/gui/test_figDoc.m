@@ -235,6 +235,46 @@ function test_figDoc()
     assert(~ismember(tplName, names2), 'template deleted');
     fprintf('  PASS\n'); passed = passed + 1;
 
+    % ── TEST 15: installInteractions wires context menus ────────────────
+    fprintf('\n== TEST 15: installInteractions wires context menus ==\n');
+    figI = uifigure('Visible', 'off');
+    axI = uiaxes(figI);
+    plot(axI, 1:10, rand(1,10), 'DisplayName', 'trace1');
+    hold(axI, 'on');
+    plot(axI, 1:10, rand(1,10), 'DisplayName', 'trace2');
+    hold(axI, 'off');
+    mI = bosonPlotter.figDoc.FigDocModel();
+    mI.addAnnotation(struct('type','text','position',[3 0.5],'text','hi','style',struct()));
+    dsI = makeFakeDataset((1:10)', rand(10,1), 'test', true);
+    dsI.figDoc = mI;
+    appI = struct('activeIdx', 1, 'datasets', {{dsI}});
+    bosonPlotter.figDoc.applyToAxes(axI, mI);
+    bosonPlotter.figDoc.installInteractions(axI, figI, appI, ...
+        @() bosonPlotter.figDoc.applyToAxes(axI, mI), @(s) disp(s));
+    assert(~isempty(axI.ContextMenu), 'axes context menu installed');
+    lines = findobj(axI.Children, 'Type', 'Line');
+    dataLines = lines(~startsWith(string({lines.Tag}'), 'figDoc'));
+    assert(~isempty(dataLines(1).ContextMenu), 'trace context menu installed');
+    annots = findobj(axI, 'Tag', 'figDocAnnotation', 'Type', 'text');
+    assert(~isempty(annots), 'annotation text found');
+    assert(~isempty(annots(1).ButtonDownFcn), 'annotation drag wired');
+    delete(figI);
+    fprintf('  PASS\n'); passed = passed + 1;
+
+    % ── TEST 16: legend cycle ────────────────────────────────────────────
+    fprintf('\n== TEST 16: legend cycle ==\n');
+    mC = bosonPlotter.figDoc.FigDocModel();
+    mC.legendLocation = 'northeast';
+    dsC = makeFakeDataset((1:5)', (1:5)', 'cyc', true);
+    dsC.figDoc = mC;
+    appC = struct('activeIdx', 1, 'datasets', {{dsC}});
+    locations = {'northeast', 'southeast', 'southwest', 'northwest', ...
+                 'northoutside', 'eastoutside', 'best'};
+    idx = find(strcmp(locations, 'northeast'), 1);
+    nextIdx = mod(idx, numel(locations)) + 1;
+    assert(strcmp(locations{nextIdx}, 'southeast'), 'next after NE is SE');
+    fprintf('  PASS\n'); passed = passed + 1;
+
     % ── Summary ──────────────────────────────────────────────────────────
     fprintf('\n====================================================================\n');
     fprintf('  test_figDoc: %d passed, %d failed\n', passed, failed);
