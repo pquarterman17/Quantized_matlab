@@ -56,6 +56,9 @@ classdef FigDocModel < handle
         y2Scale  = 'linear' % right-Y 'linear' | 'log'
         y2Label  = ""       % right-Y axis label
 
+        % ── Axis breaks ─────────────────────────────────────────────────
+        axisBreaks = {}     % cell array of structs: .axis='x'|'y', .range=[lo hi]
+
         % ── Export ──────────────────────────────────────────────────────
         lastExportProfile = 'powerpoint'  % 'powerpoint' | 'aps' | 'nature' | 'custom'
     end
@@ -146,6 +149,23 @@ classdef FigDocModel < handle
             end
             obj.traceStyles{idx}.(field) = value;
             obj.dirty = true;
+        end
+
+        function addAxisBreak(obj, axis, range)
+        %ADDAXISBREAK  Add a break region to skip when rendering.
+            obj.axisBreaks{end+1} = struct('axis', axis, 'range', range);
+            obj.dirty = true;
+        end
+
+        function removeAxisBreak(obj, idx)
+            if idx >= 1 && idx <= numel(obj.axisBreaks)
+                obj.axisBreaks(idx) = [];
+                obj.dirty = true;
+            end
+        end
+
+        function tf = hasAxisBreaks(obj)
+            tf = ~isempty(obj.axisBreaks);
         end
 
         function setTraceYAxis(obj, idx, side)

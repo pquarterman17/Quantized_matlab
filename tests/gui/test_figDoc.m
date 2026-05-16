@@ -312,8 +312,41 @@ function test_figDoc()
     assert(isequal(mY2b.y2Lim, [0 1000]), 'y2Lim round-trip');
     fprintf('  PASS\n'); passed = passed + 1;
 
-    % ── TEST 19: legend cycle ────────────────────────────────────────────
-    fprintf('\n== TEST 19: legend cycle ==\n');
+    % ── TEST 19: axis breaks model ──────────────────────────────────────
+    fprintf('\n== TEST 19: axis breaks model ==\n');
+    mBrk = bosonPlotter.figDoc.FigDocModel();
+    assert(~mBrk.hasAxisBreaks(), 'no breaks initially');
+    mBrk.addAxisBreak('x', [20 40]);
+    mBrk.addAxisBreak('y', [100 200]);
+    assert(mBrk.hasAxisBreaks(), 'has breaks after add');
+    assert(numel(mBrk.axisBreaks) == 2, 'two breaks');
+    assert(strcmp(mBrk.axisBreaks{1}.axis, 'x'), 'first is x');
+    mBrk.removeAxisBreak(1);
+    assert(numel(mBrk.axisBreaks) == 1, 'one break after remove');
+    assert(strcmp(mBrk.axisBreaks{1}.axis, 'y'), 'remaining is y');
+    sBrk = mBrk.snapshot();
+    mBrk2 = bosonPlotter.figDoc.FigDocModel();
+    mBrk2.restore(sBrk);
+    assert(mBrk2.hasAxisBreaks(), 'breaks survive round-trip');
+    fprintf('  PASS\n'); passed = passed + 1;
+
+    % ── TEST 20: axis break rendering ────────────────────────────────────
+    fprintf('\n== TEST 20: axis break rendering ==\n');
+    figBrk = uifigure('Visible', 'off');
+    axBrk = uiaxes(figBrk);
+    plot(axBrk, 1:50, 1:50, 'DisplayName', 'linear');
+    mBrk3 = bosonPlotter.figDoc.FigDocModel();
+    mBrk3.addAxisBreak('x', [15 25]);
+    bosonPlotter.figDoc.applyAxisBreaks(axBrk, mBrk3);
+    marks = findall(axBrk, 'Tag', 'figDocBreakMark');
+    assert(~isempty(marks), 'break marks rendered');
+    ln = findobj(axBrk.Children, 'Type', 'Line', '-not', 'Tag', 'figDocBreakMark');
+    assert(any(isnan(ln(1).YData)), 'NaN gap introduced in break region');
+    delete(figBrk);
+    fprintf('  PASS\n'); passed = passed + 1;
+
+    % ── TEST 21: legend cycle ────────────────────────────────────────────
+    fprintf('\n== TEST 21: legend cycle ==\n');
     mC = bosonPlotter.figDoc.FigDocModel();
     mC.legendLocation = 'northeast';
     dsC = makeFakeDataset((1:5)', (1:5)', 'cyc', true);

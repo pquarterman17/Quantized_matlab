@@ -27,6 +27,12 @@ function installInteractions(ax, fig, appData, applyFcn, setStatusFcn)
         'MenuSelectedFcn', @(~,~) editLabel_(ax, appData, applyFcn, 'x'));
     uimenu(axMenu, 'Text', 'Edit Y Label...', ...
         'MenuSelectedFcn', @(~,~) editLabel_(ax, appData, applyFcn, 'y'));
+    uimenu(axMenu, 'Text', 'Add X-Axis Break...', 'Separator', 'on', ...
+        'MenuSelectedFcn', @(~,~) addAxisBreak_(ax, appData, applyFcn, 'x'));
+    uimenu(axMenu, 'Text', 'Add Y-Axis Break...', ...
+        'MenuSelectedFcn', @(~,~) addAxisBreak_(ax, appData, applyFcn, 'y'));
+    uimenu(axMenu, 'Text', 'Clear Axis Breaks', ...
+        'MenuSelectedFcn', @(~,~) clearAxisBreaks_(appData, applyFcn, setStatusFcn));
     uimenu(axMenu, 'Text', 'Reset to Auto', 'Separator', 'on', ...
         'MenuSelectedFcn', @(~,~) resetAuto_(ax, appData, applyFcn, setStatusFcn));
     ax.ContextMenu = axMenu;
@@ -137,6 +143,42 @@ function editLabel_(~, appData, applyFcn, which)
         model.yLabel = string(answer{1});
     end
     applyFcn();
+end
+
+% ═══════════════════════════════════════════════════════════════════════════
+function addAxisBreak_(ax, appData, applyFcn, which)
+    model = getModel_(appData);
+    if isempty(model), return; end
+    if which == 'x'
+        cur = ax.XLim;
+        prompt = {'Break start:', 'Break end:'};
+        title = 'X-Axis Break';
+    else
+        cur = ax.YLim;
+        prompt = {'Break start:', 'Break end:'};
+        title = 'Y-Axis Break';
+    end
+    mid = mean(cur); span = diff(cur) * 0.1;
+    answer = inputdlg(prompt, title, [1 30], ...
+        {num2str(mid - span), num2str(mid + span)});
+    if isempty(answer), return; end
+    lo = str2double(answer{1}); hi = str2double(answer{2});
+    if isnan(lo) || isnan(hi) || lo >= hi, return; end
+    model.pushUndo();
+    model.addAxisBreak(which, [lo hi]);
+    applyFcn();
+end
+
+% ═══════════════════════════════════════════════════════════════════════════
+function clearAxisBreaks_(appData, applyFcn, setStatusFcn)
+    model = getModel_(appData);
+    if isempty(model), return; end
+    if isempty(model.axisBreaks), return; end
+    model.pushUndo();
+    model.axisBreaks = {};
+    model.markDirty();
+    applyFcn();
+    setStatusFcn('Axis breaks cleared.');
 end
 
 % ═══════════════════════════════════════════════════════════════════════════

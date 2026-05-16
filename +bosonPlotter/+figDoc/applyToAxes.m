@@ -111,6 +111,11 @@ function applyToAxes(ax, model)
     % ── Annotations ──────────────────────────────────────────────────────
     applyAnnotations(ax, model);
 
+    % ── Axis breaks ──────────────────────────────────────────────────────
+    if model.hasAxisBreaks()
+        bosonPlotter.figDoc.applyAxisBreaks(ax, model);
+    end
+
     model.markClean();
 end
 
