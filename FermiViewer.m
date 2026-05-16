@@ -4133,235 +4133,19 @@ function varargout = FermiViewer()
     %  CALLBACK: onRectClick — Handle clicks during rectangle selection
     % ════════════════════════════════════════════════════════════════════
     function onRectClick(~, ~)
-        if ~ismember(appData.captureMode, {'zoom', 'crop', 'savecrop', 'rectROI', 'batchcrop'})
-            return;
-        end
-
-        cp = ax.CurrentPoint;
-        x  = cp(1, 1);
-        y  = cp(1, 2);
-
-        % Clamp to image bounds
-        [H, W] = size(appData.filteredPixels);
-        x = max(0.5, min(W + 0.5, x));
-        y = max(0.5, min(H + 0.5, y));
-
-        appData.captureClicks(end+1, :) = [x, y];
-
-        if size(appData.captureClicks, 1) == 1
-            % First click — draw live preview rectangle
-            hRect = rectangle(ax, 'Position', [x y 1 1], ...
-                'EdgeColor', OVERLAY_COLOR, ...
-                'LineWidth', 1.5, ...
-                'LineStyle', '--', ...
-                'HandleVisibility', 'off');
-            appData.overlays.clickMarkers{end+1} = hRect;
-
-            % Attach motion callback for live rubber-band
-            fig.WindowButtonMotionFcn = @(~,~) updateRectPreview(hRect, ...
-                appData.captureClicks(1,1), appData.captureClicks(1,2));
-
-            switch appData.captureMode
-                case 'zoom'
-                    setStatus('Click second corner to zoom... (Esc to cancel)');
-                case 'crop'
-                    setStatus('Click second corner to crop... (Esc to cancel)');
-                case 'savecrop'
-                    setStatus('Click second corner to save... (Esc to cancel)');
-                case 'rectROI'
-                    setStatus('Click second corner for Rect ROI... (Esc to cancel)');
-            end
-
-        elseif size(appData.captureClicks, 1) >= 2
-            % Both corners collected
-            x1 = appData.captureClicks(1, 1);
-            y1 = appData.captureClicks(1, 2);
-            x2 = appData.captureClicks(2, 1);
-            y2 = appData.captureClicks(2, 2);
-
-            mode = appData.captureMode;
-
-            % Clean up preview rectangle and restore callbacks
-            fig.WindowButtonMotionFcn = @onMouseMotion;
-            for ci = 1:numel(appData.overlays.clickMarkers)
-                h = appData.overlays.clickMarkers{ci};
-                if isvalid(h), delete(h); end
-            end
-            appData.overlays.clickMarkers = {};
-            finishCapture();
-
-            % Normalize to [xMin xMax yMin yMax]
-            xMin = max(1, floor(min(x1, x2)));
-            xMax = min(size(appData.displayImg, 2), ceil(max(x1, x2)));
-            yMin = max(1, floor(min(y1, y2)));
-            yMax = min(size(appData.displayImg, 1), ceil(max(y1, y2)));
-
-            if xMax - xMin < 2 || yMax - yMin < 2
-                setStatus('Selection too small — cancelled.');
-                return;
-            end
-
-            switch mode
-                case 'zoom'
-                    ax.XLim = [xMin - 0.5, xMax + 0.5];
-                    ax.YLim = [yMin - 0.5, yMax + 0.5];
-                    setStatus(sprintf('Zoomed to [%d:%d, %d:%d]', ...
-                        xMin, xMax, yMin, yMax));
-
-                case 'crop'
-                    undoPush();
-                    appData.rawPixels      = appData.rawPixels(yMin:yMax, xMin:xMax);
-                    appData.filteredPixels = appData.filteredPixels(yMin:yMax, xMin:xMax);
-                    refreshDisplay();
-                    setStatus(sprintf('Cropped to %dx%d px', ...
-                        xMax - xMin + 1, yMax - yMin + 1));
-
-                case 'savecrop'
-                    onExportAction('saveCroppedRegion', xMin, xMax, yMin, yMax);
-
-                case 'rectROI'
-                    executeRectROI(xMin, xMax, yMin, yMax);
-
-                case 'batchcrop'
-                    applyBatchCrop(xMin, xMax, yMin, yMax);
-            end
-        end
+        appData = emViewer.captureDispatch('rectClick', appData, buildCaptureCtx());
     end
 
-    % ════════════════════════════════════════════════════════════════════
-    %  HELPER: updateRectPreview — Update rubber-band rectangle on motion
-    % ════════════════════════════════════════════════════════════════════
-    function updateRectPreview(hRect, x0, y0)
-        if ~isvalid(hRect), return; end
-        cp = ax.CurrentPoint;
-        cx = cp(1,1);
-        cy = cp(1,2);
-        rx = min(x0, cx);
-        ry = min(y0, cy);
-        rw = abs(cx - x0);
-        rh = abs(cy - y0);
-        if rw < 0.5, rw = 0.5; end
-        if rh < 0.5, rh = 0.5; end
-        hRect.Position = [rx ry rw rh];
-    end
+    % updateRectPreview is now inlined in +emViewer/captureDispatch.m
 
-    % ════════════════════════════════════════════════════════════════════
-    %  HELPER: executeRectROI — Draw persistent rectangle ROI + stats
-    %  Registers the ROI as a measurement record so it can be clicked to
-    %  select, deleted via the Delete key or marquee, and removed by
-    %  Clear All alongside distance/profile/polyline measurements.
-    % ════════════════════════════════════════════════════════════════════
+    % executeRectROI is now in +emViewer/captureDispatch.m
+
     function executeRectROI(xMin, xMax, yMin, yMax)
-        roiPx = appData.filteredPixels(yMin:yMax, xMin:xMax);
-        vals = double(roiPx(:));
-
-        roiMean = mean(vals);
-        roiStd  = std(vals);
-        roiMin  = min(vals);
-        roiMax  = max(vals);
-        roiArea = numel(vals);
-
-        % Calibrated area if available
-        areaStr = sprintf('%d px²', roiArea);
-        if appData.activeIdx >= 1
-            imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
-            if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
-                calibArea = roiArea * imgInfo.pixelSize^2;
-                areaStr = sprintf('%.4g %s²', calibArea, imgInfo.pixelUnit);
-            end
-        end
-
-        % Build stats text
-        statsLines = { ...
-            sprintf('ROI: [%d:%d, %d:%d]', xMin, xMax, yMin, yMax), ...
-            sprintf('Size: %d x %d px', xMax - xMin + 1, yMax - yMin + 1), ...
-            sprintf('Area: %s', areaStr), ...
-            '', ...
-            sprintf('Mean:  %.4g', roiMean), ...
-            sprintf('Std:   %.4g', roiStd), ...
-            sprintf('Min:   %.4g', roiMin), ...
-            sprintf('Max:   %.4g', roiMax), ...
-            sprintf('Range: %.4g', roiMax - roiMin)};
-
-        % Show in a figure with histogram
-        roiFig = figure('Name', 'ROI Statistics', 'NumberTitle', 'off', ...
-            'Units', 'pixels', 'Position', [300 250 420 380]);
-        roiLayout = uigridlayout(roiFig, [2 1], ...
-            'RowHeight', {'1x', '1x'}, 'Padding', [10 10 10 10]);
-
-        % Top: histogram
-        roiAx = uiaxes(roiLayout);
-        roiAx.Layout.Row = 1;
-        histogram(roiAx, vals, 128, ...
-            'FaceColor', [0.4 0.6 0.8], 'EdgeColor', 'none');
-        title(roiAx, 'ROI Histogram', 'Interpreter', 'none');
-        xlabel(roiAx, 'Intensity');
-        ylabel(roiAx, 'Count');
-        roiAx.Box = 'on';
-
-        % Bottom: stats text
-        taStats = uitextarea(roiLayout, ...
-            'Value', statsLines, ...
-            'Editable', 'off', ...
-            'FontName', 'Courier New', ...
-            'FontSize', 11);
-        taStats.Layout.Row = 2;
-
-        % Draw the ROI rectangle on the main image (persistent overlay).
-        % Leave HitTest on so the user can click it to select, and tie
-        % ButtonDownFcn to selectMeasurement like other measurement types.
-        measClr = ddMeasColor.Value;
-        if isempty(measClr), measClr = OVERLAY_COLOR; end
-        hRect = rectangle(ax, 'Position', [xMin yMin xMax-xMin yMax-yMin], ...
-            'EdgeColor', measClr, ...
-            'LineWidth', 1.5, ...
-            'LineStyle', '-', ...
-            'HandleVisibility', 'off');
-
-        % Register as a measurement so Delete / marquee / selection work.
-        meas = struct();
-        meas.type      = 'rectROI';
-        meas.hRect     = hRect;
-        meas.hLine     = hRect;   % aliased so existing highlight paths find it
-        meas.hP1       = [];
-        meas.hP2       = [];
-        meas.hText     = [];
-        meas.lineColor = measClr;
-        meas.xMin      = xMin;
-        meas.xMax      = xMax;
-        meas.yMin      = yMin;
-        meas.yMax      = yMax;
-        meas.stats     = struct('mean', roiMean, 'std', roiStd, ...
-                                'min', roiMin, 'max', roiMax, 'area', roiArea);
-        midx = numel(appData.overlays.measurements) + 1;
-        appData.overlays.measurements{midx} = meas;
-        appData.measWorkshop.sync(appData.overlays.measurements);
-
-        % Click the rectangle outline to (re)select it.
-        hRect.HitTest = 'on';
-        hRect.PickableParts = 'visible';
-        hRect.ButtonDownFcn = @(~,~) selectMeasurement(midx);
-
-        % Log to measurement table
-        appData.measurementLog{end+1} = struct( ...
-            'type', 'ROI', ...
-            'value', roiMean, ...
-            'unit', 'intensity', ...
-            'details', sprintf('[%d:%d, %d:%d] mean=%.4g std=%.4g min=%.4g max=%.4g area=%s', ...
-                xMin, xMax, yMin, yMax, roiMean, roiStd, roiMin, roiMax, areaStr), ...
-            'timestamp', char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
-
-        % Add to ROI list for ROI Manager
-        roiEntry = struct('name', sprintf('ROI_%d', numel(appData.roiList)+1), ...
-            'xMin', xMin, 'xMax', xMax, 'yMin', yMin, 'yMax', yMax, ...
-            'stats', struct('mean', roiMean, 'std', roiStd, 'min', roiMin, ...
-                            'max', roiMax, 'area', roiArea), ...
-            'areaStr', areaStr, 'hRect', hRect);
-        appData.roiList{end+1} = roiEntry;
-
-        setStatus(sprintf('Rect ROI: mean=%.1f std=%.1f min=%.0f max=%.0f area=%s', ...
-            roiMean, roiStd, roiMin, roiMax, areaStr));
+        appData = emViewer.captureDispatch('rectROI', appData, buildCaptureCtx(), ...
+            xMin, xMax, yMin, yMax);
     end
+
+    % executeRectROI body is now in +emViewer/captureDispatch.m
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: refreshDisplay — Re-apply contrast to filteredPixels; update
@@ -4979,166 +4763,7 @@ function varargout = FermiViewer()
     %  CALLBACK: onCaptureClick — Handle clicks during two-click capture
     % ════════════════════════════════════════════════════════════════════
     function onCaptureClick(~, ~)
-        if isempty(appData.captureMode)
-            return;
-        end
-
-        % Get click position in data (image pixel) coordinates
-        cp = ax.CurrentPoint;
-        x  = cp(1, 1);
-        y  = cp(1, 2);
-
-        % Validate within image bounds
-        if isempty(appData.displayImg)
-            return;
-        end
-        [H, W] = size(appData.filteredPixels);
-        x = max(0.5, min(W + 0.5, x));
-        y = max(0.5, min(H + 0.5, y));
-
-        % Draw click marker
-        hMark = line(ax, x, y, ...
-            'Marker',           'o', ...
-            'MarkerSize',       6, ...
-            'Color',            OVERLAY_COLOR, ...
-            'MarkerFaceColor',  OVERLAY_COLOR, ...
-            'LineStyle',        'none', ...
-            'HandleVisibility', 'off');
-        appData.overlays.clickMarkers{end+1} = hMark;
-
-        % Handle single-click modes that accumulate without a fixed endpoint
-        if strcmp(appData.captureMode, 'diffspot')
-            newSpot = [y, x];  % [row, col]
-            appData.diffSpots = [appData.diffSpots; newSpot];
-            appData.diffWorkshop.model.spots = appData.diffSpots;
-            onDiffractionAction('drawSpots');
-            lblSpotCount.Text = sprintf('%d spots', size(appData.diffSpots, 1));
-            return;
-        end
-
-        if strcmp(appData.captureMode, 'specnav')
-            % Navigate spectrum image pixel — single click, stays active
-            col = round(x); row = round(y);
-            [Ny, Nx, ~] = size(appData.eelsCube);
-            if row >= 1 && row <= Ny && col >= 1 && col <= Nx
-                spec = squeeze(double(appData.eelsCube(row, col, :)));
-                delete(findobj(ax, 'Tag', 'specnav_marker'));
-                hold(ax, 'on');
-                plot(ax, col, row, 'r+', 'MarkerSize', 15, 'LineWidth', 2, ...
-                    'Tag', 'specnav_marker', 'HandleVisibility', 'off');
-                hold(ax, 'off');
-                if ~isempty(appData.eelsFig) && isvalid(appData.eelsFig)
-                    ax2 = findobj(appData.eelsFig, 'Type', 'axes');
-                    if ~isempty(ax2)
-                        cla(ax2(1));
-                        plot(ax2(1), appData.eelsEnergyAxis, spec, 'k-', 'LineWidth', 1);
-                        xlabel(ax2(1), 'Energy Loss (eV)'); ylabel(ax2(1), 'Counts');
-                        title(ax2(1), sprintf('Pixel [%d, %d]', row, col));
-                        grid(ax2(1), 'on');
-                    end
-                end
-                setStatus(sprintf('Pixel [%d,%d]: max=%.0f', row, col, max(spec)));
-            end
-            return;
-        end
-
-        if strcmp(appData.captureMode, 'vdf_select')
-            % Virtual dark-field — single click selects the FFT spot
-            col = round(x); row = round(y);
-            idx = appData.activeIdx;
-            if idx > 0 && idx <= numel(appData.images)
-                pixels = double(appData.images{idx}.metadata.parserSpecific.imageData.pixels);
-                try
-                    vdf = imaging.virtualDarkField(pixels, 'MaskCenter', [row col], 'MaskRadius', 10);
-                    imagesc(ax, vdf); colormap(ax, 'gray'); axis(ax, 'image');
-                    title(ax, sprintf('VDF at [%d,%d]', row, col));
-                catch ME
-                    setStatus(sprintf('VDF failed: %s', ME.message));
-                end
-            end
-            appData.captureMode = '';
-            fig.WindowButtonDownFcn = @onIdleMouseDown;
-            fig.Pointer = 'arrow';
-            return;
-        end
-
-        % Accumulate clicks
-        appData.captureClicks(end+1, :) = [x, y];
-
-        if size(appData.captureClicks, 1) == 1
-            % First click recorded — wait for second
-            if strcmp(appData.captureMode, 'scalebar')
-                setStatus('Click other end of scale bar... (Escape to cancel)');
-            else
-                setStatus('Click second point on the image... (Escape to cancel)');
-            end
-
-        elseif size(appData.captureClicks, 1) >= 2
-            % Both clicks collected — execute the measurement
-            x1 = appData.captureClicks(1, 1);
-            y1 = appData.captureClicks(1, 2);
-            x2 = appData.captureClicks(2, 1);
-            y2 = appData.captureClicks(2, 2);
-
-            mode = appData.captureMode;
-
-            % Restore normal interaction
-            finishCapture();
-
-            switch mode
-                case 'profile'
-                    executeMeasureProfile(x1, y1, x2, y2);
-                case 'boxprofile'
-                    executeBoxProfile(x1, y1, x2, y2, appData.boxProfileWidth);
-                case 'distance'
-                    executeMeasureDistance(x1, y1, x2, y2);
-                case 'scalebar'
-                    executeScaleBarCalibration(x1, y1, x2, y2);
-                case 'dspacing'
-                    executeDSpacing(x1, y1, x2, y2);
-                case 'roiellipse'
-                    executeEllipseROI(x1, y1, x2, y2);
-                case 'arrow'
-                    executeArrow(x1, y1, x2, y2);
-                case 'annotline'
-                    executeAnnotLine(x1, y1, x2, y2);
-                case 'annotrect'
-                    executeAnnotRect(x1, y1, x2, y2);
-                case 'annotcircle'
-                    executeAnnotCircle(x1, y1, x2, y2);
-                case 'lattice'
-                    appData.captureClicks = [appData.captureClicks; x1, y1; x2, y2];
-                    onDiffractionAction('latticeExecute');
-                case 'gpa'
-                    appData.captureClicks = [appData.captureClicks; x1, y1; x2, y2];
-                    executeGPA();
-                case 'edsprofile'
-                    p1 = [x1, y1];
-                    p2 = [x2, y2];
-                    profile = imaging.edsCompositionProfile(appData.edsAtomicPct, ...
-                        appData.edsElements, p1(1), p1(2), p2(1), p2(2));
-                    profFig = figure('Name', 'Composition Profile');
-                    ax2 = axes(profFig);
-                    plot(ax2, profile.distance, profile.atomicPct, 'LineWidth', 1.5);
-                    xlabel(ax2, sprintf('Distance (%s)', profile.unit));
-                    ylabel(ax2, 'Atomic %%');
-                    legend(ax2, appData.edsElements);
-                    title(ax2, 'EDS Composition Profile');
-                    grid(ax2, 'on');
-                    setStatus('Profile extracted');
-                case 'edsroi'
-                    c1 = max(1, min(round(x1), round(x2)));
-                    c2 = min(size(appData.edsAtomicPct{1},2), max(round(x1), round(x2)));
-                    r1 = max(1, min(round(y1), round(y2)));
-                    r2 = min(size(appData.edsAtomicPct{1},1), max(round(y1), round(y2)));
-                    msg = 'ROI Composition: ';
-                    for kq = 1:numel(appData.edsElements)
-                        roi = appData.edsAtomicPct{kq}(r1:r2, c1:c2);
-                        msg = [msg sprintf('%s=%.1f%% ', appData.edsElements{kq}, mean(roi(:), 'omitnan'))]; %#ok<AGROW>
-                    end
-                    setStatus(msg);
-            end
-        end
+        appData = emViewer.captureDispatch('captureClick', appData, buildCaptureCtx());
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -5374,87 +4999,27 @@ function varargout = FermiViewer()
     end
 
     function enterCompareMode()
-        if numel(appData.images) < 2
-            return;
+        ctx = buildCompareCtx();
+        [appData, h] = emViewer.compareDispatch('enter', appData, ctx);
+        if ~isempty(h.axL)
+            % Assign closure vars BEFORE display calls (closures capture by ref)
+            axL = h.axL; axR = h.axR; compareGL = h.compareGL;
+            axGL = []; ax = [];
+            displayCompareImage('L');
+            displayCompareImage('R');
+            updateCompareHighlight();
+            setToolsEnabled('off');
+            setStatus('Compare mode — click or Tab to switch panel, arrows to scroll');
         end
-
-        % Mutually exclusive with EDS mode
-        if appData.edsMode
-            onExitEDS();
-        end
-
-        appData.compareMode = true;
-
-        % Pick indices for left and right panels
-        appData.compareIdxL = appData.activeIdx;
-        nextIdx = appData.activeIdx + 1;
-        if nextIdx > numel(appData.images), nextIdx = 1; end
-        appData.compareIdxR = nextIdx;
-        appData.compareActivePanel = 'L';
-
-        % Cancel any in-progress capture
-        if ~isempty(appData.captureMode)
-            cancelCapture();
-        end
-
-        % Clear overlays before destroying the axes
-        clearAllOverlays();
-
-        % Destroy single-view axes
-        delete(axGL);
-        axGL = [];
-        ax   = [];
-
-        % Create side-by-side layout inside axPanel
-        compareGL = uigridlayout(axPanel, [1 2], ...
-            'ColumnWidth', {'1x', '1x'}, ...
-            'Padding', [2 2 2 2], ...
-            'ColumnSpacing', 4);
-
-        axL = uiaxes(compareGL);
-        axL.Layout.Row = 1; axL.Layout.Column = 1;
-        axL.Box = 'on';
-        axL.XTick = []; axL.YTick = [];
-        axL.Toolbar.Visible = 'off';
-        try, disableDefaultInteractivity(axL); catch, end
-        axL.Interactions = [];
-        colormap(axL, gray(256));
-
-        axR = uiaxes(compareGL);
-        axR.Layout.Row = 1; axR.Layout.Column = 2;
-        axR.Box = 'on';
-        axR.XTick = []; axR.YTick = [];
-        axR.Toolbar.Visible = 'off';
-        try, disableDefaultInteractivity(axR); catch, end
-        axR.Interactions = [];
-        colormap(axR, gray(256));
-
-        % Render both panels
-        displayCompareImage('L');
-        displayCompareImage('R');
-        updateCompareHighlight();
-
-        % Disable measurement/processing buttons (they operate on single ax)
-        setToolsEnabled('off');
-        setStatus('Compare mode — click or Tab to switch panel, arrows to scroll');
     end
 
     function exitCompareMode()
-        appData.compareMode = false;
+        % Package handles cleanup (scalebar fields, delete compareGL, status)
+        ctx = buildCompareCtx();
+        appData = emViewer.compareDispatch('exit', appData, ctx);
+        compareGL = []; axL = []; axR = [];
 
-        % Clean up compare scale bars (handles destroyed with axes)
-        appData.overlays.scalebarL = [];
-        appData.overlays.scalebarR = [];
-
-        % Destroy compare layout
-        if ~isempty(compareGL) && isvalid(compareGL)
-            delete(compareGL);
-        end
-        compareGL = [];
-        axL = [];
-        axR = [];
-
-        % Recreate single-view axes with toolbar + stack navigator rows
+        % Layout rebuild stays here — too many closure vars to pass cleanly
         axGL = uigridlayout(axPanel, [3 1], ...
             'RowHeight', {32, '1x', 0}, 'Padding', [2 2 2 2], ...
             'RowSpacing', 2);
@@ -5676,35 +5241,11 @@ function varargout = FermiViewer()
     end
 
     function syncCompareZoom(sourceAx, targetAx2)
-    %SYNCCOMPAREZOOM  Copy axis limits from source to target in compare mode.
-        if ~compareLinkedZoom, return; end
-        if isempty(sourceAx) || ~isvalid(sourceAx), return; end
-        if isempty(targetAx2) || ~isvalid(targetAx2), return; end
-        targetAx2.XLim = sourceAx.XLim;
-        targetAx2.YLim = sourceAx.YLim;
+        emViewer.compareDispatch('syncZoom', appData, buildCompareCtx(), sourceAx, targetAx2);
     end
 
     function updateCompareHighlight()
-    %UPDATECOMPAREHIGHLIGHT  Show cyan border on the active compare panel.
-        if isempty(axL) || ~isvalid(axL), return; end
-        if isempty(axR) || ~isvalid(axR), return; end
-
-        inactiveBorder = [0.4 0.4 0.4];
-        if appData.compareActivePanel == 'L'
-            axL.XColor = OVERLAY_COLOR; axL.YColor = OVERLAY_COLOR;
-            axL.LineWidth = 2;
-            axR.XColor = inactiveBorder; axR.YColor = inactiveBorder;
-            axR.LineWidth = 0.5;
-            setStatus(sprintf('Compare: LEFT [%d] active — click or Tab to switch, arrows to scroll', ...
-                appData.compareIdxL));
-        else
-            axR.XColor = OVERLAY_COLOR; axR.YColor = OVERLAY_COLOR;
-            axR.LineWidth = 2;
-            axL.XColor = inactiveBorder; axL.YColor = inactiveBorder;
-            axL.LineWidth = 0.5;
-            setStatus(sprintf('Compare: RIGHT [%d] active — click or Tab to switch, arrows to scroll', ...
-                appData.compareIdxR));
-        end
+        emViewer.compareDispatch('updateHighlight', appData, buildCompareCtx());
     end
 
     function setToolsEnabled(state)
@@ -5991,85 +5532,11 @@ function varargout = FermiViewer()
     end
 
     function onBoxZoomDrag(~, ~)
-    %ONBOXZOOMDRAG  Motion handler for drag interactions (zoom/marquee/pan).
-        if strcmp(appData.dragAction, 'pan')
-            if isempty(appData.panStartXY), return; end
-            cp = ax.CurrentPoint;
-            [H, W] = size(appData.rawPixels);
-            [newXLim, newYLim] = emViewer.computePanLimits( ...
-                appData.panStartXY, cp(1,1:2), appData.panStartLims, H, W);
-            ax.XLim = newXLim;
-            ax.YLim = newYLim;
-            return;
-        end
-
-        % ── Zoom / marquee: rubber-band rectangle ──
-        p0 = appData.zoomStartXY;
-        if isempty(p0), return; end
-        cp = ax.CurrentPoint;
-        x0 = min(p0(1), cp(1,1));  x1 = max(p0(1), cp(1,1));
-        y0 = min(p0(2), cp(1,2));  y1 = max(p0(2), cp(1,2));
-        w = max(1e-6, x1 - x0);    h = max(1e-6, y1 - y0);
-        if isempty(appData.zoomRect) || ~isvalid(appData.zoomRect)
-            if w < 10 && h < 10, return; end
-            appData.zoomRect = rectangle(ax, ...
-                'Position',        [x0, y0, w, h], ...
-                'EdgeColor',       [1 1 0], ...
-                'LineStyle',       '--', ...
-                'LineWidth',       1, ...
-                'FaceColor',       'none', ...
-                'PickableParts',   'none', ...
-                'HandleVisibility','off');
-            return;
-        end
-        appData.zoomRect.Position = [x0, y0, w, h];
+        appData = emViewer.captureDispatch('boxZoomDrag', appData, buildCaptureCtx());
     end
 
     function onBoxZoomRelease(~, ~)
-    %ONBOXZOOMRELEASE  End of drag. Pan: restores cursor. Zoom/marquee:
-    %   applies box-zoom or selects items inside the rectangle.
-        wasPan = strcmp(appData.dragAction, 'pan');
-        appData.dragAction = '';
-
-        if wasPan
-            appData.panStartXY   = [];
-            appData.panStartLims = [];
-            fig.WindowButtonMotionFcn = appData.prevMotionFcn;
-            fig.WindowButtonUpFcn     = appData.prevUpFcn;
-            appData.prevMotionFcn = '';
-            appData.prevUpFcn     = '';
-            if appData.panMode
-                fig.Pointer = 'hand';
-            else
-                fig.Pointer = 'arrow';
-            end
-            return;
-        end
-
-        pos = [];
-        if ~isempty(appData.zoomRect) && isvalid(appData.zoomRect)
-            pos = appData.zoomRect.Position;
-            delete(appData.zoomRect);
-        end
-        appData.zoomRect = [];
-        appData.zoomStartXY = [];
-        fig.WindowButtonMotionFcn = appData.prevMotionFcn;
-        fig.WindowButtonUpFcn     = appData.prevUpFcn;
-        appData.prevMotionFcn = '';
-        appData.prevUpFcn     = '';
-        % Apply only if drag covers > 15 data units in both dims — matches the
-        % deferred-rectangle threshold and further rejects tiny accidental drags.
-        if isempty(pos) || pos(3) < 15 || pos(4) < 15
-            return;
-        end
-        xMin = pos(1); xMax = pos(1) + pos(3);
-        yMin = pos(2); yMax = pos(2) + pos(4);
-        if appData.zoomMode
-            ax.XLim = [xMin, xMax];
-            ax.YLim = [yMin, yMax];
-        else
-            applyMarqueeSelection(xMin, xMax, yMin, yMax);
-        end
+        appData = emViewer.captureDispatch('boxZoomRelease', appData, buildCaptureCtx());
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -6759,42 +6226,7 @@ function varargout = FermiViewer()
     %  HELPER: startTwoClickCapture — Enter two-click capture mode
     % ════════════════════════════════════════════════════════════════════
     function startTwoClickCapture(mode)
-        % Cancel any existing capture first
-        if ~isempty(appData.captureMode)
-            cancelCapture();
-        end
-
-        appData.captureMode   = mode;
-        appData.captureClicks = [];
-
-        fig.Pointer = 'crosshair';
-
-        % Intercept button-down on the axes
-        fig.WindowButtonDownFcn = @onCaptureClick;
-
-        switch mode
-            case 'profile'
-                setStatus('Click first point for line profile... (Escape to cancel)');
-            case 'boxprofile'
-                setStatus(sprintf('Box profile (width %d px): click first point... (Escape to cancel)', ...
-                    appData.boxProfileWidth));
-            case 'distance'
-                setStatus('Click first point for distance... (Escape to cancel)');
-            case 'scalebar'
-                setStatus('Click one end of the scale bar... (Escape to cancel)');
-            case 'dspacing'
-                setStatus('Click first FFT spot for d-spacing measurement... (Escape to cancel)');
-            case 'roiellipse'
-                setStatus('Click center of ellipse... (Escape to cancel)');
-            case 'arrow'
-                setStatus('Click arrow start point... (Escape to cancel)');
-            case 'annotline'
-                setStatus('Click line start point... (Escape to cancel)');
-            case 'annotrect'
-                setStatus('Click first corner of rectangle... (Escape to cancel)');
-            case 'annotcircle'
-                setStatus('Click center of circle... (Escape to cancel)');
-        end
+        appData = emViewer.captureDispatch('startCapture', appData, buildCaptureCtx(), mode);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -6824,6 +6256,63 @@ function varargout = FermiViewer()
         fig.WindowButtonMotionFcn = @onMouseMotion;
 
         finishCapture();
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CTX BUILDERS: supply closure references to +emViewer package functions
+    % ════════════════════════════════════════════════════════════════════
+    function ctx = buildCaptureCtx()
+    %BUILDCAPTURECTX  Build context struct for emViewer.captureDispatch.
+        ctx.ax           = ax;
+        ctx.fig          = fig;
+        ctx.overlayColor = OVERLAY_COLOR;
+        ctx.ui.ddMeasColor  = ddMeasColor;
+        ctx.ui.lblSpotCount = lblSpotCount;
+        ctx.cb.setStatus                = @setStatus;
+        ctx.cb.undoPush                 = @undoPush;
+        ctx.cb.finishCapture            = @finishCapture;
+        ctx.cb.cancelCapture            = @cancelCapture;
+        ctx.cb.refreshDisplay           = @refreshDisplay;
+        ctx.cb.onMouseMotion            = @onMouseMotion;
+        ctx.cb.onIdleMouseDown          = @onIdleMouseDown;
+        ctx.cb.onCaptureClick           = @onCaptureClick;
+        ctx.cb.onExportAction           = @onExportAction;
+        ctx.cb.applyBatchCrop           = @applyBatchCrop;
+        ctx.cb.applyMarqueeSelection    = @applyMarqueeSelection;
+        ctx.cb.selectMeasurement        = @selectMeasurement;
+        ctx.cb.executeMeasureProfile    = @executeMeasureProfile;
+        ctx.cb.executeMeasureDistance   = @executeMeasureDistance;
+        ctx.cb.executeBoxProfile        = @executeBoxProfile;
+        ctx.cb.executeScaleBarCalibration = @executeScaleBarCalibration;
+        ctx.cb.executeDSpacing          = @executeDSpacing;
+        ctx.cb.executeEllipseROI        = @executeEllipseROI;
+        ctx.cb.executeArrow             = @executeArrow;
+        ctx.cb.executeAnnotLine         = @executeAnnotLine;
+        ctx.cb.executeAnnotRect         = @executeAnnotRect;
+        ctx.cb.executeAnnotCircle       = @executeAnnotCircle;
+        ctx.cb.executeGPA               = @executeGPA;
+        ctx.cb.onDiffractionAction      = @onDiffractionAction;
+    end
+
+    function ctx = buildCompareCtx()
+    %BUILDCOMPARECTX  Build context struct for emViewer.compareDispatch.
+        ctx.fig              = fig;
+        ctx.axPanel          = axPanel;
+        ctx.axGL             = axGL;
+        ctx.axL              = axL;
+        ctx.axR              = axR;
+        ctx.compareGL        = compareGL;
+        ctx.overlayColor     = OVERLAY_COLOR;
+        ctx.compareLinkedZoom = compareLinkedZoom;
+        ctx.toggleValue      = false;  % caller sets before dispatch
+        ctx.ui.btnFlickerCompare = btnFlickerCompare;
+        ctx.cb.setStatus         = @setStatus;
+        ctx.cb.setToolsEnabled   = @setToolsEnabled;
+        ctx.cb.clearAllOverlays  = @clearAllOverlays;
+        ctx.cb.cancelCapture     = @cancelCapture;
+        ctx.cb.onExitEDS         = @onExitEDS;
+        ctx.cb.displayCompareImage = @displayCompareImage;
+        ctx.cb.flickerTick       = @flickerTick;
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -11308,44 +10797,7 @@ function varargout = FermiViewer()
 
     % ── Feature 18: Flicker Compare ────────────────────────────────────
     function onFlickerCompare(~, ~)
-        if ~isfield(appData, 'images') || numel(appData.images) < 2
-            uialert(fig, 'Load at least 2 images.', 'Need 2+ images'); return;
-        end
-        if isfield(appData, 'flickerTimer') && ~isempty(appData.flickerTimer) ...
-                && isvalid(appData.flickerTimer)
-            stop(appData.flickerTimer);
-            delete(appData.flickerTimer);
-            appData.flickerTimer = [];
-            btnFlickerCompare.Text = 'Flicker';
-            setStatus('Flicker mode stopped.');
-            return;
-        end
-        answer = inputdlg({'Flicker rate (Hz):', 'Image A index:', 'Image B index:'}, ...
-            'Flicker Compare', [1 30; 1 30; 1 30], ...
-            {'2', '1', num2str(min(2, numel(appData.images)))});
-        if isempty(answer), return; end
-        rate = str2double(answer{1});
-        idxA = str2double(answer{2});
-        idxB = str2double(answer{3});
-        if any(isnan([rate, idxA, idxB])), return; end
-        rate = max(0.5, min(rate, 10));
-        imgA = appData.images{idxA};
-        imgB = appData.images{idxB};
-        % Resize B to match A if needed
-        [HA, WA] = size(imgA, [1 2]);
-        [HB, WB] = size(imgB, [1 2]);
-        if HA ~= HB || WA ~= WB
-            [Xq, Yq] = meshgrid(linspace(1, WB, WA), linspace(1, HB, HA));
-            imgB = interp2(double(imgB), Xq, Yq, 'nearest');
-        end
-        flickerState = struct('imgA', imgA, 'imgB', imgB, 'showA', true);
-        appData.flickerState = flickerState;
-        t = timer('ExecutionMode', 'fixedRate', 'Period', 1/rate, ...
-            'TimerFcn', @(~,~) flickerTick());
-        appData.flickerTimer = t;
-        start(t);
-        btnFlickerCompare.Text = 'Stop Flicker';
-        setStatus(sprintf('Flicker: %.1f Hz between images %d and %d', rate, idxA, idxB));
+        appData = emViewer.compareDispatch('flicker', appData, buildCompareCtx());
     end
 
     function flickerTick()
