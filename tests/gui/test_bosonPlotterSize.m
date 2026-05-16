@@ -34,16 +34,17 @@ function test_bosonPlotterSize
     % ════════════════════════════════════════════════════════════════════
     %  TEST 1: Line-count ratchet
     % ════════════════════════════════════════════════════════════════════
-    % Current: 7,467 lines (2026-05-15). History: 8,931 (start of W5 #22)
+    % Current: 7,111 lines (2026-05-16). History: 8,931 (start of W5 #22)
     % → 8,400 (2026-04-26 pre-extractions) → 7,641 (2026-04-26 post 3
     % UI-construction extractions, -759 / -9%) → 7,658 (one-off edits
-    % since) → 7,350 (2026-05-15 buildPlotControlsPanel extraction, -117).
+    % since) → 7,350 (2026-05-15 buildPlotControlsPanel extraction, -117)
+    % → 7,111 (2026-05-16 extract guiImport/export/resample/watch, -239).
     % Goal revised 2026-05-01 from <8,000 (achieved) to <6,000
-    % (requires another -1,350 lines / -18%).
+    % (requires another -1,111 lines / -16%).
     % Ceiling carries a small buffer (~20 lines) so one in-flight edit
     % won't fail the build before an extraction commit lands. Ratchet
     % DOWN whenever an extraction lowers the baseline.
-    LINE_CEILING = 7370;
+    LINE_CEILING = 7131;
 
     fprintf('\n== TEST 1: BosonPlotter.m line-count ratchet ==\n');
     try
