@@ -31,5 +31,13 @@ function dispatchAction(action, fig, appData, overlayOn, ax, setStatusFcn)
         case 'applyStyleToAll'
             bosonPlotter.figDoc.applyStyleToAll(appData.datasets, appData.activeIdx);
             setStatusFcn(sprintf('Style applied to %d datasets.', numel(appData.datasets)));
+        case 'undo'
+            if model.canUndo()
+                model.undo();
+                applyFcn();
+                setStatusFcn('Style change undone.');
+            else
+                setStatusFcn('Nothing to undo.');
+            end
     end
 end

@@ -76,6 +76,7 @@ function editLimits_(ax, appData, applyFcn, which)
     if isempty(answer), return; end
     lo = str2double(answer{1}); hi = str2double(answer{2});
     if isnan(lo) || isnan(hi) || lo >= hi, return; end
+    model.pushUndo();
     if which == 'x'
         model.xLim = [lo hi];
     else
@@ -85,9 +86,10 @@ function editLimits_(ax, appData, applyFcn, which)
 end
 
 % ═══════════════════════════════════════════════════════════════════════════
-function toggleScale_(ax, appData, applyFcn, which)
+function toggleScale_(~, appData, applyFcn, which)
     model = getModel_(appData);
     if isempty(model), return; end
+    model.pushUndo();
     if which == 'x'
         if strcmp(model.xScale, 'linear')
             model.xScale = 'log';
@@ -108,6 +110,7 @@ end
 function toggleGrid_(~, appData, applyFcn)
     model = getModel_(appData);
     if isempty(model), return; end
+    model.pushUndo();
     model.gridOn = ~model.gridOn;
     applyFcn();
 end
@@ -125,6 +128,7 @@ function editLabel_(~, appData, applyFcn, which)
     end
     answer = inputdlg({'Label:'}, title, [1 50], {cur});
     if isempty(answer), return; end
+    model.pushUndo();
     if which == 'x'
         model.xLabel = string(answer{1});
     else
@@ -137,6 +141,7 @@ end
 function resetAuto_(~, appData, applyFcn, setStatusFcn)
     model = getModel_(appData);
     if isempty(model), return; end
+    model.pushUndo();
     model.xLim = 'auto';
     model.yLim = 'auto';
     model.xScale = 'linear';
@@ -149,6 +154,7 @@ end
 function cycleLegend_(~, appData, applyFcn, setStatusFcn)
     model = getModel_(appData);
     if isempty(model), return; end
+    model.pushUndo();
     locations = {'northeast', 'southeast', 'southwest', 'northwest', ...
                  'northoutside', 'eastoutside', 'best'};
     cur = model.legendLocation;
@@ -169,6 +175,7 @@ function editTraceColor_(ax, fig, appData, applyFcn)
     if isempty(idx), return; end
     c = uisetcolor(ln.Color, 'Trace Color');
     if isequal(c, 0), return; end
+    model.pushUndo();
     model.setTraceStyle(idx, 'color', c);
     applyFcn();
 end
@@ -184,6 +191,7 @@ function editTraceWidth_(ax, fig, appData, applyFcn)
     if isempty(answer), return; end
     w = str2double(answer{1});
     if isnan(w) || w <= 0, return; end
+    model.pushUndo();
     model.setTraceStyle(idx, 'lineWidth', w);
     applyFcn();
 end
@@ -198,6 +206,7 @@ function editTraceMarker_(ax, fig, appData, applyFcn)
     [sel, ok] = listdlg('ListString', markers, 'SelectionMode', 'single', ...
         'PromptString', 'Select marker:', 'ListSize', [120 200]);
     if ~ok, return; end
+    model.pushUndo();
     model.setTraceStyle(idx, 'marker', markers{sel});
     applyFcn();
 end
@@ -238,6 +247,8 @@ end
 
 % ═══════════════════════════════════════════════════════════════════════════
 function startDrag_(src, ~, ax, appData, applyFcn, annotIdx)
+    model = getModel_(appData);
+    if ~isempty(model), model.pushUndo(); end
     fig = ancestor(ax, 'figure');
     fig.UserData.dragAnnot = struct('src', src, 'ax', ax, ...
         'appData', appData, 'applyFcn', applyFcn, 'annotIdx', annotIdx);

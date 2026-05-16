@@ -56,6 +56,11 @@ classdef FigDocModel < handle
 
     properties (SetAccess = private)
         dirty = false   % true when model changed since last applyToAxes
+        undoStack = {}  % cell array of snapshot structs (max 10)
+    end
+
+    properties (Constant, Hidden)
+        UNDO_CAP = 10
     end
 
     methods
@@ -78,8 +83,11 @@ classdef FigDocModel < handle
         %SNAPSHOT  Serialize model to a plain struct for session save.
             props = properties(obj);
             s = struct();
+            skip = {'dirty', 'undoStack'};
             for k = 1:numel(props)
-                s.(props{k}) = obj.(props{k});
+                p = props{k};
+                if ismember(p, skip), continue; end
+                s.(p) = obj.(p);
             end
         end
 
@@ -87,9 +95,11 @@ classdef FigDocModel < handle
         %RESTORE  Load model state from a snapshot struct.
             if ~isstruct(s), return; end
             props = properties(obj);
+            skip = {'dirty', 'undoStack'};
             for k = 1:numel(props)
                 p = props{k};
-                if isfield(s, p) && ~strcmp(p, 'dirty')
+                if ismember(p, skip), continue; end
+                if isfield(s, p)
                     obj.(p) = s.(p);
                 end
             end
@@ -130,6 +140,31 @@ classdef FigDocModel < handle
             end
             obj.traceStyles{idx}.(field) = value;
             obj.dirty = true;
+        end
+
+        function pushUndo(obj)
+        %PUSHUNDO  Save current state to the undo stack (before a change).
+            s = obj.snapshot();
+            obj.undoStack{end+1} = s;
+            if numel(obj.undoStack) > obj.UNDO_CAP
+                obj.undoStack(1) = [];
+            end
+        end
+
+        function tf = canUndo(obj)
+            tf = ~isempty(obj.undoStack);
+        end
+
+        function undo(obj)
+        %UNDO  Restore the most recent undo snapshot.
+            if isempty(obj.undoStack), return; end
+            s = obj.undoStack{end};
+            obj.undoStack(end) = [];
+            obj.restore(s);
+        end
+
+        function clearUndo(obj)
+            obj.undoStack = {};
         end
     end
 end

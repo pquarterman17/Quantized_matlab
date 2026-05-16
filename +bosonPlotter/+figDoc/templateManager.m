@@ -17,7 +17,6 @@ classdef templateManager
         %SAVE  Persist current FigDocModel state as a named template.
             s = model.snapshot();
             s.templateName = name;
-            s = rmfield(s, 'dirty');
             dir_ = bosonPlotter.figDoc.templateManager.templateDir_();
             outPath = fullfile(dir_, [name '.mat']);
             save(outPath, '-struct', 's');

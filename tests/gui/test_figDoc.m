@@ -235,8 +235,40 @@ function test_figDoc()
     assert(~ismember(tplName, names2), 'template deleted');
     fprintf('  PASS\n'); passed = passed + 1;
 
-    % ── TEST 15: installInteractions wires context menus ────────────────
-    fprintf('\n== TEST 15: installInteractions wires context menus ==\n');
+    % ── TEST 15: undo stack ────────────────────────────────────────────
+    fprintf('\n== TEST 15: undo stack ==\n');
+    mU = bosonPlotter.figDoc.FigDocModel();
+    assert(~mU.canUndo(), 'starts with empty undo');
+    mU.pushUndo();
+    mU.xLim = [5 50];
+    mU.pushUndo();
+    mU.yScale = 'log';
+    assert(mU.canUndo(), 'can undo after push');
+    mU.undo();
+    assert(isequal(mU.xLim, [5 50]), 'xLim preserved after partial undo');
+    assert(strcmp(mU.yScale, 'linear'), 'yScale reverted by undo');
+    mU.undo();
+    assert(isequal(mU.xLim, 'auto'), 'xLim reverted to auto');
+    assert(~mU.canUndo(), 'stack exhausted');
+    fprintf('  PASS\n'); passed = passed + 1;
+
+    % ── TEST 16: undo cap at 10 ─────────────────────────────────────────
+    fprintf('\n== TEST 16: undo cap at 10 ==\n');
+    mCap = bosonPlotter.figDoc.FigDocModel();
+    for ii = 1:15
+        mCap.pushUndo();
+        mCap.fontSize = ii;
+    end
+    undoCount = 0;
+    while mCap.canUndo()
+        mCap.undo();
+        undoCount = undoCount + 1;
+    end
+    assert(undoCount == 10, sprintf('undo capped at 10, got %d', undoCount));
+    fprintf('  PASS\n'); passed = passed + 1;
+
+    % ── TEST 17: installInteractions wires context menus ────────────────
+    fprintf('\n== TEST 17: installInteractions wires context menus ==\n');
     figI = uifigure('Visible', 'off');
     axI = uiaxes(figI);
     plot(axI, 1:10, rand(1,10), 'DisplayName', 'trace1');
@@ -261,8 +293,8 @@ function test_figDoc()
     delete(figI);
     fprintf('  PASS\n'); passed = passed + 1;
 
-    % ── TEST 16: legend cycle ────────────────────────────────────────────
-    fprintf('\n== TEST 16: legend cycle ==\n');
+    % ── TEST 18: legend cycle ────────────────────────────────────────────
+    fprintf('\n== TEST 18: legend cycle ==\n');
     mC = bosonPlotter.figDoc.FigDocModel();
     mC.legendLocation = 'northeast';
     dsC = makeFakeDataset((1:5)', (1:5)', 'cyc', true);
