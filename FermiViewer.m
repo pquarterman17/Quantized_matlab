@@ -2508,131 +2508,16 @@ function varargout = FermiViewer()
     %  CALLBACK: onOpenFiles — Browse for image files via uigetfile
     % ════════════════════════════════════════════════════════════════════
     function onOpenFiles(~, ~)
-        filterSpec = { ...
-            '*.tif;*.tiff;*.jpg;*.jpeg;*.png;*.bmp;*.raw;*.dm3;*.dm4;*.bcf;*.ser;*.mrc;*.mrcs;*.spm;*.000;*.001;*.002;*.003', 'All Supported Images'; ...
-            '*.tif;*.tiff',                   'TIFF Files (*.tif, *.tiff)'; ...
-            '*.jpg;*.jpeg;*.png;*.bmp',       'Common Images (*.jpg, *.png, *.bmp)'; ...
-            '*.dm3;*.dm4',                    'Gatan Files (*.dm3, *.dm4)'; ...
-            '*.bcf',                          'Bruker EDS Files (*.bcf)'; ...
-            '*.ser',                          'FEI SER Files (*.ser)'; ...
-            '*.mrc;*.mrcs',                   'MRC Files (*.mrc, *.mrcs)'; ...
-            '*.spm;*.000;*.001;*.002;*.003',  'AFM Files (*.spm, *.000)'; ...
-            '*.raw',                          'RAW Binary Files (*.raw)'; ...
-            '*.*',                            'All Files (*.*)'};
-
-        startDir = appData.lastDir;
-        if isempty(startDir) || ~isfolder(startDir)
-            startDir = pwd;
-        end
-
-        try
-            [files, folder] = uigetfile(filterSpec, 'Select Image File(s)', ...
-                startDir, 'MultiSelect', 'on');
-        catch ME
-            % uigetfile can fail on unreachable network paths or user interrupt
-            fig.Pointer = 'arrow';
-            setStatus('File browser cancelled or failed.');
-            return;
-        end
-
-        if isequal(files, 0)
-            return;   % user cancelled
-        end
-
-        appData.lastDir = folder;
-
-        % Normalize to cell array
-        if ischar(files)
-            files = {files};
-        end
-
-        % Build full paths
-        fpaths = cellfun(@(f) fullfile(folder, f), files, 'UniformOutput', false);
-
-        try
-            loadImagesFromPaths(fpaths);
-        catch ME
-            hideLoading();
-            fprintf(2, '\n[FermiViewer] Error loading files: %s\n', ME.message);
-            for si = 1:numel(ME.stack)
-                fprintf(2, '  at %s (line %d)\n', ME.stack(si).name, ME.stack(si).line);
-            end
-            uialert(fig, sprintf('Error loading files:\n%s', ME.message), ...
-                'Load Error', 'Icon', 'error');
-        end
+    %ONOPENFILES  Browse for image files -- delegates to emViewer.imageOps.
+        appData = emViewer.imageOps('open', appData, buildImageCtx());
     end
-
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onRemoveImage — Remove selected image(s) from the list
     % ════════════════════════════════════════════════════════════════════
     function onRemoveImage(~, ~)
-        if isempty(appData.images)
-            return;
-        end
-
-        % Get selected indices from listbox
-        selVals = lbImages.Value;
-        if iscell(selVals)
-            selIdx = [selVals{:}];
-        else
-            selIdx = selVals;
-        end
-
-        % Filter out invalid indices (e.g., the placeholder 0)
-        selIdx = selIdx(selIdx > 0 & selIdx <= numel(appData.images));
-        if isempty(selIdx)
-            return;
-        end
-
-        % Confirm multi-image removal — matches BosonPlotter's dataset-
-        % removal prompt so accidental Ctrl+A → Remove doesn't silently
-        % destroy work.
-        if numel(selIdx) > 1
-            answer = uiconfirm(fig, ...
-                sprintf('Remove %d selected images?', numel(selIdx)), ...
-                'Confirm Remove', 'Options', {'Remove', 'Cancel'}, ...
-                'DefaultOption', 'Remove', 'CancelOption', 'Cancel');
-            if strcmp(answer, 'Cancel'), return; end
-        end
-
-        % Remove selected images (keep contrast-state cache in lockstep)
-        appData.images(selIdx) = [];
-        if numel(appData.imageContrastState) >= max(selIdx)
-            appData.imageContrastState(selIdx) = [];
-        end
-        if appData.lastDisplayedIdx > 0 && any(selIdx == appData.lastDisplayedIdx)
-            appData.lastDisplayedIdx = 0;   % referenced image gone
-        end
-
-        % Update active index
-        if isempty(appData.images)
-            appData.activeIdx = 0;
-        elseif appData.activeIdx > numel(appData.images)
-            appData.activeIdx = numel(appData.images);
-        elseif any(selIdx == appData.activeIdx)
-            appData.activeIdx = min(appData.activeIdx, numel(appData.images));
-            if appData.activeIdx == 0 && ~isempty(appData.images)
-                appData.activeIdx = 1;
-            end
-        end
-
-        % Exit compare mode if fewer than 2 images remain
-        if numel(appData.images) < 2 && appData.compareMode
-            btnCompare.Value = false;
-            exitCompareMode();
-        end
-        btnCompare.Enable = onOff(numel(appData.images) >= 2);
-        btnEDSToolbar.Enable = onOff(numel(appData.images) >= 1);
-
-        rebuildImageList();
-
-        if appData.activeIdx > 0
-            displayImage();
-        else
-            clearDisplay();
-        end
+    %ONREMOVEIMAGE  Remove selected image(s) -- delegates to emViewer.imageOps.
+        appData = emViewer.imageOps('remove', appData, buildImageCtx());
     end
-
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onSelectImage — Handle listbox selection change
     % ════════════════════════════════════════════════════════════════════
@@ -2709,68 +2594,9 @@ function varargout = FermiViewer()
     %  CALLBACK: onMouseMotion — Track mouse over axes, show pixel info
     % ════════════════════════════════════════════════════════════════════
     function onMouseMotion(~, ~)
-        % Panel resize border detection: skip during capture mode
-        if isempty(appData.captureMode) || strcmp(appData.captureMode, '')
-            dir = detectResizeBorder();
-            appData.panelResizeDir = dir;
-            if     ~isempty(dir) && startsWith(dir, 'v_'), fig.Pointer = 'left';
-            elseif ~isempty(dir) && startsWith(dir, 'h_'), fig.Pointer = 'top';
-            elseif appData.panMode,                        fig.Pointer = 'hand';
-            else
-                fig.Pointer = 'arrow';
-            end
-        end
-
-        % In compare mode, ax may not exist
-        if isempty(ax) || ~isvalid(ax)
-            return;
-        end
-        % If no image is loaded, nothing to show
-        if appData.activeIdx < 1 || isempty(appData.rawPixels)
-            lblStatusMouse.Text = '';
-            return;
-        end
-
-        [H, W] = size(appData.rawPixels);
-
-        % Get mouse position in data coordinates
-        cp = ax.CurrentPoint;
-        xData = cp(1, 1);
-        yData = cp(1, 2);
-
-        % Check if mouse is within axes limits
-        if xData < ax.XLim(1) || xData > ax.XLim(2) || ...
-           yData < ax.YLim(1) || yData > ax.YLim(2)
-            lblStatusMouse.Text = '';
-            return;
-        end
-
-        % Convert to nearest integer pixel coordinate
-        col = round(xData);
-        row = round(yData);
-
-        % Check if within image bounds
-        if col < 1 || col > W || row < 1 || row > H
-            lblStatusMouse.Text = '';
-            return;
-        end
-
-        % Read raw pixel intensity (before contrast adjustment)
-        intensity = appData.rawPixels(row, col);
-
-        % Format based on data type (integer vs float)
-        if intensity == floor(intensity) && abs(intensity) < 1e7
-            lblStatusMouse.Text = sprintf('(%d, %d) = %d', col, row, round(intensity));
-        else
-            lblStatusMouse.Text = sprintf('(%d, %d) = %.4g', col, row, intensity);
-        end
-
-        % Update pixel inspector if active
-        if cbPixelInspector.Value && ~isempty(hPixelInspector) && isvalid(hPixelInspector)
-            updatePixelInspector(col, row);
-        end
+    %ONMOUSEMOTION  Track cursor, show pixel info -- delegates to emViewer.mouseOps.
+        appData = emViewer.mouseOps('motion', appData, buildMouseCtx());
     end
-
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onFigureClose — Clean up and close the figure
     % ════════════════════════════════════════════════════════════════════
@@ -3374,6 +3200,88 @@ function varargout = FermiViewer()
         else
             geometry = 'CrossSection';          % safe default
         end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: buildMouseCtx -- context struct for emViewer.mouseOps
+    % ════════════════════════════════════════════════════════════════════
+    function ctx = buildMouseCtx()
+        ctx.fig              = fig;
+        ctx.ax               = ax;
+        ctx.lbImages         = lbImages;
+        ctx.lblStatusMouse   = lblStatusMouse;
+        ctx.cbPixelInspector = cbPixelInspector;
+        ctx.cb.detectResizeBorder    = @detectResizeBorder;
+        ctx.cb.startPanelResize      = @startPanelResize;
+        ctx.cb.deselectMeasurement   = @deselectMeasurement;
+        ctx.cb.highlightAnnotation   = @highlightAnnotation;
+        ctx.cb.onZoomBox             = @onZoomBox;
+        ctx.cb.onResetZoom           = @onResetZoom;
+        ctx.cb.onZoomFit             = @onZoomFit;
+        ctx.cb.onZoomActual          = @onZoomActual;
+        ctx.cb.onZoomOut             = @onZoomOut;
+        ctx.cb.togglePanMode         = @() onDragModeToggle(struct('Value', ~appData.panMode), [], 'pan');
+        ctx.cb.onExportAction        = @onExportAction;
+        ctx.cb.contextToggleScaleBar = @contextToggleScaleBar;
+        ctx.cb.onClearOverlays       = @onClearOverlays;
+        ctx.cb.onOpenFiles           = @onOpenFiles;
+        ctx.cb.onRenameSelected      = @onRenameSelected;
+        ctx.cb.onRemoveImage         = @onRemoveImage;
+        ctx.cb.onBoxZoomDrag         = @onBoxZoomDrag;
+        ctx.cb.onBoxZoomRelease      = @onBoxZoomRelease;
+        ctx.cb.attachImageContextMenu = @attachImageContextMenu;
+        ctx.cb.onAutoContrast        = @onAutoContrast;
+        ctx.cb.onArmDistance         = @onArmDistance;
+        ctx.cb.onArmLineProfile      = @onArmLineProfile;
+        ctx.cb.onArmROIStats         = @onArmROIStats;
+        ctx.cb.refreshState          = @refreshState;
+        ctx.cb.cancelCapture         = @cancelCapture;
+        ctx.cb.onContrastChanged     = @onContrastChanged;
+        ctx.cb.updatePixelInspector  = @updatePixelInspector;
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: buildSessionCtx -- context struct for emViewer.sessionOps
+    % ════════════════════════════════════════════════════════════════════
+    function ctx = buildSessionCtx(inPath, idxs, evt)
+        if nargin < 1, inPath = ''; end
+        if nargin < 2, idxs   = []; end
+        if nargin < 3, evt    = []; end
+        ctx.fig          = fig;
+        ctx.lbImages     = lbImages;
+        ctx.sldGamma     = sldGamma;
+        ctx.efGamma      = efGamma;
+        ctx.ddColormap   = ddColormap;
+        ctx.efRenameBase = efRenameBase;
+        ctx.sldLow       = sldLow;
+        ctx.sldHigh      = sldHigh;
+        ctx.inPath       = inPath;
+        ctx.idxs         = idxs;
+        ctx.evt          = evt;
+        ctx.cb.rebuildImageList    = @rebuildImageList;
+        ctx.cb.displayImage        = @displayImage;
+        ctx.cb.refreshDisplay      = @refreshDisplay;
+        ctx.cb.setStatus           = @setStatus;
+        ctx.cb.hideLoading         = @hideLoading;
+        ctx.cb.loadImagesFromPaths = @loadImagesFromPaths;
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: buildImageCtx -- context struct for emViewer.imageOps
+    % ════════════════════════════════════════════════════════════════════
+    function ctx = buildImageCtx()
+        ctx.fig           = fig;
+        ctx.lbImages      = lbImages;
+        ctx.btnCompare    = btnCompare;
+        ctx.btnEDSToolbar = btnEDSToolbar;
+        ctx.cb.loadImagesFromPaths = @loadImagesFromPaths;
+        ctx.cb.hideLoading         = @hideLoading;
+        ctx.cb.setStatus           = @setStatus;
+        ctx.cb.rebuildImageList    = @rebuildImageList;
+        ctx.cb.displayImage        = @displayImage;
+        ctx.cb.clearDisplay        = @clearDisplay;
+        ctx.cb.exitCompareMode     = @exitCompareMode;
+        ctx.cb.onOff               = @onOff;
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -5903,93 +5811,16 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
 
     function onIdleMouseDown(~, ~)
-    %ONIDLEMOUSEDOWN  Figure-level mouse-down in idle mode — starts resize if near border.
-        if strcmp(fig.SelectionType, 'alt'), return; end   % right-click: skip
-        if ~isempty(appData.panelResizeDir)
-            startPanelResize();
-            return;
-        end
-        % Click on empty canvas deselects any highlighted measurement
-        % and any marquee-selected annotations. A measurement's own
-        % ButtonDownFcn fires AFTER this figure-level callback, so
-        % clicks directly on a measurement re-select it via
-        % selectMeasurement — no flicker, no missed highlights.
-        if appData.selectedMeasIdx > 0 || ~isempty(appData.selectedMeasIndices)
-            deselectMeasurement();
-        end
-        if appData.selectedAnnotIdx > 0 || ~isempty(appData.selectedAnnotIndices)
-            for ai = appData.selectedAnnotIndices(:)'
-                if ai >= 1 && ai <= numel(appData.overlays.textAnnotations)
-                    highlightAnnotation(appData.overlays.textAnnotations{ai}, false);
-                end
-            end
-            if appData.selectedAnnotIdx > 0 && ...
-                    appData.selectedAnnotIdx <= numel(appData.overlays.textAnnotations)
-                highlightAnnotation( ...
-                    appData.overlays.textAnnotations{appData.selectedAnnotIdx}, false);
-            end
-            appData.selectedAnnotIndices = [];
-            appData.selectedAnnotIdx = 0;
-        end
+    %ONIDLEMOUSEDOWN  Figure-level mouse-down -- delegates to emViewer.mouseOps.
+        appData = emViewer.mouseOps('idleDown', appData, buildMouseCtx());
     end
-
     % ════════════════════════════════════════════════════════════════════
     %  BOX-ZOOM: click-drag rubber-band on image axes, double-click reset
     % ════════════════════════════════════════════════════════════════════
     function onAxesMouseDown(~, ~)
-    %ONAXESMOUSEDOWN  Image-axes ButtonDownFcn: box-zoom, pan, or double-click reset.
-        if ~isempty(appData.captureMode), return; end
-        if appData.compareMode, return; end
-        if isempty(appData.imgHandle) || ~isvalid(appData.imgHandle), return; end
-
-        selType = fig.SelectionType;
-        if strcmp(selType, 'alt'), return; end
-
-        % Manual double-click detection — uifigure on macOS does not always
-        % upgrade SelectionType to 'open' for rapid successive clicks.
-        nowTick = tic;
-        isDouble = strcmp(selType, 'open');
-        if ~isDouble && appData.lastClickTick > 0
-            if toc(appData.lastClickTick) < 0.35
-                isDouble = true;
-            end
-        end
-        appData.lastClickTick = nowTick;
-
-        if isDouble
-            cdata = appData.imgHandle.CData;
-            H = size(cdata, 1); W = size(cdata, 2);
-            if H > 0 && W > 0
-                ax.XLim = [0.5, W + 0.5];
-                ax.YLim = [0.5, H + 0.5];
-            end
-            return;
-        end
-
-        % Determine drag action: middle-click always pans, panMode left-click
-        % pans, otherwise zoom/marquee as before.
-        wantPan = strcmp(selType, 'extend') || ...
-                  (appData.panMode && strcmp(selType, 'normal'));
-
-        cp = ax.CurrentPoint;
-        appData.prevMotionFcn = fig.WindowButtonMotionFcn;
-        appData.prevUpFcn     = fig.WindowButtonUpFcn;
-
-        if wantPan
-            appData.dragAction   = 'pan';
-            appData.panStartXY   = cp(1, 1:2);
-            appData.panStartLims = struct('XLim', ax.XLim, 'YLim', ax.YLim);
-            fig.Pointer = 'hand';
-        else
-            appData.dragAction   = 'zoomMarquee';
-            appData.zoomStartXY  = cp(1, 1:2);
-            appData.zoomRect     = [];
-        end
-
-        fig.WindowButtonMotionFcn = @onBoxZoomDrag;
-        fig.WindowButtonUpFcn     = @onBoxZoomRelease;
+    %ONAXESMOUSEDOWN  Image-axes ButtonDownFcn -- delegates to emViewer.mouseOps.
+        appData = emViewer.mouseOps('axesDown', appData, buildMouseCtx());
     end
-
     function onBoxZoomDrag(~, ~)
     %ONBOXZOOMDRAG  Motion handler for drag interactions (zoom/marquee/pan).
         if strcmp(appData.dragAction, 'pan')
@@ -6076,59 +5907,9 @@ function varargout = FermiViewer()
     %  CONTEXT MENUS: right-click on image, thumbnail list, scale bar
     % ════════════════════════════════════════════════════════════════════
     function buildContextMenus()
-    %BUILDCONTEXTMENUS  Attach right-click menus to image axes, listbox, scale bar.
-    %  All items reuse existing callbacks — no new business logic.
-    %  macOS uifigure does not reliably deliver right-clicks to a parent
-    %  uiaxes wrapper; attach the image menu to BOTH the axes and the image
-    %  HG object, and reapply to the image object on every displayImage.
-
-        % --- Image axes + image menu -----------------------------------------
-        cmImage = uicontextmenu(fig);
-        uimenu(cmImage, 'Text', 'Zoom', ...
-            'MenuSelectedFcn', @(~,~) onZoomBox([], []));
-        uimenu(cmImage, 'Text', 'Reset Zoom', ...
-            'MenuSelectedFcn', @(~,~) onResetZoom([], []));
-        uimenu(cmImage, 'Text', 'Fit to Window', ...
-            'MenuSelectedFcn', @(~,~) onZoomFit([], []));
-        uimenu(cmImage, 'Text', 'Zoom 1:1 (Actual Size)', ...
-            'MenuSelectedFcn', @(~,~) onZoomActual([], []));
-        uimenu(cmImage, 'Text', 'Zoom Out (2×)', ...
-            'MenuSelectedFcn', @(~,~) onZoomOut([], []));
-        uimenu(cmImage, 'Text', 'Zoom to Dimensions…', ...
-            'MenuSelectedFcn', @(~,~) onZoomBox([], [], 'dims'));
-        uimenu(cmImage, 'Text', 'Toggle Pan Mode', ...
-            'MenuSelectedFcn', @(~,~) onDragModeToggle(struct('Value', ~appData.panMode), [], 'pan'));
-        uimenu(cmImage, 'Text', 'Copy to Clipboard', ...
-            'Separator', 'on', ...
-            'MenuSelectedFcn', @(~,~) onExportAction('copyClipboard'));
-        uimenu(cmImage, 'Text', 'Save Image As…', ...
-            'MenuSelectedFcn', @(~,~) onExportAction('saveImage'));
-        uimenu(cmImage, 'Text', 'Toggle Scale Bar', ...
-            'Separator', 'on', ...
-            'MenuSelectedFcn', @(~,~) contextToggleScaleBar());
-        uimenu(cmImage, 'Text', 'Clear Overlays', ...
-            'MenuSelectedFcn', @(~,~) onClearOverlays([], []));
-        appData.cmImage = cmImage;
-        if ~isempty(ax) && isvalid(ax)
-            ax.ContextMenu = cmImage;
-        end
-        attachImageContextMenu();   % also attach to the current image HG object
-
-        % --- Thumbnail list menu ---------------------------------------------
-        cmList = uicontextmenu(fig);
-        uimenu(cmList, 'Text', 'Open…', ...
-            'MenuSelectedFcn', @(~,~) onOpenFiles([], []));
-        uimenu(cmList, 'Text', 'Rename Selected…', ...
-            'MenuSelectedFcn', @(~,~) onRenameSelected([], []));
-        uimenu(cmList, 'Text', 'Remove Selected', ...
-            'Separator', 'on', ...
-            'MenuSelectedFcn', @(~,~) onRemoveImage([], []));
-        appData.cmList = cmList;
-        if ~isempty(lbImages) && isvalid(lbImages)
-            lbImages.ContextMenu = cmList;
-        end
+    %BUILDCONTEXTMENUS  Attach right-click menus -- delegates to emViewer.mouseOps.
+        appData = emViewer.mouseOps('buildContextMenus', appData, buildMouseCtx());
     end
-
     function attachImageContextMenu()
     %ATTACHIMAGECONTEXTMENU  Bind the image context menu to the current
     %  image HG object. Called from displayImage / undoPop / FFT-mask apply
@@ -9620,79 +9401,13 @@ function varargout = FermiViewer()
     end
 
     function renameBatch(idxs)
-    %RENAMEBATCH  Rename files on disk with baseName_001, _002, ... pattern.
-        if isempty(appData.images)
-            setStatus('No images loaded.'); return;
-        end
-
-        baseName = strtrim(efRenameBase.Value);
-        if isempty(baseName)
-            setStatus('Enter a base name before renaming.');
-            return;
-        end
-
-        % Confirm with user
-        msg = sprintf('Rename %d file(s) on disk to %s_001, _002, ...?\nThis cannot be undone.', ...
-            numel(idxs), baseName);
-        answer = uiconfirm(fig, msg, 'Confirm Batch Rename', ...
-            'Options', {'Rename', 'Cancel'}, 'DefaultOption', 2, 'CancelOption', 2);
-        if ~strcmp(answer, 'Rename'), return; end
-
-        fig.Pointer = 'watch'; drawnow;
-        nRenamed = 0;
-        for ri = 1:numel(idxs)
-            ki = idxs(ri);
-            try
-                srcPath = appData.images{ki}.metadata.source;
-                [srcDir, ~, srcExt] = fileparts(srcPath);
-                newName = sprintf('%s_%03d%s', baseName, ri, srcExt);
-                newPath = fullfile(srcDir, newName);
-
-                if ~strcmp(srcPath, newPath)
-                    if isfile(newPath)
-                        warning('FermiViewer:rename', ...
-                            'Skipped %s: target %s already exists.', srcPath, newName);
-                        continue;
-                    end
-                    movefile(srcPath, newPath);
-                    appData.images{ki}.metadata.source = newPath;
-                    nRenamed = nRenamed + 1;
-                end
-            catch ME
-                warning('FermiViewer:rename', 'Failed to rename %s: %s', ...
-                    srcPath, ME.message);
-            end
-        end
-
-        % Update listbox display
-        refreshImageList();
-        fig.Pointer = 'arrow';
-        setStatus(sprintf('Renamed %d / %d files with base "%s".', ...
-            nRenamed, numel(idxs), baseName));
+    %RENAMEBATCH  Rename files on disk -- delegates to emViewer.sessionOps.
+        appData = emViewer.sessionOps('renameBatch', appData, buildSessionCtx('', idxs));
     end
-
     function refreshImageList()
-    %REFRESHIMAGELIST  Rebuild listbox items from current appData.images.
-        if isempty(appData.images)
-            lbImages.Items = {'(no images loaded)'};
-            lbImages.ItemsData = {0};
-            return;
-        end
-        names = cell(1, numel(appData.images));
-        data  = cell(1, numel(appData.images));
-        for ri = 1:numel(appData.images)
-            [~, nm, ex] = fileparts(appData.images{ri}.metadata.source);
-            names{ri} = [nm ex];
-            data{ri}  = ri;
-        end
-        lbImages.Items = names;
-        lbImages.ItemsData = data;
-        % Restore selection to current active
-        if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
-            lbImages.Value = {appData.activeIdx};
-        end
+    %REFRESHIMAGELIST  Rebuild listbox items -- delegates to emViewer.sessionOps.
+        appData = emViewer.sessionOps('refreshImageList', appData, buildSessionCtx());
     end
-
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onEditMetadata — Open Metadata Editor for active image
     % ════════════════════════════════════════════════════════════════════
@@ -9713,35 +9428,9 @@ function varargout = FermiViewer()
     %  CALLBACK: onFileDrop — Handle drag-and-drop files onto the figure
     % ════════════════════════════════════════════════════════════════════
     function onFileDrop(~, evt)
-        % evt.Items contains the dropped file paths
-        if isempty(evt) || ~isprop(evt, 'Items')
-            return;
-        end
-
-        items = evt.Items;
-        fpaths = {};
-
-        for ki = 1:numel(items)
-            fp = items(ki);
-            if ischar(fp) || isstring(fp)
-                fp = char(fp);
-            elseif isstruct(fp) && isfield(fp, 'Path')
-                fp = char(fp.Path);
-            else
-                continue;
-            end
-
-            [~, ~, ext] = fileparts(fp);
-            if ismember(lower(ext), {'.tif', '.tiff', '.raw', '.dm3', '.dm4'})
-                fpaths{end+1} = fp; %#ok<AGROW>
-            end
-        end
-
-        if ~isempty(fpaths)
-            loadImagesFromPaths(fpaths);
-        end
+    %ONFILEDROP  Handle drag-and-drop files -- delegates to emViewer.sessionOps.
+        appData = emViewer.sessionOps('fileDrop', appData, buildSessionCtx('', [], evt));
     end
-
     % ════════════════════════════════════════════════════════════════════
     %  STACK NAVIGATOR: frame slider, prev/next, MIP
     % ════════════════════════════════════════════════════════════════════
@@ -10042,58 +9731,9 @@ function varargout = FermiViewer()
     end
 
     function sessionLoadAPI(inPath)
-        fig.Pointer = 'watch'; drawnow;
-        try
-            tmp = load(inPath, 'session');
-            if ~isfield(tmp, 'session')
-                uialert(fig, 'Not a valid session file.', 'Error', 'Icon', 'error');
-                fig.Pointer = 'arrow'; return;
-            end
-            s = tmp.session;
-            appData.images        = s.images;
-            appData.activeIdx     = s.activeIdx;
-            % Reset contrast-state cache to match restored image list
-            appData.imageContrastState = cell(1, numel(appData.images));
-            appData.lastDisplayedIdx   = 0;
-            if isfield(s, 'gamma')
-                appData.gamma = s.gamma;
-                sldGamma.Value = s.gamma;
-                efGamma.Value = s.gamma;
-            end
-            if isfield(s, 'roiList'), appData.roiList = s.roiList; end
-            if isfield(s, 'measureLog'), appData.measurementLog = s.measureLog; end
-            if isfield(s, 'edsChannels'), appData.edsChannels = s.edsChannels; end
-            if isfield(s, 'colormap') && ismember(s.colormap, ddColormap.Items)
-                ddColormap.Value = s.colormap;
-            end
-            if isfield(s, 'prefs')
-                flds = fieldnames(s.prefs);
-                for fi2 = 1:numel(flds)
-                    appData.prefs.(flds{fi2}) = s.prefs.(flds{fi2});
-                end
-            end
-            rebuildImageList();
-            if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
-                displayImage();
-                if isfield(s, 'contrastLow') && isfield(s, 'contrastHigh')
-                    lo2 = max(sldLow.Limits(1), min(sldLow.Limits(2), s.contrastLow));
-                    hi2 = max(sldHigh.Limits(1), min(sldHigh.Limits(2), s.contrastHigh));
-                    if lo2 < hi2
-                        sldLow.Value  = lo2;
-                        sldHigh.Value = hi2;
-                    end
-                    refreshDisplay();
-                end
-            end
-            appData.sessionFile = inPath;
-            setStatus(sprintf('Session loaded: %d images from %s', numel(appData.images), inPath));
-        catch ME
-            uialert(fig, sprintf('Load failed:\n%s', ME.message), ...
-                'Session Error', 'Icon', 'error');
-        end
-        fig.Pointer = 'arrow';
+    %SESSIONLOADAPI  Load a session .mat -- delegates to emViewer.sessionOps.
+        appData = emViewer.sessionOps('load', appData, buildSessionCtx(inPath));
     end
-
     function setGammaAPI(g)
         appData.gamma = g;
         sldGamma.Value = g;
@@ -11392,569 +11032,6 @@ function varargout = FermiViewer()
 
     % ── Feature 20: Right-Click Context Menu ───────────────────────────
     function buildContextMenu()
-        if isempty(ax) || ~isvalid(ax), return; end
-        cm = uicontextmenu(fig);
-        uimenu(cm, 'Text', 'Auto Contrast', 'MenuSelectedFcn', @(~,~) onAutoContrast());
-        uimenu(cm, 'Text', 'Copy to Clipboard', 'MenuSelectedFcn', @(~,~) onExportAction('copyClipboard'));
-        uimenu(cm, 'Text', 'Save Image', 'MenuSelectedFcn', @(~,~) onExportAction('saveImage'));
-        uimenu(cm, 'Text', 'Measure Distance', 'Separator', 'on', ...
-            'MenuSelectedFcn', @(~,~) onArmDistance([], []));
-        uimenu(cm, 'Text', 'Line Profile', 'MenuSelectedFcn', @(~,~) onArmLineProfile([], []));
-        uimenu(cm, 'Text', 'ROI Statistics', 'MenuSelectedFcn', @(~,~) onArmROIStats([], []));
-        uimenu(cm, 'Text', 'Zoom to Fit', 'Separator', 'on', ...
-            'MenuSelectedFcn', @(~,~) onResetZoom([], []));
-        uimenu(cm, 'Text', 'Refresh State (F5)', 'Separator', 'on', ...
-            'MenuSelectedFcn', @(~,~) refreshState());
-        ax.ContextMenu = cm;
+    %BUILDCONTEXTMENU  Simple axes context menu -- delegates to emViewer.mouseOps.
+        appData = emViewer.mouseOps('buildContextMenu', appData, buildMouseCtx());
     end
-
-    function stats = getMeasStatsAPI()
-        stats = appData.measWorkshop.model.aggregateStats();
-    end
-
-    function model = getMeasModelAPI()
-        if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
-            try
-                imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
-                appData.measWorkshop.bindCalibration(imgInfo);
-            catch
-            end
-        end
-        try
-            [tiltDeg, tiltAxis, ~, tiltGeom] = getTiltState();
-            appData.measWorkshop.model.tiltAngle = tiltDeg;
-            appData.measWorkshop.model.tiltAxis  = tiltAxis;
-            appData.measWorkshop.model.tiltGeom  = tiltGeom;
-        catch
-        end
-        model = appData.measWorkshop.model;
-    end
-
-    function closeAll()
-        appData.measWorkshop.close(); appData.diffWorkshop.close();
-        appData.contrastWS.close(); appData.annotWorkshop.close(); appData.eelsWorkshop.close(); appData.edsWorkshop.close(); appData.procWorkshop.close(); appData.calibWS.close();
-        auxFigs = [appData.eelsKKFig, appData.eelsSVDFig, appData.eelsFig, appData.eelsELNESFig];
-        for f = auxFigs
-            if ~isempty(f) && ishandle(f), close(f); end
-        end
-        close(fig);
-    end
-
-    function refreshState()
-    %REFRESHSTATE  Flush caches and re-sync display without losing data.
-    %  Bound to F5.  Clears stale display state, persistent caches, and
-    %  forces a full image redraw — without destroying loaded images.
-        % Clear persistent caches in calc modules
-        clear calc.constants;
-        clear calc.elementData;
-        clear calc.unitConvert;
-        clear calc.crystalCache;
-
-        % Cancel any in-progress capture
-        if ~isempty(appData.captureMode)
-            cancelCapture();
-        end
-
-        % Re-display current image
-        if appData.activeIdx > 0 && ~isempty(appData.rawPixels)
-            displayImage();
-        end
-
-        setStatus('State refreshed.');
-    end
-
-    % ════════════════════════════════════════════════════════════════════
-    %  EELS CALLBACKS
-    % ════════════════════════════════════════════════════════════════════
-
-    function onEnterEELS(~, ~)
-    %ONENTEREELS  Enter EELS spectrum analysis mode.
-        if isempty(appData.images), return; end
-
-        % Exit other exclusive modes first
-        if appData.edsMode
-            onExitEDS();
-        end
-        if appData.compareMode
-            exitCompareMode();
-        end
-
-        if ~appData.eelsMode
-            appData.eelsMode = true;
-            btnEnterEELS.Text = 'Exit EELS';
-            btnEnterEELS.BackgroundColor = BTN_DANGER;
-
-            % Try to load spectrum data from current image metadata
-            idx = appData.activeIdx;
-            if idx > 0 && idx <= numel(appData.images)
-                ps = appData.images{idx}.metadata.parserSpecific;
-                if isfield(ps, 'spectrumData')
-                    appData.eelsData = ps.spectrumData;
-                    appData.eelsEnergyAxis = ps.spectrumData.energyAxis;
-                    if isfield(ps, 'spectrumImage')
-                        appData.eelsCube = ps.spectrumImage.cube;
-                    end
-                end
-            end
-
-            if ~isempty(appData.eelsData)
-                showEELSSpectrum();
-            end
-
-            setStatus('EELS mode active');
-            appData.eelsWorkshop.sync(appData);
-        else
-            onExitEELS();
-        end
-    end
-
-    function onExitEELS()
-        appData.eelsMode       = false;
-        appData.eelsData       = [];
-        appData.eelsCube       = [];
-        appData.eelsEnergyAxis = [];
-        btnEnterEELS.Text = 'Enter EELS';
-        btnEnterEELS.BackgroundColor = BTN_PRIMARY;
-
-        if ~isempty(appData.eelsFig) && isvalid(appData.eelsFig)
-            close(appData.eelsFig);
-        end
-        appData.eelsFig = [];
-
-        displayImage();
-        setStatus('');
-        appData.eelsWorkshop.sync(appData);
-    end
-
-    function showEELSSpectrum()
-        if isempty(appData.eelsData), return; end
-        appData.eelsFig = emViewer.eels.showSpectrum( ...
-            appData.eelsData.energyAxis, double(appData.eelsData.counts), ...
-            appData.eelsFig);
-    end
-
-    function onEELSAction(action)
-        switch action
-            case 'bgFit'
-                if isempty(appData.eelsData), return; end
-                E = appData.eelsData.energyAxis;
-                I = double(appData.eelsData.counts);
-                E1 = str2double(edtEELSPreEdgeStart.Value);
-                E2 = str2double(edtEELSPreEdgeEnd.Value);
-                if isnan(E1) || isnan(E2) || E1 >= E2
-                    setStatus('Invalid pre-edge window'); return;
-                end
-                method = ddEELSMethod.Value;
-                try
-                    r = emViewer.eels.executeBackgroundFit(E, I, [E1 E2], method);
-                catch ME
-                    setStatus(['EELS background error: ' ME.message]); return;
-                end
-                if ~isempty(appData.eelsFig) && isvalid(appData.eelsFig)
-                    eelsAx = findobj(appData.eelsFig, 'Type', 'axes');
-                    if ~isempty(eelsAx)
-                        eelsAx = eelsAx(1);
-                        cla(eelsAx); hold(eelsAx, 'on');
-                        plot(eelsAx, E, I, 'k-', 'LineWidth', 0.5, 'DisplayName', 'Raw');
-                        plot(eelsAx, E, r.bg, 'r--', 'LineWidth', 1, 'DisplayName', 'Background');
-                        plot(eelsAx, E, max(r.signal, 0), 'b-', 'LineWidth', 1, 'DisplayName', 'Signal');
-                        hold(eelsAx, 'off'); legend(eelsAx, 'show');
-                        if ~isempty(r.titleStr), title(eelsAx, r.titleStr); end
-                    end
-                end
-                setStatus(r.statusMsg);
-                appData.eelsWorkshop.sync(appData);
-
-            case 'showEdges'
-                if isempty(appData.eelsFig) || ~isvalid(appData.eelsFig), return; end
-                eelsAx = findobj(appData.eelsFig, 'Type', 'axes');
-                if isempty(eelsAx), return; end
-                eelsAx = eelsAx(1);
-                if ~chkShowEdges.Value
-                    delete(findobj(eelsAx, 'Tag', 'eels_edge'));
-                    return;
-                end
-                emViewer.eels.overlayEdges(eelsAx, ddEdgeFilter.Value);
-
-            case 'extractMap'
-                if isempty(appData.eelsCube), setStatus('No spectrum image loaded'); return; end
-                E1 = str2double(edtEELSSignalStart.Value);
-                E2 = str2double(edtEELSSignalEnd.Value);
-                if isnan(E1) || isnan(E2), setStatus('Invalid signal window'); return; end
-                bgE1 = str2double(edtEELSPreEdgeStart.Value);
-                bgE2 = str2double(edtEELSPreEdgeEnd.Value);
-                bgWin = [];
-                if ~isnan(bgE1) && ~isnan(bgE2) && bgE1 < bgE2, bgWin = [bgE1 bgE2]; end
-                try
-                    map = imaging.eelsExtractMap(appData.eelsCube, appData.eelsEnergyAxis, ...
-                        [E1 E2], 'BackgroundWindow', bgWin);
-                catch ME
-                    setStatus(['EELS extract error: ' ME.message]); return;
-                end
-                cla(ax); imagesc(ax, map); colorbar(ax); colormap(ax, 'hot');
-                title(ax, sprintf('EELS Map: %.0f-%.0f eV', E1, E2)); axis(ax, 'image');
-                setStatus(sprintf('Extracted map: %.0f-%.0f eV', E1, E2));
-
-            case 'thicknessMap'
-                if isempty(appData.eelsCube), setStatus('No spectrum image loaded'); return; end
-                try
-                    [tMap, mask] = imaging.eelsThicknessMap(appData.eelsCube, appData.eelsEnergyAxis);
-                catch ME
-                    setStatus(['Thickness map error: ' ME.message]); return;
-                end
-                cla(ax); imagesc(ax, tMap); colorbar(ax); colormap(ax, 'parula');
-                title(ax, 't/\lambda thickness map'); axis(ax, 'image');
-                setStatus(sprintf('Thickness map: mean t/lambda=%.2f', mean(tMap(mask))));
-
-            case 'alignZLP'
-                if isempty(appData.eelsCube), setStatus('No spectrum image loaded'); return; end
-                try
-                    [appData.eelsCube, shifts] = imaging.eelsAlignZLP( ...
-                        appData.eelsCube, appData.eelsEnergyAxis);
-                catch ME
-                    setStatus(['ZLP alignment error: ' ME.message]); return;
-                end
-                appData.eelsData.counts = squeeze(sum(sum(double(appData.eelsCube), 1), 2));
-                showEELSSpectrum();
-                setStatus(sprintf('ZLP aligned: max shift=%.0f channels', max(abs(shifts(:)))));
-                appData.eelsWorkshop.sync(appData);
-        end
-    end
-
-    function eelsBackgroundAPI(fitWin)
-        edtEELSPreEdgeStart.Value = num2str(fitWin(1));
-        edtEELSPreEdgeEnd.Value   = num2str(fitWin(2));
-        onEELSAction('bgFit');
-    end
-
-    function eelsExtractMapAPI(sigWin, bgWin)
-    %EELSEXTRACTMAPAPI  Programmatic EELS map extraction.
-        edtEELSSignalStart.Value = num2str(sigWin(1));
-        edtEELSSignalEnd.Value   = num2str(sigWin(2));
-        if nargin >= 2 && ~isempty(bgWin)
-            edtEELSPreEdgeStart.Value = num2str(bgWin(1));
-            edtEELSPreEdgeEnd.Value   = num2str(bgWin(2));
-        end
-        onEELSAction('extractMap');
-    end
-
-    function onEELSAdvanced(action)
-        switch action
-            case 'deconvolve'
-    %ONEELSDECONVOLVE  Fourier-log plural scattering removal.
-        if isempty(appData.eelsData), return; end
-        E = appData.eelsData.energyAxis;
-        I = double(appData.eelsData.counts);
-        try
-            [ssd, tl] = imaging.eelsFourierLog(E, I);
-            appData.eelsSSD = ssd;
-            if ~isempty(appData.eelsFig) && isvalid(appData.eelsFig)
-                ax2 = findobj(appData.eelsFig, 'Type', 'axes');
-                if ~isempty(ax2)
-                    hold(ax2(1), 'on');
-                    plot(ax2(1), E, ssd, 'm-', 'LineWidth', 1.2, 'DisplayName', 'SSD');
-                    hold(ax2(1), 'off');
-                    legend(ax2(1), 'show');
-                end
-            end
-            setStatus(sprintf('Deconvolved: t/lambda=%.2f', tl));
-            appData.eelsWorkshop.sync(appData);
-        catch ME
-            setStatus(sprintf('Deconvolution failed: %s', ME.message));
-        end
-
-            case 'elnes'
-        if isempty(appData.eelsData), return; end
-        onset = str2double(edtEELSEdgeOnset.Value);
-        if isnan(onset), setStatus('Invalid edge onset'); return; end
-        E = appData.eelsData.energyAxis;
-        I = double(appData.eelsData.counts);
-        if ~isempty(appData.eelsSSD), I = appData.eelsSSD; end
-        E1 = str2double(edtEELSPreEdgeStart.Value);
-        E2 = str2double(edtEELSPreEdgeEnd.Value);
-        if isnan(E1) || isnan(E2), setStatus('Set pre-edge window first'); return; end
-        try
-            if ishandle(appData.eelsELNESFig), close(appData.eelsELNESFig); end
-            elnesOut = emViewer.eels.executeELNES(E, I, onset, [E1 E2]);
-            appData.eelsELNESFig = elnesOut.elnesFig;
-            setStatus(elnesOut.statusMsg);
-        catch ME
-            setStatus(sprintf('ELNES failed: %s', ME.message));
-        end
-
-            case 'kramersKronig'
-        if isempty(appData.eelsData), return; end
-        if ishandle(appData.eelsKKFig), close(appData.eelsKKFig); end
-        try
-            kkOut = emViewer.eels.executeKramersKronig( ...
-                appData.eelsData.energyAxis, double(appData.eelsData.counts));
-            appData.eelsKKResult = kkOut.kkResult;
-            appData.eelsKKFig = kkOut.kkFig;
-            setStatus(kkOut.statusMsg);
-            appData.eelsWorkshop.sync(appData);
-        catch ME
-            setStatus(sprintf('KK failed: %s', ME.message));
-        end
-
-            case 'svd'
-        if isempty(appData.eelsCube)
-            setStatus('No spectrum image loaded'); return;
-        end
-        if ishandle(appData.eelsSVDFig), close(appData.eelsSVDFig); end
-        setStatus('Running SVD decomposition...');
-        fig.Pointer = 'watch'; drawnow;
-        try
-            svdOut = emViewer.eels.executeSVD(appData.eelsCube, appData.eelsEnergyAxis, fig);
-        catch ME
-            fig.Pointer = 'arrow';
-            setStatus(sprintf('SVD failed: %s', ME.message)); return;
-        end
-        fig.Pointer = 'arrow';
-        appData.eelsSVDResult = svdOut.svdResult;
-        appData.eelsSVDFig = svdOut.svdFig;
-        if svdOut.denoised
-            appData.eelsCube = svdOut.denoisedCube;
-            appData.eelsData.counts = svdOut.sumSpectrum;
-            showEELSSpectrum();
-        end
-        setStatus(svdOut.statusMsg);
-        appData.eelsWorkshop.sync(appData);
-        end  % switch action
-    end  % onEELSAdvanced
-
-    function onEELSNavigateToggle(src, ~)
-        if src.Value
-            if isempty(appData.eelsCube)
-                setStatus('No spectrum image loaded');
-                src.Value = false;
-                return;
-            end
-            appData.captureMode = 'specnav';
-            fig.WindowButtonDownFcn = @onCaptureClick;
-            fig.Pointer = 'crosshair';
-            setStatus('Click on image to show pixel spectrum');
-        else
-            appData.captureMode = '';
-            fig.WindowButtonDownFcn = @onIdleMouseDown;
-            fig.Pointer = 'arrow';
-            delete(findobj(ax, 'Tag', 'specnav_marker'));
-            setStatus('');
-        end
-    end
-
-    % ════════════════════════════════════════════════════════════════════
-    %  DIFFRACTION INDEXING CALLBACKS
-    % ════════════════════════════════════════════════════════════════════
-
-    % onAutoDetectSpots/onClickDiffSpot/onClearDiffSpots/drawDiffSpots/
-    % onMatchDiffraction/onOverlayDiffRings/onSimulateDiffraction →
-    % onDiffractionAction('autoDetect'/'clickSpot'/'clearSpots'/etc.)
-
-    function onVirtualDarkField(~, ~)
-    %ONVIRTUALDARKFIELD  Select an FFT spot for virtual dark-field imaging.
-        if isempty(appData.images), return; end
-        appData.captureMode = 'vdf_select';
-        fig.WindowButtonDownFcn = @onCaptureClick;
-        fig.Pointer = 'crosshair';
-        setStatus('Click on FFT spot for virtual dark-field');
-    end
-
-    % ════════════════════════════════════════════════════════════════════
-    %  EDS QUANTIFICATION CALLBACKS
-    % ════════════════════════════════════════════════════════════════════
-
-    function onAssignElements(~, ~)
-    %ONASSIGNELEMENTS  Assign element symbols to loaded EDS channels.
-        if ~appData.edsMode || isempty(appData.edsChannels), return; end
-
-        nCh      = numel(appData.edsChannels);
-        elements = cell(1, nCh);
-
-        % Auto-detect element symbol from channel label (e.g. "Fe_Ka" → "Fe")
-        for k = 1:nCh
-            lbl = appData.edsChannels{k}.label;
-            tok = regexp(lbl, '^([A-Z][a-z]?)', 'tokens', 'once');
-            if ~isempty(tok)
-                elements{k} = tok{1};
-            else
-                elements{k} = sprintf('El%d', k);
-            end
-        end
-
-        % Ask user to confirm / override
-        prompt   = cell(1, nCh);
-        defaults = cell(1, nCh);
-        for k = 1:nCh
-            prompt{k}   = sprintf('Channel %d (%s):', k, appData.edsChannels{k}.label);
-            defaults{k} = elements{k};
-        end
-
-        answer = inputdlg(prompt, 'Assign Elements', 1, defaults);
-        if isempty(answer), return; end
-
-        appData.edsElements = answer';
-        setStatus(sprintf('Elements assigned: %s', strjoin(appData.edsElements, ', ')));
-    end
-
-    function onQuantifyCL(~, ~)
-    %ONQUANTIFYCL  Quantify EDS composition using the Cliff-Lorimer method.
-        if ~appData.edsMode || isempty(appData.edsChannels)
-            return;
-        end
-        if isempty(appData.edsElements)
-            setStatus('Assign elements first');
-            return;
-        end
-
-        nCh  = numel(appData.edsChannels);
-        maps = cell(1, nCh);
-        for k = 1:nCh
-            chIdx  = appData.edsChannels{k}.imageIdx;
-            maps{k} = double(appData.images{chIdx}.metadata.parserSpecific.imageData.pixels);
-        end
-
-        try
-            result = imaging.cliffLorimer(maps, appData.edsElements);
-        catch ME
-            setStatus(['Cliff-Lorimer error: ' ME.message]);
-            return;
-        end
-
-        appData.edsAtomicPct  = result.atomicPctMaps;
-        appData.edsWeightPct  = result.weightPctMaps;
-        appData.edsQuantified = true;
-
-        % Build summary status string
-        msg = 'Composition (at%): ';
-        for k = 1:nCh
-            msg = [msg sprintf('%s=%.1f%% ', appData.edsElements{k}, result.meanAtomicPct(k))]; %#ok<AGROW>
-        end
-        setStatus(msg);
-        appData.edsWorkshop.sync(appData);
-    end
-
-    function onCompositionProfile(~, ~)
-        if ~appData.edsQuantified
-            setStatus('Run quantification first');
-            return;
-        end
-        appData.captureMode   = 'edsprofile';
-        appData.captureClicks = [];
-        fig.WindowButtonDownFcn = @onCaptureClick;
-        fig.Pointer = 'crosshair';
-        setStatus('Click 2 points for composition profile (Escape to cancel)');
-    end
-
-    function onROIComposition(~, ~)
-    %ONROICOMPOSITION  Compute mean composition in a rectangular ROI.
-        if ~appData.edsQuantified
-            setStatus('Run quantification first');
-            return;
-        end
-        appData.captureMode   = 'edsroi';
-        appData.captureClicks = [];
-        fig.WindowButtonDownFcn = @onCaptureClick;
-        fig.Pointer = 'crosshair';
-        setStatus('Click 2 corners for ROI composition (Escape to cancel)');
-    end
-
-    % API helper for EDS element assignment
-    function edsAssignAPI(elems)
-    %EDSASSIGNAPI  Programmatically assign element symbols to EDS channels.
-        appData.edsElements = elems;
-    end
-
-    function onQuantifyZAF(~, ~)
-    %ONQUANTIFYZAF  ZAF-corrected EDS quantification for thick specimens.
-        if ~appData.edsMode || isempty(appData.edsChannels), return; end
-        if isempty(appData.edsElements), setStatus('Assign elements first'); return; end
-        nCh = numel(appData.edsChannels);
-        maps = cell(1, nCh);
-        for k = 1:nCh
-            chIdx = appData.edsChannels{k}.imageIdx;
-            maps{k} = double(appData.images{chIdx}.metadata.parserSpecific.imageData.pixels);
-        end
-        thickness = str2double(edtEDSThickness.Value);
-        takeoff   = str2double(edtEDSTakeOff.Value);
-        if isnan(thickness), thickness = 100; end
-        if isnan(takeoff),   takeoff   = 20;  end
-        try
-            result = imaging.zafCorrection(maps, appData.edsElements, ...
-                'Thickness', thickness, 'TakeOffAngle', takeoff);
-            appData.edsAtomicPct  = result.atomicPctMaps;
-            appData.edsWeightPct  = result.weightPctMaps;
-            appData.edsQuantified = true;
-            msg = 'ZAF (at%): ';
-            for k = 1:nCh
-                msg = [msg sprintf('%s=%.1f%% ', appData.edsElements{k}, result.meanAtomicPct(k))]; %#ok<AGROW>
-            end
-            setStatus(msg);
-        catch ME
-            setStatus(sprintf('ZAF failed: %s', ME.message));
-        end
-    end
-
-    % ════════════════════════════════════════════════════════════════════
-    %  API HELPERS: Advanced EELS, Diffraction, ZAF
-    % ════════════════════════════════════════════════════════════════════
-
-    function eelsELNESAPI(onset)
-    %EELSELNESAPI  Programmatic ELNES extraction at given onset energy.
-        edtEELSEdgeOnset.Value = num2str(onset);
-        onEELSAdvanced('elnes');
-    end
-
-    function eelsNavigateAPI(row, col)
-    %EELSNAVIGATEAPI  Programmatic spectrum navigation to pixel [row, col].
-        if isempty(appData.eelsCube), return; end
-        [Ny, Nx, ~] = size(appData.eelsCube);
-        if row >= 1 && row <= Ny && col >= 1 && col <= Nx
-            spec = squeeze(double(appData.eelsCube(row, col, :)));
-            showEELSSpectrum();
-            ax2 = findobj(appData.eelsFig, 'Type', 'axes');
-            if ~isempty(ax2)
-                cla(ax2(1));
-                plot(ax2(1), appData.eelsEnergyAxis, spec, 'k-', 'LineWidth', 1);
-                title(ax2(1), sprintf('Pixel [%d, %d]', row, col));
-            end
-        end
-    end
-
-    function res = eelsSVDAPI(nComp)
-    %EELSSVDAPI  Programmatic SVD decomposition of the EELS cube.
-        if isempty(appData.eelsCube)
-            res = []; return;
-        end
-        res = imaging.eelsSVD(appData.eelsCube, appData.eelsEnergyAxis, ...
-            NumComponents=nComp);
-        appData.eelsSVDResult = res;
-    end
-
-    function simDiffAPI(phase, za)
-    %SIMDIFFAPI  Programmatic diffraction simulation for given phase and zone axis.
-        edtZoneAxis.Value = sprintf('%d %d %d', za);
-        if ~isempty(appData.diffResults) && ~isempty(appData.diffResults.candidates)
-            appData.diffResults.candidates(1).phaseName = phase;
-            appData.diffWorkshop.model.setResults(appData.diffResults);
-        end
-        onDiffractionAction('simulate');
-    end
-
-    function vdfAPI(center, radius)
-    %VDFAPI  Programmatic virtual dark-field image from mask center and radius.
-        idx = appData.activeIdx;
-        if idx > 0 && idx <= numel(appData.images)
-            pixels = double(appData.images{idx}.metadata.parserSpecific.imageData.pixels);
-            vdf = imaging.virtualDarkField(pixels, 'MaskCenter', center, 'MaskRadius', radius);
-            imagesc(ax, vdf); colormap(ax, 'gray'); axis(ax, 'image');
-        end
-    end
-
-    function quantifyZAFAPI(t, angle)
-    %QUANTIFYZAFAPI  Programmatic ZAF quantification with given thickness and take-off angle.
-        edtEDSThickness.Value = num2str(t);
-        edtEDSTakeOff.Value   = num2str(angle);
-        onQuantifyZAF([], []);
-    end
-
-end
