@@ -102,6 +102,7 @@ function buildMenuBar(fig, cb)
     toolsMenu = uimenu(fig, 'Text', '&Tools');
     addItem(toolsMenu, 'Figure Properties...',    cb.onFigureProperties);
     addItem(toolsMenu, 'Quick Export...',         cb.onQuickExport);
+    addItem(toolsMenu, 'Export Preview...',       cb.onExportPreview);
     addItem(toolsMenu, 'Copy for Slides',         cb.onCopyForSlides,       'Accelerator','P');
     addItem(toolsMenu, 'FigDoc Templates...',    cb.onFigDocTemplates,    'Separator',true);
     addItem(toolsMenu, 'Plot Templates...',       cb.onPlotTemplates);
