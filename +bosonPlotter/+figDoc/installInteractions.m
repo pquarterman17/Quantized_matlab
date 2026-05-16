@@ -52,7 +52,9 @@ function installInteractions(ax, fig, appData, applyFcn, setStatusFcn)
         'MenuSelectedFcn', @(~,~) editTraceWidth_(ax, fig, appData, applyFcn));
     uimenu(traceMenu, 'Text', 'Marker...', ...
         'MenuSelectedFcn', @(~,~) editTraceMarker_(ax, fig, appData, applyFcn));
-    uimenu(traceMenu, 'Text', 'Move to Right Y-Axis', 'Separator', 'on', ...
+    uimenu(traceMenu, 'Text', 'Rename...', 'Separator', 'on', ...
+        'MenuSelectedFcn', @(~,~) renameTrace_(ax, fig, appData, applyFcn));
+    uimenu(traceMenu, 'Text', 'Move to Right Y-Axis', ...
         'MenuSelectedFcn', @(~,~) toggleTraceAxis_(ax, fig, appData, applyFcn, setStatusFcn));
     uimenu(traceMenu, 'Text', 'Edit All Styles...', ...
         'MenuSelectedFcn', @(~,~) bosonPlotter.figDoc.dispatchAction('traceStyles', fig, appData, false, ax, setStatusFcn));
@@ -314,6 +316,23 @@ function editTraceMarker_(ax, fig, appData, applyFcn)
     if ~ok, return; end
     model.pushUndo();
     model.setTraceStyle(idx, 'marker', markers{sel});
+    applyFcn();
+end
+
+% ═══════════════════════════════════════════════════════════════════════════
+function renameTrace_(ax, fig, appData, applyFcn)
+    model = getModel_(appData);
+    if isempty(model), return; end
+    [idx, ln] = pickTrace_(ax, fig);
+    if isempty(idx), return; end
+    curName = ln.DisplayName;
+    if isempty(curName), curName = sprintf('Trace %d', idx); end
+    answer = inputdlg({'Display name:'}, 'Rename Trace', [1 50], {curName});
+    if isempty(answer), return; end
+    newName = strtrim(answer{1});
+    if isempty(newName), return; end
+    model.pushUndo();
+    model.setTraceStyle(idx, 'displayName', newName);
     applyFcn();
 end
 
