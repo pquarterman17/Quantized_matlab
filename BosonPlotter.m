@@ -412,7 +412,7 @@ function varargout = BosonPlotter(options)
         'onWilliamsonHallPlot',@onWilliamsonHallPlot, 'onReflectivityFFT',@onReflectivityFFT, 'onFFTThickness',@onFFTThickness, ...
         'onRefineLattice',@onRefineLattice, 'onMatchPhases',@onMatchPhases, ...
         'onPoleFigure',@onPoleFigure, 'onDecomposeRSM',@onDecomposeRSM, 'onAdvAsymmetry',@onAdvAsymmetry, 'onShowAdvancedMenu',@onShowAdvancedMenu, ...
-        'onFigureProperties',@onFigureProperties, 'onQuickExport',@onQuickExport, 'onCopyForSlides',@onCopyForSlides, ...
+        'onFigureProperties',@onFigureProperties, 'onQuickExport',@onQuickExport, 'onCopyForSlides',@onCopyForSlides, 'onAnnotations',@onAnnotations, 'onTraceStyles',@onTraceStyles, ...
         'onPlotTemplates',@onPlotTemplates, 'onOpenPlotStyleDialog',@onOpenPlotStyleDialog, 'onAdvancedFigureBuilder',@onAdvancedFigureBuilder, ...
         'onComposeFigure',@onComposeFigure, 'onBatchFigureExport',@onBatchFigureExport, 'onPolarPlot',@onPolarPlot, ...
         'onToggleMacroRecord',@onToggleMacroRecord, 'onExportMacro',@onExportMacro, ...
@@ -5556,9 +5556,11 @@ function onSendToOrigin(~,~)
         bosonPlotter.saveFigure(appData, fig, ui, cb);
     end
 
-    function onFigureProperties(~,~), figDocDispatch_('properties'); end
-    function onQuickExport(~,~),      figDocDispatch_('export');     end
-    function onCopyForSlides(~,~),    figDocDispatch_('copy');       end
+    function onFigureProperties(~,~), figDocDispatch_('properties');  end
+    function onQuickExport(~,~),      figDocDispatch_('export');      end
+    function onCopyForSlides(~,~),    figDocDispatch_('copy');        end
+    function onAnnotations(~,~),      figDocDispatch_('annotations'); end
+    function onTraceStyles(~,~),     figDocDispatch_('traceStyles'); end
     function figDocDispatch_(action)
         overlayOn = numel(lbDatasets.Value) > 1 || iscell(lbDatasets.Value);
         bosonPlotter.figDoc.dispatchAction(action, fig, appData, overlayOn, ax, @setStatus);
@@ -6865,11 +6867,9 @@ function u = guiXUnit(meta)
     end
 end
 
-
 function s = guiLabel(name, unit)
     s = bosonPlotter.smartLabel(name, unit);
 end
-
 
 function ls = guiLineSpec(style)
     switch style

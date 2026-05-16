@@ -46,6 +46,7 @@ function buildMenuBar(fig, cb)
     addItem(editMenu, 'Unmask All',               cb.onUnmaskAll);
     addItem(editMenu, 'Edit Axis Labels...',      cb.onEditAxisLabelsMenu, 'Separator',true);
     addItem(editMenu, 'Edit Legend...',           cb.onOpenLegendEditor);
+    addItem(editMenu, 'Edit Trace Styles...',    cb.onTraceStyles);
     addItem(editMenu, 'Edit Column Mapping...',   cb.onEditColumnMapping);
 
     % ── &View ──────────────────────────────────────────────────────────
@@ -58,7 +59,8 @@ function buildMenuBar(fig, cb)
     addItem(viewMenu, 'Add Vertical Reference Line',   cb.onAddVRefLine);
     addItem(viewMenu, 'Clear Reference Lines',    cb.onClearRefLines);
     addItem(viewMenu, 'Clear Fit Overlays',       cb.onClearFitOverlays);
-    addItem(viewMenu, 'Add Inset...',             cb.onCreateInsetFromMenu, 'Separator',true);
+    addItem(viewMenu, 'Annotations...',            cb.onAnnotations,        'Separator',true);
+    addItem(viewMenu, 'Add Inset...',             cb.onCreateInsetFromMenu);
     addItem(viewMenu, 'Remove Inset',             cb.onRemoveInset);
     addItem(viewMenu, 'Customise Toolbar...',     cb.onCustomiseToolbar,   'Separator',true);
     addItem(viewMenu, 'Refresh / Re-plot',        cb.onPlot);

@@ -6,9 +6,10 @@ function dispatchAction(action, fig, appData, overlayOn, ax, setStatusFcn)
     if ~isfield(ds, 'figDoc') || isempty(ds.figDoc), return; end
     model = ds.figDoc;
 
+    applyFcn = @() bosonPlotter.figDoc.applyAfterRender(ax, appData.datasets, appData.activeIdx);
+
     switch action
         case 'properties'
-            applyFcn = @() bosonPlotter.figDoc.applyAfterRender(ax, appData.datasets, appData.activeIdx);
             bosonPlotter.figDoc.buildPropertiesPanel(fig, model, applyFcn);
         case 'export'
             bosonPlotter.figDoc.buildQuickExportDialog(fig, appData.datasets, ...
@@ -21,5 +22,9 @@ function dispatchAction(action, fig, appData, overlayOn, ax, setStatusFcn)
             catch ME
                 setStatusFcn(['Copy failed: ' ME.message]);
             end
+        case 'annotations'
+            bosonPlotter.figDoc.buildAnnotationDialog(fig, ax, model, applyFcn);
+        case 'traceStyles'
+            bosonPlotter.figDoc.buildTraceStyleDialog(fig, ax, model, applyFcn);
     end
 end
