@@ -2528,25 +2528,19 @@ function varargout = FermiViewer()
         try
             [files, folder] = uigetfile(filterSpec, 'Select Image File(s)', ...
                 startDir, 'MultiSelect', 'on');
-        catch ME
-            % uigetfile can fail on unreachable network paths or user interrupt
+        catch
             fig.Pointer = 'arrow';
             setStatus('File browser cancelled or failed.');
             return;
         end
 
-        if isequal(files, 0)
-            return;   % user cancelled
-        end
+        if isequal(files, 0), return; end
 
         appData.lastDir = folder;
 
-        % Normalize to cell array
         if ischar(files)
             files = {files};
         end
-
-        % Build full paths
         fpaths = cellfun(@(f) fullfile(folder, f), files, 'UniformOutput', false);
 
         try
@@ -2566,27 +2560,17 @@ function varargout = FermiViewer()
     %  CALLBACK: onRemoveImage — Remove selected image(s) from the list
     % ════════════════════════════════════════════════════════════════════
     function onRemoveImage(~, ~)
-        if isempty(appData.images)
-            return;
-        end
+        if isempty(appData.images), return; end
 
-        % Get selected indices from listbox
         selVals = lbImages.Value;
         if iscell(selVals)
             selIdx = [selVals{:}];
         else
             selIdx = selVals;
         end
-
-        % Filter out invalid indices (e.g., the placeholder 0)
         selIdx = selIdx(selIdx > 0 & selIdx <= numel(appData.images));
-        if isempty(selIdx)
-            return;
-        end
+        if isempty(selIdx), return; end
 
-        % Confirm multi-image removal — matches BosonPlotter's dataset-
-        % removal prompt so accidental Ctrl+A → Remove doesn't silently
-        % destroy work.
         if numel(selIdx) > 1
             answer = uiconfirm(fig, ...
                 sprintf('Remove %d selected images?', numel(selIdx)), ...
@@ -2595,16 +2579,14 @@ function varargout = FermiViewer()
             if strcmp(answer, 'Cancel'), return; end
         end
 
-        % Remove selected images (keep contrast-state cache in lockstep)
         appData.images(selIdx) = [];
         if numel(appData.imageContrastState) >= max(selIdx)
             appData.imageContrastState(selIdx) = [];
         end
         if appData.lastDisplayedIdx > 0 && any(selIdx == appData.lastDisplayedIdx)
-            appData.lastDisplayedIdx = 0;   % referenced image gone
+            appData.lastDisplayedIdx = 0;
         end
 
-        % Update active index
         if isempty(appData.images)
             appData.activeIdx = 0;
         elseif appData.activeIdx > numel(appData.images)
@@ -2616,12 +2598,11 @@ function varargout = FermiViewer()
             end
         end
 
-        % Exit compare mode if fewer than 2 images remain
         if numel(appData.images) < 2 && appData.compareMode
             btnCompare.Value = false;
             exitCompareMode();
         end
-        btnCompare.Enable = onOff(numel(appData.images) >= 2);
+        btnCompare.Enable    = onOff(numel(appData.images) >= 2);
         btnEDSToolbar.Enable = onOff(numel(appData.images) >= 1);
 
         rebuildImageList();
@@ -2709,66 +2690,13 @@ function varargout = FermiViewer()
     %  CALLBACK: onMouseMotion — Track mouse over axes, show pixel info
     % ════════════════════════════════════════════════════════════════════
     function onMouseMotion(~, ~)
-        % Panel resize border detection: skip during capture mode
-        if isempty(appData.captureMode) || strcmp(appData.captureMode, '')
-            dir = detectResizeBorder();
-            appData.panelResizeDir = dir;
-            if     ~isempty(dir) && startsWith(dir, 'v_'), fig.Pointer = 'left';
-            elseif ~isempty(dir) && startsWith(dir, 'h_'), fig.Pointer = 'top';
-            elseif appData.panMode,                        fig.Pointer = 'hand';
-            else
-                fig.Pointer = 'arrow';
-            end
-        end
-
-        % In compare mode, ax may not exist
-        if isempty(ax) || ~isvalid(ax)
-            return;
-        end
-        % If no image is loaded, nothing to show
-        if appData.activeIdx < 1 || isempty(appData.rawPixels)
-            lblStatusMouse.Text = '';
-            return;
-        end
-
-        [H, W] = size(appData.rawPixels);
-
-        % Get mouse position in data coordinates
-        cp = ax.CurrentPoint;
-        xData = cp(1, 1);
-        yData = cp(1, 2);
-
-        % Check if mouse is within axes limits
-        if xData < ax.XLim(1) || xData > ax.XLim(2) || ...
-           yData < ax.YLim(1) || yData > ax.YLim(2)
-            lblStatusMouse.Text = '';
-            return;
-        end
-
-        % Convert to nearest integer pixel coordinate
-        col = round(xData);
-        row = round(yData);
-
-        % Check if within image bounds
-        if col < 1 || col > W || row < 1 || row > H
-            lblStatusMouse.Text = '';
-            return;
-        end
-
-        % Read raw pixel intensity (before contrast adjustment)
-        intensity = appData.rawPixels(row, col);
-
-        % Format based on data type (integer vs float)
-        if intensity == floor(intensity) && abs(intensity) < 1e7
-            lblStatusMouse.Text = sprintf('(%d, %d) = %d', col, row, round(intensity));
-        else
-            lblStatusMouse.Text = sprintf('(%d, %d) = %.4g', col, row, intensity);
-        end
-
-        % Update pixel inspector if active
-        if cbPixelInspector.Value && ~isempty(hPixelInspector) && isvalid(hPixelInspector)
-            updatePixelInspector(col, row);
-        end
+        motionCtx = struct('fig', fig, 'ax', ax, ...
+            'lblStatusMouse', lblStatusMouse, ...
+            'cbPixelInspector', cbPixelInspector, ...
+            'hPixelInspector', hPixelInspector, ...
+            'detectResizeBorder', @detectResizeBorder, ...
+            'updatePixelInspector', @updatePixelInspector);
+        appData = emViewer.mouseHandlers('motion', appData, motionCtx);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4376,11 +4304,6 @@ function varargout = FermiViewer()
         lo = sldLow.Value;
         hi = sldHigh.Value;
 
-        % Called after filter / crop / rotate / undo changes to the
-        % filteredPixels buffer. Always rebuild displayPixels here because
-        % we can't cheaply detect value changes at same size (CLAHE, blur,
-        % morph, etc.). Contrast/gamma-only paths use refreshContrastOnly
-        % (cheaper — skips the rebuild).
         appData.displayPixels = [];
         prepareDisplayBuffer();
         dispImg = applyContrastPipeline(appData.displayPixels, lo, hi);
@@ -4388,24 +4311,16 @@ function varargout = FermiViewer()
         appData.displayImg = dispImg;
         appData.imgHandle.CData = dispImg;
 
-        % Only refresh the marker lines on contrast changes — rebuilding the
-        % full histogram bars is O(N) on raw pixels and was firing on every
-        % slider tick. updateHistogram() still runs on image-load paths.
         refreshHistogramMarkers();
 
-        % Update minimap if active
         if cbMinimap.Value && ~isempty(hMinimap) && isvalid(hMinimap)
             updateMinimapRect();
         end
 
-        % Update live FFT if active
         if ~isempty(appData.liveFFTFig) && isvalid(appData.liveFFTFig)
             updateLiveFFT();
         end
 
-        % Restore scale bar if checkbox is still ticked.  The bar
-        % position is stored in image-pixel coordinates so it must be
-        % rebuilt any time filteredPixels changes (filter, crop, undo).
         if ~isempty(cbScaleBar) && isvalid(cbScaleBar) && ...
                 strcmp(cbScaleBar.Enable, 'on') && cbScaleBar.Value
             rebuildScaleBar();
@@ -5868,31 +5783,24 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     function toggleSection(sect)
     %TOGGLESECTION  Collapse or expand a tools panel section.
-        % Map section name → header button handle
         switch sect.name
-            case 'Contrast',    hdr = btnContrastHeader;
-            case 'Histogram',   hdr = btnHistogramHeader;
-            case 'Measurement', hdr = btnMeasureHeader;
-            case 'Processing',  hdr = btnProcessHeader;
+            case 'Contrast',       hdr = btnContrastHeader;
+            case 'Histogram',      hdr = btnHistogramHeader;
+            case 'Measurement',    hdr = btnMeasureHeader;
+            case 'Processing',     hdr = btnProcessHeader;
             case 'Export & Style', hdr = btnExportHeader;
-            case 'Annotations',  hdr = btnAnnotHeader;
-            case 'EDS Channels', hdr = btnEDSHeader;
-            case 'EELS Spectrum', hdr = btnEELSHeader;
-            case 'Diffraction',  hdr = btnDiffHeader;
-            case 'Metadata',     hdr = btnMetaHeader;
+            case 'Annotations',    hdr = btnAnnotHeader;
+            case 'EDS Channels',   hdr = btnEDSHeader;
+            case 'EELS Spectrum',  hdr = btnEELSHeader;
+            case 'Diffraction',    hdr = btnDiffHeader;
+            case 'Metadata',       hdr = btnMetaHeader;
             otherwise, return;
         end
-
         currentH = toolsGL.RowHeight{sect.panelRow};
         if currentH == 0
-            % Expand to the section's full open height. toolsPanel has
-            % Scrollable='on', so overflow beyond the visible panel
-            % scrolls — capping the section would silently clip its
-            % inner grid and hide controls (e.g. the Line color row).
             toolsGL.RowHeight{sect.panelRow} = sect.openHeight;
             hdr.Text = [ARROW_OPEN ' ' sect.name];
         else
-            % Collapse
             toolsGL.RowHeight{sect.panelRow} = 0;
             hdr.Text = [ARROW_SHUT ' ' sect.name];
         end
@@ -5938,56 +5846,10 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     function onAxesMouseDown(~, ~)
     %ONAXESMOUSEDOWN  Image-axes ButtonDownFcn: box-zoom, pan, or double-click reset.
-        if ~isempty(appData.captureMode), return; end
-        if appData.compareMode, return; end
-        if isempty(appData.imgHandle) || ~isvalid(appData.imgHandle), return; end
-
-        selType = fig.SelectionType;
-        if strcmp(selType, 'alt'), return; end
-
-        % Manual double-click detection — uifigure on macOS does not always
-        % upgrade SelectionType to 'open' for rapid successive clicks.
-        nowTick = tic;
-        isDouble = strcmp(selType, 'open');
-        if ~isDouble && appData.lastClickTick > 0
-            if toc(appData.lastClickTick) < 0.35
-                isDouble = true;
-            end
-        end
-        appData.lastClickTick = nowTick;
-
-        if isDouble
-            cdata = appData.imgHandle.CData;
-            H = size(cdata, 1); W = size(cdata, 2);
-            if H > 0 && W > 0
-                ax.XLim = [0.5, W + 0.5];
-                ax.YLim = [0.5, H + 0.5];
-            end
-            return;
-        end
-
-        % Determine drag action: middle-click always pans, panMode left-click
-        % pans, otherwise zoom/marquee as before.
-        wantPan = strcmp(selType, 'extend') || ...
-                  (appData.panMode && strcmp(selType, 'normal'));
-
-        cp = ax.CurrentPoint;
-        appData.prevMotionFcn = fig.WindowButtonMotionFcn;
-        appData.prevUpFcn     = fig.WindowButtonUpFcn;
-
-        if wantPan
-            appData.dragAction   = 'pan';
-            appData.panStartXY   = cp(1, 1:2);
-            appData.panStartLims = struct('XLim', ax.XLim, 'YLim', ax.YLim);
-            fig.Pointer = 'hand';
-        else
-            appData.dragAction   = 'zoomMarquee';
-            appData.zoomStartXY  = cp(1, 1:2);
-            appData.zoomRect     = [];
-        end
-
-        fig.WindowButtonMotionFcn = @onBoxZoomDrag;
-        fig.WindowButtonUpFcn     = @onBoxZoomRelease;
+        axesCtx = struct('fig', fig, 'ax', ax, ...
+            'onBoxZoomDrag', @onBoxZoomDrag, ...
+            'onBoxZoomRelease', @onBoxZoomRelease);
+        appData = emViewer.mouseHandlers('axesdown', appData, axesCtx);
     end
 
     function onBoxZoomDrag(~, ~)
@@ -6092,16 +5954,17 @@ function varargout = FermiViewer()
             'MenuSelectedFcn', @(~,~) onZoomFit([], []));
         uimenu(cmImage, 'Text', 'Zoom 1:1 (Actual Size)', ...
             'MenuSelectedFcn', @(~,~) onZoomActual([], []));
-        uimenu(cmImage, 'Text', 'Zoom Out (2×)', ...
+        uimenu(cmImage, 'Text', 'Zoom Out (2x)', ...
             'MenuSelectedFcn', @(~,~) onZoomOut([], []));
-        uimenu(cmImage, 'Text', 'Zoom to Dimensions…', ...
+        uimenu(cmImage, 'Text', 'Zoom to Dimensions...', ...
             'MenuSelectedFcn', @(~,~) onZoomBox([], [], 'dims'));
         uimenu(cmImage, 'Text', 'Toggle Pan Mode', ...
-            'MenuSelectedFcn', @(~,~) onDragModeToggle(struct('Value', ~appData.panMode), [], 'pan'));
+            'MenuSelectedFcn', @(~,~) onDragModeToggle( ...
+                struct('Value', ~appData.panMode), [], 'pan'));
         uimenu(cmImage, 'Text', 'Copy to Clipboard', ...
             'Separator', 'on', ...
             'MenuSelectedFcn', @(~,~) onExportAction('copyClipboard'));
-        uimenu(cmImage, 'Text', 'Save Image As…', ...
+        uimenu(cmImage, 'Text', 'Save Image As...', ...
             'MenuSelectedFcn', @(~,~) onExportAction('saveImage'));
         uimenu(cmImage, 'Text', 'Toggle Scale Bar', ...
             'Separator', 'on', ...
@@ -6112,13 +5975,13 @@ function varargout = FermiViewer()
         if ~isempty(ax) && isvalid(ax)
             ax.ContextMenu = cmImage;
         end
-        attachImageContextMenu();   % also attach to the current image HG object
+        attachImageContextMenu();
 
         % --- Thumbnail list menu ---------------------------------------------
         cmList = uicontextmenu(fig);
-        uimenu(cmList, 'Text', 'Open…', ...
+        uimenu(cmList, 'Text', 'Open...', ...
             'MenuSelectedFcn', @(~,~) onOpenFiles([], []));
-        uimenu(cmList, 'Text', 'Rename Selected…', ...
+        uimenu(cmList, 'Text', 'Rename Selected...', ...
             'MenuSelectedFcn', @(~,~) onRenameSelected([], []));
         uimenu(cmList, 'Text', 'Remove Selected', ...
             'Separator', 'on', ...
@@ -8671,77 +8534,10 @@ function varargout = FermiViewer()
     %  HELPER: deleteSelectedMeasurement — Remove selected overlay
     % ════════════════════════════════════════════════════════════════════
     function deleteSelectedMeasurement()
-        idx = appData.selectedMeasIdx;
-        if idx < 1 || idx > numel(appData.overlays.measurements)
-            return;
-        end
-
-        meas = appData.overlays.measurements{idx};
-
-        % Delete graphics objects. Different types own different handle
-        % sets, so dispatch on type. Each branch tolerates missing or
-        % already-deleted handles via empty/isvalid checks.
-        if isfield(meas, 'type') && strcmp(meas.type, 'rectROI')
-            if isfield(meas, 'hRect') && isvalid(meas.hRect), delete(meas.hRect); end
-        elseif isfield(meas, 'type') && strcmp(meas.type, 'polyline')
-            if isfield(meas, 'hLines')
-                for h = meas.hLines(:)'
-                    if isvalid(h), delete(h); end
-                end
-            end
-            if isfield(meas, 'hMarkers')
-                for h = meas.hMarkers(:)'
-                    if isvalid(h), delete(h); end
-                end
-            end
-            if isfield(meas, 'hText') && ~isempty(meas.hText) && isvalid(meas.hText)
-                delete(meas.hText);
-            end
-        else
-            if isfield(meas, 'hLine') && isvalid(meas.hLine), delete(meas.hLine); end
-            if isfield(meas, 'hP1')   && ~isempty(meas.hP1)   && isvalid(meas.hP1),   delete(meas.hP1);   end
-            if isfield(meas, 'hP2')   && ~isempty(meas.hP2)   && isvalid(meas.hP2),   delete(meas.hP2);   end
-            if isfield(meas, 'hText') && ~isempty(meas.hText) && isvalid(meas.hText)
-                delete(meas.hText);
-            end
-        end
-
-        % Remove from list
-        appData.overlays.measurements(idx) = [];
-        appData.measWorkshop.sync(appData.overlays.measurements);
-
-        % Re-bind drag + selection callbacks with updated indices. Only
-        % legacy line-segment measurements use startEndpointDrag; rectROI
-        % and polyline have no drag handles yet.
-        for mi = 1:numel(appData.overlays.measurements)
-            m = appData.overlays.measurements{mi};
-            if isfield(m, 'hP1') && ~isempty(m.hP1) && isvalid(m.hP1)
-                m.hP1.ButtonDownFcn = @(~,~) startEndpointDrag(mi, 1);
-            end
-            if isfield(m, 'hP2') && ~isempty(m.hP2) && isvalid(m.hP2)
-                m.hP2.ButtonDownFcn = @(~,~) startEndpointDrag(mi, 2);
-            end
-            if isfield(m, 'hLine') && isvalid(m.hLine)
-                m.hLine.ButtonDownFcn = @(~,~) selectMeasurement(mi);
-            end
-            if isfield(m, 'type') && strcmp(m.type, 'polyline') && isfield(m, 'hLines')
-                for h = m.hLines(:)'
-                    if isvalid(h), h.ButtonDownFcn = @(~,~) selectMeasurement(mi); end
-                end
-            end
-        end
-
-        appData.selectedMeasIdx = 0;
-        % Keep the multi-select array consistent under the index shift:
-        % drop the deleted index and decrement any indices above it.
-        if ~isempty(appData.selectedMeasIndices)
-            keep = appData.selectedMeasIndices ~= idx;
-            appData.selectedMeasIndices = appData.selectedMeasIndices(keep);
-            shift = appData.selectedMeasIndices > idx;
-            appData.selectedMeasIndices(shift) = ...
-                appData.selectedMeasIndices(shift) - 1;
-        end
-        setStatus(sprintf('Deleted %s measurement', meas.type));
+        ctx = struct('setStatus', @setStatus, ...
+            'startEndpointDrag', @startEndpointDrag, ...
+            'selectMeasurement', @selectMeasurement);
+        appData = emViewer.overlayOps('deleteSelected', appData, ctx);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -9621,77 +9417,11 @@ function varargout = FermiViewer()
 
     function renameBatch(idxs)
     %RENAMEBATCH  Rename files on disk with baseName_001, _002, ... pattern.
-        if isempty(appData.images)
-            setStatus('No images loaded.'); return;
-        end
-
-        baseName = strtrim(efRenameBase.Value);
-        if isempty(baseName)
-            setStatus('Enter a base name before renaming.');
-            return;
-        end
-
-        % Confirm with user
-        msg = sprintf('Rename %d file(s) on disk to %s_001, _002, ...?\nThis cannot be undone.', ...
-            numel(idxs), baseName);
-        answer = uiconfirm(fig, msg, 'Confirm Batch Rename', ...
-            'Options', {'Rename', 'Cancel'}, 'DefaultOption', 2, 'CancelOption', 2);
-        if ~strcmp(answer, 'Rename'), return; end
-
-        fig.Pointer = 'watch'; drawnow;
-        nRenamed = 0;
-        for ri = 1:numel(idxs)
-            ki = idxs(ri);
-            try
-                srcPath = appData.images{ki}.metadata.source;
-                [srcDir, ~, srcExt] = fileparts(srcPath);
-                newName = sprintf('%s_%03d%s', baseName, ri, srcExt);
-                newPath = fullfile(srcDir, newName);
-
-                if ~strcmp(srcPath, newPath)
-                    if isfile(newPath)
-                        warning('FermiViewer:rename', ...
-                            'Skipped %s: target %s already exists.', srcPath, newName);
-                        continue;
-                    end
-                    movefile(srcPath, newPath);
-                    appData.images{ki}.metadata.source = newPath;
-                    nRenamed = nRenamed + 1;
-                end
-            catch ME
-                warning('FermiViewer:rename', 'Failed to rename %s: %s', ...
-                    srcPath, ME.message);
-            end
-        end
-
-        % Update listbox display
-        refreshImageList();
-        fig.Pointer = 'arrow';
-        setStatus(sprintf('Renamed %d / %d files with base "%s".', ...
-            nRenamed, numel(idxs), baseName));
+        ctx = struct('fig', fig, 'efRenameBase', efRenameBase, ...
+            'lbImages', lbImages, 'setStatus', @setStatus);
+        appData = emViewer.sessionOps('renameBatch', appData, ctx, idxs);
     end
 
-    function refreshImageList()
-    %REFRESHIMAGELIST  Rebuild listbox items from current appData.images.
-        if isempty(appData.images)
-            lbImages.Items = {'(no images loaded)'};
-            lbImages.ItemsData = {0};
-            return;
-        end
-        names = cell(1, numel(appData.images));
-        data  = cell(1, numel(appData.images));
-        for ri = 1:numel(appData.images)
-            [~, nm, ex] = fileparts(appData.images{ri}.metadata.source);
-            names{ri} = [nm ex];
-            data{ri}  = ri;
-        end
-        lbImages.Items = names;
-        lbImages.ItemsData = data;
-        % Restore selection to current active
-        if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
-            lbImages.Value = {appData.activeIdx};
-        end
-    end
 
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onEditMetadata — Open Metadata Editor for active image
@@ -9868,48 +9598,16 @@ function varargout = FermiViewer()
         updateHistogram();
     end
 
-    % ════════════════════════════════════════════════════════════════════
-    %  HELPER: saveRecentFiles — Persist recent file list to MAT
-    % ════════════════════════════════════════════════════════════════════
-    function saveRecentFiles()
-        try
-            recentFiles = appData.recentFiles;
-            save(recentFilePath, 'recentFiles');
-        catch
-            % Ignore save errors
-        end
-    end
-
     function addToRecentFiles(fp)
     %ADDTORECENTFILES  Add a file path to the recent files list (deduplicated).
-        fp = char(fp);
-        % Remove if already present
-        appData.recentFiles(strcmp(appData.recentFiles, fp)) = [];
-        % Prepend
-        appData.recentFiles = [{fp}, appData.recentFiles];
-        % Cap at 10
-        if numel(appData.recentFiles) > 10
-            appData.recentFiles = appData.recentFiles(1:10);
-        end
-        saveRecentFiles();
-        updateRecentDropdown();
+        ctx = struct('filePath', fp, 'recentFilePath', recentFilePath, 'ddRecent', ddRecent);
+        appData = emViewer.sessionOps('addRecent', appData, ctx);
     end
 
     function updateRecentDropdown()
     %UPDATERECENTDROPDOWN  Refresh the Recent dropdown in the toolbar.
-        if isempty(appData.recentFiles)
-            ddRecent.Items = {'(recent files)'};
-            ddRecent.Value = '(recent files)';
-        else
-            shortNames = cell(size(appData.recentFiles));
-            for ri = 1:numel(appData.recentFiles)
-                [~, fn, fe] = fileparts(appData.recentFiles{ri});
-                shortNames{ri} = [fn fe];
-            end
-            ddRecent.Items     = shortNames;
-            ddRecent.ItemsData = appData.recentFiles;
-            ddRecent.Value     = appData.recentFiles{1};
-        end
+        ctx = struct('ddRecent', ddRecent);
+        appData = emViewer.sessionOps('updateDropdown', appData, ctx);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -10002,7 +9700,6 @@ function varargout = FermiViewer()
         defName = 'emviewer_session.mat';
         startPath = appData.lastDir;
         if isempty(startPath) || ~isfolder(startPath), startPath = pwd; end
-
         [fn, fp] = uiputfile({'*.mat', 'Session File (*.mat)'}, ...
             'Save Session', fullfile(startPath, defName));
         if isequal(fn, 0), return; end
@@ -10010,26 +9707,12 @@ function varargout = FermiViewer()
     end
 
     function sessionSaveAPI(outPath)
-        fig.Pointer = 'watch'; drawnow;
-        try
-            session.images     = appData.images;
-            session.activeIdx  = appData.activeIdx;
-            session.gamma      = appData.gamma;
-            session.roiList    = appData.roiList;
-            session.measureLog = appData.measurementLog;
-            session.contrastLow  = sldLow.Value;
-            session.contrastHigh = sldHigh.Value;
-            session.colormap     = ddColormap.Value;
-            session.prefs        = appData.prefs;
-            session.edsChannels  = appData.edsChannels;
-            save(outPath, 'session', '-v7.3');
-            appData.sessionFile = outPath;
-            setStatus(sprintf('Session saved: %s', outPath));
-        catch ME
-            uialert(fig, sprintf('Save failed:\n%s', ME.message), ...
-                'Session Error', 'Icon', 'error');
-        end
-        fig.Pointer = 'arrow';
+        ctx = struct('fig', fig, ...
+            'sldLow', sldLow, 'sldHigh', sldHigh, ...
+            'ddColormap', ddColormap, ...
+            'setStatus', @setStatus, ...
+            'outPath', outPath);
+        appData = emViewer.sessionOps('saveToPath', appData, ctx);
     end
 
     function onSessionLoad(~, ~)
@@ -10052,7 +9735,6 @@ function varargout = FermiViewer()
             s = tmp.session;
             appData.images        = s.images;
             appData.activeIdx     = s.activeIdx;
-            % Reset contrast-state cache to match restored image list
             appData.imageContrastState = cell(1, numel(appData.images));
             appData.lastDisplayedIdx   = 0;
             if isfield(s, 'gamma')
@@ -10060,7 +9742,7 @@ function varargout = FermiViewer()
                 sldGamma.Value = s.gamma;
                 efGamma.Value = s.gamma;
             end
-            if isfield(s, 'roiList'), appData.roiList = s.roiList; end
+            if isfield(s, 'roiList'),    appData.roiList = s.roiList; end
             if isfield(s, 'measureLog'), appData.measurementLog = s.measureLog; end
             if isfield(s, 'edsChannels'), appData.edsChannels = s.edsChannels; end
             if isfield(s, 'colormap') && ismember(s.colormap, ddColormap.Items)
@@ -10086,7 +9768,8 @@ function varargout = FermiViewer()
                 end
             end
             appData.sessionFile = inPath;
-            setStatus(sprintf('Session loaded: %d images from %s', numel(appData.images), inPath));
+            setStatus(sprintf('Session loaded: %d images from %s', ...
+                numel(appData.images), inPath));
         catch ME
             uialert(fig, sprintf('Load failed:\n%s', ME.message), ...
                 'Session Error', 'Icon', 'error');
@@ -11765,72 +11448,14 @@ function varargout = FermiViewer()
 
     function onAssignElements(~, ~)
     %ONASSIGNELEMENTS  Assign element symbols to loaded EDS channels.
-        if ~appData.edsMode || isempty(appData.edsChannels), return; end
-
-        nCh      = numel(appData.edsChannels);
-        elements = cell(1, nCh);
-
-        % Auto-detect element symbol from channel label (e.g. "Fe_Ka" → "Fe")
-        for k = 1:nCh
-            lbl = appData.edsChannels{k}.label;
-            tok = regexp(lbl, '^([A-Z][a-z]?)', 'tokens', 'once');
-            if ~isempty(tok)
-                elements{k} = tok{1};
-            else
-                elements{k} = sprintf('El%d', k);
-            end
-        end
-
-        % Ask user to confirm / override
-        prompt   = cell(1, nCh);
-        defaults = cell(1, nCh);
-        for k = 1:nCh
-            prompt{k}   = sprintf('Channel %d (%s):', k, appData.edsChannels{k}.label);
-            defaults{k} = elements{k};
-        end
-
-        answer = inputdlg(prompt, 'Assign Elements', 1, defaults);
-        if isempty(answer), return; end
-
-        appData.edsElements = answer';
-        setStatus(sprintf('Elements assigned: %s', strjoin(appData.edsElements, ', ')));
+        ctx = struct('setStatus', @setStatus);
+        appData = emViewer.overlayOps('assignElements', appData, ctx);
     end
 
     function onQuantifyCL(~, ~)
     %ONQUANTIFYCL  Quantify EDS composition using the Cliff-Lorimer method.
-        if ~appData.edsMode || isempty(appData.edsChannels)
-            return;
-        end
-        if isempty(appData.edsElements)
-            setStatus('Assign elements first');
-            return;
-        end
-
-        nCh  = numel(appData.edsChannels);
-        maps = cell(1, nCh);
-        for k = 1:nCh
-            chIdx  = appData.edsChannels{k}.imageIdx;
-            maps{k} = double(appData.images{chIdx}.metadata.parserSpecific.imageData.pixels);
-        end
-
-        try
-            result = imaging.cliffLorimer(maps, appData.edsElements);
-        catch ME
-            setStatus(['Cliff-Lorimer error: ' ME.message]);
-            return;
-        end
-
-        appData.edsAtomicPct  = result.atomicPctMaps;
-        appData.edsWeightPct  = result.weightPctMaps;
-        appData.edsQuantified = true;
-
-        % Build summary status string
-        msg = 'Composition (at%): ';
-        for k = 1:nCh
-            msg = [msg sprintf('%s=%.1f%% ', appData.edsElements{k}, result.meanAtomicPct(k))]; %#ok<AGROW>
-        end
-        setStatus(msg);
-        appData.edsWorkshop.sync(appData);
+        ctx = struct('setStatus', @setStatus);
+        appData = emViewer.overlayOps('quantifyCL', appData, ctx);
     end
 
     function onCompositionProfile(~, ~)
@@ -11866,32 +11491,10 @@ function varargout = FermiViewer()
 
     function onQuantifyZAF(~, ~)
     %ONQUANTIFYZAF  ZAF-corrected EDS quantification for thick specimens.
-        if ~appData.edsMode || isempty(appData.edsChannels), return; end
-        if isempty(appData.edsElements), setStatus('Assign elements first'); return; end
-        nCh = numel(appData.edsChannels);
-        maps = cell(1, nCh);
-        for k = 1:nCh
-            chIdx = appData.edsChannels{k}.imageIdx;
-            maps{k} = double(appData.images{chIdx}.metadata.parserSpecific.imageData.pixels);
-        end
-        thickness = str2double(edtEDSThickness.Value);
-        takeoff   = str2double(edtEDSTakeOff.Value);
-        if isnan(thickness), thickness = 100; end
-        if isnan(takeoff),   takeoff   = 20;  end
-        try
-            result = imaging.zafCorrection(maps, appData.edsElements, ...
-                'Thickness', thickness, 'TakeOffAngle', takeoff);
-            appData.edsAtomicPct  = result.atomicPctMaps;
-            appData.edsWeightPct  = result.weightPctMaps;
-            appData.edsQuantified = true;
-            msg = 'ZAF (at%): ';
-            for k = 1:nCh
-                msg = [msg sprintf('%s=%.1f%% ', appData.edsElements{k}, result.meanAtomicPct(k))]; %#ok<AGROW>
-            end
-            setStatus(msg);
-        catch ME
-            setStatus(sprintf('ZAF failed: %s', ME.message));
-        end
+        ctx = struct('setStatus', @setStatus, ...
+            'edtEDSThickness', edtEDSThickness, ...
+            'edtEDSTakeOff', edtEDSTakeOff);
+        appData = emViewer.overlayOps('quantifyZAF', appData, ctx);
     end
 
     % ════════════════════════════════════════════════════════════════════
