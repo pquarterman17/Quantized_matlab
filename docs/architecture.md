@@ -18,8 +18,8 @@
     └──────┬──────┘  └─────┬──────┘  └──────┬──────┘
            │               │               │
     ┌──────▼──────┐  ┌─────▼──────┐  ┌──────▼──────┐
-    │ +bosonPlotter│  │  +imaging/  │  │   +calc/    │
-    │ (extracted) │  │             │  │             │
+    │ +bosonPlotter│  │ +emViewer/  │  │   +calc/    │
+    │ (extracted) │  │ (extracted) │  │             │
     └──────┬──────┘  └─────┬──────┘  └──────┬──────┘
            │               │               │
     ┌──────▼──────────────▼────────────────▼──────┐
@@ -250,6 +250,50 @@ imagesc(ax, displayImg) ← rendered to axes
 - **Capture modes**: `appData.captureMode` gates mouse click behavior.
 - **FFT masking**: Uses `ButtonDownFcn` on axes, not `ginput()`.
 
+## Extracted Subsystems (+emViewer/)
+
+FermiViewer's logic is extracted to `+emViewer/` (47 files). The orchestrator
+builds context structs and delegates; package functions return modified appData.
+
+```
+FermiViewer.m (6,082 lines — orchestrator + closure state)
+    │
+    ├── ctx = struct(fig, ax, sliders, callbacks...)
+    │
+    └── appData = emViewer.<module>(action, appData, ctx, ...)
+```
+
+### Accept-and-return pattern (closure mutation fix)
+
+MATLAB structs are value-type: extracted functions hold local copies. Callbacks
+that modify appData in the closure (rebuildScaleBar, refreshDisplay) must accept
+and return appData so the caller's copy stays current:
+
+```matlab
+% WRONG — closure's scale bar updates lost when filterOps returns its stale copy
+cb.refreshDisplay();
+
+% CORRECT — state flows back through the return value
+appData = cb.refreshDisplay(appData);
+```
+
+For `displayImage.m`, the `closureReturn_` bridge provides:
+- `pushAppData(appData)` — write local state TO closure before callbacks fire
+- `pullAppData()` — read closure state back after callbacks modify it
+
+### Module groups (see `+emViewer/README.md` for full index)
+
+| Area | Key modules |
+|------|-------------|
+| Display | `displayImage`, `displayHelpers`, `displayStackFrame`, `clearDisplay` |
+| Processing | `filterOps`, `processActions`, `rotateFlip`, `contrastOps` |
+| Interaction | `mouseOps`, `measInteract`, `measExecute`, `captureDispatch` |
+| UI build | `buildToolbar`, `buildContrastPanel`, `buildEDSPanel`, `buildEELSPanel` |
+| Scale bar | `scaleBarOps`, `applyScaleBarPos`, `snapScaleBarPos` |
+| Session | `sessionOps`, `onKeyPress`, `export` |
+| Compare | `compareImage`, `compareDispatch` |
+| Domain | `onDiffractionAction`, `onAnnotationAction`, `applyColorChannel` |
+
 ## Testing Architecture
 
 Tests are organized into subdirectories under `tests/`:
@@ -276,7 +320,8 @@ tests/
 +calc/ ← standalone
 +scripts/ ← depends on +parser/, +utilities/
 +bosonPlotter/ ← depends on +parser/, +utilities/
++emViewer/ ← depends on +imaging/, +parser/
 BosonPlotter.m ← depends on all packages
-FermiViewer.m ← depends on +parser/, +imaging/
+FermiViewer.m ← depends on +emViewer/, +parser/, +imaging/
 DiraCulator.m ← depends on +calc/
 ```

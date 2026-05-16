@@ -30,6 +30,7 @@ quantized_matlab/
 ├── +scripts/                 # Batch workflows (see +scripts/README.md)
 ├── +fitting/                 # General curve fitting engine, model library, equation parser
 ├── +bosonPlotter/             # Extracted BosonPlotter subsystems
+├── +emViewer/                 # Extracted FermiViewer subsystems (see +emViewer/README.md)
 ├── +dataWorkspace/            # DataWorkspace model, formula engine, autosave (see +dataWorkspace/README.md)
 ├── DataWorkspace.m            # Standalone spreadsheet GUI (shares WorkspaceModel with BosonPlotter)
 ├── docs/                     # Detailed feature documentation
@@ -136,6 +137,7 @@ Feature-level docs are in separate files to keep this context compact:
 | Architecture, data flow, state management | [docs/architecture.md](docs/architecture.md) |
 | Parser formats and dispatch | [+parser/README.md](+parser/README.md) |
 | Imaging utilities | [+imaging/README.md](+imaging/README.md) |
+| FermiViewer extracted subsystems | [+emViewer/README.md](+emViewer/README.md) |
 | Calculator modules | [+calc/README.md](+calc/README.md) |
 | Data processing utilities | [+utilities/README.md](+utilities/README.md) |
 | Batch scripts | [+scripts/README.md](+scripts/README.md) |
@@ -189,7 +191,7 @@ MASTERPLAN W5 #68 (BosonPlotter) and #69 (FermiViewer) target each file under **
 - **Never add doubly-nested functions** (8-space indent) to either file — see `matlab-gui-complexity.md` for why (parser-slot cost and worse refactorability).
 - **Enforcement:**
   - `tests/gui/test_bosonPlotterSize.m` — `BosonPlotter.m <= 7,665 lines` and nested-fn total `<= 290`. Current baseline: 7,661 lines / 280 nested fns (2026-05-04).
-  - `tests/imaging/test_fermiViewerSize.m` — `FermiViewer.m <= 11,960 lines` and nested-fn total `<= 320` (doubly-nested `<= 10`). Current baseline: ~11,936 lines / 319 nested fns (2026-05-10). Runs via `runAllTests(Group="emgui")`. **Ceiling is never raised — extract to `+emViewer/` to make room.**
+  - `tests/imaging/test_fermiViewerSize.m` — `FermiViewer.m <= 6,100 lines` and nested-fn total `<= 330` (doubly-nested `<= 6`). Current baseline: 6,082 lines / 324+6=330 nested fns (2026-05-16). Runs via `runAllTests(Group="emgui")`. **Ceiling is never raised — extract to `+emViewer/` to make room.**
   - **Ratchet the ceiling downward** as extractions lower the baseline; never raise it to accept growth.
 
 `DiraCulator.m` does not yet have a size ratchet — apply the same pattern if it grows unchecked.
