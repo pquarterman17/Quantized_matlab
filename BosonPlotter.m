@@ -412,6 +412,7 @@ function varargout = BosonPlotter(options)
         'onWilliamsonHallPlot',@onWilliamsonHallPlot, 'onReflectivityFFT',@onReflectivityFFT, 'onFFTThickness',@onFFTThickness, ...
         'onRefineLattice',@onRefineLattice, 'onMatchPhases',@onMatchPhases, ...
         'onPoleFigure',@onPoleFigure, 'onDecomposeRSM',@onDecomposeRSM, 'onAdvAsymmetry',@onAdvAsymmetry, 'onShowAdvancedMenu',@onShowAdvancedMenu, ...
+        'onFigureProperties',@onFigureProperties, 'onQuickExport',@onQuickExport, 'onCopyForSlides',@onCopyForSlides, ...
         'onPlotTemplates',@onPlotTemplates, 'onOpenPlotStyleDialog',@onOpenPlotStyleDialog, 'onAdvancedFigureBuilder',@onAdvancedFigureBuilder, ...
         'onComposeFigure',@onComposeFigure, 'onBatchFigureExport',@onBatchFigureExport, 'onPolarPlot',@onPolarPlot, ...
         'onToggleMacroRecord',@onToggleMacroRecord, 'onExportMacro',@onExportMacro, ...
@@ -4494,7 +4495,6 @@ function onSendToOrigin(~,~)
 
     % ── Plot callbacks ────────────────────────────────────────────────────
 
-
     function onPlot(~,~)
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
         y2IsActive = ~all(strcmp(ensureCell(lbY2.Value), '(none)'));
@@ -4708,7 +4708,6 @@ function onSendToOrigin(~,~)
         bosonPlotter.figDoc.capture(ax, appData.datasets, appData.activeIdx);
     end
 
-
     function appearance = resolveActiveAppearance()
     %RESOLVEACTIVEAPPEARANCE  Build the effective visual style struct.
     %   Layers: styles.template(name) → appData.styleOverrides.  Per-
@@ -4742,7 +4741,6 @@ function onSendToOrigin(~,~)
 
         appearance = bosonPlotter.resolveStyle(tpl, appData.styleOverrides);
     end
-
 
     function onToggleSinglePrecision()
     %ONTOGGLESINGLEPREC  Convert 2D intensity matrix between single/double.
@@ -5556,6 +5554,14 @@ function onSendToOrigin(~,~)
         cb.drawToAxes  = @drawToAxes;
         cb.logGUIError = @logGUIError;
         bosonPlotter.saveFigure(appData, fig, ui, cb);
+    end
+
+    function onFigureProperties(~,~), figDocDispatch_('properties'); end
+    function onQuickExport(~,~),      figDocDispatch_('export');     end
+    function onCopyForSlides(~,~),    figDocDispatch_('copy');       end
+    function figDocDispatch_(action)
+        overlayOn = numel(lbDatasets.Value) > 1 || iscell(lbDatasets.Value);
+        bosonPlotter.figDoc.dispatchAction(action, fig, appData, overlayOn, ax, @setStatus);
     end
 
     % ── Session save / load ───────────────────────────────────────────────
@@ -6620,7 +6626,6 @@ function onSendToOrigin(~,~)
 
 end  % BosonPlotter
 
-
 % ════════════════════════════════════════════════════════════════════════
 %  Module-level helpers  (stateless — no access to GUI handles)
 % ════════════════════════════════════════════════════════════════════════
@@ -6741,7 +6746,6 @@ function ds = buildDs(fp, data, parserName)
     ds.figDoc          = bosonPlotter.figDoc.defaults();  % persistent plot document model
 end
 
-
 function [data, parserName] = guiImport(fp)
 %GUIIMPORT  Dispatch to the correct parser and return both data and parser name.
 %   Uses centralized resolveParser for extension→parser mapping.
@@ -6845,7 +6849,6 @@ function ext = extractFileExt(fp)
     ext = lower(ext);
 end
 
-
 function name = guiXName(meta)
     if isfield(meta,'xColumnName') && ~isempty(meta.xColumnName)
         name = meta.xColumnName;
@@ -6853,7 +6856,6 @@ function name = guiXName(meta)
         name = 'X';
     end
 end
-
 
 function u = guiXUnit(meta)
     if isfield(meta,'xColumnUnit') && ~isempty(meta.xColumnUnit)
