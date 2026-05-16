@@ -126,7 +126,16 @@ classdef sessionManager
         %       appData  — bosonPlotter.AppState handle (datasets read from here)
         %       guiState — struct produced by collectGuiState()
 
-            savedDatasets  = appData.datasets;  %#ok<NASGU>
+            % Snapshot figDoc handle objects → plain structs for serialization
+            dsSave = appData.datasets;
+            for dsi_ = 1:numel(dsSave)
+                if isfield(dsSave{dsi_}, 'figDoc') && ~isempty(dsSave{dsi_}.figDoc) ...
+                        && isa(dsSave{dsi_}.figDoc, 'bosonPlotter.figDoc.FigDocModel')
+                    dsSave{dsi_}.figDocSnap = dsSave{dsi_}.figDoc.snapshot();
+                    dsSave{dsi_}.figDoc = [];
+                end
+            end
+            savedDatasets  = dsSave;  %#ok<NASGU>
             savedActiveIdx = appData.activeIdx; %#ok<NASGU>
             savedBgFile    = appData.bgFile;    %#ok<NASGU>
             savedBgDataset = appData.bgDataset; %#ok<NASGU>
@@ -240,6 +249,18 @@ classdef sessionManager
             end
             datasets = patchedDatasets;
 
+            % ── Restore figDoc handle objects from snapshots ─────────────
+            for di = 1:numel(datasets)
+                if isfield(datasets{di}, 'figDocSnap') && ~isempty(datasets{di}.figDocSnap)
+                    fdm = bosonPlotter.figDoc.FigDocModel();
+                    fdm.restore(datasets{di}.figDocSnap);
+                    datasets{di}.figDoc = fdm;
+                    datasets{di} = rmfield(datasets{di}, 'figDocSnap');
+                elseif ~isfield(datasets{di}, 'figDoc') || isempty(datasets{di}.figDoc)
+                    datasets{di}.figDoc = bosonPlotter.figDoc.defaults();
+                end
+            end
+
             % ── Build restored struct ─────────────────────────────────────
             nDS = numel(datasets);
 
@@ -315,7 +336,8 @@ classdef sessionManager
                 'styleOverride',  struct(), ...
                 'channelStyles',  {{}},   ...
                 'annotations',    {{}},   ...
-                'visible',        true);
+                'visible',        true,   ...
+                'figDoc',         []);
         end
 
         function c = ensureCell_(v)

@@ -2424,6 +2424,7 @@ function varargout = BosonPlotter(options)
     function saveAxisLimsToActiveDataset()
     %SAVEAXISLIMSTOACTIVEDATASET  Delegate to extracted +bosonPlotter module.
         bosonPlotter.saveAxisLimsToActiveDataset(appData, ui, ax);
+        captureFigDoc();
     end
 
     function rebuildDatasetList(keepActiveIdx)
@@ -4684,6 +4685,9 @@ function onSendToOrigin(~,~)
             catch piME
                 logGUIError('plotInteractions', piME.message, piME);
             end
+
+            % ── Apply persistent figDoc overrides after render ────────────
+            applyFigDoc(targetAx);
         end
     end
 
@@ -4695,6 +4699,13 @@ function onSendToOrigin(~,~)
             ef.Value = newVal;
             onPlot([],[]);
         end
+    end
+
+    function applyFigDoc(targetAx)
+        bosonPlotter.figDoc.applyAfterRender(targetAx, appData.datasets, appData.activeIdx);
+    end
+    function captureFigDoc()
+        bosonPlotter.figDoc.capture(ax, appData.datasets, appData.activeIdx);
     end
 
 
@@ -5018,6 +5029,12 @@ function onSendToOrigin(~,~)
             ax.YDir  = 'normal';
         end
         clearCompletedBoxPatch();
+        if appData.activeIdx >= 1 && ~isempty(appData.datasets) ...
+                && isfield(appData.datasets{appData.activeIdx}, 'figDoc') ...
+                && ~isempty(appData.datasets{appData.activeIdx}.figDoc)
+            appData.datasets{appData.activeIdx}.figDoc.xLim = 'auto';
+            appData.datasets{appData.activeIdx}.figDoc.yLim = 'auto';
+        end
         saveAxisLimsToActiveDataset();
         updateControlsForActiveDataset();   % re-pull parser defaults
         onPlot([],[]);
@@ -6721,6 +6738,7 @@ function ds = buildDs(fp, data, parserName)
     ds.refLines       = {};       % Cell array of structs: {orientation, value, color, style}
     ds.mask            = true(size(data.time));  % logical; true = included, false = masked
     ds.notes           = '';       % Free-text annotation; persists in session save/load
+    ds.figDoc          = bosonPlotter.figDoc.defaults();  % persistent plot document model
 end
 
 
