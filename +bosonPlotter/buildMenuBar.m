@@ -110,6 +110,9 @@ function buildMenuBar(fig, cb)
     addItem(toolsMenu, 'Plot Style...',           cb.onOpenPlotStyleDialog);
     addItem(toolsMenu, 'Advanced Figure Builder...', cb.onAdvancedFigureBuilder);
     addItem(toolsMenu, 'Compose Figure...',       cb.onComposeFigure);
+    addItem(toolsMenu, 'Layout 1x2',             cb.onLayout1x2);
+    addItem(toolsMenu, 'Layout 2x1',             cb.onLayout2x1);
+    addItem(toolsMenu, 'Layout 2x2',             cb.onLayout2x2);
     addItem(toolsMenu, 'Batch Figure Export...',  cb.onBatchFigureExport);
     addItem(toolsMenu, 'Polar Plot...',           cb.onPolarPlot);
     addItem(toolsMenu, 'Macro Record (toggle)',   cb.onToggleMacroRecord,  'Separator',true);

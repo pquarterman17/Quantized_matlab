@@ -45,5 +45,9 @@ function dispatchAction(action, fig, appData, overlayOn, ax, setStatusFcn)
             else
                 setStatusFcn('Nothing to undo.');
             end
+        case {'layout1x2', 'layout2x1', 'layout2x2'}
+            layoutStr = strrep(action, 'layout', '');
+            layoutStr = [layoutStr(1) 'x' layoutStr(3)];
+            bosonPlotter.figDoc.quickLayout(ax, fig, appData, layoutStr, setStatusFcn);
     end
 end

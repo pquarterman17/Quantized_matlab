@@ -31,6 +31,12 @@ cb.onFilterClear          = @onFilterClear;
 cb.onDescriptiveStats     = @onDescriptiveStats;
 cb.onTableSort            = @onTableSort;
 cb.onTableSaveAs          = @onTableSaveAs;
+cb.onColSortAsc           = @onColSortAsc;
+cb.onColSortDesc          = @onColSortDesc;
+cb.onColSetX              = @onColSetX;
+cb.onColPlotY             = @onColPlotY;
+cb.onColStats             = @onColStats;
+cb.onColFormula           = @onColFormula;
 
     function applyMaskStyling()
     %APPLYMASKSTYLING  Highlight masked rows in soft red using uistyle/addStyle.
@@ -90,6 +96,7 @@ cb.onTableSaveAs          = @onTableSaveAs;
     function onUnitsCellSelection(~, evt)
     %ONUNITSCELLSELECTION  Arm the column drag-to-plot gesture.
         if isempty(evt.Indices), return; end
+        appData.unitsSelection = evt.Indices;
         col = evt.Indices(1,2);
         colNames = tblUnits.ColumnName;
         if col < 1 || col > numel(colNames), return; end
@@ -315,6 +322,129 @@ cb.onTableSaveAs          = @onTableSaveAs;
         appData.tableMask = appData.tableMask(idx);
         refreshDataTable();
         setStatus(sprintf('Sorted by column %d (%s)', sortCol, direction));
+    end
+
+    function col = getSelectedColumn()
+    %GETSELECTEDCOLUMN  Return column index from the units table selection.
+        col = 1;
+        if isfield(appData, 'unitsSelection') && ~isempty(appData.unitsSelection)
+            col = appData.unitsSelection(1, 2);
+        elseif ~isempty(appData.tableSelection)
+            col = appData.tableSelection(1, 2);
+        end
+        nCols = size(appData.tableWorkingCopy, 2);
+        if col < 1 || col > nCols, col = 1; end
+    end
+
+    function onColSortAsc(~, ~)
+        col = getSelectedColumn();
+        [~, idx] = sort(appData.tableWorkingCopy(:, col), 'ascend');
+        appData.tableWorkingCopy = appData.tableWorkingCopy(idx, :);
+        appData.tableMask = appData.tableMask(idx);
+        refreshDataTable();
+        setStatus(sprintf('Sorted column %d ascending', col));
+    end
+
+    function onColSortDesc(~, ~)
+        col = getSelectedColumn();
+        [~, idx] = sort(appData.tableWorkingCopy(:, col), 'descend');
+        appData.tableWorkingCopy = appData.tableWorkingCopy(idx, :);
+        appData.tableMask = appData.tableMask(idx);
+        refreshDataTable();
+        setStatus(sprintf('Sorted column %d descending', col));
+    end
+
+    function onColSetX(~, ~)
+        col = getSelectedColumn();
+        if col == 1
+            setStatus('Column 1 is already the X axis.');
+            return;
+        end
+        wc = appData.tableWorkingCopy;
+        nCols = size(wc, 2);
+        newOrder = [col, setdiff(1:nCols, col, 'stable')];
+        appData.tableWorkingCopy = wc(:, newOrder);
+        if numel(appData.tableUnits) == nCols
+            appData.tableUnits = appData.tableUnits(newOrder);
+        end
+        refreshDataTable();
+        setStatus(sprintf('Column %d set as X-axis', col));
+    end
+
+    function onColPlotY(~, ~)
+        col = getSelectedColumn();
+        if col == 1
+            setStatus('Cannot plot X column as Y.');
+            return;
+        end
+        onColumnDragStart(tblUnits.ColumnName{col});
+        setStatus(sprintf('Plotting column %d as Y', col));
+    end
+
+    function onColStats(~, ~)
+        col = getSelectedColumn();
+        wc = appData.tableWorkingCopy;
+        mask = appData.tableMask;
+        if ~isempty(mask) && any(mask)
+            wc = wc(~mask, :);
+        end
+        colData = wc(:, col);
+        colData = colData(~isnan(colData));
+        if isempty(colData)
+            uialert(fig, 'No valid data in selected column.', 'Statistics');
+            return;
+        end
+        colNames = tblData.ColumnName;
+        colName = colNames{col};
+        mu = mean(colData); sg = std(colData); med = median(colData);
+        mn = min(colData); mx = max(colData); n = numel(colData);
+        msg = sprintf(['Column: %s\n\n' ...
+            'N:       %d\nMean:    %.6g\nStd:     %.6g\n' ...
+            'Median:  %.6g\nMin:     %.6g\nMax:     %.6g'], ...
+            colName, n, mu, sg, med, mn, mx);
+        uialert(fig, msg, 'Column Statistics', 'Icon', 'info');
+    end
+
+    function onColFormula(~, ~)
+        if isempty(appData.tableWorkingCopy)
+            uialert(fig, 'No data loaded.', 'Formula');
+            return;
+        end
+        colNames = tblData.ColumnName;
+        prompt = sprintf('Enter formula using column names (%s).\nExample: col2 * 1000', ...
+            strjoin(colNames, ', '));
+        answer = inputdlg({prompt, 'New column name:'}, 'Column from Formula', ...
+            [2 50; 1 50], {'', 'Calc'});
+        if isempty(answer), return; end
+        expr = strtrim(answer{1});
+        newName = strtrim(answer{2});
+        if isempty(expr), return; end
+        wc = appData.tableWorkingCopy;
+        nCols = size(wc, 2);
+        try
+            fakeDs.time = wc(:, 1);
+            fakeDs.values = wc(:, 2:end);
+            fakeDs.labels = colNames(2:end)';
+            fakeDs.units = appData.tableUnits(2:end);
+            fakeDs.metadata = struct();
+            newCol = dataWorkspace.FormulaEngine.evaluate(expr, fakeDs);
+        catch ME
+            uialert(fig, sprintf('Formula error:\n%s', ME.message), 'Error');
+            return;
+        end
+        if numel(newCol) ~= size(wc, 1)
+            uialert(fig, 'Result must have same number of rows as data.', 'Error');
+            return;
+        end
+        appData.tableWorkingCopy = [wc, newCol(:)];
+        appData.tableUnits = [appData.tableUnits, {''}];
+        tblData.ColumnName = [colNames; {newName}];
+        tblData.Data = appData.tableWorkingCopy;
+        tblData.ColumnEditable = true(1, nCols + 1);
+        tblUnits.ColumnName = [colNames; {newName}];
+        tblUnits.Data = appData.tableUnits;
+        tblUnits.ColumnEditable = true(1, nCols + 1);
+        setStatus(sprintf('Added column "%s" from formula', newName));
     end
 
     function onTableSaveAs(~, ~)

@@ -408,6 +408,32 @@ function test_figDoc()
     assert(strcmp(locations{nextIdx}, 'southeast'), 'next after NE is SE');
     fprintf('  PASS\n'); passed = passed + 1;
 
+    % ── TEST 25: quickLayout creates tiled panels ────────────────────────
+    fprintf('\n== TEST 25: quickLayout creates tiled panels ==\n');
+    fQ = uifigure('Visible', 'off');
+    axQ = uiaxes(fQ);
+    dsQ1 = makeFakeDataset((1:5)', (1:5)', 'ds1', true);
+    dsQ2 = makeFakeDataset((1:5)', (2:6)', 'ds2', true);
+    appQ = struct('activeIdx', 1, 'datasets', {{dsQ1, dsQ2}});
+    statusMsg = '';
+    setStQ = @(m) assignin('caller', 'statusMsg', m);
+    bosonPlotter.figDoc.quickLayout(axQ, fQ, appQ, '1x2', ...
+        @(m) fprintf('  quickLayout status: %s\n', m));
+    allFigs = findall(0, 'Type', 'figure');
+    layoutFig = [];
+    for kf = 1:numel(allFigs)
+        if contains(allFigs(kf).Name, 'Multi-Panel')
+            layoutFig = allFigs(kf);
+            break;
+        end
+    end
+    assert(~isempty(layoutFig), 'quickLayout created a Multi-Panel figure');
+    tl = findobj(layoutFig, 'Type', 'tiledlayout');
+    assert(~isempty(tl), 'layout figure has tiledlayout');
+    delete(layoutFig);
+    delete(fQ);
+    fprintf('  PASS\n'); passed = passed + 1;
+
     % ── Summary ──────────────────────────────────────────────────────────
     fprintf('\n====================================================================\n');
     fprintf('  test_figDoc: %d passed, %d failed\n', passed, failed);

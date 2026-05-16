@@ -414,7 +414,7 @@ function varargout = BosonPlotter(options)
         'onPoleFigure',@onPoleFigure, 'onDecomposeRSM',@onDecomposeRSM, 'onAdvAsymmetry',@onAdvAsymmetry, 'onShowAdvancedMenu',@onShowAdvancedMenu, ...
         'onFigureProperties',@(~,~)figDocDispatch_('properties'), 'onQuickExport',@(~,~)figDocDispatch_('export'), 'onCopyForSlides',@(~,~)figDocDispatch_('copy'), 'onAnnotations',@(~,~)figDocDispatch_('annotations'), 'onTraceStyles',@(~,~)figDocDispatch_('traceStyles'), 'onFigDocTemplates',@(~,~)figDocDispatch_('templates'), 'onApplyStyleToAll',@(~,~)figDocDispatch_('applyStyleToAll'), 'onUndoStyle',@(~,~)figDocDispatch_('undo'), 'onExportPreview',@(~,~)figDocDispatch_('preview'), 'onReExport',@(~,~)figDocDispatch_('reexport'), ...
         'onPlotTemplates',@onPlotTemplates, 'onOpenPlotStyleDialog',@onOpenPlotStyleDialog, 'onAdvancedFigureBuilder',@onAdvancedFigureBuilder, ...
-        'onComposeFigure',@onComposeFigure, 'onBatchFigureExport',@onBatchFigureExport, 'onPolarPlot',@onPolarPlot, ...
+        'onComposeFigure',@onComposeFigure, 'onLayout1x2',@(~,~)figDocDispatch_('layout1x2'), 'onLayout2x1',@(~,~)figDocDispatch_('layout2x1'), 'onLayout2x2',@(~,~)figDocDispatch_('layout2x2'), 'onBatchFigureExport',@onBatchFigureExport, 'onPolarPlot',@onPolarPlot, ...
         'onToggleMacroRecord',@onToggleMacroRecord, 'onExportMacro',@onExportMacro, ...
         'onToggleWatchFile',@onToggleWatchFile, 'onToggleSinglePrecision',@onToggleSinglePrecision, ...
         'onShowShortcuts',@onShowShortcuts, 'onReportBug',@(~,~) onReportBug());
@@ -1050,7 +1050,14 @@ function varargout = BosonPlotter(options)
     miMaskRows        = dtUI_.miMaskRows;
     miUnmaskRows      = dtUI_.miUnmaskRows;
     miUnmaskAll       = dtUI_.miUnmaskAll;
+    miColSortAsc      = dtUI_.miColSortAsc;
+    miColSortDesc     = dtUI_.miColSortDesc;
+    miColSetX         = dtUI_.miColSetX;
+    miColPlotY        = dtUI_.miColPlotY;
+    miColStats        = dtUI_.miColStats;
+    miColFormula      = dtUI_.miColFormula;
     appData.tableSelection = [];  % [Nx2] matrix of [row col] pairs
+    appData.unitsSelection = [];  % [Nx2] from units row selection
 
     % ── Hidden floaters: not visible, but read by callbacks ──────────────
     % These were formerly visible widgets in axLimPanel. After the Axes
@@ -1621,6 +1628,12 @@ function varargout = BosonPlotter(options)
     miMaskRows.MenuSelectedFcn        = tblCb.onTableMaskSelected;
     miUnmaskRows.MenuSelectedFcn      = tblCb.onTableUnmaskSelected;
     miUnmaskAll.MenuSelectedFcn       = tblCb.onTableUnmaskAll;
+    miColSortAsc.MenuSelectedFcn      = tblCb.onColSortAsc;
+    miColSortDesc.MenuSelectedFcn     = tblCb.onColSortDesc;
+    miColSetX.MenuSelectedFcn         = tblCb.onColSetX;
+    miColPlotY.MenuSelectedFcn        = tblCb.onColPlotY;
+    miColStats.MenuSelectedFcn        = tblCb.onColStats;
+    miColFormula.MenuSelectedFcn      = tblCb.onColFormula;
 
     % ════════════════════════════════════════════════════════════════════
     %  PROGRAMMATIC API (for automated testing / scripting)
