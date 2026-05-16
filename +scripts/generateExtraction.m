@@ -26,7 +26,7 @@ function out = generateExtraction(filePath, startLine, endLine, functionName, op
 
     inv = scripts.extractionInventory(filePath, startLine, endLine, Verbose=true);
 
-    lines = readlines(filePath);
+    lines = cellstr(readlines(filePath));
     block = lines(startLine:endLine);
 
     % ── Classify closure reads ───────────────────────────────────────
@@ -88,7 +88,7 @@ function out = generateExtraction(filePath, startLine, endLine, functionName, op
 
     bld{end+1} = '    % ═══════════ EXTRACTED BLOCK ═══════════';
     for i = 1:numel(block)
-        ln = char(block(i));
+        ln = block{i};
         % Replace the primary parent variable with 'parent'
         if ~isempty(primaryParent)
             ln = regexprep(ln, sprintf('\\b%s\\b', primaryParent), 'parent');

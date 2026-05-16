@@ -25,6 +25,7 @@ function result = extractionInventory(filePath, startLine, endLine, opts)
     end
 
     lines = readlines(filePath);
+    lines = cellstr(lines);
     totalLines = numel(lines);
 
     if endLine > totalLines
@@ -37,8 +38,8 @@ function result = extractionInventory(filePath, startLine, endLine, opts)
     after  = lines(endLine+1:end);
     outside = [before; after];
 
-    blockText  = join(block, newline);
-    outsideText = join(outside, newline);
+    blockText  = char(strjoin(block, newline));
+    outsideText = char(strjoin(outside, newline));
 
     % ── Identify all assignments in the block ────────────────────────
     assignPat = '^\s*(\w+)\s*[=]';
@@ -63,8 +64,8 @@ function result = extractionInventory(filePath, startLine, endLine, opts)
 
     % ── Callback references (@functionName)
     cbPat = '@(\w+)';
-    callbackRefs = unique(regexp(blockText, cbPat, 'tokens'));
-    callbackRefs = cellfun(@(c) c{1}, callbackRefs, 'UniformOutput', false);
+    cbRaw = regexp(blockText, cbPat, 'tokens');
+    callbackRefs = unique(cellfun(@(c) c{1}, cbRaw, 'UniformOutput', false));
     callbackRefs = callbackRefs(~startsWith(callbackRefs, '('));
 
     % ── Widget creation calls
@@ -75,13 +76,13 @@ function result = extractionInventory(filePath, startLine, endLine, opts)
         'uimenu','uicontextmenu','uihtml','uilamp','uigauge', ...
         'uispinner','uiprogressdlg','uihyperlink'};
     widgetPat = sprintf('(%s)\\s*\\(', strjoin(widgetTypes, '|'));
-    widgetCreates = unique(regexp(blockText, widgetPat, 'tokens'));
-    widgetCreates = cellfun(@(c) c{1}, widgetCreates, 'UniformOutput', false);
+    wcRaw = regexp(blockText, widgetPat, 'tokens');
+    widgetCreates = unique(cellfun(@(c) c{1}, wcRaw, 'UniformOutput', false));
 
     % Widget handles — variables assigned from widget creation
     widgetHandles = {};
     for i = 1:numel(block)
-        ln = block(i);
+        ln = block{i};
         for w = 1:numel(widgetTypes)
             wt = widgetTypes{w};
             pat = sprintf('^\\s*(\\w+)\\s*=\\s*%s\\(', wt);
@@ -95,8 +96,8 @@ function result = extractionInventory(filePath, startLine, endLine, opts)
 
     % ── Parent refs (grid/layout/panel vars used as first arg to widget creation)
     parentPat = sprintf('(?:%s)\\s*\\(\\s*(\\w+)', strjoin(widgetTypes, '|'));
-    parentRefs = unique(regexp(blockText, parentPat, 'tokens'));
-    parentRefs = cellfun(@(c) c{1}, parentRefs, 'UniformOutput', false);
+    prRaw = regexp(blockText, parentPat, 'tokens');
+    parentRefs = unique(cellfun(@(c) c{1}, prRaw, 'UniformOutput', false));
 
     % ── Dot-property assignments (ui.xxx = ..., appData.xxx = ...)
     dotWrites = {};
@@ -109,8 +110,8 @@ function result = extractionInventory(filePath, startLine, endLine, opts)
     % ── Code metrics
     codeLines = 0;
     for i = 1:numel(block)
-        ln = strtrim(block(i));
-        if strlength(ln) > 0 && ~startsWith(ln, '%')
+        ln = strtrim(block{i});
+        if ~isempty(ln) && ln(1) ~= '%'
             codeLines = codeLines + 1;
         end
     end
@@ -144,8 +145,8 @@ end
 function tokens = extractTokens(lines, pat)
     tokens = {};
     for i = 1:numel(lines)
-        ln = lines(i);
-        if startsWith(strtrim(ln), '%'), continue; end
+        ln = lines{i};
+        if ~isempty(ln) && ln(1) == '%', continue; end
         tok = regexp(ln, pat, 'tokens');
         for j = 1:numel(tok)
             tokens{end+1} = tok{j}{1}; %#ok<AGROW>
@@ -158,8 +159,8 @@ end
 function tokens = extractDotTokens(lines, pat)
     tokens = {};
     for i = 1:numel(lines)
-        ln = lines(i);
-        if startsWith(strtrim(ln), '%'), continue; end
+        ln = lines{i};
+        if ~isempty(ln) && ln(1) == '%', continue; end
         tok = regexp(ln, pat, 'tokens');
         for j = 1:numel(tok)
             tokens{end+1} = tok{j}; %#ok<AGROW>
@@ -169,15 +170,16 @@ end
 
 
 function ids = extractAllIdentifiers(lines)
-    text = join(lines, newline);
-    % Remove comments
+    text = char(strjoin(lines, newline));
     text = regexprep(text, '%[^\n]*', '');
-    % Remove string literals
     text = regexprep(text, '''[^'']*''', '');
     text = regexprep(text, '"[^"]*"', '');
-    % Extract identifiers
-    raw = unique(regexp(text, '\b([a-zA-Z]\w*)\b', 'tokens'));
-    ids = cellfun(@(c) c{1}, raw, 'UniformOutput', false);
+    raw = regexp(text, '(?<![a-zA-Z_])([a-zA-Z]\w*)', 'tokens');
+    if isempty(raw)
+        ids = {};
+    else
+        ids = unique(cellfun(@(c) c{1}, raw, 'UniformOutput', false));
+    end
 end
 
 

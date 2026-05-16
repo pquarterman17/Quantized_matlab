@@ -15,7 +15,7 @@ function plan = extractionPlan(filePath, opts)
         opts.Verbose (1,1) logical = true
     end
 
-    lines = readlines(filePath);
+    lines = cellstr(readlines(filePath));
     n = numel(lines);
 
     widgetTypes = {'uifigure','uigridlayout','uipanel','uitab','uitabgroup', ...
@@ -24,21 +24,23 @@ function plan = extractionPlan(filePath, opts)
         'uitable','uispreadsheet','uiimage','uitree','uitreenode', ...
         'uimenu','uicontextmenu','uihtml','uilamp','uigauge', ...
         'uispinner','uihyperlink'};
-    widgetPat = sprintf('\\b(%s)\\s*\\(', strjoin(widgetTypes, '|'));
+    widgetPat = sprintf('(?<=[\\s=])(%s)\\s*\\(', strjoin(widgetTypes, '|'));
 
     % ── Find all widget creation lines ───────────────────────────────
     isWidget = false(n, 1);
-    parentVar = strings(n, 1);
+    parentVar = cell(n, 1);
+    parentVar(:) = {''};
     parentArgPat = sprintf('(?:%s)\\s*\\(\\s*(\\w+)', strjoin(widgetTypes, '|'));
 
     for i = 1:n
-        ln = lines(i);
-        if startsWith(strtrim(ln), '%'), continue; end
+        ln = lines{i};
+        trimmed = strtrim(ln);
+        if ~isempty(trimmed) && trimmed(1) == '%', continue; end
         if ~isempty(regexp(ln, widgetPat, 'once'))
             isWidget(i) = true;
             tok = regexp(ln, parentArgPat, 'tokens', 'once');
             if ~isempty(tok)
-                parentVar(i) = tok{1};
+                parentVar{i} = tok{1};
             end
         end
     end
@@ -48,16 +50,14 @@ function plan = extractionPlan(filePath, opts)
     for i = 1:n
         if isWidget(i)
             isBlock(i) = true;
-            % Walk backward for assignment line
             if i > 1 && ~isWidget(i-1)
-                prev = strtrim(lines(i-1));
+                prev = strtrim(lines{i-1});
                 if endsWith(prev, '...')
                     isBlock(i-1) = true;
                 end
             end
-            % Walk forward for continuation lines
             j = i;
-            while j <= n && endsWith(strtrim(lines(j)), '...')
+            while j <= n && endsWith(strtrim(lines{j}), '...')
                 isBlock(j) = true;
                 j = j + 1;
             end
@@ -67,12 +67,11 @@ function plan = extractionPlan(filePath, opts)
         end
     end
 
-    % Also include adjacent property-setting lines (set(handle,...) or
-    % handle.Property = value) within 3 lines of a widget creation
+    % Also include adjacent property-setting lines
     for i = 1:n
         if isWidget(i)
             for j = max(1,i-1):min(n,i+5)
-                ln = strtrim(lines(j));
+                ln = strtrim(lines{j});
                 if contains(ln, '.ButtonPushedFcn') || ...
                    contains(ln, '.ValueChangedFcn') || ...
                    contains(ln, '.MenuSelectedFcn') || ...
@@ -130,15 +129,14 @@ function plan = extractionPlan(filePath, opts)
 
         % Dominant parent in this block
         parents = parentVar(s:e);
-        parents = parents(parents ~= "");
+        parents = parents(~cellfun('isempty', parents));
         if isempty(parents)
-            dominant = "(unknown)";
+            dominant = '(unknown)';
         else
-            [~, ~, ic] = unique(parents);
+            [uparents, ~, ic] = unique(parents);
             counts = accumarray(ic, 1);
             [~, mi] = max(counts);
-            uparents = unique(parents);
-            dominant = uparents(mi);
+            dominant = uparents{mi};
         end
 
         wc = sum(isWidget(s:e));
