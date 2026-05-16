@@ -100,6 +100,11 @@ function applyToAxes(ax, model)
         end
     end
 
+    % ── Second Y-axis ────────────────────────────────────────────────────
+    if model.hasRightAxis()
+        bosonPlotter.figDoc.applySecondYAxis(ax, model);
+    end
+
     % ── Legend ────────────────────────────────────────────────────────────
     applyLegend(ax, model);
 

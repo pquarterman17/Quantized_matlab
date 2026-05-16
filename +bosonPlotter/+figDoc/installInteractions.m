@@ -46,7 +46,9 @@ function installInteractions(ax, fig, appData, applyFcn, setStatusFcn)
         'MenuSelectedFcn', @(~,~) editTraceWidth_(ax, fig, appData, applyFcn));
     uimenu(traceMenu, 'Text', 'Marker...', ...
         'MenuSelectedFcn', @(~,~) editTraceMarker_(ax, fig, appData, applyFcn));
-    uimenu(traceMenu, 'Text', 'Edit All Styles...', 'Separator', 'on', ...
+    uimenu(traceMenu, 'Text', 'Move to Right Y-Axis', 'Separator', 'on', ...
+        'MenuSelectedFcn', @(~,~) toggleTraceAxis_(ax, fig, appData, applyFcn, setStatusFcn));
+    uimenu(traceMenu, 'Text', 'Edit All Styles...', ...
         'MenuSelectedFcn', @(~,~) bosonPlotter.figDoc.dispatchAction('traceStyles', fig, appData, false, ax, setStatusFcn));
 
     for k = 1:numel(lines)
@@ -165,6 +167,26 @@ function cycleLegend_(~, appData, applyFcn, setStatusFcn)
     model.legendLocation = locations{nextIdx};
     applyFcn();
     setStatusFcn(sprintf('Legend → %s', locations{nextIdx}));
+end
+
+% ═══════════════════════════════════════════════════════════════════════════
+function toggleTraceAxis_(ax, fig, appData, applyFcn, setStatusFcn)
+    model = getModel_(appData);
+    if isempty(model), return; end
+    [idx, ~] = pickTrace_(ax, fig);
+    if isempty(idx), return; end
+    model.pushUndo();
+    while numel(model.traceYAxis) < idx
+        model.traceYAxis{end+1} = 'left';
+    end
+    if strcmp(model.traceYAxis{idx}, 'right')
+        model.traceYAxis{idx} = 'left';
+        setStatusFcn(sprintf('Trace %d → left Y-axis', idx));
+    else
+        model.traceYAxis{idx} = 'right';
+        setStatusFcn(sprintf('Trace %d → right Y-axis', idx));
+    end
+    applyFcn();
 end
 
 % ═══════════════════════════════════════════════════════════════════════════

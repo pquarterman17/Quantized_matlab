@@ -293,8 +293,27 @@ function test_figDoc()
     delete(figI);
     fprintf('  PASS\n'); passed = passed + 1;
 
-    % ── TEST 18: legend cycle ────────────────────────────────────────────
-    fprintf('\n== TEST 18: legend cycle ==\n');
+    % ── TEST 18: second Y-axis assignment ───────────────────────────────
+    fprintf('\n== TEST 18: second Y-axis assignment ==\n');
+    mY2 = bosonPlotter.figDoc.FigDocModel();
+    assert(~mY2.hasRightAxis(), 'no right axis initially');
+    mY2.setTraceYAxis(2, 'right');
+    assert(mY2.hasRightAxis(), 'has right axis after assignment');
+    assert(strcmp(mY2.traceYAxis{1}, 'left'), 'trace 1 still left');
+    assert(strcmp(mY2.traceYAxis{2}, 'right'), 'trace 2 is right');
+    mY2.y2Lim = [0 1000];
+    mY2.y2Scale = 'log';
+    mY2.y2Label = "Current (A)";
+    s18 = mY2.snapshot();
+    mY2b = bosonPlotter.figDoc.FigDocModel();
+    mY2b.restore(s18);
+    assert(mY2b.hasRightAxis(), 'right axis survives round-trip');
+    assert(strcmp(mY2b.y2Scale, 'log'), 'y2Scale round-trip');
+    assert(isequal(mY2b.y2Lim, [0 1000]), 'y2Lim round-trip');
+    fprintf('  PASS\n'); passed = passed + 1;
+
+    % ── TEST 19: legend cycle ────────────────────────────────────────────
+    fprintf('\n== TEST 19: legend cycle ==\n');
     mC = bosonPlotter.figDoc.FigDocModel();
     mC.legendLocation = 'northeast';
     dsC = makeFakeDataset((1:5)', (1:5)', 'cyc', true);

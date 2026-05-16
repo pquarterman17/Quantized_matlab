@@ -50,6 +50,12 @@ classdef FigDocModel < handle
                             %   .color, .lineWidth, .lineStyle, .marker,
                             %   .markerSize, .displayName
 
+        % ── Second Y-axis ───────────────────────────────────────────────
+        traceYAxis = {}     % cell array of 'left'|'right' per trace (empty = all left)
+        y2Lim    = 'auto'   % right-Y [min max] or 'auto'
+        y2Scale  = 'linear' % right-Y 'linear' | 'log'
+        y2Label  = ""       % right-Y axis label
+
         % ── Export ──────────────────────────────────────────────────────
         lastExportProfile = 'powerpoint'  % 'powerpoint' | 'aps' | 'nature' | 'custom'
     end
@@ -140,6 +146,19 @@ classdef FigDocModel < handle
             end
             obj.traceStyles{idx}.(field) = value;
             obj.dirty = true;
+        end
+
+        function setTraceYAxis(obj, idx, side)
+        %SETTRACEYAXIS  Assign trace to 'left' or 'right' Y-axis.
+            while numel(obj.traceYAxis) < idx
+                obj.traceYAxis{end+1} = 'left';
+            end
+            obj.traceYAxis{idx} = side;
+            obj.dirty = true;
+        end
+
+        function tf = hasRightAxis(obj)
+            tf = any(strcmp(obj.traceYAxis, 'right'));
         end
 
         function pushUndo(obj)
