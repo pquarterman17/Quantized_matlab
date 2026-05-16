@@ -22,3 +22,6 @@ calctest.log
 
 # Smoke test screenshots (ephemeral CI artifacts)
 tests/smoke/screenshots/
+
+# Extraction tooling output (temporary scaffolds)
+extraction_output/
