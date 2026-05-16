@@ -3895,61 +3895,11 @@ function onLoadBackground(~,~)
     end
 
     function onToggleWatchFile()
-    %ONTOGGLEWATCHFILE  Start or stop live file watching on the active dataset.
-    %   Creates a scripts.dataConnector that polls the source file and calls
-    %   onFileChanged when a modification is detected.  The connector is stored
-    %   in appData.dataConnectors{activeIdx}.  A second toggle stops and clears
-    %   the watcher for that slot.
-        if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a file first.', 'Watch File');
-            return;
-        end
-
-        idx = appData.activeIdx;
-        ds  = appData.datasets{idx};
-
-        % Ensure connector cell is large enough
-        while numel(appData.dataConnectors) < idx
-            appData.dataConnectors{end+1} = [];
-        end
-
-        existing = appData.dataConnectors{idx};
-        if ~isempty(existing) && isstruct(existing) && existing.isRunning()
-            % Already watching — stop it
-            existing.stop();
-            appData.dataConnectors{idx} = [];
-            setStatus(sprintf('File watch stopped for: %s', ds.filepath));
-            return;
-        end
-
-        if ~isfile(ds.filepath)
-            uialert(fig, sprintf('Cannot watch: file not found.\n%s', ds.filepath), 'Watch File');
-            return;
-        end
-
-        connector = scripts.dataConnector(ds.filepath, ...
-            Callback=@(newData) onFileChanged(idx, newData));
-        appData.dataConnectors{idx} = connector;
-        setStatus(sprintf('Watching: %s', ds.filepath));
-    end
-
-    function onFileChanged(dsIdx, newData)
-    %ONFILECHANGED  Called by dataConnector when the watched file changes.
-    %   Replaces the dataset's raw data, clears corrData, and replots.
-        if dsIdx < 1 || dsIdx > numel(appData.datasets), return; end
-        ds = appData.datasets{dsIdx};
-        ds.data     = newData;
-        ds.corrData = [];  % stale corrections discarded — user must re-apply
-        appData.datasets{dsIdx} = ds;
-        try
-            appData.model.updateDataset(dsIdx, ds);
-        catch
-        end
-        rebuildDatasetList(false);
-        if appData.activeIdx == dsIdx
-            onPlot([], []);
-        end
-        setStatus(sprintf('Reloaded: %s', ds.filepath));
+    %ONTOGGLEWATCHFILE  Delegate to +bosonPlotter/watchFile.m.
+        wfCb_.setStatus = @setStatus;
+        wfCb_.rebuildDatasetList = @rebuildDatasetList;
+        wfCb_.onPlot = @() onPlot([],[]);
+        bosonPlotter.watchFile(appData, fig, wfCb_);
     end
 
     % ── Annotation tool ───────────────────────────────────────────────────
@@ -4358,71 +4308,19 @@ function onLoadBackground(~,~)
     end
 
 function onSendToOrigin(~,~)
-    %ONSENDTOORIGIN  Send active dataset to OriginPro via COM; fall back to clipboard.
-        if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a file first.', 'No data');
-            return;
-        end
-        ds  = appData.datasets{appData.activeIdx};
-        src = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
-        src = bosonPlotter.applyDisplayUnits(src, ds, appData);
-        [~, fn, ~] = fileparts(ds.filepath);
-
-        % Gather axis label hints from current GUI state
-        axLabels = struct();
-        if ~isempty(efCustomXLabel.Value)
-            axLabels.x = efCustomXLabel.Value;
-        end
-        if ~isempty(efCustomYLabel.Value)
-            axLabels.y = efCustomYLabel.Value;
-        end
-
-        % Attempt COM bridge
-        ok = utilities.toOrigin(src, ...
-            'SheetName',  fn, ...
-            'BookName',   'ThinFilmToolkit', ...
-            'AxisLabels', axLabels, ...
-            'LogY',       strcmp(ddScaleY.Value, 'Log'), ...
-            'LogX',       strcmp(ddScaleX.Value, 'Log'));
-
-        if ok
-            uialert(fig, sprintf('Data sent to OriginPro.\nWorksheet: %s', fn), ...
-                'Origin Export');
-        else
-            % Fallback: copy to clipboard in Origin-ready format
-            clipStr = bosonPlotter.buildClipboardString(appData, appData.activeIdx);
-            clipboard('copy', clipStr);
-            uialert(fig, ...
-                ['Origin not available — data copied to clipboard instead.' newline ...
-                 'Paste into Origin with Edit > Paste.'], ...
-                'Origin not found');
-        end
+    %ONSENDTOORIGIN  Delegate to +bosonPlotter/sendToOrigin.m.
+        gs.xLabel = efCustomXLabel.Value;
+        gs.yLabel = efCustomYLabel.Value;
+        gs.logX = strcmp(ddScaleX.Value, 'Log');
+        gs.logY = strcmp(ddScaleY.Value, 'Log');
+        bosonPlotter.sendToOrigin(appData, fig, gs);
     end
 
     function onExportOriginScript(~,~)
-    %ONEXPORTORIGINSCRIPT  Export active dataset as LabTalk script + CSV.
-        if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data'); return;
-        end
-        ds  = appData.datasets{appData.activeIdx};
-        src = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
-        [fp, fn, ~] = fileparts(ds.filepath);
-
-        defaultPath = fullfile(fp, [fn, '.ogs']);
-        [outFile, outDir] = uiputfile({'*.ogs','LabTalk Script (*.ogs)'}, ...
-            'Save Origin Script', defaultPath);
-        if isequal(outFile, 0), return; end
-
-        scriptPath = fullfile(outDir, outFile);
-        try
-            utilities.exportOriginScript(src, scriptPath, ...
-                'LogY', strcmp(ddScaleY.Value, 'Log'), ...
-                'LogX', strcmp(ddScaleX.Value, 'Log'));
-            uialert(fig, sprintf('Origin script saved:\n%s\n\nRun in Origin: run.file("%s")', ...
-                scriptPath, outFile), 'Export Complete');
-        catch ME
-            uialert(fig, sprintf('Export failed:\n%s', ME.message), 'Export Error');
-        end
+    %ONEXPORTORIGINSCRIPT  Delegate to +bosonPlotter/exportOriginScript.m.
+        gs.logX = strcmp(ddScaleX.Value, 'Log');
+        gs.logY = strcmp(ddScaleY.Value, 'Log');
+        bosonPlotter.exportOriginScript(appData, fig, gs);
     end
 
     function onBatchConvertXRD(~,~)
@@ -4462,35 +4360,8 @@ function onSendToOrigin(~,~)
     end
 
     function onExportHDF5(~,~)
-    %ONEXPORTHDF5  Export the active dataset to HDF5 via a browse-and-save dialog.
-        if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data');
-            return;
-        end
-        ds = appData.datasets{appData.activeIdx};
-        [~, fn, ~] = fileparts(ds.filepath);
-        defName    = fullfile(fileparts(ds.filepath), [fn, '.h5']);
-        [fname, fpath] = uiputfile( ...
-            {'*.h5','HDF5 files (*.h5)'; '*.hdf5','HDF5 files (*.hdf5)'}, ...
-            'Export to HDF5 as...', defName);
-        if isequal(fname, 0), return; end
-        outPath = fullfile(fpath, fname);
-        try
-            utilities.exportHDF5(ds.data, outPath, ...
-                'CorrData',    ds.corrData, ...
-                'Corrections', struct('xOff', ds.xOff, 'yOff', ds.yOff, ...
-                                      'bgSlope', ds.bgSlope, 'bgInt', ds.bgInt), ...
-                'IncludePeaks', ~isempty(ds.peaks), ...
-                'Peaks',        ds.peaks);
-            uialert(fig, sprintf('Saved:\n%s', outPath), 'HDF5 Exported');
-        catch ME
-            fprintf(2, '\n[BosonPlotter] HDF5 export error: %s\n', ME.message);
-            for si = 1:numel(ME.stack)
-                fprintf(2, '  at %s  (line %d)\n', ME.stack(si).name, ME.stack(si).line);
-            end
-            logGUIError('Export error', ME.message, ME);
-            uialert(fig, ME.message, 'Export error');
-        end
+    %ONEXPORTHDF5  Delegate to +bosonPlotter/exportHDF5.m.
+        bosonPlotter.exportHDF5(appData, fig, @logGUIError);
     end
 
     % ── Plot callbacks ────────────────────────────────────────────────────
@@ -6163,45 +6034,13 @@ function onSendToOrigin(~,~)
     end
 
     function onResampleDataset(~,~)
-    %ONRESAMPLEDATASET  Resample active dataset to a uniform x-grid (#15).
-        if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data'); return;
-        end
-        ds = appData.datasets{appData.activeIdx};
-        d = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
-        if isdatetime(d.time)
-            uialert(fig,'Cannot resample datetime x-axes.','Error'); return;
-        end
-        xVec = double(d.time);
-        xLo = min(xVec); xHi = max(xVec);
-        nPts = numel(xVec);
-        answer = inputdlg({'X min:', 'X max:', 'Number of points:'}, ...
-            'Resample Dataset', [1 40], {num2str(xLo), num2str(xHi), num2str(nPts)});
-        if isempty(answer), return; end
-        newXMin = str2double(answer{1}); newXMax = str2double(answer{2});
-        newN    = round(str2double(answer{3}));
-        if isnan(newXMin) || isnan(newXMax) || isnan(newN) || newN < 2
-            uialert(fig,'Invalid parameters.','Error'); return;
-        end
-        newX = linspace(newXMin, newXMax, newN)';
-        newVals = zeros(newN, size(d.values, 2));
-        for k = 1:size(d.values, 2)
-            newVals(:, k) = interp1(xVec, d.values(:, k), newX, 'pchip', NaN);
-        end
-        resD = d;
-        resD.time   = newX;
-        resD.values = newVals;
-        dsNew = buildDs(ds.filepath, resD, 'resampled');
-        [~, fn, fext] = fileparts(ds.filepath);
-        dsNew.displayName = [fn fext ' (resampled)'];
-        dsNew.legendName  = [fn fext ' (resampled)'];
-        appData.datasets{end+1} = dsNew;
-        appData.model.addDataset(dsNew.data, dsNew.filepath, dsNew.parserName);
-        appData.activeIdx = numel(appData.datasets);
-        rebuildDatasetList(true);
-        updateControlsForActiveDataset();
-        onPlot([],[]);
-        recordAction(sprintf('%% Resample: %d pts [%.4g, %.4g]', newN, newXMin, newXMax));
+    %ONRESAMPLEDATASET  Delegate to +bosonPlotter/resampleDataset.m.
+        rsCb_.buildDs = @buildDs;
+        rsCb_.rebuildDatasetList = @rebuildDatasetList;
+        rsCb_.updateControlsForActiveDataset = @updateControlsForActiveDataset;
+        rsCb_.onPlot = @() onPlot([],[]);
+        rsCb_.recordAction = @recordAction;
+        bosonPlotter.resampleDataset(appData, fig, rsCb_);
     end
 
     function onColumnCalculator(~,~)
@@ -6751,106 +6590,8 @@ function ds = buildDs(fp, data, parserName)
 end
 
 function [data, parserName] = guiImport(fp)
-%GUIIMPORT  Dispatch to the correct parser and return both data and parser name.
-%   Uses centralized resolveParser for extension→parser mapping.
-
-    resolveResult = parser.resolveParser(fp);
-    parserName = resolveResult.name;
-
-    % GUI-specific parameters for each parser
-    switch parserName
-        case 'importRigaku_raw'
-            data = parser.importRigaku_raw(fp);
-
-        case 'importXRDML'
-            % Load raw counts; the GUI's Cts/s toggle handles cps conversion.
-            data = parser.importXRDML(fp, Intensity='counts');
-
-        case 'importBruker'
-            data = parser.importBruker(fp);
-
-        case 'importExcel'
-            data = parser.importExcel(fp);
-
-        case 'importCSV'
-            data = parser.importCSV(fp);
-
-        case 'importSIMS'
-            data = parser.importSIMS(fp);
-
-        case 'importNCNRRefl'
-            data = parser.importNCNRRefl(fp);
-
-        case 'importNCNRPNR'
-            data = parser.importNCNRPNR(fp);
-
-        case 'importNCNRDat'
-            % NCNR refl1d output: polarization encoded in extension
-            data = parser.importNCNRDat(fp);
-
-        case 'importRefl1dDat'
-            data = parser.importRefl1dDat(fp);
-
-        case 'importQDVSM'
-            % Load every available channel so the user can explore them in the GUI.
-            try
-                data = parser.importQDVSM(fp, 'Verbose', false, 'YAxis', 'all');
-            catch ME
-                if contains(ME.message,'[Data]','IgnoreCase',true)
-                    % Fall back to PPMS format
-                    data = parser.importPPMS(fp, 'YAxis', 'all');
-                    parserName = 'importPPMS';
-                else
-                    rethrow(ME);
-                end
-            end
-
-        case 'importPPMS'
-            data = parser.importPPMS(fp, 'YAxis', 'all');
-
-        case 'importLakeShore'
-            % Lake Shore magnetometer exports — routed here by
-            % resolveParser's content-sniffer when the .dat header shows
-            % vendor strings or 7400/8600 model numbers. Load all
-            % channels so the GUI Y-axis picker sees every column.
-            data = parser.importLakeShore(fp, 'YAxis', 'all');
-
-        case 'importMPMS'
-            % MPMS SQUID magnetometer — shares the QD [Header]/[Data]
-            % layout, so it's normally reached via importQDVSM dispatch.
-            % This branch exists for users who configure the parser
-            % directly (e.g. from templates or scripts).
-            data = parser.importMPMS(fp, 'YAxis', 'all');
-
-        case 'importImage'
-            data = parser.importImage(fp);
-
-        case 'importBCF'
-            data = parser.importBCF(fp);
-
-        case 'importDM3'
-            data = parser.importDM3(fp);
-
-        case 'importDM4'
-            data = parser.importDM4(fp);
-
-        case 'importAFM'
-            data = parser.importAFM(fp);
-
-        otherwise
-            error('BosonPlotter:unknownExt', ...
-                ['No parser for extension "%s" (resolved as "%s").\n' ...
-                 'Supported: .raw, .xrdml, .brml, .xlsx/.xls/.xlsm/.xlsb/.ods, ' ...
-                 '.csv/.tsv/.txt, .refl, .pnr, .datA/B/C/D, .dat, ' ...
-                 '.jpg/.jpeg/.png/.bmp/.gif, .bcf, .dm3, .dm4'], ...
-                extractFileExt(fp), parserName);
-    end
-end
-
-% ────────────────────────────────────────────────────────────────────
-function ext = extractFileExt(fp)
-    [~, ~, ext] = fileparts(fp);
-    ext = lower(ext);
+%GUIIMPORT  Delegate to +bosonPlotter/guiImport.m.
+    [data, parserName] = bosonPlotter.guiImport(fp);
 end
 
 function name = guiXName(meta)
