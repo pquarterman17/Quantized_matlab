@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-05-01 (Goal revision: added W5 #68 (BosonPlotter <6k, replaces achieved #22 <8k milestone) + W5 #69 (FermiViewer <6k, net-new). Items #28 + #65 promoted T3 → T2 to drive #69. Earlier today: closed shipped W5 #22/#59-#62 and added #66/#67 dialog cutover follow-ups.)
+**Last regenerated:** 2026-05-16 (Updated line counts: BosonPlotter 7,119 (-16% to 6k), FermiViewer 6,082 (-1.4% to 6k). Archived figdoc-plan + origin-interaction-parity (Complete). Previous: 2026-05-01 goal revision added #68/#69.)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -16,8 +16,8 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 ## Tier 1 — High Impact (open)
 
 ### MASTERPLAN (MATLAB consolidated) — `plans/MASTERPLAN.md`
-- [ ] **#68** W5 Decomposition → Drive `BosonPlotter.m` below **6,000 lines** (current 7,658, -22% to go). Replaces achieved #22 <8k milestone.
-- [ ] **#69** W5 Decomposition → Drive `FermiViewer.m` below **6,000 lines** (current 13,188 / 326 nested fns, **-54% to go** — 8 workshop models shipped, callback extraction ongoing)
+- [ ] **#68** W5 Decomposition → Drive `BosonPlotter.m` below **6,000 lines** (current 7,119, -16% to go). Replaces achieved #22 <8k milestone.
+- [ ] **#69** W5 Decomposition → Drive `FermiViewer.m` below **6,000 lines** (current 6,082 / 330 nested fns, **-1.4% to go** — 8 workshop models shipped, callback extraction ongoing)
 
 ### Origin parity (Python port, MATLAB side complete) — `plans/origin-feature-gap.md`
 - [ ] **#1** AIC/BIC/F-test fit comparison → Python
