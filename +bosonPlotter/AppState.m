@@ -148,6 +148,7 @@ classdef AppState < handle
         tableEdited     logical = false
         tableRowCap     double  = 5000   % uitable visible-row cap. If scroll feels janky on long scans, lower this (was 500 historically).
         tableSelection  double  = []   % [Nx2] selected cells from CellSelectionCallback
+        unitsSelection  double  = []   % [Nx2] selected cells from units row
 
         % ── Collapsible sections ───────────────────────────────────
         sectionCollapsed struct = struct( ...

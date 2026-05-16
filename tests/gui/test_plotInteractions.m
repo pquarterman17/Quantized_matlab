@@ -49,13 +49,16 @@ function test_plotInteractions
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  TEST 2: axes has a ContextMenu (R2023b+ only)
+    %  TEST 2: axes has a ContextMenu after data load (R2023b+ only)
     % ════════════════════════════════════════════════════════════════════
     fprintf('\n== TEST 2: axes context menu ==\n');
     try
-        if isMATLABReleaseOlderThan('R2023b')
-            fprintf('   SKIP (pre-R2023b)\n');
+        if isMATLABReleaseOlderThan('R2023b') || ~isfile(VSM_F)
+            fprintf('   SKIP (pre-R2023b or missing data)\n');
         else
+            api.addFiles({VSM_F});
+            api.setActiveIdx(1);
+            drawnow; pause(0.5);
             axh = api.getAxes();
             check('axes has ContextMenu', ...
                 ~isempty(axh.ContextMenu) && isgraphics(axh.ContextMenu));
@@ -65,20 +68,20 @@ function test_plotInteractions
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  TEST 3: context menu contains new 'Edit Axis Labels...' item
+    %  TEST 3: context menu contains figDoc interaction items
     % ════════════════════════════════════════════════════════════════════
     fprintf('\n== TEST 3: new context menu items present ==\n');
     try
-        if isMATLABReleaseOlderThan('R2023b')
-            fprintf('   SKIP (pre-R2023b)\n');
+        if isMATLABReleaseOlderThan('R2023b') || ~isfile(VSM_F)
+            fprintf('   SKIP (pre-R2023b or missing data)\n');
         else
             axh   = api.getAxes();
             cm    = axh.ContextMenu;
             items = cm.Children;
             texts = arrayfun(@(m) m.Text, items, 'UniformOutput', false);
-            check('menu has Edit Axis Labels...',  any(strcmp(texts, 'Edit Axis Labels...')));
-            check('menu has Set Axis Limits...',   any(strcmp(texts, 'Set Axis Limits...')));
-            check('menu has Toggle Log X',         any(strcmp(texts, 'Toggle Log X')));
+            check('menu has Set X Limits...',  any(strcmp(texts, 'Set X Limits...')));
+            check('menu has Log X',            any(strcmp(texts, 'Log X')));
+            check('menu has Toggle Grid',      any(strcmp(texts, 'Toggle Grid')));
         end
     catch ME
         recordCrash('TEST 3', ME);
@@ -122,8 +125,6 @@ function test_plotInteractions
         if ~isfile(VSM_F)
             fprintf('   SKIP (test dataset missing)\n');
         else
-            api.addFiles({VSM_F});
-            api.setActiveIdx(1);
             drawnow;
             axh   = api.getAxes();
             % Accept any visible plot objects (line, errorbar, scatter, etc.)
