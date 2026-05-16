@@ -172,7 +172,7 @@ switch lower(action)
         end
         % Persist
         try
-            recentFiles = appData.recentFiles; %#ok<NASGU>
+            recentFiles = appData.recentFiles; %#ok<NASGU> % needed by save()
             save(ctx.recentFilePath, 'recentFiles');
         catch
             % Ignore save errors silently
@@ -270,10 +270,10 @@ function refreshListBox(appData, lbImages)
     end
     names = cell(1, numel(appData.images));
     data  = cell(1, numel(appData.images));
-    for ri = 1:numel(appData.images)
-        [~, nm, ex] = fileparts(appData.images{ri}.metadata.source);
-        names{ri} = [nm ex];
-        data{ri}  = ri;
+    for rk = 1:numel(appData.images)
+        [~, nm, ex] = fileparts(appData.images{rk}.metadata.source);
+        names{rk} = [nm ex];
+        data{rk}  = rk;
     end
     lbImages.Items = names;
     lbImages.ItemsData = data;
