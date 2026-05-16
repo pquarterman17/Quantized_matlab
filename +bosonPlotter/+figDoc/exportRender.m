@@ -61,10 +61,16 @@ function outPath = exportRender(datasets, activeIdx, overlayMode, model, profile
         ax.YLabel.FontName = profile.fontName;
     end
 
-    % Scale data line widths
+    % Scale data line widths (respect user overrides from traceStyles)
     lines = findobj(ax.Children, 'Type', 'Line');
     for k = 1:numel(lines)
-        lines(k).LineWidth = profile.lineWidth;
+        trIdx = numel(lines) - k + 1;
+        hasOverride = trIdx <= numel(model.traceStyles) ...
+            && isfield(model.traceStyles{trIdx}, 'lineWidth') ...
+            && ~isempty(model.traceStyles{trIdx}.lineWidth);
+        if ~hasOverride
+            lines(k).LineWidth = profile.lineWidth;
+        end
     end
 
     % Scale legend font

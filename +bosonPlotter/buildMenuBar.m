@@ -47,6 +47,7 @@ function buildMenuBar(fig, cb)
     addItem(editMenu, 'Edit Axis Labels...',      cb.onEditAxisLabelsMenu, 'Separator',true);
     addItem(editMenu, 'Edit Legend...',           cb.onOpenLegendEditor);
     addItem(editMenu, 'Edit Trace Styles...',    cb.onTraceStyles);
+    addItem(editMenu, 'Apply Style to All',      cb.onApplyStyleToAll);
     addItem(editMenu, 'Edit Column Mapping...',   cb.onEditColumnMapping);
 
     % ── &View ──────────────────────────────────────────────────────────

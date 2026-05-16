@@ -28,5 +28,8 @@ function dispatchAction(action, fig, appData, overlayOn, ax, setStatusFcn)
             bosonPlotter.figDoc.buildTraceStyleDialog(fig, ax, model, applyFcn);
         case 'templates'
             bosonPlotter.figDoc.buildTemplateDialog(fig, model, applyFcn);
+        case 'applyStyleToAll'
+            bosonPlotter.figDoc.applyStyleToAll(appData.datasets, appData.activeIdx);
+            setStatusFcn(sprintf('Style applied to %d datasets.', numel(appData.datasets)));
     end
 end

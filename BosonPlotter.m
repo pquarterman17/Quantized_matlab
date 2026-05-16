@@ -412,7 +412,7 @@ function varargout = BosonPlotter(options)
         'onWilliamsonHallPlot',@onWilliamsonHallPlot, 'onReflectivityFFT',@onReflectivityFFT, 'onFFTThickness',@onFFTThickness, ...
         'onRefineLattice',@onRefineLattice, 'onMatchPhases',@onMatchPhases, ...
         'onPoleFigure',@onPoleFigure, 'onDecomposeRSM',@onDecomposeRSM, 'onAdvAsymmetry',@onAdvAsymmetry, 'onShowAdvancedMenu',@onShowAdvancedMenu, ...
-        'onFigureProperties',@onFigureProperties, 'onQuickExport',@onQuickExport, 'onCopyForSlides',@onCopyForSlides, 'onAnnotations',@onAnnotations, 'onTraceStyles',@onTraceStyles, 'onFigDocTemplates',@onFigDocTemplates, ...
+        'onFigureProperties',@onFigureProperties, 'onQuickExport',@onQuickExport, 'onCopyForSlides',@onCopyForSlides, 'onAnnotations',@onAnnotations, 'onTraceStyles',@onTraceStyles, 'onFigDocTemplates',@onFigDocTemplates, 'onApplyStyleToAll',@onApplyStyleToAll, ...
         'onPlotTemplates',@onPlotTemplates, 'onOpenPlotStyleDialog',@onOpenPlotStyleDialog, 'onAdvancedFigureBuilder',@onAdvancedFigureBuilder, ...
         'onComposeFigure',@onComposeFigure, 'onBatchFigureExport',@onBatchFigureExport, 'onPolarPlot',@onPolarPlot, ...
         'onToggleMacroRecord',@onToggleMacroRecord, 'onExportMacro',@onExportMacro, ...
@@ -5561,7 +5561,8 @@ function onSendToOrigin(~,~)
     function onCopyForSlides(~,~),    figDocDispatch_('copy');        end
     function onAnnotations(~,~),      figDocDispatch_('annotations'); end
     function onTraceStyles(~,~),     figDocDispatch_('traceStyles'); end
-    function onFigDocTemplates(~,~), figDocDispatch_('templates');   end
+    function onFigDocTemplates(~,~),  figDocDispatch_('templates');      end
+    function onApplyStyleToAll(~,~), figDocDispatch_('applyStyleToAll'); end
     function figDocDispatch_(action)
         overlayOn = numel(lbDatasets.Value) > 1 || iscell(lbDatasets.Value);
         bosonPlotter.figDoc.dispatchAction(action, fig, appData, overlayOn, ax, @setStatus);
@@ -6894,7 +6895,6 @@ function ls = guiLineSpec_raw(style)
             ls = {'LineStyle','--','LineWidth',0.75};
     end
 end
-
 
 function ls = guiLineSpec_right(style)
 %GUILINESPEC_RIGHT  Dashed line spec for right-axis (Y2) channels.
