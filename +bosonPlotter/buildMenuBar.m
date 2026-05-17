@@ -105,6 +105,7 @@ function buildMenuBar(fig, cb)
     addItem(toolsMenu, 'Quick Export...',         cb.onQuickExport);
     addItem(toolsMenu, 'Export Preview...',       cb.onExportPreview);
     addItem(toolsMenu, 'Re-export (last)',        cb.onReExport,            'Accelerator','E');
+    addItem(toolsMenu, 'Publish...',             cb.onPublishFigure,       'Separator',true, 'Accelerator','J');
     addItem(toolsMenu, 'Copy for Slides',         cb.onCopyForSlides,       'Accelerator','P');
     addItem(toolsMenu, 'FigDoc Templates...',    cb.onFigDocTemplates,    'Separator',true);
     addItem(toolsMenu, 'Plot Templates...',       cb.onPlotTemplates);

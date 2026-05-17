@@ -50,15 +50,15 @@ function test_rowLevelMasking
     % ════════════════════════════════════════════════════════════════════
     fprintf('\n== TEST 1: Masked column removed ==\n');
     try
-        colNames = tbl.ColumnName;
+        colNames = tblU.ColumnName;
         check('ColumnName does NOT contain "Masked"', ...
               ~any(strcmp(colNames, 'Masked')));
 
-        % Data is now a numeric matrix (post-split).  Column count
-        % should still match ColumnName count.
+        % tblData.ColumnName is now {} (hidden header); column names
+        % live in tblUnits. Data column count matches tblUnits count.
         if ~isempty(tbl.Data)
             nTableCols = size(tbl.Data, 2);
-            check('Data column count == ColumnName count', ...
+            check('Data column count == tblUnits ColumnName count', ...
                   nTableCols == numel(colNames));
         end
     catch ME
@@ -134,7 +134,7 @@ function test_rowLevelMasking
 
         % Column count still matches (no mask column added back)
         check('column count stable after refresh with mask', ...
-              size(tbl.Data, 2) == numel(tbl.ColumnName));
+              size(tbl.Data, 2) == numel(tblU.ColumnName));
     catch ME
         recordCrash('TEST 3', ME);
     end
@@ -157,7 +157,7 @@ function test_rowLevelMasking
 
         check('table still valid after clearing all masks', isvalid(tbl));
         check('column count still matches', ...
-              size(tbl.Data, 2) == numel(tbl.ColumnName));
+              size(tbl.Data, 2) == numel(tblU.ColumnName));
     catch ME
         recordCrash('TEST 4', ME);
     end
