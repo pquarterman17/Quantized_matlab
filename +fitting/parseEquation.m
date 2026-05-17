@@ -192,19 +192,97 @@ while ~isempty(opStack)
 end
 
 % ════════════════════════════════════════════════════════════════════════
-% Build evaluator function handle (stack machine over the RPN list)
+% Compile RPN to a function handle (hot path for repeated evaluation)
 % ════════════════════════════════════════════════════════════════════════
 
-% Capture rpn and funcHandles into the closure
-rpnCopy = rpn;
-fhMap = funcHandles;
-
-fcn = @(x, p) evaluateRPN(rpnCopy, fhMap, x, p);
+% compileRPN walks the token list ONCE and builds a MATLAB expression
+% string, then wraps it with str2func.  Only tokens that survived the
+% validated tokenizer/shunting-yard above are used — no user string is
+% passed through str2func directly.
+fcn = compileRPN(rpn);
 
 end
 
 % ════════════════════════════════════════════════════════════════════════
-% RPN stack-machine evaluator
+% RPN compiler — builds a MATLAB expression string from validated tokens
+% ════════════════════════════════════════════════════════════════════════
+
+function fcn = compileRPN(rpn)
+%COMPILERPN  Walk validated RPN tokens once; return @(x, p) handle.
+%
+%   Only tokens produced by the validated tokenizer/shunting-yard are
+%   used here — no raw user string reaches str2func.  The set of legal
+%   operators and function names is closed by construction.
+    strStack = cell(1, numel(rpn));
+    top = 0;
+
+    for k = 1:numel(rpn)
+        tok = rpn{k};
+        switch tok.type
+            case 'number'
+                top = top + 1;
+                % Emit a full-precision literal so the compiled handle
+                % matches the parse-time double value exactly.
+                strStack{top} = sprintf('%.17g', tok.value);
+
+            case 'x'
+                top = top + 1;
+                strStack{top} = 'x';
+
+            case 'param'
+                top = top + 1;
+                strStack{top} = sprintf('p(%d)', tok.value);
+
+            case 'operator'
+                b = strStack{top}; top = top - 1;
+                a = strStack{top}; top = top - 1;
+                switch tok.value
+                    case '+', expr = ['(' a '+' b ')'];
+                    case '-', expr = ['(' a '-' b ')'];
+                    case '*', expr = ['(' a '.*' b ')'];
+                    case '/', expr = ['(' a './' b ')'];
+                    case '^', expr = ['(' a '.^' b ')'];
+                    otherwise
+                        error('fitting:parseEquation:compileRPN:badOp', ...
+                            'Unknown operator "%s".', tok.value);
+                end
+                top = top + 1;
+                strStack{top} = expr;
+
+            case 'function'
+                % All function names in funcNames are safe built-ins
+                % validated during tokenization.
+                a = strStack{top}; top = top - 1;
+                top = top + 1;
+                strStack{top} = [tok.value '(' a ')'];
+        end
+    end
+
+    if top ~= 1
+        error('fitting:parseEquation:compileRPN:badExpr', ...
+            'RPN compilation produced %d stack items; expected 1.', top);
+    end
+
+    exprStr = strStack{1};
+    % Wrap for column-vector output matching evaluateRPN contract.
+    bodyStr = ['@(x,p) reshape((' exprStr '),size(x,1),size(x,2))'];
+    rawFcn  = str2func(bodyStr);
+
+    % Ensure scalar-model output is broadcast to x-shaped vector.
+    fcn = @(x, p) wrapScalar(rawFcn, x, p);
+end
+
+function y = wrapScalar(rawFcn, x, p)
+    y = rawFcn(x(:), p);
+    if isscalar(y)
+        y = repmat(y, numel(x), 1);
+    else
+        y = y(:);
+    end
+end
+
+% ════════════════════════════════════════════════════════════════════════
+% RPN stack-machine evaluator (fallback / oracle — no longer the hot path)
 % ════════════════════════════════════════════════════════════════════════
 
 function y = evaluateRPN(rpn, fhMap, x, p)

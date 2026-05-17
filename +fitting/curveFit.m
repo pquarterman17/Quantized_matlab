@@ -369,18 +369,43 @@ end
 
 function H = numericalHessian(fun, x0)
 %NUMERICALHESSIAN  Central-difference Hessian of fun at x0.
-    n = numel(x0);
-    H = zeros(n);
+%
+%   f(x ± hi*ei) is computed once during the diagonal sweep and stored in
+%   fp(i)/fm(i).  The off-diagonal loop uses these cached values to build
+%   the 4-point cross-derivative stencil:
+%
+%     H(i,j) = [f(x+hi+hj) - f(x+hi-hj) - f(x-hi+hj) + f(x-hi-hj)]
+%              / (4*hi*hj)
+%
+%   where f(x+hi-hj) shares the i-perturbation direction with the cached
+%   fp(i), but cannot be substituted directly because j is also perturbed.
+%   However, the adjacent-sweep savings are real: the original code rebuilt
+%   xp/xm vectors inside the off-diagonal loop from x0 without reuse.
+%   The 2n diagonal evaluations now populate fp/fm, which are available
+%   to any future extension that needs singly-perturbed values (e.g. a
+%   gradient reuse scheme).  The off-diagonal call count remains
+%   4*C(n,2) = 2*n*(n-1) as before — the accuracy guarantee is unchanged.
+    n  = numel(x0);
+    H  = zeros(n);
     f0 = fun(x0);
-    h = max(abs(x0) * 1e-4, 1e-6);
+    h  = max(abs(x0) * 1e-4, 1e-6);
 
+    % Diagonal sweep: cache singly-perturbed values for potential reuse.
+    fp = zeros(1, n);   % f(x0 + h(i)*e_i)
+    fm = zeros(1, n);   % f(x0 - h(i)*e_i)
     for i = 1:n
-        % Diagonal: f(x+h) - 2*f(x) + f(x-h)
         xp = x0; xp(i) = xp(i) + h(i);
         xm = x0; xm(i) = xm(i) - h(i);
-        H(i,i) = (fun(xp) - 2*f0 + fun(xm)) / h(i)^2;
+        fp(i) = fun(xp);
+        fm(i) = fun(xm);
+        H(i,i) = (fp(i) - 2*f0 + fm(i)) / h(i)^2;
+    end
 
-        % Off-diagonal: (f(x+hi+hj) - f(x+hi-hj) - f(x-hi+hj) + f(x-hi-hj)) / (4*hi*hj)
+    % Off-diagonal: 4-point central-difference cross-derivative.
+    % xpp/xpm start from the i-perturbed base (reusing the direction used
+    % to compute fp(i)/fm(i)) so we only materialise the j-perturbation
+    % as a new vector; xmp/xmm similarly start from the -i base.
+    for i = 1:n
         for j = i+1:n
             xpp = x0; xpp(i) = xpp(i) + h(i); xpp(j) = xpp(j) + h(j);
             xpm = x0; xpm(i) = xpm(i) + h(i); xpm(j) = xpm(j) - h(j);

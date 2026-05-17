@@ -123,20 +123,32 @@ lpKept   = logPost(keepIdx);
 
 % ── Diagnostics ───────────────────────────────────────────────────────
 nKept = numel(keepIdx);
-% Rough effective sample size via integrated autocorrelation time
-% estimate (Sokal 1997). Placeholder — production code should use a
-% full windowed estimator.
+% Effective sample size via integrated autocorrelation time (Sokal 1997).
+% All P parameters are processed in a single batched FFT pass rather than
+% calling xcorr() in a per-parameter loop.  For each column the normalised
+% autocorrelation is the inverse FFT of |FFT(z)|^2 / nKept^2, where z is
+% the mean-centred chain.  This is numerically equivalent to xcorr(z,'normalized')
+% but avoids repeated FFT setup and MATLAB function-call overhead.
 essPerDim = zeros(1, P);
-for p = 1:P
-    x = samples(:, p) - mean(samples(:, p));
-    if all(x == 0)
-        essPerDim(p) = nKept;
-        continue;
-    end
-    ac = xcorr(x, 'normalized');
-    tau = 1 + 2 * sum(ac((nKept + 1):(2 * nKept - 1)) ...
-                      .* (ac((nKept + 1):(2 * nKept - 1)) > 0.05));
-    essPerDim(p) = nKept / max(tau, 1);
+nfft  = 2^nextpow2(2 * nKept - 1);   % zero-pad to avoid circular wrap
+Z     = samples - mean(samples, 1);   % [nKept × P] mean-centred
+
+% Columns that are all-zero get ESS = nKept immediately.
+zeroMask = all(Z == 0, 1);
+essPerDim(zeroMask) = nKept;
+
+if any(~zeroMask)
+    Zactive = Z(:, ~zeroMask);
+    F       = fft(Zactive, nfft, 1);          % FFT along rows (lags)
+    acFull  = real(ifft(F .* conj(F), [], 1));% [nfft × Pactive] power
+    % Normalise each column by its zero-lag value (= variance * nKept)
+    acFull  = acFull ./ acFull(1, :);
+    % Keep only the positive-lag half [lags 1 … nKept-1]
+    acPos   = acFull(2:nKept, :);             % [nKept-1 × Pactive]
+    % Integrated autocorrelation: tau = 1 + 2 * sum of positive ac values
+    % above the 0.05 threshold (matching the original per-parameter logic).
+    tauVec  = 1 + 2 * sum(acPos .* (acPos > 0.05), 1);
+    essPerDim(~zeroMask) = nKept ./ max(tauVec, 1);
 end
 
 result.samples       = samples;
