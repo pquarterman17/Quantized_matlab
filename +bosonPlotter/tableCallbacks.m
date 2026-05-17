@@ -395,7 +395,7 @@ cb.onPasteFromClipboard   = @onPasteFromClipboard;
             uialert(fig, 'No valid data in selected column.', 'Statistics');
             return;
         end
-        colNames = tblData.ColumnName;
+        colNames = tblUnits.ColumnName;
         colName = colNames{col};
         mu = mean(colData); sg = std(colData); med = median(colData);
         mn = min(colData); mx = max(colData); n = numel(colData);
@@ -411,7 +411,7 @@ cb.onPasteFromClipboard   = @onPasteFromClipboard;
             uialert(fig, 'No data loaded.', 'Formula');
             return;
         end
-        colNames = tblData.ColumnName;
+        colNames = tblUnits.ColumnName;
         prompt = sprintf('Enter formula using column names (%s).\nExample: col2 * 1000', ...
             strjoin(colNames, ', '));
         answer = inputdlg({prompt, 'New column name:'}, 'Column from Formula', ...
@@ -439,10 +439,10 @@ cb.onPasteFromClipboard   = @onPasteFromClipboard;
         end
         appData.tableWorkingCopy = [wc, newCol(:)];
         appData.tableUnits = [appData.tableUnits, {''}];
-        tblData.ColumnName = [colNames; {newName}];
+        allNames = [colNames; {newName}];
         tblData.Data = appData.tableWorkingCopy;
         tblData.ColumnEditable = true(1, nCols + 1);
-        tblUnits.ColumnName = [colNames; {newName}];
+        tblUnits.ColumnName = allNames;
         tblUnits.Data = appData.tableUnits;
         tblUnits.ColumnEditable = true(1, nCols + 1);
         setStatus(sprintf('Added column "%s" from formula', newName));
@@ -501,7 +501,6 @@ cb.onPasteFromClipboard   = @onPasteFromClipboard;
             appData.tableWorkingCopy = mat;
             appData.tableMask = false(nRows, 1);
             appData.tableUnits = repmat({''}, 1, nCols);
-            tblData.ColumnName = colNames(:);
             tblData.Data = mat;
             tblData.ColumnEditable = true(1, nCols);
             tblUnits.ColumnName = colNames(:);
@@ -516,9 +515,8 @@ cb.onPasteFromClipboard   = @onPasteFromClipboard;
             end
             appData.tableWorkingCopy = [wc, mat];
             appData.tableUnits = [appData.tableUnits, repmat({''}, 1, nCols)];
-            allNames = [tblData.ColumnName; colNames(:)];
+            allNames = [tblUnits.ColumnName; colNames(:)];
             nAll = size(appData.tableWorkingCopy, 2);
-            tblData.ColumnName = allNames;
             tblData.Data = appData.tableWorkingCopy;
             tblData.ColumnEditable = true(1, nAll);
             tblUnits.ColumnName = allNames;
@@ -543,7 +541,7 @@ cb.onPasteFromClipboard   = @onPasteFromClipboard;
         outPath = fullfile(fp, fn);
 
         try
-            colNames = tblData.ColumnName;
+            colNames = tblUnits.ColumnName;
             if strcmp(colNames{end}, 'Masked')
                 colNames = colNames(1:end-1);
             end

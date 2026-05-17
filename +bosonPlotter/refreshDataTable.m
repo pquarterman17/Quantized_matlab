@@ -34,7 +34,7 @@ function refreshDataTable(appData, tblData, tblUnits, lblTableUnits, lblTableSta
 % ════════════════════════════════════════════════════════════════════════
 
     if appData.activeIdx < 1 || isempty(appData.datasets)
-        tblData.ColumnName = {'(no data)'};
+        tblData.ColumnName = {};
         tblData.Data = [];
         tblUnits.ColumnName = {'(no data)'};
         tblUnits.Data = {};
@@ -46,7 +46,7 @@ function refreshDataTable(appData, tblData, tblUnits, lblTableUnits, lblTableSta
     % Skip table population for 2D datasets — the table is hidden and
     % the 1D projection data is not meaningful in 2D map mode.
     if callbacks.is2DDatasetFn(appData.datasets{appData.activeIdx})
-        tblData.ColumnName = {'(2D map — table hidden)'};
+        tblData.ColumnName = {};
         tblData.Data = [];
         tblUnits.ColumnName = {'(2D map — table hidden)'};
         tblUnits.Data = {};
@@ -124,7 +124,7 @@ function refreshDataTable(appData, tblData, tblUnits, lblTableUnits, lblTableSta
         % the full matrix lives in appData.tableWorkingCopy and is
         % still available for export / analysis.
         cap = min(nRows, appData.tableRowCap);
-        tblData.ColumnName = colNames;
+        tblData.ColumnName = {};
         tblData.Data = dataMat(1:cap, :);
         tblData.ColumnEditable = true(1, nDataCols);
 
@@ -167,7 +167,7 @@ function refreshDataTable(appData, tblData, tblUnits, lblTableUnits, lblTableSta
 
         % Pure numeric data rows
         cap = min(nRows, appData.tableRowCap);
-        tblData.ColumnName = colNames;
+        tblData.ColumnName = {};
         tblData.Data = [xCol(1:cap), yMat(1:cap, :)];
         tblData.ColumnEditable = true(1, 1 + nCols);
 

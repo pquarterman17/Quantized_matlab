@@ -70,8 +70,8 @@ Collapsible panel below the plot axes. Toggle via the "▾ Data Table" bar.
 
 The data table panel is implemented as **two separate `uitable` widgets** stacked inside `dataTableInnerGL`:
 
-- `tblUnits` (row 4 of the inner grid) — a **1-row** editable table rendered with green text on a pale green background. Holds the unit strings for each column. Its `ColumnName` is always kept in sync with `tblData.ColumnName` and `ColumnWidth` is synchronised explicitly via `syncUnitsColumnWidths()` after every refresh.
-- `tblData` (row 5 of the inner grid) — the main **scrollable** data table. Its `Data` property is always a **pure numeric matrix** (never a cell array).
+- `tblUnits` (row 4 of the inner grid) — a **1-row** editable table rendered with green text on a pale green background. Holds the unit strings for each column. Its `ColumnName` displays column headers; `ColumnWidth` is synchronised explicitly via `syncUnitsColumnWidths()` after every refresh.
+- `tblData` (row 5 of the inner grid) — the main **scrollable** data table. Its `Data` property is always a **pure numeric matrix** (never a cell array). `ColumnName` is set to `{}` (hidden) to avoid a duplicate header row — all column names are shown via `tblUnits` above. Code that needs column names should read `tblUnits.ColumnName`.
 
 **Why the split?** MATLAB's `uitable` renders approximately 10x slower on scroll events when `Data` is a cell array compared to a pure numeric matrix. Previously, the units row lived in row 1 of the single table's `Data` as a cell, which forced the entire `Data` property to be a cell array and caused visible scroll lag on datasets with hundreds of rows. Separating the units into their own fixed 1-row `tblUnits` keeps `tblData.Data` as a numeric matrix, eliminating the re-render cost on every scroll event.
 
