@@ -91,11 +91,6 @@ helpMenu = uimenu(fig, 'Text', '&Help');
 uimenu(helpMenu, 'Text', 'Report a Bug...', ...
     'MenuSelectedFcn', @(~,~) onReportBug());
 
-% ── Help menu (Report a Bug) ─────────────────────────────────────────────
-helpMenu = uimenu(fig, 'Text', '&Help');
-uimenu(helpMenu, 'Text', 'Report a Bug...', ...
-    'MenuSelectedFcn', @(~,~) onReportBug());
-
 % ════════════════════════════════════════════════════════════════════════
 %  Root grid: [toolbar ; content]
 % ════════════════════════════════════════════════════════════════════════
