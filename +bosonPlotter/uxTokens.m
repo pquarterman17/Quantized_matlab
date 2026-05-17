@@ -38,8 +38,13 @@ function tk = uxTokens(theme)
 % Backgrounds:
 %   tk.color.bgFigure      figure root background
 %   tk.color.bgPanel       uipanel / uigridlayout
+%   tk.color.bgSidebar     nav sidebar / status bar (deeper than bgPanel)
+%   tk.color.bgTable       table / content-area background
 %   tk.color.bgInput       edit fields, listboxes, tables
 %   tk.color.bgSubtle      secondary button bg / muted surfaces
+%
+% Accent:
+%   tk.color.accent        interactive selection / active-state highlight
 %
 % Compatibility alias:
 %   tk.color.bgDark        — alias for bgInput (legacy name; bg of input
@@ -105,8 +110,13 @@ function tk = uxTokens(theme)
         % Backgrounds (DARK)
         tk.color.bgFigure      = [0.13 0.13 0.13];
         tk.color.bgPanel       = [0.18 0.18 0.18];
+        tk.color.bgSidebar     = [0.10 0.10 0.10];
+        tk.color.bgTable       = [0.13 0.13 0.13];
         tk.color.bgInput       = [0.17 0.17 0.17];
         tk.color.bgSubtle      = [0.28 0.28 0.28];
+
+        % Accent (DARK)
+        tk.color.accent        = [0.24 0.52 0.90];
 
         % Button palette: theme-aware members
         tk.color.btn.tool      = [0.28 0.28 0.28];
@@ -130,8 +140,13 @@ function tk = uxTokens(theme)
         % Backgrounds (LIGHT)
         tk.color.bgFigure      = [0.94 0.94 0.94];
         tk.color.bgPanel       = [0.97 0.97 0.97];
+        tk.color.bgSidebar     = [0.92 0.92 0.92];
+        tk.color.bgTable       = [0.97 0.97 0.97];
         tk.color.bgInput       = [1.00 1.00 1.00];
         tk.color.bgSubtle      = [0.88 0.88 0.88];
+
+        % Accent (LIGHT)
+        tk.color.accent        = [0.20 0.45 0.85];
 
         % Button palette: theme-aware members
         tk.color.btn.tool      = [0.85 0.85 0.85];

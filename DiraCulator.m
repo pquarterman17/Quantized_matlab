@@ -36,17 +36,11 @@ try
     diracTheme_ = bosonPlotter.resolveTheme(bosonPlotter.themePref('read'));
 catch
 end
-if strcmpi(diracTheme_, 'Light')
-    FIG_BG       = [0.96 0.96 0.96];   % figure / panel background
-    SIDEBAR_BG   = [0.92 0.92 0.92];   % slightly darker sidebar
-    LABEL_FG     = [0.15 0.15 0.15];   % label text on light backgrounds
-    STATUSBAR_BG = [0.92 0.92 0.92];   % status bar background
-else
-    FIG_BG       = [0.13 0.13 0.13];   % figure / panel background
-    SIDEBAR_BG   = [0.10 0.10 0.10];   % slightly darker sidebar
-    LABEL_FG     = [0.85 0.85 0.85];   % label text on dark backgrounds
-    STATUSBAR_BG = [0.10 0.10 0.10];   % status bar background
-end
+tk           = bosonPlotter.uxTokens(lower(diracTheme_));
+FIG_BG       = tk.color.bgFigure;    % figure / panel background
+SIDEBAR_BG   = tk.color.bgSidebar;   % nav sidebar and status bar
+LABEL_FG     = tk.color.text;        % primary foreground text
+STATUSBAR_BG = tk.color.bgSidebar;   % status bar background
 
 % ════════════════════════════════════════════════════════════════════════
 % MAIN FIGURE

@@ -59,21 +59,13 @@ try
     dwTheme_ = bosonPlotter.resolveTheme(bosonPlotter.themePref('read'));
 catch
 end
-if strcmpi(dwTheme_, 'Light')
-    BG  = [0.95 0.95 0.95];   % figure / panel background
-    PAN = [0.92 0.92 0.92];   % left panel background
-    TBL = [0.97 0.97 0.97];   % table area background
-    FG  = [0.10 0.10 0.10];   % primary foreground text
-    BTN = [0.85 0.85 0.85];   % toolbar button background
-    ACC = [0.20 0.45 0.85];   % accent (selected / active)
-else
-    BG  = [0.15 0.15 0.15];   % figure / panel background
-    PAN = [0.18 0.18 0.18];   % left panel background
-    TBL = [0.13 0.13 0.13];   % table area background
-    FG  = [0.92 0.92 0.92];   % primary foreground text
-    BTN = [0.28 0.28 0.28];   % toolbar button background
-    ACC = [0.24 0.52 0.90];   % accent (selected / active)
-end
+tk  = bosonPlotter.uxTokens(lower(dwTheme_));
+BG  = tk.color.bgFigure;    % figure / panel background
+PAN = tk.color.bgPanel;     % left panel background
+TBL = tk.color.bgTable;     % table area background
+FG  = tk.color.text;        % primary foreground text
+BTN = tk.color.btn.tool;    % toolbar button background
+ACC = tk.color.accent;      % accent (selected / active)
 
 fig = uifigure( ...
     'Name',            'Data Workspace', ...
