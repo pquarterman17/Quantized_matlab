@@ -12,12 +12,12 @@ function s = computeAutoWaterfallSpacing(datasets, activeIdx, ySel, scaleY)
 %
 % Outputs
 %   s  - spacing value:
-%          Linear mode → additive offset (1.1× max data range)
-%          Log mode    → multiplicative factor (10^(1.1 × max log-range))
+%          Linear mode → additive offset (0.7× max data range)
+%          Log mode    → multiplicative factor (10^(0.7 × max log-range))
 %
 % Notes
-%   Linear mode: 1.1× the maximum data range (additive offset).
-%   Log mode:    10^(1.1 × max log-range) as a multiplicative factor.
+%   Linear mode: 0.7× the maximum data range (additive offset).
+%   Log mode:    10^(0.7 × max log-range) as a multiplicative factor.
 %   SIMS single-file: scan across all selected channels, not datasets.
 
     nDS2 = numel(datasets);
@@ -60,7 +60,7 @@ function s = computeAutoWaterfallSpacing(datasets, activeIdx, ySel, scaleY)
                 if r > maxLogRange, maxLogRange = r; end
             end
         end
-        if maxLogRange > 0, s = 10^(maxLogRange * 1.1); end
+        if maxLogRange > 0, s = 10^(maxLogRange * 0.7); end
     else
         % Linear mode — return an additive offset
         s = 1;   % safe fallback if no data range can be determined
@@ -93,7 +93,7 @@ function s = computeAutoWaterfallSpacing(datasets, activeIdx, ySel, scaleY)
                 if r > maxRange, maxRange = r; end
             end
         end
-        if maxRange > 0, s = maxRange * 1.1; end
+        if maxRange > 0, s = maxRange * 0.7; end
     end
 end
 
