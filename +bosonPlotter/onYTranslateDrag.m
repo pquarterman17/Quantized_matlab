@@ -69,8 +69,13 @@ function localMove(appData, ax, widgets, callbacks)
     cp = ax.CurrentPoint;
     dy = cp(1,2) - appData.yTranslateY0;
     widgets.efYOffset.Value = appData.yTranslateOff0 - dy;
+    % Throttle: WindowButtonMotionFcn fires up to 60 Hz; calling the full
+    % correction + render pipeline on every fire freezes the GUI on large
+    % datasets. drawnow limitrate skips work when the event queue is
+    % already saturated, capping the effective rate at ~20 Hz.
     try
         callbacks.onApplyCorrections([],[]);
+        drawnow limitrate
     catch
     end
 end
