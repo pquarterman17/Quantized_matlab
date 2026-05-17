@@ -89,20 +89,8 @@ function data = importLakeShore(filepath, options)
     % ════════════════════════════════════════════════════════════════════════
     %  1. Read file
     % ════════════════════════════════════════════════════════════════════════
-    fid = fopen(filepath, 'r');
-    if fid == -1
-        error('parser:importLakeShore:cannotOpen', ...
-            'Cannot open file: %s', filepath);
-    end
-    cleanObj = onCleanup(@() fclose(fid));
-
-    rawLines = {};
-    while ~feof(fid)
-        line = fgetl(fid);
-        if ischar(line)
-            rawLines{end+1} = line; %#ok<AGROW>
-        end
-    end
+    % Use readlines() for vectorized I/O (R2020b+) — much faster than fgetl loop
+    rawLines = cellstr(readlines(filepath));
 
     % ════════════════════════════════════════════════════════════════════════
     %  2. Locate column header row
@@ -138,7 +126,7 @@ function data = importLakeShore(filepath, options)
     colNames = cell(1, numCols);
     colUnits = cell(1, numCols);
     for c = 1:numCols
-        [colNames{c}, colUnits{c}] = parseColumnHeader(rawColNames{c});
+        [colNames{c}, colUnits{c}] = parser.parseColHeader(rawColNames{c});
     end
 
     % ════════════════════════════════════════════════════════════════════════
@@ -260,90 +248,47 @@ function headerIdx = detectHeaderRow(rawLines)
     end
 end
 
-function [name, unit] = parseColumnHeader(headerStr)
-%PARSECOLUMNHEADER  Extract name and unit from "Name (unit)" format.
-%   If no unit present, returns ('Name', '').
-    headerStr = strtrim(headerStr);
-
-    % Match pattern "Name (unit)"
-    pattern = '(.+?)\s*\(([^)]+)\)\s*$';
-    tokens = regexp(headerStr, pattern, 'tokens', 'once');
-
-    if ~isempty(tokens) && numel(tokens) == 2
-        name = strtrim(tokens{1});
-        unit = strtrim(tokens{2});
-    else
-        name = headerStr;
-        unit = '';
-    end
-end
-
 function colIdx = resolveLakeShoreColumn(spec, colNames, role)
-%RESOLVELAKESHORECOLUMN  Resolve a column spec (shorthand, name, or index).
-%   Returns 1-based column index, or errors if not found.
-    spec = char(spec);
-
-    % If numeric index, validate and return
-    if all(ismember(spec, '0123456789'))
-        colIdx = str2double(spec);
-        if colIdx < 1 || colIdx > numel(colNames)
-            error('parser:importLakeShore:badColIndex', ...
-                'Column index %d out of range [1, %d]', colIdx, numel(colNames));
+%RESOLVELAKESHORECOLUMN  Resolve a single column spec (shorthand, name, or index).
+%   Delegates to parser.resolveColumnShorthand with the LakeShore shorthand map.
+    persistent LAKESHORE_SHORTHAND_MAP
+    if isempty(LAKESHORE_SHORTHAND_MAP)
+        LAKESHORE_SHORTHAND_MAP = {
+            'temp',           'Temperature'
+            'temperature',    'Temperature'
+            't',              'Temperature'
+            'field',          'Magnetic Field'
+            'h',              'Magnetic Field'
+            'appliedfield',   'Magnetic Field'
+            'moment',         'Moment'
+            'magnetization',  'Moment'
+            'm',              'Moment'
+            'susceptibility', 'Susceptibility'
+            'chi',            'Susceptibility'
+            'chi_m',          'Susceptibility'
+        };
+    end
+    try
+        colIdx = parser.resolveColumnShorthand(spec, colNames, LAKESHORE_SHORTHAND_MAP, role);
+    catch ME
+        if contains(ME.identifier, 'notFound')
+            error('parser:importLakeShore:colNotFound', ...
+                'Could not resolve %s column "%s". Available: %s', ...
+                role, char(spec), strjoin(colNames, ', '));
         end
-        return;
+        rethrow(ME);
     end
-
-    % Try shorthands
-    shorthand = lower(spec);
-
-    % Temperature shorthands
-    if ismember(shorthand, {'temp', 'temperature', 't'})
-        colIdx = findColumnByKeyword(colNames, {'Temperature', 'Temp', 'T'});
-        if ~isnan(colIdx), return; end
-    end
-
-    % Field shorthands
-    if ismember(shorthand, {'field', 'h', 'appliedfield'})
-        colIdx = findColumnByKeyword(colNames, {'Magnetic Field', 'Field', 'H-Field', 'H Field'});
-        if ~isnan(colIdx), return; end
-    end
-
-    % Moment shorthands
-    if ismember(shorthand, {'moment', 'magnetization', 'm'})
-        colIdx = findColumnByKeyword(colNames, {'Moment', 'Magnetization', 'M'});
-        if ~isnan(colIdx), return; end
-    end
-
-    % Susceptibility shorthands
-    if ismember(shorthand, {'susceptibility', 'chi', 'chi_m'})
-        colIdx = findColumnByKeyword(colNames, {'Susceptibility', 'Chi', 'χ'});
-        if ~isnan(colIdx), return; end
-    end
-
-    % Try exact match (case-insensitive)
-    colIdx = findColumnByExactName(colNames, spec);
-    if ~isnan(colIdx), return; end
-
-    % Not found
-    error('parser:importLakeShore:colNotFound', ...
-        'Could not resolve %s column "%s". Available: %s', ...
-        role, spec, strjoin(colNames, ', '));
 end
 
 function colIndices = resolveLakeShoreColumns(spec, colNames, xColIdx, role)
 %RESOLVELAKESHORECOLUMNS  Resolve one or more y-axis columns.
 %   Returns 1-based column indices. Special value 'all' returns all except xColIdx.
-    if ischar(spec) && strcmpi(spec, 'all')
-        % All columns except x-axis
+    if (ischar(spec) || isstring(spec)) && strcmpi(spec, 'all')
         colIndices = setdiff(1:numel(colNames), xColIdx);
-        if isempty(colIndices)
-            colIndices = [];
-        end
         return;
     end
 
     if ischar(spec) || isstring(spec)
-        % Single column
         spec = {spec};
     end
 
@@ -351,36 +296,9 @@ function colIndices = resolveLakeShoreColumns(spec, colNames, xColIdx, role)
     if iscell(spec)
         for k = 1:numel(spec)
             idx = resolveLakeShoreColumn(spec{k}, colNames, role);
-            if idx ~= xColIdx  % exclude x-axis
-                colIndices = [colIndices, idx]; %#ok<AGROW>
+            if idx ~= xColIdx
+                colIndices(end+1) = idx; %#ok<AGROW>
             end
-        end
-    end
-end
-
-function idx = findColumnByKeyword(colNames, keywords)
-%FINDCOLUMNBYKEYWORD  Find first column name containing any keyword.
-%   Returns 1-based index or NaN.
-    idx = NaN;
-    for k = 1:numel(keywords)
-        keyword = keywords{k};
-        for c = 1:numel(colNames)
-            if contains(colNames{c}, keyword, 'IgnoreCase', true)
-                idx = c;
-                return;
-            end
-        end
-    end
-end
-
-function idx = findColumnByExactName(colNames, name)
-%FINDCOLUMNBYEXACTNAME  Find column by exact case-insensitive name match.
-%   Returns 1-based index or NaN.
-    idx = NaN;
-    for c = 1:numel(colNames)
-        if strcmpi(colNames{c}, name)
-            idx = c;
-            return;
         end
     end
 end

@@ -89,19 +89,8 @@ function data = importPPMS(filepath, options)
     %  DataStartRow = -1 (auto = HeaderRow+1) or an explicit 1-based index
     %  Comment lines are those whose first non-space character is ; # or %
     % ════════════════════════════════════════════════════════════════
-    fid = fopen(filepath, 'r');
-    if fid == -1
-        error('parser:importPPMS:cannotOpen', 'Cannot open file: %s', filepath);
-    end
-    cleanObj = onCleanup(@() fclose(fid));
-
-    allLines = {};
-    while ~feof(fid)
-        line = fgetl(fid);
-        if ischar(line)
-            allLines{end+1} = line; %#ok<AGROW>
-        end
-    end
+    % Use readlines() for vectorized I/O (R2020b+) — much faster than fgetl loop
+    allLines = cellstr(readlines(filepath));
 
     if isempty(allLines)
         error('parser:importPPMS:emptyFile', 'File is empty: %s', filepath);
@@ -109,16 +98,13 @@ function data = importPPMS(filepath, options)
 
     % Resolve header row
     if options.HeaderRow == -1
-        headerRowIdx = 0;
-        for li = 1:numel(allLines)
-            ln = strtrim(allLines{li});
-            if isempty(ln), continue; end
-            if ~any(ln(1) == ';#%')
-                headerRowIdx = li;
-                break;
-            end
-        end
-        if headerRowIdx == 0
+        trimmed = strtrim(allLines);
+        nonEmpty = ~cellfun('isempty', trimmed);
+        firstChars = repmat(' ', 1, numel(trimmed));
+        firstChars(nonEmpty) = cellfun(@(s) s(1), trimmed(nonEmpty));
+        isHeader = nonEmpty & ~ismember(firstChars, ';#%');
+        headerRowIdx = find(isHeader, 1);
+        if isempty(headerRowIdx)
             error('parser:importPPMS:noHeader', ...
                 'No non-comment header line found in: %s', filepath);
         end
@@ -133,15 +119,10 @@ function data = importPPMS(filepath, options)
         dataStartIdx = options.DataStartRow;
     end
 
-    % Collect non-empty lines from data start onward
+    % Collect non-empty lines from data start onward (vectorized)
     headerLine = allLines{headerRowIdx};
-    rawLines   = {};
-    for li = dataStartIdx:numel(allLines)
-        ln = strtrim(allLines{li});
-        if ~isempty(ln)
-            rawLines{end+1} = ln; %#ok<AGROW>
-        end
-    end
+    tailLines  = strtrim(allLines(dataStartIdx:end));
+    rawLines   = tailLines(~cellfun('isempty', tailLines));
 
     if isempty(rawLines)
         error('parser:importPPMS:noData', 'No data rows found in: %s', filepath);
@@ -173,7 +154,7 @@ function data = importPPMS(filepath, options)
     colNames = cell(1, numCols);
     colUnits = cell(1, numCols);
     for c = 1:numCols
-        [colNames{c}, colUnits{c}] = parseColHeader(allHeaders{c});
+        [colNames{c}, colUnits{c}] = parser.parseColHeader(allHeaders{c});
     end
 
     % ════════════════════════════════════════════════════════════════
@@ -270,18 +251,6 @@ end
 % ════════════════════════════════════════════════════════════════════
 %  LOCAL HELPERS
 % ════════════════════════════════════════════════════════════════════
-
-function [name, unit] = parseColHeader(raw)
-%PARSECOLHEADER Split "Magnetic Field (Oe)" → name='Magnetic Field', unit='Oe'
-    unit = '';
-    name = strtrim(raw);
-    tok  = regexp(name, '^(.+?)\s*\(([^)]+)\)\s*$', 'tokens', 'once');
-    if ~isempty(tok)
-        name = strtrim(tok{1});
-        unit = strtrim(tok{2});
-    end
-end
-
 
 function idx = resolvePPMSColumn(spec, colNames, role)
 %RESOLVEPPMSCOLUMN Map a shorthand or name/index to a column index.

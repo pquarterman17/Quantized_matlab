@@ -59,21 +59,8 @@ function data = importNCNRDat(filepath, options)
     % ════════════════════════════════════════════════════════════════
     %  Read file and parse header
     % ════════════════════════════════════════════════════════════════
-    fid = fopen(filepath, 'r');
-    try
-        lines = {};
-        while true
-            line = fgetl(fid);
-            if ~ischar(line)
-                break;
-            end
-            lines{end+1} = line; %#ok<AGROW>
-        end
-    catch ME
-        fclose(fid);
-        rethrow(ME);
-    end
-    fclose(fid);
+    % Use readlines() for vectorized I/O (R2020b+) — much faster than fgetl loop
+    lines = cellstr(readlines(filepath));
 
     if isempty(lines)
         error('parser:importNCNRDat:emptyFile', ...
@@ -107,30 +94,44 @@ function data = importNCNRDat(filepath, options)
     end
 
     % ════════════════════════════════════════════════════════════════
-    %  Parse data rows
+    %  Parse data rows — vectorized: skip comments/blanks, then tokenize
+    %  every row at once and pre-allocate the matrix.
     % ════════════════════════════════════════════════════════════════
-    dataLines = lines(dataStartIdx:end);
-    dataArray = [];
+    dataLines = strtrim(lines(dataStartIdx:end));
+    keepMask  = ~cellfun('isempty', dataLines) & ...
+                ~startsWith(dataLines, '#');
+    dataLines = dataLines(keepMask);
 
-    for i = 1:numel(dataLines)
-        line = dataLines{i};
-        if isempty(strtrim(line)) || startsWith(strtrim(line), '#')
-            continue;
-        end
-        tokens = str2double(strsplit(strtrim(line)));
-        % Filter out NaN tokens
-        tokens(isnan(tokens)) = [];
-        if isempty(tokens), continue; end
-        % Guard: skip rows with inconsistent column count
-        if ~isempty(dataArray) && numel(tokens) ~= size(dataArray, 2)
-            continue;
-        end
-        dataArray = [dataArray; tokens]; %#ok<AGROW>
-    end
-
-    if isempty(dataArray)
+    if isempty(dataLines)
         error('parser:importNCNRDat:noData', ...
             'No numeric data found in file: %s', filepath);
+    end
+
+    % Tokenize once per row, drop NaNs, accumulate into a pre-allocated matrix
+    perRowTokens = cell(numel(dataLines), 1);
+    rowWidths    = zeros(numel(dataLines), 1);
+    for i = 1:numel(dataLines)
+        tok = str2double(strsplit(dataLines{i}));
+        tok(isnan(tok)) = [];
+        perRowTokens{i} = tok;
+        rowWidths(i) = numel(tok);
+    end
+
+    % Use the first non-empty row's width as the canonical column count;
+    % skip rows with inconsistent column count (matches prior behavior).
+    nonEmpty = rowWidths > 0;
+    if ~any(nonEmpty)
+        error('parser:importNCNRDat:noData', ...
+            'No numeric data found in file: %s', filepath);
+    end
+    firstIdx  = find(nonEmpty, 1);
+    nColsRef  = rowWidths(firstIdx);
+    validRows = nonEmpty & (rowWidths == nColsRef);
+
+    dataArray = zeros(sum(validRows), nColsRef);
+    validIdx  = find(validRows);
+    for k = 1:numel(validIdx)
+        dataArray(k, :) = perRowTokens{validIdx(k)};
     end
 
     % ════════════════════════════════════════════════════════════════

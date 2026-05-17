@@ -196,7 +196,7 @@ function data = importQDVSM(filepath, options)
     colNames = cell(1, numCols);
     colUnits = cell(1, numCols);
     for c = 1:numCols
-        [colNames{c}, colUnits{c}] = parseColumnHeader(rawColNames{c});
+        [colNames{c}, colUnits{c}] = parser.parseColHeader(rawColNames{c});
     end
 
     headerInfo.allColumnNames = colNames;
@@ -343,21 +343,6 @@ end
 % ════════════════════════════════════════════════════════════════════
 %  LOCAL HELPER FUNCTIONS
 % ════════════════════════════════════════════════════════════════════
-
-function [name, unit] = parseColumnHeader(raw)
-%PARSECOLUMNHEADER Split "Magnetic Field (Oe)" → name, unit
-    unit = '';
-    name = strtrim(raw);
-    if isempty(name), return; end
-
-    % Match "Name (unit)" pattern
-    tok = regexp(name, '^(.+?)\s*\(([^)]+)\)\s*$', 'tokens', 'once');
-    if ~isempty(tok)
-        name = strtrim(tok{1});
-        unit = strtrim(tok{2});
-    end
-end
-
 
 function scanType = detectScanType(headerInfo, colNames)
 %DETECTSCANTYPE  Infer scan type from STARTUPAXIS and column names.
