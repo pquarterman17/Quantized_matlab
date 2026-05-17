@@ -56,9 +56,9 @@ function saveFigure(appData, fig, ui, callbacks)
             fmtFilter = {'*.fig','MATLAB figure (*.fig)'};
             egOpts   = {};
         otherwise
-            ext      = '.png';
-            fmtFilter = {'*.png','PNG image (*.png)'};
-            egOpts   = {'ContentType','image','Resolution',300, 'BackgroundColor','none'};
+            ext      = '.pdf';
+            fmtFilter = {'*.pdf','PDF vector (*.pdf)'};
+            egOpts   = {'ContentType','vector', 'BackgroundColor','none'};
     end
 
     % Suggest a filename based on the active dataset
@@ -78,7 +78,7 @@ function saveFigure(appData, fig, ui, callbacks)
     % saved image doesn't carry the GUI's dark-theme background.
     tmpFig = figure('Visible','off','Name','SaveFig','NumberTitle','off', ...
                     'MenuBar','none','ToolBar','none', ...
-                    'Color','none', ...
+                    'Renderer','painters','Color','none', ...
                     'Units','inches','Position',[0 0 figW figH]);
     tmpAx = axes(tmpFig);
     set(tmpAx, 'Color','none');

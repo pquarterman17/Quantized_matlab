@@ -1108,6 +1108,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         function [outFig, tlo] = makeOutFig(nR, nC, shareX)
         %MAKEOUTFIG  Create a figure + tiledlayout with the global dimensions.
             outFig = figure('Name','Figure','NumberTitle','off', ...
+                'Renderer','painters', ...
                 'Units','inches','Position',[1 1 spBFigW.Value spBFigH.Value]);
             spacing = 'loose';
             if shareX, spacing = 'compact'; end
