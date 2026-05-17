@@ -82,6 +82,10 @@ function buildMenuBar(fig, cb)
     addItem(dataMenu, 'Dataset Math...',          cb.onDatasetMath);
     addItem(dataMenu, 'Dataset Algebra...',       cb.onDatasetAlgebra);
     addItem(dataMenu, 'Merge Selected',           cb.onMergeDatasets);
+    % Processing shortcuts (toggle + apply in one step)
+    addItem(dataMenu, 'Smooth (toggle + apply)',  cb.onMenuSmooth,         'Separator',true);
+    addItem(dataMenu, 'Normalize (cycle + apply)', cb.onMenuNormalize);
+    addItem(dataMenu, 'Subtract Baseline',        cb.onEstimateBaseline);
 
     % ── &Analysis ──────────────────────────────────────────────────────
     analysisMenu = uimenu(fig, 'Text', '&Analysis');

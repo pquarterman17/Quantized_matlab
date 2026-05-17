@@ -407,7 +407,7 @@ function varargout = BosonPlotter(options)
         'onSaveCSV',@onSaveCSV, 'onBatchExportCSV',@onBatchExportCSV, 'onExportHDF5',@onExportHDF5, 'onCopyDataToClipboard',@onCopyDataToClipboard, ...
         'onSendToOrigin',@onSendToOrigin, 'onExportOriginScript',@onExportOriginScript, ...
         'onConvertUnits',@onConvertUnits, 'onResampleDataset',@onResampleDataset, 'onColumnCalculator',@onColumnCalculator, ...
-        'onDatasetMath',@onDatasetMath, 'onDatasetAlgebra',@onDatasetAlgebra, 'onMergeDatasets',@onMergeDatasets, ...
+        'onDatasetMath',@onDatasetMath, 'onDatasetAlgebra',@onDatasetAlgebra, 'onMergeDatasets',@onMergeDatasets, 'onMenuSmooth',@onMenuSmooth, 'onMenuNormalize',@onMenuNormalize, ...
         'showPeakWindow',@showPeakWindow, 'onEstimateBaseline',@onEstimateBaseline, 'onFitBGRegion',@onFitBGRegion, 'onApplyCorrections',@onApplyCorrections, ...
         'onWilliamsonHallPlot',@onWilliamsonHallPlot, 'onReflectivityFFT',@onReflectivityFFT, 'onFFTThickness',@onFFTThickness, ...
         'onRefineLattice',@onRefineLattice, 'onMatchPhases',@onMatchPhases, ...
@@ -5454,6 +5454,20 @@ function onSendToOrigin(~,~)
         bosonPlotter.publishFigure(appData, fig, pubCb);
     end
 
+    function onMenuSmooth(~,~)
+        cbSmooth.Value = ~cbSmooth.Value;
+        onApplyCorrections();
+        setStatus(guiTernary(cbSmooth.Value, 'Smooth ON', 'Smooth OFF'));
+    end
+
+    function onMenuNormalize(~,~)
+        items = ddNormalize.Items;
+        cur = find(strcmp(items, ddNormalize.Value), 1);
+        ddNormalize.Value = items{mod(cur, numel(items)) + 1};
+        onApplyCorrections();
+        setStatus(sprintf('Normalize: %s', ddNormalize.Value));
+    end
+
     function figDocDispatch_(action)
         overlayOn = numel(lbDatasets.Value) > 1 || iscell(lbDatasets.Value);
         bosonPlotter.figDoc.dispatchAction(action, fig, appData, overlayOn, ax, @setStatus);
@@ -6455,13 +6469,6 @@ function onSendToOrigin(~,~)
         onPlot([],[]);
     end
 
-    % ── Analysis callbacks — stubs delegate to anaCb (analysisCallbacks.m) ─
-    % NOTE: onOverlayModeChanged / onPlotTemplates / onBatchFigureExport /
-    %       onAdvancedFigureBuilder are wired to toolbar buttons created
-    %       before anaCb exists, so named stubs are needed.  All other
-    %       analysis callbacks are wired directly as anaCb.onFoo handles
-    %       in onShowAdvancedMenu.
-
     if nargout > 0
         varargout{1} = api;
     end
@@ -6648,7 +6655,6 @@ function ls = guiLineSpec_right(style)
     end
 end
 
-
 function v = guiTernary(cond, a, b)
     if cond, v = a; else, v = b; end
 end
@@ -6674,7 +6680,6 @@ function b = bytesPerElem(x)
     end
 end
 
-
 function ls = localLineSpec(style)
 %LOCALLINESPEC  Return line-spec cell for multi-panel plot style.
     switch style
@@ -6697,7 +6702,6 @@ function x = str2num_trim(s)
     if isnan(x), x = NaN; end
 end
 
-
 function c = ensureCell(v)
 %ENSURECELL  Wrap a char/string scalar in a cell array; pass cell arrays through.
     if ischar(v) || isstring(v)
@@ -6706,7 +6710,6 @@ function c = ensureCell(v)
         c = v;
     end
 end
-
 
 function guiSaveCSV(d, fp, dRaw, asymData, fmt)
 %GUISAVECSV  Write a data struct to a comma-delimited CSV file.
@@ -6825,7 +6828,6 @@ function guiSaveCSV(d, fp, dRaw, asymData, fmt)
     end
 end
 
-
 function unit = extractUnitFromHeader(hdr)
 %EXTRACTUNITFROMHEADER  Extract text inside parentheses from a header string.
 %   'Moment (emu) [corr]' → 'emu';  'X [raw]' → ''
@@ -6836,7 +6838,6 @@ function unit = extractUnitFromHeader(hdr)
         unit = '';
     end
 end
-
 
 function desigs = buildColumnDesignations(hdrs)
 %BUILDCOLUMNDESIGNATIONS  Map header names to Origin column designations.
@@ -6854,7 +6855,6 @@ function desigs = buildColumnDesignations(hdrs)
         end
     end
 end
-
 
 function unit = extractXUnitFromStruct(d)
 %EXTRACTXUNITFROMSTRUCT  Get X-axis unit string from a data struct's metadata.

@@ -131,6 +131,26 @@ function publishFigure(appData, fig, callbacks)
             % Apply journal formatting
             applyJournalStyle(tmpAx, fontName, fontSize, lineW);
 
+            % Validate before exporting
+            idx = find(strcmp(presetNames, ddPreset.Value), 1);
+            pset = presets(idx);
+            pset.width = w; pset.height = h;
+            pset.fontSize = fontSize; pset.lineWidth = lineW;
+            [~, warns] = bosonPlotter.validateForPublish(tmpAx, pset);
+            if ~isempty(warns)
+                warnMsg = strjoin(cellfun(@(s) ['• ' s], warns, 'Uni', false), newline);
+                answer = uiconfirm(pubFig, ...
+                    sprintf('Pre-export check found issues:\n\n%s\n\nPublish anyway?', warnMsg), ...
+                    'Validation', 'Options', {'Publish Anyway', 'Cancel'}, ...
+                    'DefaultOption', 2, 'CancelOption', 2, 'Icon', 'warning');
+                if strcmp(answer, 'Cancel')
+                    delete(tmpFig);
+                    lblStatus.Text = 'Cancelled — fix issues and retry.';
+                    pubFig.Pointer = 'arrow';
+                    return;
+                end
+            end
+
             exportgraphics(tmpFig, outPath, 'ContentType', 'vector', ...
                 'BackgroundColor', 'none');
             delete(tmpFig);
