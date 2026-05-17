@@ -101,27 +101,61 @@ if ~isempty(options.Resolution) && any(options.Resolution > 0)
              'of σ_Q (got %d elements, expected %d).'], numel(res), N);
     end
 
-    nOver  = 21;     % samples per point
+    nOver  = 21;     % samples per point (must be odd so a centre sample exists)
     nSigma = 3;      % truncation in σ
-    R      = zeros(N, 1);
-    for iPt = 1:N
-        if dQ(iPt) <= 0
-            % Zero resolution at this point — evaluate a single point
-            R(iPt) = fitting.parrattRefl(Q(iPt), layers, ...
-                Roughness=options.Roughness, ...
-                Scale=options.Scale, ...
-                Background=options.Background);
-            continue;
-        end
-        qSamp = linspace(Q(iPt) - nSigma * dQ(iPt), ...
-                         Q(iPt) + nSigma * dQ(iPt), nOver)';
-        qSamp = max(qSamp, 1e-6);            % avoid non-physical negatives
-        Rsamp = fitting.parrattRefl(qSamp, layers, ...
-            Roughness=options.Roughness, ...
-            Scale=options.Scale, ...
-            Background=options.Background);
-        w     = exp(-0.5 * ((qSamp - Q(iPt)) / dQ(iPt)).^2);
-        R(iPt) = sum(w .* Rsamp) / sum(w);
+
+    % ────────────────────────────────────────────────────────────────────
+    % Vectorised resolution smearing.
+    %
+    % Build a [N × nOver] grid of oversampled Q values so that
+    %   qFull(i, k) = Q(i) + dQ(i) * offsets(k),   offsets ∈ [-nSigma, +nSigma]
+    %
+    % Flatten to a length N*nOver column, call the Q-vectorised Parratt
+    % kernel below ONCE (no recursion, no resolution argument), reshape
+    % back to [N × nOver] and weight-sum along the oversample axis.
+    %
+    % Zero-resolution rows (dQ(i) <= 0) take a placeholder spacing of 1
+    % so the matrix math stays finite; the centre column (offset = 0)
+    % gives the unsmeared R(Q(i)), and we overwrite the output for those
+    % rows to that centre value — exactly matching the original loop's
+    % `if dQ(iPt) <= 0` branch.
+    %
+    % Gaussian weights are expressed in σ-units (offsets are already in σ),
+    % so the same weight row applies to every Q point. Normalize per row
+    % via Σ_k w_k for safety (sum should be ~10.49 for nOver=21, nSigma=3).
+    % ────────────────────────────────────────────────────────────────────
+    offsets = linspace(-nSigma, nSigma, nOver);              % [1 x nOver]
+
+    qCol  = Q(:);                                             % [N x 1]
+    dQcol = dQ(:);                                            % [N x 1]
+    zeroRes = dQcol <= 0;
+    dQsafe = dQcol;
+    dQsafe(zeroRes) = 1;                                      % placeholder
+
+    qFull = qCol + dQsafe .* offsets;                        % [N x nOver]
+    qFull = max(qFull, 1e-6);                                 % physical guard
+
+    % Single non-recursive call: Parratt kernel below is fully Q-vectorised.
+    Rflat = fitting.parrattRefl(qFull(:), layers, ...
+        Roughness=options.Roughness, ...
+        Scale=options.Scale, ...
+        Background=options.Background);
+
+    Rmat = reshape(Rflat, N, nOver);                          % [N x nOver]
+
+    % Gaussian weights based on the ACTUAL (post-clamp) Q distances, to
+    % match the scalar reference exactly when low-Q samples get clamped
+    % to 1e-6. For un-clamped rows this reduces to exp(-0.5 * offsets.^2)
+    % per row. We can't use a single normalising scalar because the
+    % clamped rows have an asymmetric weight distribution.
+    W    = exp(-0.5 * ((qFull - qCol) ./ dQsafe).^2);         % [N x nOver]
+    Wsum = sum(W, 2);                                         % [N x 1]
+    R    = sum(W .* Rmat, 2) ./ Wsum;                         % [N x 1]
+
+    % Zero-resolution rows: fall back to unsmeared centre value.
+    if any(zeroRes)
+        centreIdx = (nOver + 1) / 2;
+        R(zeroRes) = Rmat(zeroRes, centreIdx);
     end
     return;
 end
