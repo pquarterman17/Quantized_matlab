@@ -45,7 +45,7 @@ function test_bosonPlotterSize
     % Ceiling carries a small buffer (~20 lines) so one in-flight edit
     % won't fail the build before an extraction commit lands. Ratchet
     % DOWN whenever an extraction lowers the baseline.
-    LINE_CEILING = 7119;
+    LINE_CEILING = 7110;
 
     fprintf('\n== TEST 1: BosonPlotter.m line-count ratchet ==\n');
     try
