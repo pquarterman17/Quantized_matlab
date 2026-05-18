@@ -118,6 +118,7 @@ SUITES = {
     T('gui','test_themeConformance'),       'gui',    'Theme conformance: every widget BG/FG comes from uxTokens palette in both dark and light'
     T('gui','test_resolveTheme'),           'gui',    'resolveTheme: Auto-mode resolution + Dark/Light passthrough (themePref Auto support)'
     T('gui','test_noNewColorLiterals'),     'gui',    'Static linter: no new hardcoded RGB literals in BosonPlotter.m / +bosonPlotter/ above the baseline ratchet'
+    T('gui','test_headlessHelpers'),        'gui',    'Headless helpers: isHeadless, resolveVisible, quietAlert, quietConfirm — env-var logic + log format'
     T('gui','test_contour_features'),       'contour','Contour/heatmap: gridding, plot styles, edge cases, export'
     T('gui','test_diraculator'),            'calcgui','DiraCulator GUI API'
     % ── Imaging tests ─────────────────────────────────────────────────
