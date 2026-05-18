@@ -816,8 +816,8 @@ function varargout = BosonPlotter(options)
         cmCb.onSetTickSpacingMenu     = @onSetTickSpacingMenu;
         cmCb.onContextSetLegendLoc    = @onContextSetLegendLoc;
         cmCb.onContextSetDatasetColor = @onContextSetDatasetColor;
-        cmCb.onCopyPlotToClipboard    = @() onCopyPlotOp('vector');
-        cmCb.onCopyToClipboardAsPNG   = @() onCopyPlotOp('png');
+        cmCb.onCopyPlotToClipboard    = @(varargin) onCopyPlotOp('vector');
+        cmCb.onCopyToClipboardAsPNG   = @(varargin) onCopyPlotOp('png');
         cmCb.onCopyDataToClipboard    = @onCopyDataToClipboard;
         cmCb.onExportVisibleRange     = @() bosonPlotter.onExportVisibleRange(appData, fig, ax);
         cmCb.toggleWfGradient         = @toggleWfGradient;
@@ -1123,7 +1123,7 @@ function varargout = BosonPlotter(options)
         'onCopyDataToClipboard',  @onCopyDataToClipboard, ...
         'onExportHDF5',           @onExportHDF5, ...
         'onExportFigure',         @onExportFigure, ...
-        'onCopyToClipboard',      @() onCopyPlotOp('vector'), ...
+        'onCopyToClipboard',      @(varargin) onCopyPlotOp('vector'), ...
         'onSaveFigure',           @onSaveFigure, ...
         'onSaveSession',          @onSaveSession, ...
         'onLoadSession',          @onLoadSession, ...
@@ -5400,7 +5400,7 @@ function onSendToOrigin(~,~)
         ofkpCb_.onRedo                    = appData.undoCb.onRedo;
         ofkpCb_.onUnmaskAll               = @onUnmaskAll;
         ofkpCb_.onSaveCSV                 = @onSaveCSV;
-        ofkpCb_.onCopyToClipboard         = @() onCopyPlotOp('vector');
+        ofkpCb_.onCopyToClipboard         = @(varargin) onCopyPlotOp('vector');
         ofkpCb_.onToggleDatasetVisibility = @onToggleDatasetVisibility;
         ofkpCb_.onMoveDatasetUp           = @onMoveDatasetUp;
         ofkpCb_.onMoveDatasetDown         = @onMoveDatasetDown;
