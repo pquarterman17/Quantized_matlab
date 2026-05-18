@@ -37,6 +37,7 @@ function runAllTests(options)
 %       workspace — DataWorkspace model (WorkspaceModel add/remove/mask/undo/events)
 %       physics3 — Tier-3 physics: BCS gap, Debye/Einstein, FORC, Kissinger, relaxation
 %       smoke    — full interaction sequences: fire every button, capture screenshots
+%       app      — app-level infrastructure: path shadows, headless detection
 %       all      — all of the above, in order
 %
 %   Examples:
@@ -63,7 +64,7 @@ options.Group = validatestring(options.Group, ...
      "xrayneutron", "superconductor", "cif", "optics", "vacuum", "electrochemistry", ...
      "eels", "eels_adv", "diffindex", "diff_sim", "edsquant", "contour", "fitting", "plotting", ...
      "spectral", "sigproc", "interp2d", "baseline", "errorprop", "utilities", "templates", ...
-     "workspace", "transport", "magnetic", "physics3", "bugReport", "smoke"]);
+     "workspace", "transport", "magnetic", "physics3", "bugReport", "smoke", "app"]);
 
 % Build absolute paths to test scripts so `run` works regardless of CWD.
 % Tests are organized into subdirectories: parser/, gui/, imaging/, calc/, batch/
@@ -237,6 +238,8 @@ SUITES = {
     T('workspace','test_syncMasksFromModel'), 'workspace','syncMasksFromModel: model→appData mask flow (DataWorkspace ↔ BosonPlotter sync)'
     T('workspace','test_tableWidget'),     'workspace','createTableWidget: version-branched uispreadsheet/uitable factory'
     T('workspace','test_formulaEngine'),   'workspace','FormulaEngine: tokenize, RPN, evaluate, hasCircularRef, WorkspaceModel integration'
+    % ── App / infrastructure tests ──────────────────────────────────────
+    T('app','test_uialert_shadow'),        'app',      'Path-shadow: uialert/uiconfirm intercepted in headless, delegated in normal mode'
     % ── Bug-report tests ─────────────────────────────────────────────────
     T('bugReport','test_reportBug'),       'bugReport','Bug report: buildReport, formatReportMarkdown, URL encoding'
     % ── Smoke tests (full interaction sequences) ──────────────────────
