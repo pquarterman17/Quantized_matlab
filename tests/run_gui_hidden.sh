@@ -28,7 +28,9 @@ fi
 
 echo "Running GUI tests (Group=$GROUP) via: $MATLAB_BIN"
 # Headless mode: GUI launchers detect QUANTIZED_MATLAB_HEADLESS=1 and
-# default Visible='off'; quietAlert/quietConfirm bypass popups. The groot
-# default catches secondary uifigures opened by callbacks.
+# default Visible='off'. tests/shadows/ is added to the path so bare
+# uialert()/uiconfirm() calls in source files are intercepted by the
+# path-shadow files without any source-code changes. The groot default
+# catches secondary uifigures opened by callbacks.
 export QUANTIZED_MATLAB_HEADLESS=1
-"$MATLAB_BIN" -batch "cd('$SCRIPT_DIR'); set(groot,'DefaultFigureVisible','off'); addpath(pwd); setupToolbox; runAllTests(Group='$GROUP')"
+"$MATLAB_BIN" -batch "cd('$SCRIPT_DIR'); set(groot,'DefaultFigureVisible','off'); addpath(pwd); setupToolbox; addpath(fullfile(pwd,'tests','shadows'),'-begin'); runAllTests(Group='$GROUP')"
