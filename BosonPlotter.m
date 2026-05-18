@@ -500,8 +500,8 @@ function varargout = BosonPlotter(options)
         'onDatasetReload',           @() onDatasetMetaEdit('reload'), ...
         'onEditColumnMapping',       @onEditColumnMapping, ...
         'onSaveAsTemplate',          @onSaveAsTemplate, ...
-        'onAddToOverlay',            @onAddToOverlay, ...
-        'onOverlayOnY2',             @onOverlayOnY2);
+        'onAddToOverlay',            @(~,~) onOverlayOp('add'), ...
+        'onOverlayOnY2',             @(~,~) onOverlayOp('y2'));
     fileListPalette_ = struct('primary', BTN_PRIMARY, 'danger', BTN_DANGER, ...
         'accent', BTN_ACCENT, 'tool', BTN_TOOL, 'fg', BTN_FG, ...
         'textMuted', tk.color.textMuted, 'textHighlight', tk.color.textHighlight);
@@ -729,7 +729,7 @@ function varargout = BosonPlotter(options)
         'callback',@(~,~) onPanToolbar(),            'iconOnly',true,  'group','navigate');
     tbActions(end+1) = struct('id','copy',           'label','Copy', ...
         'tooltip','Copy plot to clipboard  [Ctrl+C]', ...
-        'callback',@(~,~) onCopyPlotToClipboard(),   'iconOnly',false, 'group','output');
+        'callback',@(~,~) onCopyPlotOp('vector'),     'iconOnly',false, 'group','output');
     tbActions(end+1) = struct('id','save',           'label','Save', ...
         'tooltip','Export figure as PNG / PDF / SVG / EPS', ...
         'callback',@(~,~) onExportFigure([],[]),     'iconOnly',false, 'group','output');
@@ -816,8 +816,8 @@ function varargout = BosonPlotter(options)
         cmCb.onSetTickSpacingMenu     = @onSetTickSpacingMenu;
         cmCb.onContextSetLegendLoc    = @onContextSetLegendLoc;
         cmCb.onContextSetDatasetColor = @onContextSetDatasetColor;
-        cmCb.onCopyPlotToClipboard    = @onCopyPlotToClipboard;
-        cmCb.onCopyToClipboardAsPNG   = @onCopyToClipboardAsPNG;
+        cmCb.onCopyPlotToClipboard    = @() onCopyPlotOp('vector');
+        cmCb.onCopyToClipboardAsPNG   = @() onCopyPlotOp('png');
         cmCb.onCopyDataToClipboard    = @onCopyDataToClipboard;
         cmCb.onExportVisibleRange     = @() bosonPlotter.onExportVisibleRange(appData, fig, ax);
         cmCb.toggleWfGradient         = @toggleWfGradient;
@@ -1123,7 +1123,7 @@ function varargout = BosonPlotter(options)
         'onCopyDataToClipboard',  @onCopyDataToClipboard, ...
         'onExportHDF5',           @onExportHDF5, ...
         'onExportFigure',         @onExportFigure, ...
-        'onCopyToClipboard',      @onCopyToClipboard, ...
+        'onCopyToClipboard',      @() onCopyPlotOp('vector'), ...
         'onSaveFigure',           @onSaveFigure, ...
         'onSaveSession',          @onSaveSession, ...
         'onLoadSession',          @onLoadSession, ...
@@ -4892,11 +4892,14 @@ function onSendToOrigin(~,~)
         setStatus('Fit overlays cleared');
     end
 
-    function onCopyPlotToClipboard()
-    %ONCOPYPLOTTOCLIPBOARD  Legacy entry-point kept for toolbar / context-menu
-    %  bindings. Delegates to onCopyToClipboard, which produces a transparent
-    %  background so the pasted image adapts to the target document's colour.
-        onCopyToClipboard([], []);
+    function onCopyPlotOp(fmt)
+    %ONCOPPLOTOP  Copy the current plot to the clipboard in the given format.
+    %  fmt = 'vector' — transparent SVG/EMF (Word, Illustrator, Origin).
+    %  fmt = 'png'    — 300-dpi PNG (Teams, Slack, OneNote).
+    %  Legacy entry-point onCopyPlotToClipboard calls this with 'vector'.
+        cpwfCb_.drawToAxes  = @drawToAxes;
+        cpwfCb_.logGUIError = @logGUIError;
+        bosonPlotter.copyPlotWithFormat(appData, fig, fmt, cpwfCb_);
     end
 
     function onAutoLimits(~,~)
@@ -5397,7 +5400,7 @@ function onSendToOrigin(~,~)
         ofkpCb_.onRedo                    = appData.undoCb.onRedo;
         ofkpCb_.onUnmaskAll               = @onUnmaskAll;
         ofkpCb_.onSaveCSV                 = @onSaveCSV;
-        ofkpCb_.onCopyToClipboard         = @onCopyToClipboard;
+        ofkpCb_.onCopyToClipboard         = @() onCopyPlotOp('vector');
         ofkpCb_.onToggleDatasetVisibility = @onToggleDatasetVisibility;
         ofkpCb_.onMoveDatasetUp           = @onMoveDatasetUp;
         ofkpCb_.onMoveDatasetDown         = @onMoveDatasetDown;
@@ -5420,25 +5423,6 @@ function onSendToOrigin(~,~)
         grid(expAx,'on');
         drawToAxes(expAx);
         figure(expFig);   % bring to front
-    end
-
-    function onCopyToClipboard(~,~)
-    %ONCOPYTOCLIPBOARD  Copy the current plot to the clipboard as a
-    %  transparent-background vector image. Best for Word, Illustrator,
-    %  Origin, most email clients — pastes crisp at any zoom.
-        cpwfCb_.drawToAxes  = @drawToAxes;
-        cpwfCb_.logGUIError = @logGUIError;
-        bosonPlotter.copyPlotWithFormat(appData, fig, 'vector', cpwfCb_);
-    end
-
-    function onCopyToClipboardAsPNG(~,~)
-    %ONCOPYTOCLIPBOARDASPNG  Copy the current plot to the clipboard as a
-    %  300-dpi transparent PNG. Use this when the target app rejects or
-    %  mangles the vector clipboard format (notably MS Teams, some Slack
-    %  clients, and older OneNote).
-        cpwfCb_.drawToAxes  = @drawToAxes;
-        cpwfCb_.logGUIError = @logGUIError;
-        bosonPlotter.copyPlotWithFormat(appData, fig, 'png', cpwfCb_);
     end
 
     function onSaveFigure(~,~)
@@ -5953,14 +5937,9 @@ function onSendToOrigin(~,~)
         onPlot([],[]);
     end
 
-    function onAddToOverlay()
-    %ONADDTOOVERLAY  Select all datasets for overlay display.
-        bosonPlotter.overlayActions('add', appData, lbDatasets, @onSelectDataset, @setStatus);
-    end
-
-    function onOverlayOnY2()
-    %ONOVERLAYONY2  Assign active dataset to right Y-axis and overlay.
-        bosonPlotter.overlayActions('y2', appData, lbDatasets, @onSelectDataset, @setStatus);
+    function onOverlayOp(action)
+    %ONOVERLAYOP  Dispatch overlay actions ('add' = select all; 'y2' = right axis).
+        bosonPlotter.overlayActions(action, appData, lbDatasets, @onSelectDataset, @setStatus);
     end
 
     function onDatasetMetaEdit(mode)
@@ -6080,11 +6059,6 @@ function onSendToOrigin(~,~)
         occCb_.setStatus     = @setStatus;
         occCb_.recordAction  = @recordAction;
         bosonPlotter.onColumnCalculator(appData, fig, occCb_);
-    end
-
-    function onCreateInset(~,~)
-    %ONCREATEINSET  Toolbar button: delegate to onCreateInsetFromMenu.
-        onCreateInsetFromMenu();
     end
 
     function onCreateInsetFromMenu()
@@ -6393,7 +6367,7 @@ function onSendToOrigin(~,~)
         cb.onFFTThickness       = @onFFTThickness;
         cb.onReflectivityFFT    = @onReflectivityFFT;
         cb.onArmFringeThickness = @onArmFringeThickness;
-        cb.onCreateInset        = @onCreateInset;
+        cb.onCreateInset        = @(~,~) onCreateInsetFromMenu();
         bosonPlotter.showAdvancedMenu(appData, fig, headless, cb);
     end
 

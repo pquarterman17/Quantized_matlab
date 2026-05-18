@@ -34,18 +34,20 @@ function test_bosonPlotterSize
     % ════════════════════════════════════════════════════════════════════
     %  TEST 1: Line-count ratchet
     % ════════════════════════════════════════════════════════════════════
-    % Current: 7,106 lines (2026-05-16). History: 8,931 (start of W5 #22)
+    % Current: 7,085 lines (2026-05-17). History: 8,931 (start of W5 #22)
     % → 8,400 (2026-04-26 pre-extractions) → 7,641 (2026-04-26 post 3
     % UI-construction extractions, -759 / -9%) → 7,658 (one-off edits
     % since) → 7,350 (2026-05-15 buildPlotControlsPanel extraction, -117)
     % → 7,111 (2026-05-16 extract guiImport/export/resample/watch, -239)
-    % → 7,106 (2026-05-16 figDoc forwarder consolidation, -5).
+    % → 7,106 (2026-05-16 figDoc forwarder consolidation, -5)
+    % → 7,085 (2026-05-17 dispatcher consolidation: onOverlayOp/
+    %          onCopyPlotOp/inline onCreateInset, −4 slots/−26 lines).
     % Goal revised 2026-05-01 from <8,000 (achieved) to <6,000
-    % (requires another -1,106 lines / -16%).
+    % (requires another -1,085 lines / -15%).
     % Ceiling carries a small buffer (~20 lines) so one in-flight edit
     % won't fail the build before an extraction commit lands. Ratchet
     % DOWN whenever an extraction lowers the baseline.
-    LINE_CEILING = 7110;
+    LINE_CEILING = 7105;
 
     fprintf('\n== TEST 1: BosonPlotter.m line-count ratchet ==\n');
     try
@@ -84,9 +86,10 @@ function test_bosonPlotterSize
     % ════════════════════════════════════════════════════════════════════
     % MATLAB's parser refuses to load the file past ~344 total nested
     % functions. The global rule in matlab-gui-complexity.md says warn
-    % at 335, hard-stop at 340. We assert <= 290 here so the test fails
-    % loudly long before the parser does.
-    NESTED_FN_CEILING = 290;
+    % at 335, hard-stop at 340. We assert <= 283 here (current: 279 after
+    % 2026-05-17 dispatcher consolidation) so the test fails loudly
+    % long before the parser does.
+    NESTED_FN_CEILING = 283;
 
     fprintf('\n== TEST 2: Nested-function count vs. parser ceiling ==\n');
     try
