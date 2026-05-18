@@ -496,7 +496,7 @@ function plotStyleDialog(parentFig, ctx)
             case 'Active dataset'
                 ds = ctx.getActiveDataset();
                 if isempty(ds)
-                    uialert(dlg, 'No active dataset — load a file first.', 'Apply');
+                    bosonPlotter.quietAlert(dlg, 'No active dataset — load a file first.', 'Apply');
                     return;
                 end
                 ds.styleOverride = newStyle;
@@ -505,11 +505,11 @@ function plotStyleDialog(parentFig, ctx)
                 ds = ctx.getActiveDataset();
                 chIdx = ctx.getActiveChannelIdx();
                 if isempty(ds)
-                    uialert(dlg, 'No active dataset — load a file first.', 'Apply');
+                    bosonPlotter.quietAlert(dlg, 'No active dataset — load a file first.', 'Apply');
                     return;
                 end
                 if isempty(chIdx) || chIdx < 1
-                    uialert(dlg, 'No Y channel is selected — pick one in the main GUI first.', 'Apply');
+                    bosonPlotter.quietAlert(dlg, 'No Y channel is selected — pick one in the main GUI first.', 'Apply');
                     return;
                 end
                 if ~isfield(ds, 'channelStyles') || isempty(ds.channelStyles)
@@ -555,7 +555,7 @@ function plotStyleDialog(parentFig, ctx)
         if isempty(prompt), return; end
         name = strtrim(prompt{1});
         if isempty(name)
-            uialert(dlg, 'Template name cannot be empty.', 'Save as');
+            bosonPlotter.quietAlert(dlg, 'Template name cannot be empty.', 'Save as');
             return;
         end
 
@@ -582,7 +582,7 @@ function plotStyleDialog(parentFig, ctx)
         try
             bosonPlotter.userTemplates.save(name, merged);
         catch ME
-            uialert(dlg, sprintf('Could not save template:\n%s', ME.message), 'Save as');
+            bosonPlotter.quietAlert(dlg, sprintf('Could not save template:\n%s', ME.message), 'Save as');
             return;
         end
 
@@ -595,25 +595,25 @@ function plotStyleDialog(parentFig, ctx)
         end
         try ctx.refreshTemplateList(); catch, end
         try ctx.setActiveTemplate(userVal); catch, end
-        uialert(dlg, sprintf('Saved template "%s"', name), 'Saved');
+        bosonPlotter.quietAlert(dlg, sprintf('Saved template "%s"', name), 'Saved');
     end
 
     function onDelete(~, ~)
         name = ddTpl.Value;
         if ~startsWith(name, 'user:')
-            uialert(dlg, 'Built-in templates cannot be deleted.', 'Delete');
+            bosonPlotter.quietAlert(dlg, 'Built-in templates cannot be deleted.', 'Delete');
             return;
         end
         userName = name(6:end);
         confirmMsg = sprintf('Delete user template "%s"?  This cannot be undone.', userName);
-        sel = uiconfirm(dlg, confirmMsg, 'Delete template', ...
+        sel = bosonPlotter.quietConfirm(dlg, confirmMsg, 'Delete template', ...
             'Options', {'Delete','Cancel'}, 'DefaultOption', 2, 'CancelOption', 2);
         if ~strcmp(sel, 'Delete'), return; end
 
         try
             bosonPlotter.userTemplates.delete(userName);
         catch ME
-            uialert(dlg, sprintf('Delete failed:\n%s', ME.message), 'Delete');
+            bosonPlotter.quietAlert(dlg, sprintf('Delete failed:\n%s', ME.message), 'Delete');
             return;
         end
 

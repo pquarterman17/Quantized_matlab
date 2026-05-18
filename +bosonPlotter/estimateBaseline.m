@@ -27,12 +27,12 @@ function estimateBaseline(appData, fig, ddBaselineMethod, efBaselineLambda, efBa
 % ════════════════════════════════════════════════════════════════════════
 
     if isempty(appData.datasets) || appData.activeIdx < 1
-        uialert(fig, 'Load a file first.', 'No data'); return;
+        bosonPlotter.quietAlert(fig, 'Load a file first.', 'No data'); return;
     end
     ds = appData.datasets{appData.activeIdx};
     d  = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
     if isdatetime(d.time)
-        uialert(fig, 'Baseline estimation requires numeric x-axes.', 'Error'); return;
+        bosonPlotter.quietAlert(fig, 'Baseline estimation requires numeric x-axes.', 'Error'); return;
     end
 
     meth = ddBaselineMethod.Value;
@@ -48,7 +48,7 @@ function estimateBaseline(appData, fig, ddBaselineMethod, efBaselineLambda, efBa
             maxWin  = str2double(answer{1});
             smoothP = round(str2double(answer{2}));
             if isnan(maxWin) || isnan(smoothP) || maxWin <= 0
-                uialert(fig, 'Invalid parameters.', 'Error'); return;
+                bosonPlotter.quietAlert(fig, 'Invalid parameters.', 'Error'); return;
             end
             xVec = double(d.time);
             for k = 1:size(d.values, 2)
@@ -81,7 +81,7 @@ function estimateBaseline(appData, fig, ddBaselineMethod, efBaselineLambda, efBa
             polyOrd  = round(str2double(answer{1}));
             maxIter  = round(str2double(answer{2}));
             if isnan(polyOrd) || isnan(maxIter) || polyOrd < 1
-                uialert(fig, 'Invalid parameters.', 'Error'); return;
+                bosonPlotter.quietAlert(fig, 'Invalid parameters.', 'Error'); return;
             end
             for k = 1:size(d.values, 2)
                 bgAll(:, k) = utilities.baselineModPoly(d.values(:, k), ...
@@ -90,7 +90,7 @@ function estimateBaseline(appData, fig, ddBaselineMethod, efBaselineLambda, efBa
             statusMsg = sprintf('Baseline subtracted (Mod. Poly, order=%d).', polyOrd);
 
         otherwise
-            uialert(fig, sprintf('Unknown baseline method: %s', meth), 'Error');
+            bosonPlotter.quietAlert(fig, sprintf('Unknown baseline method: %s', meth), 'Error');
             return;
     end
 

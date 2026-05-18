@@ -58,7 +58,7 @@ function [newDs, cutLabel] = extract2DArcIntegral(ds, params, fig, buildDsFcn)
     % Apply Q-range and sector masks, exclude NaN
     mask = sectorMask & ~isnan(I_v) & (Qrad >= params.qMin) & (Qrad <= params.qMax);
     if ~any(mask)
-        uialert(fig, 'No data points fall within the specified Q-range and sector.', ...
+        bosonPlotter.quietAlert(fig, 'No data points fall within the specified Q-range and sector.', ...
             'Empty Selection');
         return;
     end

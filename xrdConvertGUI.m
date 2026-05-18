@@ -367,7 +367,7 @@ btnConvert.FontColor = [1 1 1];
         [newItems, newPaths, newTypes] = scanFolderForXRD(folderPath);
 
         if isempty(newItems)
-            uialert(fig, sprintf('No XRD files found in:\n%s', folderPath), 'No Files Found');
+            bosonPlotter.quietAlert(fig, sprintf('No XRD files found in:\n%s', folderPath), 'No Files Found');
             return;
         end
 
@@ -574,7 +574,7 @@ btnConvert.FontColor = [1 1 1];
 
         % Safety check
         if numel(allItems) ~= numel(allFilePaths)
-            uialert(fig, ...
+            bosonPlotter.quietAlert(fig, ...
                 sprintf(['File list is out of sync (%d items vs %d paths).\n\n' ...
                     'Please use "Set Folder..." or "Add Folder..." to reload.'], ...
                     numel(allItems), numel(allFilePaths)), ...
@@ -590,7 +590,7 @@ btnConvert.FontColor = [1 1 1];
         end
 
         if numel(selectedPaths) ~= numel(selectedItems)
-            uialert(fig, ...
+            bosonPlotter.quietAlert(fig, ...
                 sprintf('Could not resolve all selected files (%d/%d found). Please try again.', ...
                     numel(selectedPaths), numel(selectedItems)), ...
                 'Selection Error');
@@ -602,7 +602,7 @@ btnConvert.FontColor = [1 1 1];
         if ~isempty(missingFiles)
             msg = sprintf('%d selected file(s) no longer exist on disk:\n\n%s\n\nRemove them from the list and try again.', ...
                 numel(missingFiles), strjoin(missingFiles, '\n'));
-            uialert(fig, msg, 'Missing Files');
+            bosonPlotter.quietAlert(fig, msg, 'Missing Files');
             return;
         end
 

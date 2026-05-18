@@ -17,7 +17,7 @@ function publishFigure(appData, fig, callbacks)
 %       .logGUIError(t,m,ME)  — error sink
 
     if isempty(appData.datasets) || appData.activeIdx < 1
-        uialert(fig, 'Load a file first.', 'Publish'); return;
+        bosonPlotter.quietAlert(fig, 'Load a file first.', 'Publish'); return;
     end
 
     presets = getPresets();
@@ -139,7 +139,7 @@ function publishFigure(appData, fig, callbacks)
             [~, warns] = bosonPlotter.validateForPublish(tmpAx, pset);
             if ~isempty(warns)
                 warnMsg = strjoin(cellfun(@(s) ['• ' s], warns, 'Uni', false), newline);
-                answer = uiconfirm(pubFig, ...
+                answer = bosonPlotter.quietConfirm(pubFig, ...
                     sprintf('Pre-export check found issues:\n\n%s\n\nPublish anyway?', warnMsg), ...
                     'Validation', 'Options', {'Publish Anyway', 'Cancel'}, ...
                     'DefaultOption', 2, 'CancelOption', 2, 'Icon', 'warning');

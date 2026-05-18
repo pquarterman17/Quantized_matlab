@@ -9,7 +9,7 @@ function sendToOrigin(appData, fig, guiState)
 %     guiState - struct with fields: xLabel, yLabel, logX, logY
 
     if isempty(appData.datasets) || appData.activeIdx < 1
-        uialert(fig, 'Load a file first.', 'No data');
+        bosonPlotter.quietAlert(fig, 'Load a file first.', 'No data');
         return;
     end
     ds  = appData.datasets{appData.activeIdx};
@@ -33,12 +33,12 @@ function sendToOrigin(appData, fig, guiState)
         'LogX',       guiState.logX);
 
     if ok
-        uialert(fig, sprintf('Data sent to OriginPro.\nWorksheet: %s', fn), ...
+        bosonPlotter.quietAlert(fig, sprintf('Data sent to OriginPro.\nWorksheet: %s', fn), ...
             'Origin Export');
     else
         clipStr = bosonPlotter.buildClipboardString(appData, appData.activeIdx);
         clipboard('copy', clipStr);
-        uialert(fig, ...
+        bosonPlotter.quietAlert(fig, ...
             ['Origin not available — data copied to clipboard instead.' newline ...
              'Paste into Origin with Edit > Paste.'], ...
             'Origin not found');

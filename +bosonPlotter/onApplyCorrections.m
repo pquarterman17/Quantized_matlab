@@ -30,7 +30,7 @@ function onApplyCorrections(appData, ui, callbacks)
 %   propagates corrections to polarization siblings for neutron datasets.
 
     if isempty(appData.datasets) || appData.activeIdx < 1
-        uialert(callbacks.fig, 'Load a file first.', 'No data');
+        bosonPlotter.quietAlert(callbacks.fig, 'Load a file first.', 'No data');
         return;
     end
     ds       = appData.datasets{appData.activeIdx};

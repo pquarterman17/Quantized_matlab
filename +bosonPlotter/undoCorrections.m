@@ -24,7 +24,7 @@ function undoCorrections(appData, fig, ui, callbacks)
 %                 .onPlot()
 
     if isempty(appData.datasets) || appData.activeIdx < 1
-        uialert(fig,'Load a file first.','No data');
+        bosonPlotter.quietAlert(fig,'Load a file first.','No data');
         return;
     end
 
@@ -34,7 +34,7 @@ function undoCorrections(appData, fig, ui, callbacks)
     hasStack = isfield(ds, 'undoStack') && iscell(ds.undoStack) && ~isempty(ds.undoStack);
     hasSingle = isfield(ds, 'undoState') && isstruct(ds.undoState) && ~isempty(fieldnames(ds.undoState));
     if ~hasStack && ~hasSingle
-        uialert(fig, 'No previous correction state to restore.', 'Undo unavailable');
+        bosonPlotter.quietAlert(fig, 'No previous correction state to restore.', 'Undo unavailable');
         return;
     end
 

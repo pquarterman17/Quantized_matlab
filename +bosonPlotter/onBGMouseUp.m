@@ -59,7 +59,7 @@ function [ds, bgOrder, p] = onBGMouseUp(ax, appData, fig, wgts)
     yMax = max(appData.bgStartPt(2), endPt(2));
 
     if (xMax - xMin) < eps(xMax)
-        uialert(fig,'Box too narrow — drag across a wider x range.','BG fit');
+        bosonPlotter.quietAlert(fig,'Box too narrow — drag across a wider x range.','BG fit');
         return;
     end
 
@@ -117,7 +117,7 @@ function [ds, bgOrder, p] = onBGMouseUp(ax, appData, fig, wgts)
     end
 
     if numel(xPool) < 2
-        uialert(fig, ...
+        bosonPlotter.quietAlert(fig, ...
             sprintf('Only %d data point(s) inside the box — need at least 2 to fit.', ...
                     numel(xPool)), ...
             'Too few points');

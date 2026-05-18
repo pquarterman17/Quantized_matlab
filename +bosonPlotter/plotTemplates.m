@@ -23,7 +23,7 @@ function plotTemplates(appData, fig, ui, callbacks)
 %   implemented as nested-to-this-file sub-functions sharing the tplFig handle.
 
     if isempty(appData.datasets) || appData.activeIdx < 1
-        uialert(fig, 'Load a file first.', 'No data'); return;
+        bosonPlotter.quietAlert(fig, 'Load a file first.', 'No data'); return;
     end
 
     tplFig = uifigure('Name', 'Plot Templates', 'Position', [350 300 360 260], 'Resize', 'off');
@@ -181,11 +181,11 @@ function plotTemplates(appData, fig, ui, callbacks)
             msg = sprintf('Batch complete: %d processed, %d failed.\nOutput: %s', ...
                 nOk, nErr, outputDir);
             callbacks.setStatus(sprintf('Batch template: %d ok, %d failed', nOk, nErr));
-            uialert(fig, msg, 'Batch Apply Complete');
+            bosonPlotter.quietAlert(fig, msg, 'Batch Apply Complete');
         catch ME
             callbacks.setStatus('Batch apply failed.');
             callbacks.logGUIError('Batch Apply Error', ME.message, ME);
-            uialert(fig, sprintf('Batch apply failed:\n%s', ME.message), ...
+            bosonPlotter.quietAlert(fig, sprintf('Batch apply failed:\n%s', ME.message), ...
                 'Batch Apply Error');
         end
     end

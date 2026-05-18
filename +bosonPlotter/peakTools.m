@@ -340,7 +340,7 @@ classdef peakTools
                 minFrac = str2double(answer{2});
                 if isnan(tol) || isnan(minFrac)
                     if ~isempty(parentFig) && isvalid(parentFig)
-                        uialert(parentFig, 'Invalid numeric input.', 'Error');
+                        bosonPlotter.quietAlert(parentFig, 'Invalid numeric input.', 'Error');
                     end
                     return;
                 end
@@ -350,7 +350,7 @@ classdef peakTools
 
                 if isempty(matches)
                     if ~isempty(parentFig) && isvalid(parentFig)
-                        uialert(parentFig, ...
+                        bosonPlotter.quietAlert(parentFig, ...
                             sprintf('No phases matched with tolerance %.3f %s and min fraction %.0f%%.', ...
                                     tol, char(197), minFrac*100), ...
                             'No matches');
@@ -576,13 +576,13 @@ classdef peakTools
                 twoThMin = efFFTMin.Value;
                 twoThMax = efFFTMax.Value;
                 if twoThMin >= twoThMax
-                    uialert(fftFig, 'Min must be less than Max.', 'Invalid range');
+                    bosonPlotter.quietAlert(fftFig, 'Min must be less than Max.', 'Invalid range');
                     return;
                 end
 
                 mask = xAll >= twoThMin & xAll <= twoThMax;
                 if sum(mask) < 10
-                    uialert(fftFig, 'Too few data points in selected range (need >= 10).', ...
+                    bosonPlotter.quietAlert(fftFig, 'Too few data points in selected range (need >= 10).', ...
                         'Insufficient data');
                     return;
                 end
@@ -1286,7 +1286,7 @@ classdef peakTools
             end
             if numel(validIdx) < 3
                 if ~isempty(options.ParentFig) && isvalid(options.ParentFig)
-                    uialert(options.ParentFig, ...
+                    bosonPlotter.quietAlert(options.ParentFig, ...
                         sprintf('Williamson-Hall needs %s 3 fitted peaks with valid FWHM.\nCurrently have %d.', ...
                             char(8805), numel(validIdx)), ...
                         'Insufficient peaks');

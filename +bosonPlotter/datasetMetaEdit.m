@@ -50,7 +50,7 @@ function datasetMetaEdit(appData, fig, ui, mode, callbacks)
                 try
                     p = bosonPlotter.correctionPresets.load(selName);
                 catch
-                    uialert(fig, sprintf('Preset "%s" not found.', selName), 'Load Error');
+                    bosonPlotter.quietAlert(fig, sprintf('Preset "%s" not found.', selName), 'Load Error');
                     return;
                 end
                 if isfield(p,'xOff'),    ui.efXOffset.Value = p.xOff; end
@@ -77,7 +77,7 @@ function datasetMetaEdit(appData, fig, ui, mode, callbacks)
     end
 
     if isempty(appData.datasets) || appData.activeIdx < 1
-        uialert(fig, 'Load a file first.', 'No data'); return;
+        bosonPlotter.quietAlert(fig, 'Load a file first.', 'No data'); return;
     end
     ds = appData.datasets{appData.activeIdx};
     switch mode
@@ -108,7 +108,7 @@ function datasetMetaEdit(appData, fig, ui, mode, callbacks)
         case 'reload'
             fp = ds.filepath;
             if ~isfile(fp)
-                uialert(fig, sprintf('File not found:\n%s', fp), 'Reload Failed');
+                bosonPlotter.quietAlert(fig, sprintf('File not found:\n%s', fp), 'Reload Failed');
                 return;
             end
             try
@@ -122,7 +122,7 @@ function datasetMetaEdit(appData, fig, ui, mode, callbacks)
                 [~, fn, fext] = fileparts(fp);
                 callbacks.setStatus(sprintf('Reloaded %s%s from disk.', fn, fext));
             catch ME
-                uialert(fig, sprintf('Reload failed:\n%s', ME.message), 'Reload Error');
+                bosonPlotter.quietAlert(fig, sprintf('Reload failed:\n%s', ME.message), 'Reload Error');
             end
     end
 end

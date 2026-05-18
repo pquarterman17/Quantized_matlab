@@ -247,11 +247,11 @@ function result = ColumnMapper(data, opts)
             end
         end
         if isempty(xIdx)
-            uialert(dlgFig, 'Please assign one column as X-axis.', 'No X-axis');
+            bosonPlotter.quietAlert(dlgFig, 'Please assign one column as X-axis.', 'No X-axis');
             return;
         end
         if isempty(yIdx)
-            uialert(dlgFig, 'Please assign at least one Y-channel.', 'No Y data');
+            bosonPlotter.quietAlert(dlgFig, 'Please assign at least one Y-channel.', 'No Y data');
             return;
         end
 
@@ -323,7 +323,7 @@ function result = ColumnMapper(data, opts)
 
         templates.TemplateEngine.save(tmpl);
 
-        uialert(dlgFig, sprintf('Template "%s" saved.', tmpl.name), ...
+        bosonPlotter.quietAlert(dlgFig, sprintf('Template "%s" saved.', tmpl.name), ...
             'Saved', 'Icon', 'success');
     end
 end

@@ -333,7 +333,7 @@ onModelChanged();
     %ONAUTOGUESS  Fill guesses from the first selected dataset.
         selIdx = getSelectedIndices();
         if isempty(selIdx)
-            uialert(dlg, 'No datasets selected.', 'Auto-Guess');
+            bosonPlotter.quietAlert(dlg, 'No datasets selected.', 'Auto-Guess');
             return;
         end
 
@@ -341,7 +341,7 @@ onModelChanged();
         ds = datasets{selIdx(1)};
         [xData, yData] = extractXY(ds, ddChannel.Value);
         if numel(xData) < 3
-            uialert(dlg, 'Not enough data in first selected dataset.', 'Auto-Guess');
+            bosonPlotter.quietAlert(dlg, 'Not enough data in first selected dataset.', 'Auto-Guess');
             return;
         end
 
@@ -361,14 +361,14 @@ onModelChanged();
     %ONRUNBATCH  Run fitting.batchFit on selected datasets.
         selIdx = getSelectedIndices();
         if isempty(selIdx)
-            uialert(dlg, 'Select at least one dataset.', 'Batch Fit');
+            bosonPlotter.quietAlert(dlg, 'Select at least one dataset.', 'Batch Fit');
             return;
         end
 
         mName = ddModel.Value;
         mIdx = find(strcmp({catalog.name}, mName), 1);
         if isempty(mIdx)
-            uialert(dlg, 'Unknown model.', 'Batch Fit');
+            bosonPlotter.quietAlert(dlg, 'Unknown model.', 'Batch Fit');
             return;
         end
         m = catalog(mIdx);
@@ -394,7 +394,7 @@ onModelChanged();
             options.StatusFcn(sprintf('Batch fit complete: %d datasets', numel(selIdx)));
             tabGroup.SelectedTab = tabResults;
         catch ME
-            uialert(dlg, sprintf('Batch fit failed:\n%s', ME.message), 'Error');
+            bosonPlotter.quietAlert(dlg, sprintf('Batch fit failed:\n%s', ME.message), 'Error');
             options.StatusFcn(sprintf('Batch fit error: %s', ME.message));
         end
         dlg.Pointer = 'arrow';
@@ -450,7 +450,7 @@ onModelChanged();
     function onPlotEvolution()
     %ONPLOTEVOLUTION  Plot each fitted parameter vs dataset index.
         if isempty(batchResult)
-            uialert(dlg, 'Run batch fit first.', 'Plot Evolution');
+            bosonPlotter.quietAlert(dlg, 'Run batch fit first.', 'Plot Evolution');
             return;
         end
 
@@ -486,7 +486,7 @@ onModelChanged();
     function onExportCSV()
     %ONEXPORTCSV  Write results table to a user-chosen CSV file.
         if isempty(batchResult)
-            uialert(dlg, 'Run batch fit first.', 'Export CSV');
+            bosonPlotter.quietAlert(dlg, 'Run batch fit first.', 'Export CSV');
             return;
         end
 
@@ -529,7 +529,7 @@ onModelChanged();
             options.StatusFcn(sprintf('Results exported to %s', filePath));
         catch ME
             try; fclose(fid); catch; end
-            uialert(dlg, sprintf('Export failed:\n%s', ME.message), 'Export Error');
+            bosonPlotter.quietAlert(dlg, sprintf('Export failed:\n%s', ME.message), 'Export Error');
         end
     end
 

@@ -193,13 +193,13 @@ digState.markers    = {};       % graphics handles for point markers
             title(digAx, fn2, 'Interpreter', 'none');
             digAx.YDir = 'reverse';  % image convention
         catch ME
-            uialert(digFig, sprintf('Failed to load image:\n%s', ME.message), 'Error');
+            bosonPlotter.quietAlert(digFig, sprintf('Failed to load image:\n%s', ME.message), 'Error');
         end
     end
 
     function digStartCalibration()
         if ~digState.imgLoaded
-            uialert(digFig, 'Load an image first.', 'Calibrate');
+            bosonPlotter.quietAlert(digFig, 'Load an image first.', 'Calibrate');
             return;
         end
         digState.mode      = 'calibrate';
@@ -217,7 +217,7 @@ digState.markers    = {};       % graphics handles for point markers
 
     function digStartCollection()
         if ~digState.calibrated
-            uialert(digFig, 'Calibrate axes first.', 'Collect');
+            bosonPlotter.quietAlert(digFig, 'Calibrate axes first.', 'Collect');
             return;
         end
         digState.mode = 'collect';
@@ -345,7 +345,7 @@ digState.markers    = {};       % graphics handles for point markers
 
     function digExportCSV()
         if isempty(digState.pts)
-            uialert(digFig, 'No points to export.', 'Export');
+            bosonPlotter.quietAlert(digFig, 'No points to export.', 'Export');
             return;
         end
         [fn2, fp2] = uiputfile({'*.csv', 'CSV (*.csv)'}, 'Export Digitized Points');
@@ -359,11 +359,11 @@ digState.markers    = {};       % graphics handles for point markers
 
     function digLoadAsDataset()
         if isempty(digState.pts)
-            uialert(digFig, 'No points to load.', 'Load');
+            bosonPlotter.quietAlert(digFig, 'No points to load.', 'Load');
             return;
         end
         if isempty(options.LoadCallback)
-            uialert(digFig, ...
+            bosonPlotter.quietAlert(digFig, ...
                 'No LoadCallback was provided. Use graphDigitizer(''LoadCallback'', @yourFcn) to enable this button.', ...
                 'Load as Dataset');
             return;

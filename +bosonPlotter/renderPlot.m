@@ -1026,7 +1026,7 @@ function renderPlot(targetAx, ctx)
             fprintf(2, '  at %s  (line %d)\n', ME.stack(si).name, ME.stack(si).line);
         end
         ctx.logGUIError('Plot error', ME.message, ME);
-        uialert(ctx.fig, ME.message, 'Plot error');
+        bosonPlotter.quietAlert(ctx.fig, ME.message, 'Plot error');
     end
 
 end

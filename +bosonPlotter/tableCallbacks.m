@@ -178,7 +178,7 @@ cb.onPasteFromClipboard   = @onPasteFromClipboard;
                 nPass = sum(passMask);
                 setStatus(sprintf('Filter applied: %d / %d rows pass', nPass, nRows));
             catch ME
-                uialert(fig, ME.message, 'Filter Error');
+                bosonPlotter.quietAlert(fig, ME.message, 'Filter Error');
                 return;
             end
         end
@@ -234,7 +234,7 @@ cb.onPasteFromClipboard   = @onPasteFromClipboard;
     function onDescriptiveStats(~, ~)
     %ONDESCRIPTIVESTATS  Show per-column descriptive statistics popup.
         if isempty(appData.tableWorkingCopy)
-            uialert(fig, 'No data loaded.', 'Stats');
+            bosonPlotter.quietAlert(fig, 'No data loaded.', 'Stats');
             return;
         end
         d = getPlotData(appData.activeIdx);
@@ -392,7 +392,7 @@ cb.onPasteFromClipboard   = @onPasteFromClipboard;
         colData = wc(:, col);
         colData = colData(~isnan(colData));
         if isempty(colData)
-            uialert(fig, 'No valid data in selected column.', 'Statistics');
+            bosonPlotter.quietAlert(fig, 'No valid data in selected column.', 'Statistics');
             return;
         end
         colNames = tblUnits.ColumnName;
@@ -403,12 +403,12 @@ cb.onPasteFromClipboard   = @onPasteFromClipboard;
             'N:       %d\nMean:    %.6g\nStd:     %.6g\n' ...
             'Median:  %.6g\nMin:     %.6g\nMax:     %.6g'], ...
             colName, n, mu, sg, med, mn, mx);
-        uialert(fig, msg, 'Column Statistics', 'Icon', 'info');
+        bosonPlotter.quietAlert(fig, msg, 'Column Statistics', 'Icon', 'info');
     end
 
     function onColFormula(~, ~)
         if isempty(appData.tableWorkingCopy)
-            uialert(fig, 'No data loaded.', 'Formula');
+            bosonPlotter.quietAlert(fig, 'No data loaded.', 'Formula');
             return;
         end
         colNames = tblUnits.ColumnName;
@@ -430,11 +430,11 @@ cb.onPasteFromClipboard   = @onPasteFromClipboard;
             fakeDs.metadata = struct();
             newCol = dataWorkspace.FormulaEngine.evaluate(expr, fakeDs);
         catch ME
-            uialert(fig, sprintf('Formula error:\n%s', ME.message), 'Error');
+            bosonPlotter.quietAlert(fig, sprintf('Formula error:\n%s', ME.message), 'Error');
             return;
         end
         if numel(newCol) ~= size(wc, 1)
-            uialert(fig, 'Result must have same number of rows as data.', 'Error');
+            bosonPlotter.quietAlert(fig, 'Result must have same number of rows as data.', 'Error');
             return;
         end
         appData.tableWorkingCopy = [wc, newCol(:)];
@@ -453,7 +453,7 @@ cb.onPasteFromClipboard   = @onPasteFromClipboard;
         try
             raw = clipboard('paste');
         catch
-            uialert(fig, 'Cannot access clipboard.', 'Paste');
+            bosonPlotter.quietAlert(fig, 'Cannot access clipboard.', 'Paste');
             return;
         end
         if isempty(raw)
@@ -509,7 +509,7 @@ cb.onPasteFromClipboard   = @onPasteFromClipboard;
         else
             nExist = size(wc, 1);
             if nRows ~= nExist
-                uialert(fig, sprintf('Row count mismatch: table has %d, clipboard has %d.', ...
+                bosonPlotter.quietAlert(fig, sprintf('Row count mismatch: table has %d, clipboard has %d.', ...
                     nExist, nRows), 'Paste');
                 return;
             end
@@ -530,7 +530,7 @@ cb.onPasteFromClipboard   = @onPasteFromClipboard;
     function onTableSaveAs(~, ~)
     %ONTABLESAVEAS  Save the working copy (with edits) to a new file.
         if isempty(appData.tableWorkingCopy)
-            uialert(fig, 'No data to save.', 'Save As');
+            bosonPlotter.quietAlert(fig, 'No data to save.', 'Save As');
             return;
         end
 
@@ -577,7 +577,7 @@ cb.onPasteFromClipboard   = @onPasteFromClipboard;
             end
             setStatus(sprintf('Table saved: %s (%d rows + units)', fn, size(wc, 1)));
         catch ME
-            uialert(fig, sprintf('Save failed:\n%s', ME.message), 'Error');
+            bosonPlotter.quietAlert(fig, sprintf('Save failed:\n%s', ME.message), 'Error');
         end
     end
 

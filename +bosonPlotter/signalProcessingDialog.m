@@ -52,7 +52,7 @@ end
 
 plotD = callbacks.getPlotData();
 if isempty(plotD) || isempty(plotD.time) || isempty(plotD.values)
-    uialert(fig, 'No plottable data in the active dataset.', 'Signal Processing');
+    bosonPlotter.quietAlert(fig, 'No plottable data in the active dataset.', 'Signal Processing');
     return
 end
 
@@ -438,7 +438,7 @@ onFilterTypeChanged();  % hides/shows second cutoff row
             try
                 doProcess();
             catch ME
-                uialert(dlgFig, ME.message, 'Processing Error');
+                bosonPlotter.quietAlert(dlgFig, ME.message, 'Processing Error');
                 return
             end
             if isempty(lastResult), return; end

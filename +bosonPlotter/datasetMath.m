@@ -23,7 +23,7 @@ function datasetMath(appData, fig, callbacks)
 %                 .logGUIError(title, msg, ME)
 
     if isempty(appData.datasets)
-        uialert(fig,'Load files first.','No data'); return;
+        bosonPlotter.quietAlert(fig,'Load files first.','No data'); return;
     end
     nDS = numel(appData.datasets);
 
@@ -114,7 +114,7 @@ function datasetMath(appData, fig, callbacks)
         callbacks.onPlot();
     catch ME
         callbacks.logGUIError('Dataset Math Error', ME.message, ME);
-        uialert(fig, sprintf('Expression error:\n\n%s', ME.message), 'Dataset Math Error');
+        bosonPlotter.quietAlert(fig, sprintf('Expression error:\n\n%s', ME.message), 'Dataset Math Error');
     end
 end
 

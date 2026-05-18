@@ -24,7 +24,7 @@ function onExportVisibleRange(appData, fig, ax)
 %   interactive axis labels in the main plot.
 
     if isempty(appData.datasets) || appData.activeIdx < 1
-        uialert(fig, 'Load a file first.', 'No data'); return;
+        bosonPlotter.quietAlert(fig, 'Load a file first.', 'No data'); return;
     end
     ds  = appData.datasets{appData.activeIdx};
     src = guiTernary(~isempty(ds.corrData), ds.corrData, ds.data);
@@ -36,7 +36,7 @@ function onExportVisibleRange(appData, fig, ax)
     xVec = double(src.time);
     mask = xVec >= xLims(1) & xVec <= xLims(2);
     if ~any(mask)
-        uialert(fig, 'No data points in the visible range.', 'Empty'); return;
+        bosonPlotter.quietAlert(fig, 'No data points in the visible range.', 'Empty'); return;
     end
 
     % Build output table
@@ -54,7 +54,7 @@ function onExportVisibleRange(appData, fig, ax)
     % Write CSV with headers (labels already updated by applyDisplayUnits)
     fid = fopen(outPath, 'w');
     if fid == -1
-        uialert(fig, 'Cannot open file for writing.', 'Error'); return;
+        bosonPlotter.quietAlert(fig, 'Cannot open file for writing.', 'Error'); return;
     end
     xHdr = guiLabel(guiXName(src.metadata), guiXUnit(src.metadata));
     headers = [{xHdr}, cellfun(@(l,u) guiLabel(l,u), ...
@@ -73,7 +73,7 @@ function onExportVisibleRange(appData, fig, ax)
         fprintf(fid, '\n');
     end
     fclose(fid);
-    uialert(fig, sprintf('Exported %d points to:\n%s', sum(mask), outPath), ...
+    bosonPlotter.quietAlert(fig, sprintf('Exported %d points to:\n%s', sum(mask), outPath), ...
         'Export Complete');
 end
 

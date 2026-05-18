@@ -58,7 +58,7 @@ function onLoadSession(appData, fig, widgets, callbacks)
         fig.Pointer = 'arrow';
         callbacks.setStatus('Session load failed.');
         callbacks.logGUIError('Load Error', ME.message, ME);
-        uialert(fig, sprintf('Could not load session:\n%s', ME.message), 'Load Error');
+        bosonPlotter.quietAlert(fig, sprintf('Could not load session:\n%s', ME.message), 'Load Error');
         return;
     end
 
@@ -123,7 +123,7 @@ function onLoadSession(appData, fig, widgets, callbacks)
     callbacks.onPlot();
     fig.Pointer = 'arrow';
     callbacks.setStatus(sprintf('Session loaded: %d dataset(s)', numel(appData.datasets)));
-    uialert(fig, sprintf('Session loaded: %d dataset(s)', numel(appData.datasets)), ...
+    bosonPlotter.quietAlert(fig, sprintf('Session loaded: %d dataset(s)', numel(appData.datasets)), ...
         'Session Loaded');
 end
 

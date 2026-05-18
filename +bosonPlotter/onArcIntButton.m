@@ -29,7 +29,7 @@ function onArcIntButton(appData, fig, callbacks)
     if ~callbacks.is2DDataset(ds), return; end
     map = ds.data.metadata.parserSpecific.map2D;
     if ~isfield(map, 'Qx')
-        uialert(fig, 'Arc integration requires Q-space coordinates (wavelength must be in the file metadata).', ...
+        bosonPlotter.quietAlert(fig, 'Arc integration requires Q-space coordinates (wavelength must be in the file metadata).', ...
             'No Q-space Data');
         return;
     end

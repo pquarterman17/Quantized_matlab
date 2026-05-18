@@ -39,7 +39,7 @@ function onYTranslateDrag(appData, fig, ax, widgets, callbacks)
 %                   .onMouseHover(src, evt)
 
     if isempty(appData.datasets) || appData.activeIdx < 1
-        uialert(fig,'Load a file first.','No data'); return;
+        bosonPlotter.quietAlert(fig,'Load a file first.','No data'); return;
     end
     callbacks.cancelInteractions();
     widgets.btnYTranslate.Text            = 'Drag on plot to translate...';

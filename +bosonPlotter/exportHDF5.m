@@ -4,7 +4,7 @@ function exportHDF5(appData, fig, logGUIErrorFcn)
 %   bosonPlotter.exportHDF5(appData, fig, logGUIErrorFcn)
 
     if isempty(appData.datasets) || appData.activeIdx < 1
-        uialert(fig, 'Load a file first.', 'No data');
+        bosonPlotter.quietAlert(fig, 'Load a file first.', 'No data');
         return;
     end
     ds = appData.datasets{appData.activeIdx};
@@ -22,13 +22,13 @@ function exportHDF5(appData, fig, logGUIErrorFcn)
                                   'bgSlope', ds.bgSlope, 'bgInt', ds.bgInt), ...
             'IncludePeaks', ~isempty(ds.peaks), ...
             'Peaks',        ds.peaks);
-        uialert(fig, sprintf('Saved:\n%s', outPath), 'HDF5 Exported');
+        bosonPlotter.quietAlert(fig, sprintf('Saved:\n%s', outPath), 'HDF5 Exported');
     catch ME
         fprintf(2, '\n[BosonPlotter] HDF5 export error: %s\n', ME.message);
         for si = 1:numel(ME.stack)
             fprintf(2, '  at %s  (line %d)\n', ME.stack(si).name, ME.stack(si).line);
         end
         logGUIErrorFcn('Export error', ME.message, ME);
-        uialert(fig, ME.message, 'Export error');
+        bosonPlotter.quietAlert(fig, ME.message, 'Export error');
     end
 end

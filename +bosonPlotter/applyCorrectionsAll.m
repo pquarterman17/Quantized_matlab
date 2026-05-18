@@ -23,7 +23,7 @@ function applyCorrectionsAll(appData, fig, ui, callbacks)
 %                 .onPlot()
 
     if isempty(appData.datasets) || appData.activeIdx < 1
-        uialert(fig,'Load a file first.','No data');
+        bosonPlotter.quietAlert(fig,'Load a file first.','No data');
         return;
     end
 
@@ -106,7 +106,7 @@ function applyCorrectionsAll(appData, fig, ui, callbacks)
     fig.Pointer = 'arrow';
     callbacks.setStatus(sprintf('Corrections applied to all %d datasets.', numel(appData.datasets)));
     callbacks.onPlot();
-    uialert(fig, sprintf('Corrections applied to all %d datasets.', ...
+    bosonPlotter.quietAlert(fig, sprintf('Corrections applied to all %d datasets.', ...
         numel(appData.datasets)), 'Batch Apply Complete');
 end
 

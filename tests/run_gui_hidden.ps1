@@ -1,13 +1,22 @@
 # Run GUI tests with MATLAB fully hidden (no taskbar, no focus steal)
 # Usage:  powershell -ExecutionPolicy Bypass -File tests/run_gui_hidden.ps1 [group]
 #   group defaults to "gui" if omitted.
+#
+# Sets QUANTIZED_MATLAB_HEADLESS=1 for the MATLAB child process. Every GUI
+# launcher (FermiViewer, BosonPlotter, DiraCulator, DataWorkspace) detects
+# this via bosonPlotter.isHeadless() and defaults Visible='off'. The
+# +bosonPlotter/quietAlert + quietConfirm helpers also suppress popups when
+# the env var is set. set(groot,'DefaultFigureVisible','off') catches any
+# secondary uifigure created by callbacks (FFT viewers, profile plots, etc.).
 param([string]$Group = "gui")
 
 $logFile = Join-Path $env:TEMP "matlab_gui_test_log.txt"
 if (Test-Path $logFile) { Remove-Item $logFile }
 
+$env:QUANTIZED_MATLAB_HEADLESS = "1"
+
 $escapedLog = $logFile -replace '\\','/'
-$matlabCmd = "diary('$escapedLog'); addpath(pwd); setupToolbox; runAllTests(Group='$Group'); diary off;"
+$matlabCmd = "diary('$escapedLog'); set(groot,'DefaultFigureVisible','off'); addpath(pwd); setupToolbox; runAllTests(Group='$Group'); diary off;"
 
 # Find MATLAB executable
 $matlabExe = Get-ChildItem "C:\Program Files\MATLAB" -Directory |

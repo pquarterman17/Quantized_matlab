@@ -20,7 +20,7 @@ function onCopyDataToClipboard(appData, fig, callbacks)
 %                 .logGUIError(title, msg, ME)
 
     if isempty(appData.datasets)
-        uialert(fig, 'Load a file first.', 'No data');
+        bosonPlotter.quietAlert(fig, 'Load a file first.', 'No data');
         return;
     end
 
@@ -45,11 +45,11 @@ function onCopyDataToClipboard(appData, fig, callbacks)
     try
         clipStr = bosonPlotter.buildClipboardString(appData, sel);
         clipboard('copy', clipStr);
-        uialert(fig, sprintf('Copied %d dataset(s) to clipboard.\nPaste into Origin or Excel.', ...
+        bosonPlotter.quietAlert(fig, sprintf('Copied %d dataset(s) to clipboard.\nPaste into Origin or Excel.', ...
             numel(sel)), 'Copied');
     catch ME
         callbacks.logGUIError('Clipboard error', ME.message, ME);
-        uialert(fig, ME.message, 'Clipboard error');
+        bosonPlotter.quietAlert(fig, ME.message, 'Clipboard error');
     end
 end
 

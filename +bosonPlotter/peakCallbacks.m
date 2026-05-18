@@ -70,16 +70,16 @@ cb.onKeyPress            = @onKeyPress;
     %   This callback is now a thin orchestrator: pull data via the hook,
     %   sync sidebar params onto the model, run detect, write back.
         if isempty(ctx.appData.datasets) || ctx.appData.activeIdx < 1
-            uialert(ctx.fig, 'Load a file first.', 'No data'); return;
+            bosonPlotter.quietAlert(ctx.fig, 'Load a file first.', 'No data'); return;
         end
 
         data = ctx.hook.getActiveData();
         if isempty(data.x) || isempty(data.y)
-            uialert(ctx.fig, 'Select a Y channel and load a dataset first.', 'Auto Peaks');
+            bosonPlotter.quietAlert(ctx.fig, 'Select a Y channel and load a dataset first.', 'Auto Peaks');
             return;
         end
         if numel(data.x) < 5
-            uialert(ctx.fig, 'Too few valid data points for peak detection.', 'Auto Peaks');
+            bosonPlotter.quietAlert(ctx.fig, 'Too few valid data points for peak detection.', 'Auto Peaks');
             return;
         end
 
@@ -94,7 +94,7 @@ cb.onKeyPress            = @onKeyPress;
 
         ctx.model.detect(data.x, data.y);
         if isempty(ctx.model.peaks)
-            uialert(ctx.fig, ...
+            bosonPlotter.quietAlert(ctx.fig, ...
                 ['No peaks found. ' ...
                  'Add manual seeds with the Add Peak button, or adjust ' ...
                  'axis limits to zoom in on the region of interest.'], ...
@@ -117,7 +117,7 @@ cb.onKeyPress            = @onKeyPress;
             ctx.cancelInteractions(); return;
         end
         if isempty(ctx.appData.datasets) || ctx.appData.activeIdx < 1
-            uialert(ctx.fig,'Load a file first.','No data'); return;
+            bosonPlotter.quietAlert(ctx.fig,'Load a file first.','No data'); return;
         end
         ctx.cancelInteractions();
         ctx.appData.peakPickMode          = true;
@@ -163,11 +163,11 @@ cb.onKeyPress            = @onKeyPress;
             ctx.cancelInteractions(); return;
         end
         if isempty(ctx.appData.datasets) || ctx.appData.activeIdx < 1
-            uialert(ctx.fig,'Load a file first.','No data'); return;
+            bosonPlotter.quietAlert(ctx.fig,'Load a file first.','No data'); return;
         end
         ds = ctx.appData.datasets{ctx.appData.activeIdx};
         if isempty(ds.peaks)
-            uialert(ctx.fig,'No peaks to remove.','No peaks'); return;
+            bosonPlotter.quietAlert(ctx.fig,'No peaks to remove.','No peaks'); return;
         end
         ctx.cancelInteractions();
         ctx.appData.peakRemoveMode          = true;
@@ -216,16 +216,16 @@ cb.onKeyPress            = @onKeyPress;
     %   only the orchestration: pull data, run fitAll, draw failure
     %   overlays + show the rich diagnostic dialog.
         if isempty(ctx.appData.datasets) || ctx.appData.activeIdx < 1
-            uialert(ctx.fig,'Load a file first.','No data'); return;
+            bosonPlotter.quietAlert(ctx.fig,'Load a file first.','No data'); return;
         end
         ds = ctx.appData.datasets{ctx.appData.activeIdx};
         if isempty(ds.peaks)
-            uialert(ctx.fig,'No peaks to fit.  Use Auto Find Peaks or Add Peak first.','No peaks'); return;
+            bosonPlotter.quietAlert(ctx.fig,'No peaks to fit.  Use Auto Find Peaks or Add Peak first.','No peaks'); return;
         end
 
         data = ctx.hook.getActiveData();
         if isempty(data.x) || isempty(data.y)
-            uialert(ctx.fig, 'Could not resolve active X / Y channel.', 'Fit Peaks');
+            bosonPlotter.quietAlert(ctx.fig, 'Could not resolve active X / Y channel.', 'Fit Peaks');
             return;
         end
 
@@ -263,7 +263,7 @@ cb.onKeyPress            = @onKeyPress;
     %    p = [H1, x0_1, fwhm1, H2, x0_2, fwhm2, …, HnP, x0_nP, fwhmnP, m, b]
     %  where m, b are the shared linear background slope and intercept.
         if isempty(ctx.appData.datasets) || ctx.appData.activeIdx < 1
-            uialert(ctx.fig,'Load a file first.','No data'); return;
+            bosonPlotter.quietAlert(ctx.fig,'Load a file first.','No data'); return;
         end
         ctx.setStatus('Fitting all peaks simultaneously...');
         ctx.fig.Pointer = 'watch';
@@ -272,7 +272,7 @@ cb.onKeyPress            = @onKeyPress;
         if numel(ds.peaks) < 2
             ctx.fig.Pointer = 'arrow';
             ctx.setStatus('Ready');
-            uialert(ctx.fig, ...
+            bosonPlotter.quietAlert(ctx.fig, ...
                 'Need at least 2 peaks for a global fit.  Use "Fit Peaks" for a single peak.', ...
                 'Global Fit: need ≥2 peaks');
             return;
@@ -290,7 +290,7 @@ cb.onKeyPress            = @onKeyPress;
         ySel = ensureCell(ctx.lbY.Value);
         yIdx = find(strcmp(d.labels, ySel{1}), 1);
         if isempty(yIdx)
-            uialert(ctx.fig,'Could not find Y channel.','Global Fit'); return;
+            bosonPlotter.quietAlert(ctx.fig,'Could not find Y channel.','Global Fit'); return;
         end
         yv = d.values(:, yIdx);
 
@@ -353,7 +353,7 @@ cb.onKeyPress            = @onKeyPress;
         try
             pFit = fminsearch(objFun, p0, opts);
         catch
-            uialert(ctx.fig,'Global fit optimisation failed.','Fit All Peaks');
+            bosonPlotter.quietAlert(ctx.fig,'Global fit optimisation failed.','Fit All Peaks');
             return;
         end
 
@@ -516,7 +516,7 @@ cb.onKeyPress            = @onKeyPress;
         if ~isempty(ds.peaks)
             nFitted = sum(strcmp({ds.peaks.status},'fitted') | strcmp({ds.peaks.status},'fitted(global)'));
             if nFitted > 0
-                sel = uiconfirm(ctx.fig, ...
+                sel = bosonPlotter.quietConfirm(ctx.fig, ...
                     sprintf('Remove all %d peaks (%d fitted)?', numel(ds.peaks), nFitted), ...
                     'Clear Peaks', 'Options', {'Clear', 'Cancel'}, ...
                     'DefaultOption', 2, 'CancelOption', 2);
@@ -614,11 +614,11 @@ cb.onKeyPress            = @onKeyPress;
     function onSavePeakSummary(~,~)
     %ONSAVEPEAKSUMMARY  Write peak centers and FWHM values to a CSV file.
         if isempty(ctx.appData.datasets) || ctx.appData.activeIdx < 1
-            uialert(ctx.fig,'Load a file first.','No data'); return;
+            bosonPlotter.quietAlert(ctx.fig,'Load a file first.','No data'); return;
         end
         ds = ctx.appData.datasets{ctx.appData.activeIdx};
         if isempty(ds.peaks)
-            uialert(ctx.fig,'No peaks to export.  Find or add peaks first.','No peaks'); return;
+            bosonPlotter.quietAlert(ctx.fig,'No peaks to export.  Find or add peaks first.','No peaks'); return;
         end
 
         [~, fn, ~] = fileparts(ds.filepath);
@@ -662,11 +662,11 @@ cb.onKeyPress            = @onKeyPress;
                     pki, pk.center, dStr, sizeStr, fwhmStr, pk.height, areaStr, pk.status);
             end
             fclose(fid);
-            uialert(ctx.fig, sprintf('Saved:\n%s', fp), 'Peak Summary Exported');
+            bosonPlotter.quietAlert(ctx.fig, sprintf('Saved:\n%s', fp), 'Peak Summary Exported');
         catch ME
             if fid >= 0, fclose(fid); end
             ctx.logGUIError('Save error', ME.message, ME);
-            uialert(ctx.fig, ME.message, 'Save error');
+            bosonPlotter.quietAlert(ctx.fig, ME.message, 'Save error');
         end
     end
 
@@ -675,7 +675,7 @@ cb.onKeyPress            = @onKeyPress;
     %  One sheet per dataset; columns: Peak#, Center, FWHM, Height, Area, Status.
     %  Datasets with no peaks are silently skipped.
         if isempty(ctx.appData.datasets)
-            uialert(ctx.fig,'Load files first.','No data'); return;
+            bosonPlotter.quietAlert(ctx.fig,'Load files first.','No data'); return;
         end
 
         % Check that at least one dataset has peaks
@@ -686,7 +686,7 @@ cb.onKeyPress            = @onKeyPress;
             end
         end
         if ~hasPeaks
-            uialert(ctx.fig, ...
+            bosonPlotter.quietAlert(ctx.fig, ...
                 'No peaks found in any dataset.  Find or add peaks first.', ...
                 'No peaks to export');
             return;
@@ -775,13 +775,13 @@ cb.onKeyPress            = @onKeyPress;
         end
 
         if nWritten == 0
-            uialert(ctx.fig, 'No peak data was written — check file permissions.', ...
+            bosonPlotter.quietAlert(ctx.fig, 'No peak data was written — check file permissions.', ...
                 'Export Failed');
         elseif isempty(errMsgs)
-            uialert(ctx.fig, sprintf('Exported %d dataset(s) to:\n%s', nWritten, outPath), ...
+            bosonPlotter.quietAlert(ctx.fig, sprintf('Exported %d dataset(s) to:\n%s', nWritten, outPath), ...
                 'Peak Export Complete');
         else
-            uialert(ctx.fig, sprintf('Exported %d dataset(s); %d error(s):\n%s', ...
+            bosonPlotter.quietAlert(ctx.fig, sprintf('Exported %d dataset(s); %d error(s):\n%s', ...
                 nWritten, numel(errMsgs), strjoin(errMsgs,'\n')), ...
                 'Peak Export Partial');
         end

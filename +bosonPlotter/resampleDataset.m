@@ -10,12 +10,12 @@ function resampleDataset(appData, fig, cb)
 %               updateControlsForActiveDataset, onPlot, recordAction
 
     if isempty(appData.datasets) || appData.activeIdx < 1
-        uialert(fig, 'Load a file first.', 'No data'); return;
+        bosonPlotter.quietAlert(fig, 'Load a file first.', 'No data'); return;
     end
     ds = appData.datasets{appData.activeIdx};
     d = guiTernary_(~isempty(ds.corrData), ds.corrData, ds.data);
     if isdatetime(d.time)
-        uialert(fig, 'Cannot resample datetime x-axes.', 'Error'); return;
+        bosonPlotter.quietAlert(fig, 'Cannot resample datetime x-axes.', 'Error'); return;
     end
     xVec = double(d.time);
     xLo = min(xVec); xHi = max(xVec);
@@ -26,7 +26,7 @@ function resampleDataset(appData, fig, cb)
     newXMin = str2double(answer{1}); newXMax = str2double(answer{2});
     newN    = round(str2double(answer{3}));
     if isnan(newXMin) || isnan(newXMax) || isnan(newN) || newN < 2
-        uialert(fig, 'Invalid parameters.', 'Error'); return;
+        bosonPlotter.quietAlert(fig, 'Invalid parameters.', 'Error'); return;
     end
     newX = linspace(newXMin, newXMax, newN)';
     newVals = zeros(newN, size(d.values, 2));

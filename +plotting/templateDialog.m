@@ -84,14 +84,14 @@ uiwait(dlg);
     function onSave(~,~)
         nm = strtrim(efName.Value);
         if isempty(nm)
-            uialert(dlg, 'Please enter a template name.', 'Missing Name');
+            bosonPlotter.quietAlert(dlg, 'Please enter a template name.', 'Missing Name');
             return;
         end
         try
             plotting.plotTemplate('save', Name=nm, Axes=ax);
             result = nm;
         catch ME
-            uialert(dlg, ME.message, 'Save Failed');
+            bosonPlotter.quietAlert(dlg, ME.message, 'Save Failed');
             return;
         end
         uiresume(dlg);
@@ -113,7 +113,7 @@ result = '';
 
 names = plotting.plotTemplate('list');
 if isempty(names)
-    uialert(ancestor(ax,'figure'), ...
+    bosonPlotter.quietAlert(ancestor(ax,'figure'), ...
         'No saved templates found. Use "Save as Template" first.', ...
         'No Templates');
     return;
@@ -192,14 +192,14 @@ uiwait(dlg);
     function onApply(~,~)
         nm = lb.Value;
         if isempty(nm)
-            uialert(dlg, 'Select a template first.', 'No Selection');
+            bosonPlotter.quietAlert(dlg, 'Select a template first.', 'No Selection');
             return;
         end
         try
             plotting.plotTemplate('apply', Name=nm, Axes=ax);
             result = nm;
         catch ME
-            uialert(dlg, ME.message, 'Apply Failed');
+            bosonPlotter.quietAlert(dlg, ME.message, 'Apply Failed');
             return;
         end
         uiresume(dlg);
@@ -210,7 +210,7 @@ uiwait(dlg);
         if isempty(nm)
             return;
         end
-        answer = uiconfirm(dlg, ...
+        answer = bosonPlotter.quietConfirm(dlg, ...
             sprintf('Delete template "%s"?', nm), 'Confirm Delete', ...
             'Options', {'Delete','Cancel'}, 'DefaultOption', 'Cancel', ...
             'Icon', 'warning');
@@ -218,7 +218,7 @@ uiwait(dlg);
             try
                 plotting.plotTemplate('delete', Name=nm);
             catch ME
-                uialert(dlg, ME.message, 'Delete Failed');
+                bosonPlotter.quietAlert(dlg, ME.message, 'Delete Failed');
                 return;
             end
             % Refresh list

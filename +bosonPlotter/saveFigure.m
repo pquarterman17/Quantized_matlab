@@ -24,7 +24,7 @@ function saveFigure(appData, fig, ui, callbacks)
 %                 .logGUIError(title, msg, ME) — error sink
 
     if isempty(appData.datasets) || appData.activeIdx < 1
-        uialert(fig,'Load a file first.','No data'); return;
+        bosonPlotter.quietAlert(fig,'Load a file first.','No data'); return;
     end
 
     % Map dropdown choice to file extension and exportgraphics options.
@@ -93,10 +93,10 @@ function saveFigure(appData, fig, ui, callbacks)
             exportgraphics(tmpFig, outPath, egOpts{:});
         end
         delete(tmpFig);
-        uialert(fig, sprintf('Saved:\n%s', outPath), 'Figure Saved');
+        bosonPlotter.quietAlert(fig, sprintf('Saved:\n%s', outPath), 'Figure Saved');
     catch ME
         delete(tmpFig);
         callbacks.logGUIError('Save error (exportgraphics)', ME.message, ME);
-        uialert(fig, sprintf('Export failed:\n%s', ME.message), 'Save error');
+        bosonPlotter.quietAlert(fig, sprintf('Export failed:\n%s', ME.message), 'Save error');
     end
 end

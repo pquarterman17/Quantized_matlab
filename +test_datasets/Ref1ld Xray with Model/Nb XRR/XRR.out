@@ -1,0 +1,39 @@
+.probe
+  .back_absorption = back_absorption Nb2444_7a_Nb200nmV4_150micronFP = 1
+  .background = background Nb2444_7a_Nb200nmV4_150micronFP = 0
+  .intensity = intensity Nb2444_7a_Nb200nmV4_150micronFP = 1.05667 in [0.9,1.1]
+  .sample_broadening = sample_broadening Nb2444_7a_Nb200nmV4_150micronFP = 0
+  .theta_offset = theta_offset Nb2444_7a_Nb200nmV4_150micronFP = 0
+.sample
+  .layers
+    [0]
+      .interface = Si interface = 2.96129 in [0.3,50]
+      .material
+        .irho = Si irho = 0.741
+        .rho = Si rho = 20
+      .thickness = Si thickness = 100
+    [1]
+      .interface = SiO2 interface = 6.39153 in [1,30]
+      .material
+        .irho = SiO2 irho = 0.294
+        .rho = SiO2 rho = 22.9034 in [20.4,25]
+      .thickness = SiO2 thickness = 23.7074 in [1,100]
+    [2]
+      .interface = Nb interface = 15.2784 in [0.3,100]
+      .material
+        .irho = Nb irho = 3.93
+        .rho = Nb rho = 66.3445 in [50,80]
+      .thickness = Nb thickness = 2012.96 in [1900,2100]
+    [3]
+      .interface = NbO interface = 13.5188 in [0.3,100]
+      .material
+        .irho = NbO irho = 0
+        .rho = NbO rho = 20.0001 in [20,40]
+      .thickness = NbO thickness = 26.613 in [1,100]
+    [4]
+      .interface = air interface = 0
+      .material = None
+      .thickness = air thickness = 0
+  .thickness = stack thickness = 2163.28
+
+[chisq=7.441(24), nllf=1975.59]

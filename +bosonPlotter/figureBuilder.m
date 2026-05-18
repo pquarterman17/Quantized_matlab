@@ -529,7 +529,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %   callback only syncs widget state to fbModel and dispatches.
             dsIdx = ensureCellNum(noWidgets.lbDS.Value);
             if isempty(dsIdx)
-                uialert(bFig,'Select at least one dataset.','No data'); return;
+                bosonPlotter.quietAlert(bFig,'Select at least one dataset.','No data'); return;
             end
             fbModel.figureType = 'Normalized Overlay';
             fbModel.normOverlayConfig = struct( ...
@@ -647,7 +647,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %GENERATEWATERFALL  Workshop-pattern thin wrapper.
             dsIdx = ensureCellNum(wfWidgets.lbDS.Value);
             if isempty(dsIdx)
-                uialert(bFig,'Select at least one dataset.','No data'); return;
+                bosonPlotter.quietAlert(bFig,'Select at least one dataset.','No data'); return;
             end
             spStr = strtrim(wfWidgets.efSpacing.Value);
             manualSp = str2double(spStr);
@@ -692,7 +692,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
             idxA = orWidgets.ddA.Value;
             idxB = orWidgets.ddB.Value;
             if idxA == idxB
-                uialert(bFig,'Select two different datasets.','Same dataset'); return;
+                bosonPlotter.quietAlert(bFig,'Select two different datasets.','Same dataset'); return;
             end
             % Map dialog's residual mode → package mode names
             residMode = orWidgets.ddResidMode.Value;
@@ -733,7 +733,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
             dsIdx = baWidgets.ddDS.Value;
             ds = datasets{dsIdx};
             if isempty(ds.corrData)
-                uialert(bFig, 'No corrections applied to this dataset. Apply corrections first.', ...
+                bosonPlotter.quietAlert(bFig, 'No corrections applied to this dataset. Apply corrections first.', ...
                     'No corrected data');
                 return;
             end
@@ -854,7 +854,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %GENERATEPARAMEVOL  Workshop-pattern thin wrapper.
             dsIdx = ensureCellNum(peWidgets.lbDS.Value);
             if isempty(dsIdx)
-                uialert(bFig,'Select at least one dataset.','No data'); return;
+                bosonPlotter.quietAlert(bFig,'Select at least one dataset.','No data'); return;
             end
             % Map dialog xMode dropdown → package xMode key
             switch peWidgets.ddXMode.Value
@@ -900,7 +900,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
             gapLo = str2double(brWidgets.efGapLo.Value);
             gapHi = str2double(brWidgets.efGapHi.Value);
             if isnan(gapLo) || isnan(gapHi) || gapLo >= gapHi
-                uialert(bFig, 'Enter valid Gap min < Gap max.', 'Invalid gap'); return;
+                bosonPlotter.quietAlert(bFig, 'Enter valid Gap min < Gap max.', 'Invalid gap'); return;
             end
             switch brWidgets.ddBreakAxis.Value
                 case 'Y axis', breakKey = 'Y';
@@ -1061,7 +1061,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %GENERATEQUICKGRID  Workshop-pattern thin wrapper.
             dsIdx = ensureCellNum(qgWidgets.lbDS.Value);
             if isempty(dsIdx)
-                uialert(bFig,'Select at least one dataset.','No data'); return;
+                bosonPlotter.quietAlert(bFig,'Select at least one dataset.','No data'); return;
             end
             fbModel.figureType = 'Quick Grid';
             fbModel.quickGridConfig = struct( ...
@@ -1604,7 +1604,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %GENERATECONFIDENCEBAND  Workshop-pattern thin wrapper.
             dsIdx = ensureCellNum(cbWidgets.lbDS.Value);
             if numel(dsIdx) < 2
-                uialert(bFig, 'Select at least 2 datasets.', 'Too few'); return;
+                bosonPlotter.quietAlert(bFig, 'Select at least 2 datasets.', 'Too few'); return;
             end
             switch cbWidgets.ddMethod.Value
                 case 'Median ± IQR', summaryMode = 'median+iqr';
@@ -1708,7 +1708,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
             if zIdx == 0, zV = d2.time(:); else, zV = d2.values(:,zIdx); end
             ok = ~isnan(xV) & ~isnan(yV) & ~isnan(zV);
             xV = xV(ok); yV = yV(ok); zV = zV(ok);
-            if numel(xV) < 4, uialert(bFig, 'Not enough data.', 'Export'); return; end
+            if numel(xV) < 4, bosonPlotter.quietAlert(bFig, 'Not enough data.', 'Export'); return; end
             nG = 100;
             xL = linspace(min(xV),max(xV),nG); yL = linspace(min(yV),max(yV),nG);
             [Xg2, Yg2] = meshgrid(xL, yL);
@@ -1843,7 +1843,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %GENERATECOLORSCATTERZ  Workshop-pattern thin wrapper.
             di = csWidgets.ddDS.Value;
             if di < 1 || di > nDS
-                uialert(bFig,'No valid dataset selected.','No data'); return;
+                bosonPlotter.quietAlert(bFig,'No valid dataset selected.','No data'); return;
             end
             xCh = csWidgets.ddX.Value;
             if strcmp(xCh, 'X (time/index)'), xCh = 'time'; end
@@ -1917,7 +1917,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %GENERATEMARGINALHISTOGRAM  Workshop-pattern thin wrapper.
             di = mhWidgets.ddDS.Value;
             if di < 1 || di > nDS
-                uialert(bFig,'No valid dataset selected.','No data'); return;
+                bosonPlotter.quietAlert(bFig,'No valid dataset selected.','No data'); return;
             end
             fbModel.figureType = 'Marginal Histogram';
             fbModel.marginalHistConfig = struct( ...
@@ -1994,7 +1994,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %GENERATEGROUPEDPLOT  Workshop-pattern thin wrapper.
             di = gpWidgets.ddDS.Value;
             if di < 1 || di > nDS
-                uialert(bFig,'No valid dataset selected.','No data'); return;
+                bosonPlotter.quietAlert(bFig,'No valid dataset selected.','No data'); return;
             end
             fbModel.figureType = 'Grouped Plot';
             fbModel.groupedPlotConfig = struct( ...
@@ -2063,7 +2063,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %GENERATEFFTSPECTRAL  Workshop-pattern thin wrapper.
             di = fsWidgets.ddDS.Value;
             if di < 1 || di > nDS
-                uialert(bFig,'No valid dataset selected.','No data'); return;
+                bosonPlotter.quietAlert(bFig,'No valid dataset selected.','No data'); return;
             end
             fbModel.figureType = 'FFT / Spectral';
             fbModel.fftSpectralConfig = struct( ...
@@ -2291,7 +2291,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %GENERATETERNARY  Workshop-pattern thin wrapper.
             di = tpWidgets.ddDS.Value;
             if di < 1 || di > nDS
-                uialert(bFig,'No valid dataset selected.','No data'); return;
+                bosonPlotter.quietAlert(bFig,'No valid dataset selected.','No data'); return;
             end
             d = getPlotData(di);
             aIdx = tpWidgets.ddA.Value;
@@ -2299,7 +2299,7 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
             cIdx = tpWidgets.ddC.Value;
             vIdx = tpWidgets.ddVal.Value;
             if any([aIdx bIdx cIdx] < 1) || any([aIdx bIdx cIdx] > numel(d.labels))
-                uialert(bFig,'Select three valid A/B/C columns.','Ternary'); return;
+                bosonPlotter.quietAlert(bFig,'Select three valid A/B/C columns.','Ternary'); return;
             end
             % Optional value channel (vIdx <= 0 means no coloring)
             if vIdx > 0 && vIdx <= numel(d.labels)
@@ -2393,12 +2393,12 @@ BTN_EXPORT   = [0.18 0.32 0.52];   % slate-blue — export/save actions
         %GENERATEBOXVIOLIN  Workshop-pattern thin wrapper.
             di = bvWidgets.ddDS.Value;
             if di < 1 || di > nDS
-                uialert(bFig,'No valid dataset selected.','No data'); return;
+                bosonPlotter.quietAlert(bFig,'No valid dataset selected.','No data'); return;
             end
             ySel = bvWidgets.lbY.Value;
             if ischar(ySel) || isstring(ySel), ySel = cellstr(ySel); end
             if isempty(ySel)
-                uialert(bFig,'Pick at least one Y column.','Box / Violin'); return;
+                bosonPlotter.quietAlert(bFig,'Pick at least one Y column.','Box / Violin'); return;
             end
             % Determine group mode from widget combination
             d = getPlotData(di);

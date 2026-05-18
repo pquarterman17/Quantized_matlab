@@ -462,7 +462,7 @@ plotData();
     %   centering, then calls fitting.pawleyRefine against the full
     %   intensity pattern. Reports refined cell and Rwp in a modal dialog.
         if numel(detectedPeaks) < 3
-            uialert(hFig, ...
+            bosonPlotter.quietAlert(hFig, ...
                 'Need at least 3 detected peaks. Run Detect Peaks first.', ...
                 'Pawley');
             return;
@@ -489,13 +489,13 @@ plotData();
                 'hklMax',   round(str2double(defAns{9})));
             lambda = str2double(defAns{8});
         catch
-            uialert(hFig, 'Invalid Pawley inputs.', 'Pawley');
+            bosonPlotter.quietAlert(hFig, 'Invalid Pawley inputs.', 'Pawley');
             return;
         end
         if ~all(isfinite([phaseInfo.a phaseInfo.b phaseInfo.c ...
                 phaseInfo.alpha phaseInfo.beta phaseInfo.gamma ...
                 lambda phaseInfo.hklMax]))
-            uialert(hFig, 'All numeric fields must be finite.', 'Pawley');
+            bosonPlotter.quietAlert(hFig, 'All numeric fields must be finite.', 'Pawley');
             return;
         end
 
@@ -517,7 +517,7 @@ plotData();
                 result.cell(3), result.cellInitial(3), ...
                 result.cell(4), result.cell(5), result.cell(6), ...
                 result.rwp, result.nPeaks);
-            uialert(hFig, msg, 'Pawley refinement', 'Icon', 'success');
+            bosonPlotter.quietAlert(hFig, msg, 'Pawley refinement', 'Icon', 'success');
 
             % Overlay model on main axes
             hold(axMain, 'on');
@@ -534,7 +534,7 @@ plotData();
                 result.cell(1), result.rwp));
         catch ME
             hFig.Pointer = 'arrow';
-            uialert(hFig, sprintf('Pawley failed:\n%s', ME.message), 'Error');
+            bosonPlotter.quietAlert(hFig, sprintf('Pawley failed:\n%s', ME.message), 'Error');
         end
     end
 

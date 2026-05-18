@@ -153,7 +153,7 @@ lblWarnings.Layout.Row = 6;
                 r.HcMean, r.MsMean, r.squareness));
         catch ME
             hFig.Pointer = 'arrow';
-            uialert(hFig, sprintf('Analysis failed:\n%s', ME.message), 'Error');
+            bosonPlotter.quietAlert(hFig, sprintf('Analysis failed:\n%s', ME.message), 'Error');
         end
     end
 

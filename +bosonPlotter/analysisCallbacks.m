@@ -109,7 +109,7 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
     %   redirects to the workshop. Modal source kept in
     %   +bosonPlotter/peakAnalysis.m for reference; not called here.
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a dataset first.', 'Peak Workshop');
+            bosonPlotter.quietAlert(fig, 'Load a dataset first.', 'Peak Workshop');
             return;
         end
         showPeakWindow();
@@ -122,13 +122,13 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
     %   The integrated region is shaded on the main axes.
 
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a dataset first.', 'Integrate');
+            bosonPlotter.quietAlert(fig, 'Load a dataset first.', 'Integrate');
             return;
         end
 
         plotD = getPlotData(appData.activeIdx);
         if isempty(plotD)
-            uialert(fig, 'Apply corrections or plot data first.', 'Integrate');
+            bosonPlotter.quietAlert(fig, 'Apply corrections or plot data first.', 'Integrate');
             return;
         end
 
@@ -241,7 +241,7 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
             ch  = ddIntCh.Value;
 
             if x1v >= x2v
-                uialert(intFig, 'X₁ must be less than X₂.', 'Range Error');
+                bosonPlotter.quietAlert(intFig, 'X₁ must be less than X₂.', 'Range Error');
                 return;
             end
 
@@ -254,7 +254,7 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
             ySeg = yAll(mask);
 
             if numel(xSeg) < 2
-                uialert(intFig, 'Not enough data points in the selected range.', 'Error');
+                bosonPlotter.quietAlert(intFig, 'Not enough data points in the selected range.', 'Error');
                 return;
             end
 
@@ -292,7 +292,7 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
 
         function copyIntResult()
             if isnan(intResult.area)
-                uialert(intFig, 'Compute an integral first.', 'Copy');
+                bosonPlotter.quietAlert(intFig, 'Compute an integral first.', 'Copy');
                 return;
             end
             txt = sprintf('Integral of %s from %.6g to %.6g = %.6g', ...
@@ -322,7 +322,7 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
     function onOpenCurveFitDialog(~, ~)
     %ONOPENCURVEFITDIALOG  Open general-purpose curve fitting dialog.
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a dataset first.', 'Curve Fit');
+            bosonPlotter.quietAlert(fig, 'Load a dataset first.', 'Curve Fit');
             return;
         end
         bosonPlotter.curveFitting(appData.datasets, appData.activeIdx, ax, ...
@@ -334,7 +334,7 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
     function onOpenHysteresisDialog(~, ~)
     %ONOPENHYSTERESISDIALOG  Open hysteresis loop analysis dialog.
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a dataset first.', 'Hysteresis');
+            bosonPlotter.quietAlert(fig, 'Load a dataset first.', 'Hysteresis');
             return;
         end
         bosonPlotter.hysteresisDialog(appData.datasets, appData.activeIdx, ax, ...
@@ -354,7 +354,7 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
         if isempty(answer), return; end
         deg = round(str2double(answer{1}));
         if isnan(deg) || deg < 1 || deg > 10
-            uialert(fig, 'Degree must be 1-10.', 'Regression'); return;
+            bosonPlotter.quietAlert(fig, 'Degree must be 1-10.', 'Regression'); return;
         end
         result = utilities.linRegress(xV, yV, 'Degree', deg);
         hold(ax, 'on');
@@ -374,7 +374,7 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
         legend(ax, 'show');
         msg = sprintf('R%s = %.6f,  p = %.4g', char(178), result.R2, result.pValue);
         setStatus(sprintf('Regression: degree=%d  %s', deg, msg));
-        uialert(fig, sprintf('Degree %d regression:\n%s\nCoeffs: %s', ...
+        bosonPlotter.quietAlert(fig, sprintf('Degree %d regression:\n%s\nCoeffs: %s', ...
             deg, msg, mat2str(result.coefficients, 4)), 'Regression', 'Icon', 'info');
         recordAction(sprintf('%% Regression: degree=%d R2=%.4f', deg, result.R2));
     end
@@ -383,7 +383,7 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
     %ONTTEST  Perform a t-test on the active channel.
         [~, yV, yLbl] = getActiveXY();
         if isempty(yV), return; end
-        choice = uiconfirm(fig, ...
+        choice = bosonPlotter.quietConfirm(fig, ...
             'Select t-test type:', 't-Test', ...
             'Options', {'One-sample (vs 0)', 'One-sample (vs value)', 'Cancel'}, ...
             'DefaultOption', 1, 'CancelOption', 3);
@@ -405,7 +405,7 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
             yLbl, mu0, result.tStat, result.pValue, result.df, ...
             result.ci(1), result.ci(2), ...
             mat2str(result.pValue < 0.05));
-        uialert(fig, msg, 't-Test Result', 'Icon', 'info');
+        bosonPlotter.quietAlert(fig, msg, 't-Test Result', 'Icon', 'info');
         setStatus(sprintf('t-Test: t=%.3f  p=%.4g', result.tStat, result.pValue));
         recordAction(sprintf('%% t-Test: %s vs %.4g, p=%.4g', yLbl, mu0, result.pValue));
     end
@@ -413,10 +413,10 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
     function onConfidenceBand(~, ~)
     %ONCONFIDENCEBAND  Overlay mean+/-std band from multiple datasets.
         if numel(appData.datasets) < 2
-            uialert(fig, 'Need at least 2 datasets for confidence bands.', 'Confidence Band');
+            bosonPlotter.quietAlert(fig, 'Need at least 2 datasets for confidence bands.', 'Confidence Band');
             return;
         end
-        choice = uiconfirm(fig, ...
+        choice = bosonPlotter.quietConfirm(fig, ...
             'Band type:', 'Confidence Band', ...
             'Options', {'Mean +/- Std', 'Median +/- IQR', 'Cancel'}, ...
             'DefaultOption', 1, 'CancelOption', 3);
@@ -440,7 +440,7 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
     function onROIAnalysis(~, ~)
     %ONROIANALYSIS  Open ROI selection and statistics dialog.
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a dataset first.', 'ROI Analysis');
+            bosonPlotter.quietAlert(fig, 'Load a dataset first.', 'ROI Analysis');
             return;
         end
         bosonPlotter.roiAnalysis(appData.datasets, appData.activeIdx, ax, ...
@@ -461,7 +461,7 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
         cutoff = str2double(strsplit(strtrim(cutoffStr)));
         cutoff = cutoff(~isnan(cutoff));
         if isempty(cutoff)
-            uialert(fig, 'Invalid cutoff value.', 'FFT Filter'); return;
+            bosonPlotter.quietAlert(fig, 'Invalid cutoff value.', 'FFT Filter'); return;
         end
         result = utilities.fftFilter(xV, yV, 'Type', filterType, 'Cutoff', cutoff);
         ds   = appData.datasets{appData.activeIdx};
@@ -487,7 +487,7 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
     function onBatchFit(~, ~)
     %ONBATCHFIT  Fit the same model across all loaded datasets.
         if numel(appData.datasets) < 2
-            uialert(fig, 'Need at least 2 datasets for batch fitting.', 'Batch Fit');
+            bosonPlotter.quietAlert(fig, 'Need at least 2 datasets for batch fitting.', 'Batch Fit');
             return;
         end
         setStatus('Batch Fit: first configure a fit on the active dataset using Curve Fit dialog...');
@@ -497,7 +497,7 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
     function onGlobalFit(~, ~)
     %ONGLOBALFIT  Fit multiple datasets simultaneously with shared parameters.
         if numel(appData.datasets) < 2
-            uialert(fig, 'Need at least 2 datasets for global fitting.', 'Global Fit');
+            bosonPlotter.quietAlert(fig, 'Need at least 2 datasets for global fitting.', 'Global Fit');
             return;
         end
         setStatus('Global Fit: first configure a model via Curve Fit, then apply globally...');
@@ -507,14 +507,14 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
     function onTrackPeak(~, ~)
     %ONTRACKPEAK  Track peak position across a dataset series.
         if numel(appData.datasets) < 2
-            uialert(fig, 'Need at least 2 datasets for peak tracking.', 'Track Peak');
+            bosonPlotter.quietAlert(fig, 'Need at least 2 datasets for peak tracking.', 'Track Peak');
             return;
         end
         answer = inputdlg('Seed peak position (x value):', 'Track Peak', 1, {'0'});
         if isempty(answer), return; end
         seedPos = str2double(answer{1});
         if isnan(seedPos)
-            uialert(fig, 'Invalid position.', 'Track Peak'); return;
+            bosonPlotter.quietAlert(fig, 'Invalid position.', 'Track Peak'); return;
         end
         try
             result = fitting.trackPeak(appData.datasets, seedPos);
@@ -526,7 +526,7 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
             setStatus(sprintf('Peak tracked across %d datasets: %.4g to %.4g', ...
                 numel(result.positions), result.positions(1), result.positions(end)));
         catch ME
-            uialert(fig, sprintf('Track Peak failed:\n%s', ME.message), 'Error');
+            bosonPlotter.quietAlert(fig, sprintf('Track Peak failed:\n%s', ME.message), 'Error');
         end
         recordAction(sprintf('%% Track peak: seed=%.4g', seedPos));
     end
@@ -538,7 +538,7 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
     function onOpenReflFitDialog(~, ~)
     %ONOPENREFLFITDIALOG  Open reflectivity fitting dialog (Parratt recursion).
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a dataset first.', 'Reflectivity Fit');
+            bosonPlotter.quietAlert(fig, 'Load a dataset first.', 'Reflectivity Fit');
             return;
         end
         bosonPlotter.reflFitting(appData.datasets, appData.activeIdx, ax, ...
@@ -602,7 +602,7 @@ cb.onAdvancedFigureBuilder    = @onAdvancedFigureBuilder;
     function onAdvancedFigureBuilder(~, ~)
     %ONADVANCEDFIGUREBUILDER  Delegates to bosonPlotter.figureBuilder.
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load at least one file first.', 'No data'); return;
+            bosonPlotter.quietAlert(fig, 'Load at least one file first.', 'No data'); return;
         end
         bosonPlotter.figureBuilder(appData.datasets, appData.activeIdx, ...
             'ButtonColors', struct('primary', BTN_PRIMARY, 'tool', BTN_TOOL, 'fg', BTN_FG), ...

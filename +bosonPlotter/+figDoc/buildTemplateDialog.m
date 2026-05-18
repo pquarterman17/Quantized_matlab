@@ -50,7 +50,7 @@ function buildTemplateDialog(fig, model, applyCallback)
             bosonPlotter.figDoc.templateManager.applyTo(sel, model);
             applyCallback();
         catch ME
-            uialert(dlg, ME.message, 'Error', 'Icon', 'error');
+            bosonPlotter.quietAlert(dlg, ME.message, 'Error', 'Icon', 'error');
         end
     end
 

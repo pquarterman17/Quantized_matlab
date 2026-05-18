@@ -249,7 +249,7 @@ function varargout = BosonPlotter(options)
 %   xrdConvertGUI, test_gui_harness
 
     arguments
-        options.Visible (1,1) string {mustBeMember(options.Visible,["on","off"])} = "on"
+        options.Visible (1,1) string {mustBeMember(options.Visible,["on","off","auto"])} = "auto"
         options.Model         = []   % existing WorkspaceModel (shared with DataWorkspace)
     end
 
@@ -351,8 +351,9 @@ function varargout = BosonPlotter(options)
     initX = max(20, round((availW - initW) / 2));
     initY = max(40, round((availH - initH) / 2));
     % Headless mode: figure starts hidden and popup dialogs stay hidden.
-    % Triggered by Visible='off' (used by tests).  For full focus-steal
-    % suppression on Windows, run via tests/run_gui_hidden.ps1.
+    % Triggered by Visible='off' (used by tests) or by Visible='auto' when
+    % QUANTIZED_MATLAB_HEADLESS=1 (see bosonPlotter.resolveVisible).
+    options.Visible = bosonPlotter.resolveVisible(options.Visible);
     headless = options.Visible == "off";
     figArgs = {'Name','Data Import & Preview', ...
                'Position',[initX initY initW initH], ...
@@ -1766,7 +1767,7 @@ function varargout = BosonPlotter(options)
     % Deferred to here so all GUI callbacks exist before restoring data.
     if ~headless && bosonPlotter.autosave.check()
         try
-            answer = uiconfirm(fig, ...
+            answer = bosonPlotter.quietConfirm(fig, ...
                 'An unsaved session was found (possible crash recovery). Restore it?', ...
                 'Recover Session', ...
                 'Options', {'Restore', 'Discard'}, ...
@@ -2360,7 +2361,7 @@ function varargout = BosonPlotter(options)
         end
 
         if numel(appData.datasets) < 2
-            uialert(fig,'Need at least 2 datasets to animate.','Animate'); return;
+            bosonPlotter.quietAlert(fig,'Need at least 2 datasets to animate.','Animate'); return;
         end
 
         if ~isempty(animBtn)
@@ -2437,7 +2438,7 @@ function varargout = BosonPlotter(options)
             'Space               Toggle dataset visibility\n' ...
             'Ctrl+Up             Move dataset up\n' ...
             'Ctrl+Down           Move dataset down']);
-        uialert(fig, msg, 'Keyboard Shortcuts', 'Icon', 'info');
+        bosonPlotter.quietAlert(fig, msg, 'Keyboard Shortcuts', 'Icon', 'info');
     end
 
     function saveAxisLimsToActiveDataset()
@@ -2659,14 +2660,14 @@ function varargout = BosonPlotter(options)
     function onAutoMagCorrections(~,~)
     %ONATOMAGCORRECTIONS  Delegate — see +bosonPlotter/computeAutoMagCorrections.m.
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a file first.', 'No data'); return;
+            bosonPlotter.quietAlert(fig, 'Load a file first.', 'No data'); return;
         end
         doAll   = strcmp(ddAutoMagScope.Value, 'All Datasets');
         indices = guiTernary(doAll, 1:numel(appData.datasets), appData.activeIdx);
         corrections = bosonPlotter.computeAutoMagCorrections( ...
             appData.datasets, indices, lbY.Value);
         if isempty(corrections)
-            uialert(fig, 'No magnetometry datasets found to correct.', 'Auto BG');
+            bosonPlotter.quietAlert(fig, 'No magnetometry datasets found to correct.', 'Auto BG');
             return;
         end
         origIdx = appData.activeIdx;
@@ -2839,19 +2840,19 @@ function varargout = BosonPlotter(options)
     function onRefineLattice(~, ~)
     %ONREFINELATTICE  Delegate to PeakWorkshopModel.refineLattice.
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a file first.', 'No data'); return;
+            bosonPlotter.quietAlert(fig, 'Load a file first.', 'No data'); return;
         end
         ds   = appData.datasets{appData.activeIdx};
         wl_A = extractWavelength_A(ds);
         if isnan(wl_A) || wl_A <= 0
-            uialert(fig, ['Wavelength is required for lattice refinement.  ' ...
+            bosonPlotter.quietAlert(fig, ['Wavelength is required for lattice refinement.  ' ...
                           'Enter a value in the ' char(955) ' field or load an XRDML/Bruker file.'], ...
                 'No wavelength'); return;
         end
         fitted = ~isempty(ds.peaks) && any(strcmp({ds.peaks.status}, 'fitted') | ...
                                            strcmp({ds.peaks.status}, 'fitted(global)'));
         if ~fitted
-            uialert(fig, 'Fit peaks first (at least one fitted peak required).', ...
+            bosonPlotter.quietAlert(fig, 'Fit peaks first (at least one fitted peak required).', ...
                 'No fitted peaks'); return;
         end
         appData.peakModel.bindFromDataset(ds);
@@ -2873,12 +2874,12 @@ function varargout = BosonPlotter(options)
     function onMatchPhases(~, ~)
     %ONMATCHPHASES  Delegate to PeakWorkshopModel.matchPhases.
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a file first.', 'No data'); return;
+            bosonPlotter.quietAlert(fig, 'Load a file first.', 'No data'); return;
         end
         ds   = appData.datasets{appData.activeIdx};
         wl_A = extractWavelength_A(ds);
         if isnan(wl_A) || wl_A <= 0
-            uialert(fig, ['Wavelength is required for phase matching.  ' ...
+            bosonPlotter.quietAlert(fig, ['Wavelength is required for phase matching.  ' ...
                           'Enter a value in the ' char(955) ' field or select an X-ray source.'], ...
                 'Wavelength needed'); return;
         end
@@ -2888,7 +2889,7 @@ function varargout = BosonPlotter(options)
             appData.peakModel.matchPhases(ds, ParentFig=fig, StatusFcn=@setStatus, MainAx=ax);
         catch ME
             logGUIError('Phase Match Error', ME.message, ME);
-            uialert(fig, sprintf('Phase matching failed:\n\n%s', ME.message), 'Error');
+            bosonPlotter.quietAlert(fig, sprintf('Phase matching failed:\n\n%s', ME.message), 'Error');
         end
     end
 
@@ -2899,12 +2900,12 @@ function varargout = BosonPlotter(options)
     function onFFTThickness(~, ~)
     %ONFFTTHICKNESS  Delegate to PeakWorkshopModel.fftThickness.
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a file first.', 'No data'); return;
+            bosonPlotter.quietAlert(fig, 'Load a file first.', 'No data'); return;
         end
         ds   = appData.datasets{appData.activeIdx};
         wl_A = extractWavelength_A(ds);
         if isnan(wl_A) || wl_A <= 0
-            uialert(fig, ['Wavelength is required for FFT thickness.  ' ...
+            bosonPlotter.quietAlert(fig, ['Wavelength is required for FFT thickness.  ' ...
                           'Enter a value in the ' char(955) ' field.'], ...
                 'No wavelength'); return;
         end
@@ -2930,7 +2931,7 @@ function varargout = BosonPlotter(options)
     %   Click two fringe peaks; thickness = 2*pi / |Q1 - Q2|.
     %   Markers are draggable for refinement.
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data'); return;
+            bosonPlotter.quietAlert(fig,'Load a file first.','No data'); return;
         end
         cancelInteractions();
         clearFringeMarkers();
@@ -2991,7 +2992,7 @@ function varargout = BosonPlotter(options)
     function onReflectivityFFT(~, ~)
     %ONREFLECTIVITYFFT  Compute film thickness from Kiessig fringe periodicity.
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a file first.', 'No data'); return;
+            bosonPlotter.quietAlert(fig, 'Load a file first.', 'No data'); return;
         end
         ds = appData.datasets{appData.activeIdx};
 
@@ -3000,7 +3001,7 @@ function varargout = BosonPlotter(options)
         if ~isNeutronDS
             wl_A = extractWavelength_A(ds);
             if isnan(wl_A) || wl_A <= 0
-                uialert(fig, ['Wavelength is required for XRR FFT thickness.  ' ...
+                bosonPlotter.quietAlert(fig, ['Wavelength is required for XRR FFT thickness.  ' ...
                     'Enter a value in the ' char(955) ' field or select an X-ray source.'], ...
                     'No wavelength'); return;
             end
@@ -3024,17 +3025,17 @@ function varargout = BosonPlotter(options)
     function onWilliamsonHallPlot(~, ~)
     %ONWILLIAMSONHALLPLOT  Delegate to PeakWorkshopModel.williamsonHall.
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a file first.', 'No data'); return;
+            bosonPlotter.quietAlert(fig, 'Load a file first.', 'No data'); return;
         end
         ds   = appData.datasets{appData.activeIdx};
         wl_A = extractWavelength_A(ds);
         if isnan(wl_A) || wl_A <= 0
-            uialert(fig, ['Wavelength is required for Williamson-Hall analysis.  ' ...
+            bosonPlotter.quietAlert(fig, ['Wavelength is required for Williamson-Hall analysis.  ' ...
                           'Enter a value in the ' char(955) ' field.'], ...
                 'No wavelength'); return;
         end
         if isempty(ds.peaks)
-            uialert(fig, 'No peaks available.  Find and fit peaks first.', 'No peaks');
+            bosonPlotter.quietAlert(fig, 'No peaks available.  Find and fit peaks first.', 'No peaks');
             return;
         end
         appData.peakModel.bindFromDataset(ds);
@@ -3089,7 +3090,7 @@ function varargout = BosonPlotter(options)
                 onPlot([],[]);
             end
         catch ME
-            uialert(fig, sprintf('Failed to apply template:\n%s', ME.message), ...
+            bosonPlotter.quietAlert(fig, sprintf('Failed to apply template:\n%s', ME.message), ...
                 'Template error');
             logGUIError('onTemplateChanged', 'template apply failed', ME);
         end
@@ -3210,7 +3211,7 @@ function varargout = BosonPlotter(options)
         try
             bosonPlotter.plotStyleDialog(fig, dlgCtx);
         catch ME
-            uialert(fig, sprintf('Plot Style dialog failed:\n%s', ME.message), ...
+            bosonPlotter.quietAlert(fig, sprintf('Plot Style dialog failed:\n%s', ME.message), ...
                 'Style dialog error');
             logGUIError('onOpenPlotStyleDialog', 'dialog failed', ME);
         end
@@ -3224,7 +3225,7 @@ function varargout = BosonPlotter(options)
     %   styleOverrides (for shared style) so changes survive dataset
     %   toggles and session save/load.
         if isempty(appData.datasets)
-            uialert(fig, 'Load at least one dataset first.', 'No data');
+            bosonPlotter.quietAlert(fig, 'Load at least one dataset first.', 'No data');
             return;
         end
         legCtx = struct();
@@ -3239,7 +3240,7 @@ function varargout = BosonPlotter(options)
         try
             bosonPlotter.legendEditor(fig, legCtx);
         catch ME
-            uialert(fig, sprintf('Legend editor failed:\n%s', ME.message), ...
+            bosonPlotter.quietAlert(fig, sprintf('Legend editor failed:\n%s', ME.message), ...
                 'Legend dialog error');
             logGUIError('onOpenLegendEditor', 'dialog failed', ME);
         end
@@ -3696,7 +3697,7 @@ function varargout = BosonPlotter(options)
         fp = evt.Value;
         if ischar(fp) && strcmp(fp, '(recent)'), return; end
         if ~isfile(fp)
-            uialert(fig, sprintf('File not found:\n%s', fp), ...
+            bosonPlotter.quietAlert(fig, sprintf('File not found:\n%s', fp), ...
                 'File Missing', 'Icon', 'warning');
             % Remove stale entry
             appData.recentFiles(strcmp(appData.recentFiles, fp)) = [];
@@ -3731,7 +3732,7 @@ function varargout = BosonPlotter(options)
     function onExportMacro(~, ~)
     %ONEXPORTMACRO  Save the recorded macro to a .m file.
         if appData.macroLog.nEntries() == 0
-            uialert(fig, 'No commands recorded.', 'Export Macro');
+            bosonPlotter.quietAlert(fig, 'No commands recorded.', 'Export Macro');
             return;
         end
         [fn, fp] = uiputfile({'*.m', 'MATLAB Script (*.m)'}, ...
@@ -3742,7 +3743,7 @@ function varargout = BosonPlotter(options)
             appData.macroLog.exportScript(outPath);
             setStatus(sprintf('Macro exported: %s (%d commands)', fn, appData.macroLog.nEntries()));
         catch ME
-            uialert(fig, sprintf('Export failed:\n%s', ME.message), 'Export Error');
+            bosonPlotter.quietAlert(fig, sprintf('Export failed:\n%s', ME.message), 'Export Error');
         end
     end
 
@@ -3790,7 +3791,7 @@ function onLoadBackground(~,~)
             bgData = parser.importAuto(fullPath);
         catch ME
             logGUIError('Background Load Error', ME.message, ME);
-            uialert(fig, ME.message, 'Background Load Error');
+            bosonPlotter.quietAlert(fig, ME.message, 'Background Load Error');
             return;
         end
         appData.bgDataset = bgData;
@@ -3810,7 +3811,7 @@ function onLoadBackground(~,~)
     function onSetActiveBG(~,~)
     %ONSETACTIVEBG  Use the active dataset as the background.
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data');
+            bosonPlotter.quietAlert(fig,'Load a file first.','No data');
             return;
         end
 
@@ -3829,14 +3830,14 @@ function onLoadBackground(~,~)
         efBGFile.Value = appData.bgFile;
         cbSubtractBG.Value = true;  % auto-enable subtraction
 
-        uialert(fig, sprintf('Background set to:\n%s', appData.bgFile), ...
+        bosonPlotter.quietAlert(fig, sprintf('Background set to:\n%s', appData.bgFile), ...
             'Background Updated');
     end
 
     function onToggleDatasetVisibility(~,~)
     %ONTOGLEDATASETVISIBILITY  Toggle visibility of the active dataset.
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data');
+            bosonPlotter.quietAlert(fig,'Load a file first.','No data');
             return;
         end
 
@@ -3949,7 +3950,7 @@ function onLoadBackground(~,~)
 
     function onFitBGRegion(~,~)
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data');
+            bosonPlotter.quietAlert(fig,'Load a file first.','No data');
             return;
         end
 
@@ -3965,7 +3966,7 @@ function onLoadBackground(~,~)
         end
 
         if isdatetime(xv)
-            uialert(fig, ...
+            bosonPlotter.quietAlert(fig, ...
                 'Datetime x-axis: cannot fit a numeric linear BG.  Use a numeric X channel.', ...
                 'Not supported');
             return;
@@ -4109,7 +4110,7 @@ function onLoadBackground(~,~)
     function onArmMaskSelection(~,~)
     %ONARMMASKSELECTION  Arm click-and-drag mask mode.
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data'); return;
+            bosonPlotter.quietAlert(fig,'Load a file first.','No data'); return;
         end
         cancelInteractions();
         btnMaskSelect.Text            = 'Draw rectangle to mask...';
@@ -4197,7 +4198,7 @@ function onLoadBackground(~,~)
     function onUnmaskAll(~,~)
     %ONUNMASKALL  Restore all masked data points for the active dataset.
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data'); return;
+            bosonPlotter.quietAlert(fig,'Load a file first.','No data'); return;
         end
         ds = appData.datasets{appData.activeIdx};
         ds.mask = true(size(ds.data.time));
@@ -4210,7 +4211,7 @@ function onLoadBackground(~,~)
 
     function onPickYOrigin(~,~)
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data'); return;
+            bosonPlotter.quietAlert(fig,'Load a file first.','No data'); return;
         end
 
         cancelInteractions();
@@ -4426,17 +4427,17 @@ function onSendToOrigin(~,~)
     %ONADVASYMMETRY  Toggle spin asymmetry from the Advanced Analysis popup.
     %   Presents a dialog to configure asymmetry formula before toggling.
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a neutron dataset first.', 'Spin Asymmetry');
+            bosonPlotter.quietAlert(fig, 'Load a neutron dataset first.', 'Spin Asymmetry');
             return;
         end
         ds = appData.datasets{appData.activeIdx};
         if ~isfield(ds, 'parserName') || ~isNeutronParser(ds.parserName)
-            uialert(fig, 'Active dataset is not neutron data. Load NCNR .refl/.datA files.', 'Spin Asymmetry');
+            bosonPlotter.quietAlert(fig, 'Active dataset is not neutron data. Load NCNR .refl/.datA files.', 'Spin Asymmetry');
             return;
         end
         if cbCalculateAsymmetry.Value
             % Currently on — offer to turn off
-            choice = uiconfirm(fig, 'Spin asymmetry is currently ON. Turn off?', ...
+            choice = bosonPlotter.quietConfirm(fig, 'Spin asymmetry is currently ON. Turn off?', ...
                 'Spin Asymmetry', 'Options', {'Turn Off', 'Cancel'}, ...
                 'DefaultOption', 1, 'CancelOption', 2);
             if strcmp(choice, 'Turn Off')
@@ -4445,7 +4446,7 @@ function onSendToOrigin(~,~)
             end
         else
             % Currently off — let user pick formula then enable
-            choice = uiconfirm(fig, 'Calculate spin asymmetry?', ...
+            choice = bosonPlotter.quietConfirm(fig, 'Calculate spin asymmetry?', ...
                 'Spin Asymmetry', ...
                 'Options', {'Linear: (R++ - R--) / (R++ + R--)', 'Log: log(R++ / R--)', 'Cancel'}, ...
                 'DefaultOption', 1, 'CancelOption', 3);
@@ -4675,7 +4676,7 @@ function onSendToOrigin(~,~)
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
         ds = appData.datasets{appData.activeIdx};
         if ~is2DDataset(ds)
-            uialert(fig, 'Active dataset is not a 2D area-detector map.', 'Fit Surface');
+            bosonPlotter.quietAlert(fig, 'Active dataset is not a 2D area-detector map.', 'Fit Surface');
             return;
         end
         map = ds.data.metadata.parserSpecific.map2D;
@@ -4692,7 +4693,7 @@ function onSendToOrigin(~,~)
         if isempty(appData.datasets) || appData.activeIdx < 1, return; end
         ds = appData.datasets{appData.activeIdx};
         if ~is2DDataset(ds)
-            uialert(fig, 'Active dataset is not a 2D area-detector map.', 'Decompose RSM');
+            bosonPlotter.quietAlert(fig, 'Active dataset is not a 2D area-detector map.', 'Decompose RSM');
             return;
         end
         map = ds.data.metadata.parserSpecific.map2D;
@@ -5410,7 +5411,7 @@ function onSendToOrigin(~,~)
 
     function onExportFigure(~,~)
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data');
+            bosonPlotter.quietAlert(fig,'Load a file first.','No data');
             return;
         end
         expFig = figure('Name','Exported Plot','NumberTitle','off');
@@ -5492,7 +5493,7 @@ function onSendToOrigin(~,~)
     %ONSAVESESSION  Save all datasets and key UI settings to a .mat file.
     %  Delegates serialisation to bosonPlotter.sessionManager.save().
         if isempty(appData.datasets)
-            uialert(fig,'Nothing to save — load some files first.','No data'); return;
+            bosonPlotter.quietAlert(fig,'Nothing to save — load some files first.','No data'); return;
         end
 
         % Suggest path based on first dataset
@@ -5515,12 +5516,12 @@ function onSendToOrigin(~,~)
             bosonPlotter.sessionManager.save(outPath, appData, guiState);
             fig.Pointer = 'arrow';
             setStatus(sprintf('Session saved: %s', fname));
-            uialert(fig, sprintf('Session saved:\n%s', outPath), 'Session Saved');
+            bosonPlotter.quietAlert(fig, sprintf('Session saved:\n%s', outPath), 'Session Saved');
         catch ME
             fig.Pointer = 'arrow';
             setStatus('Session save failed.');
             logGUIError('Session Save Error', ME.message, ME);
-            uialert(fig, sprintf('Save failed:\n%s', ME.message), 'Session Save Error');
+            bosonPlotter.quietAlert(fig, sprintf('Save failed:\n%s', ME.message), 'Session Save Error');
         end
     end
 
@@ -5934,7 +5935,7 @@ function onSendToOrigin(~,~)
     function onDuplicateDataset(~,~)
     %ONDUPLICATEDATASET  Deep-copy the active dataset for side-by-side comparison (#9).
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data'); return;
+            bosonPlotter.quietAlert(fig,'Load a file first.','No data'); return;
         end
         ds = appData.datasets{appData.activeIdx};
         dsCopy = ds;
@@ -5998,7 +5999,7 @@ function onSendToOrigin(~,~)
         answer = inputdlg('Y value for horizontal line:', 'H Reference Line', [1 40], {'0'});
         if isempty(answer), return; end
         val = str2double(answer{1});
-        if isnan(val), uialert(fig, 'Invalid number.', 'Error'); return; end
+        if isnan(val), bosonPlotter.quietAlert(fig, 'Invalid number.', 'Error'); return; end
         ds = appData.datasets{appData.activeIdx};
         if ~isfield(ds, 'refLines'), ds.refLines = {}; end
         ds.refLines{end+1} = struct('orientation','horizontal','value',val, ...
@@ -6013,7 +6014,7 @@ function onSendToOrigin(~,~)
         answer = inputdlg('X value for vertical line:', 'V Reference Line', [1 40], {'0'});
         if isempty(answer), return; end
         val = str2double(answer{1});
-        if isnan(val), uialert(fig, 'Invalid number.', 'Error'); return; end
+        if isnan(val), bosonPlotter.quietAlert(fig, 'Invalid number.', 'Error'); return; end
         ds = appData.datasets{appData.activeIdx};
         if ~isfield(ds, 'refLines'), ds.refLines = {}; end
         ds.refLines{end+1} = struct('orientation','vertical','value',val, ...
@@ -6034,11 +6035,11 @@ function onSendToOrigin(~,~)
     function onCopyPeaksToClipboard(~,~)
     %ONCOPYPEAKSTOCLIPBOARD  Copy peak table as tab-delimited text to clipboard (#10).
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data'); return;
+            bosonPlotter.quietAlert(fig,'Load a file first.','No data'); return;
         end
         ds = appData.datasets{appData.activeIdx};
         if isempty(ds.peaks)
-            uialert(fig,'No peaks to copy.','No peaks'); return;
+            bosonPlotter.quietAlert(fig,'No peaks to copy.','No peaks'); return;
         end
         hdr = {'#','Center','d(A)','Size(nm)','FWHM','Height','Area','eta','Status'};
         lines = {strjoin(hdr, char(9))};
@@ -6089,7 +6090,7 @@ function onSendToOrigin(~,~)
     function onCreateInsetFromMenu()
     %ONCREATEINSETFROMMENU  Right-click menu: prompt for region, then create inset.
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig,'Load a file first.','No data'); return;
+            bosonPlotter.quietAlert(fig,'Load a file first.','No data'); return;
         end
         answer = inputdlg({'X min:', 'X max:', 'Y min:', 'Y max:'}, ...
             'Inset Region', [1 40], ...
@@ -6100,13 +6101,13 @@ function onSendToOrigin(~,~)
         yLo = str2double(answer{3}); yHi = str2double(answer{4});
         if any(isnan([xLo xHi yLo yHi])), return; end
         if xLo >= xHi || yLo >= yHi
-            uialert(fig,'Region bounds must satisfy min < max.','Invalid Region');
+            bosonPlotter.quietAlert(fig,'Region bounds must satisfy min < max.','Invalid Region');
             return;
         end
         try
             bosonPlotter.insetGraph(ax, [xLo xHi yLo yHi]);
         catch ME
-            uialert(fig, sprintf('Inset creation failed:\n%s', ME.message), 'Inset Error');
+            bosonPlotter.quietAlert(fig, sprintf('Inset creation failed:\n%s', ME.message), 'Inset Error');
         end
     end
 
@@ -6144,7 +6145,7 @@ function onSendToOrigin(~,~)
             setStatus('Cursor off.');
         else
             if isempty(appData.datasets) || appData.activeIdx < 1
-                uialert(fig,'Load a file first.','No data'); return;
+                bosonPlotter.quietAlert(fig,'Load a file first.','No data'); return;
             end
             appData.cursorActive = true;
             appData.cursorClickCount = 0;
@@ -6209,7 +6210,7 @@ function onSendToOrigin(~,~)
     function onComposeFigure(~, ~)
     %ONCOMPOSEFIGURE  Create a multi-panel composite figure.
         if isempty(appData.datasets)
-            uialert(fig, 'Load at least one dataset.', 'Compose Figure');
+            bosonPlotter.quietAlert(fig, 'Load at least one dataset.', 'Compose Figure');
             return;
         end
         % Build sources from loaded datasets
@@ -6221,7 +6222,7 @@ function onSendToOrigin(~,~)
             plotting.composeFigure(sources);
             setStatus(sprintf('Composite figure: %d panels', numel(sources)));
         catch ME
-            uialert(fig, sprintf('Compose Figure failed:\n%s', ME.message), 'Error');
+            bosonPlotter.quietAlert(fig, sprintf('Compose Figure failed:\n%s', ME.message), 'Error');
         end
         recordAction('%% Composite figure created');
     end
@@ -6229,7 +6230,7 @@ function onSendToOrigin(~,~)
     function on3DSurface(~, ~)
     %ON3DSURFACE  Create a 3D surface/mesh plot from gridded data.
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a dataset first.', '3D Surface');
+            bosonPlotter.quietAlert(fig, 'Load a dataset first.', '3D Surface');
             return;
         end
         ds = appData.datasets{appData.activeIdx};
@@ -6241,10 +6242,10 @@ function onSendToOrigin(~,~)
                 plotting.surface3D(ds.data);
                 setStatus('3D surface plot created');
             catch ME
-                uialert(fig, sprintf('3D Surface failed:\n%s', ME.message), 'Error');
+                bosonPlotter.quietAlert(fig, sprintf('3D Surface failed:\n%s', ME.message), 'Error');
             end
         else
-            uialert(fig, ['Active dataset does not contain 2D gridded data. ' ...
+            bosonPlotter.quietAlert(fig, ['Active dataset does not contain 2D gridded data. ' ...
                 'Load a 2D XRDML map or area-detector scan.'], '3D Surface');
         end
         recordAction('%% 3D surface plot');
@@ -6258,7 +6259,7 @@ function onSendToOrigin(~,~)
             plotting.polarPlot(xV, yV);
             setStatus('Polar plot created');
         catch ME
-            uialert(fig, sprintf('Polar Plot failed:\n%s', ME.message), 'Error');
+            bosonPlotter.quietAlert(fig, sprintf('Polar Plot failed:\n%s', ME.message), 'Error');
         end
         recordAction('%% Polar plot');
     end
@@ -6275,7 +6276,7 @@ function onSendToOrigin(~,~)
     function onWriteXRDcsv(~, ~)
     %ONWRITEXRDCSV  Export XRD data as CSV with metadata header.
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a dataset first.', 'XRD CSV Export');
+            bosonPlotter.quietAlert(fig, 'Load a dataset first.', 'XRD CSV Export');
             return;
         end
         ds = appData.datasets{appData.activeIdx};
@@ -6287,7 +6288,7 @@ function onSendToOrigin(~,~)
             utilities.writeXRDcsv(ds.data, outPath);
             setStatus(sprintf('XRD CSV exported: %s', fn));
         catch ME
-            uialert(fig, sprintf('Export failed:\n%s', ME.message), 'Error');
+            bosonPlotter.quietAlert(fig, sprintf('Export failed:\n%s', ME.message), 'Error');
         end
         recordAction(sprintf('%% XRD CSV export: %s', fn));
     end
@@ -6338,14 +6339,14 @@ function onSendToOrigin(~,~)
     %ONADDTOGROUP  Add selected datasets to the current group.
         groupName = ddGroup.Value;
         if strcmp(groupName, 'All Datasets')
-            uialert(fig, 'Select or create a group first (type a name in the dropdown).', 'Add to Group');
+            bosonPlotter.quietAlert(fig, 'Select or create a group first (type a name in the dropdown).', 'Add to Group');
             return;
         end
         sel = lbDatasets.Value;
         if iscell(sel), sel = [sel{:}]; end
         sel = sel(sel > 0);
         if isempty(sel)
-            uialert(fig, 'Select datasets in the list first.', 'Add to Group');
+            bosonPlotter.quietAlert(fig, 'Select datasets in the list first.', 'Add to Group');
             return;
         end
         if ~appData.datasetGroups.isKey(groupName)
@@ -6412,7 +6413,7 @@ function onSendToOrigin(~,~)
     %GETACTIVEXY  Extract x,y vectors and label for the active dataset/channel.
         xV = []; yV = []; yLbl = '';
         if isempty(appData.datasets) || appData.activeIdx < 1
-            uialert(fig, 'Load a dataset first.', 'No Data');
+            bosonPlotter.quietAlert(fig, 'Load a dataset first.', 'No Data');
             return;
         end
         ds = appData.datasets{appData.activeIdx};
@@ -6420,12 +6421,12 @@ function onSendToOrigin(~,~)
         if ~isempty(ds.corrData), d = ds.corrData; end
         ySel = ensureCell(lbY.Value);
         if isempty(ySel)
-            uialert(fig, 'Select a Y channel.', 'No Channel');
+            bosonPlotter.quietAlert(fig, 'Select a Y channel.', 'No Channel');
             return;
         end
         yIdx = find(strcmp(d.labels, ySel{1}), 1);
         if isempty(yIdx)
-            uialert(fig, 'Channel not found.', 'Error');
+            bosonPlotter.quietAlert(fig, 'Channel not found.', 'Error');
             return;
         end
         xV = d.time;  yV = d.values(:, yIdx);  yLbl = d.labels{yIdx};

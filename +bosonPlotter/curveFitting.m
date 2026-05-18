@@ -508,7 +508,7 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
     %ONPARSECUSTOM  Parse the custom equation string.
         eqn = strtrim(efCFCustom.Value);
         if isempty(eqn)
-            uialert(cfFig, 'Enter an equation first.', 'Parse Error');
+            bosonPlotter.quietAlert(cfFig, 'Enter an equation first.', 'Parse Error');
             return;
         end
         try
@@ -523,7 +523,7 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
             options.StatusFcn(sprintf('Parsed: %d parameters (%s)', ...
                 numel(customNames), strjoin(customNames, ', ')));
         catch ME
-            uialert(cfFig, sprintf('Parse error:\n%s', ME.message), 'Parse Error');
+            bosonPlotter.quietAlert(cfFig, sprintf('Parse error:\n%s', ME.message), 'Parse Error');
         end
     end
 
@@ -531,14 +531,14 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
     %DOSIMULATE  Preview model curve with current parameter values (no fitting).
         [xSeg, ySeg] = getDataSegment();
         if numel(xSeg) < 2
-            uialert(cfFig, 'Not enough data in range.', 'Simulate');
+            bosonPlotter.quietAlert(cfFig, 'Not enough data in range.', 'Simulate');
             return;
         end
 
         try
             [fcn, ~, p0, ~, ~, ~, ~] = resolveModel();
         catch ME
-            uialert(cfFig, ME.message, 'Simulate Error');
+            bosonPlotter.quietAlert(cfFig, ME.message, 'Simulate Error');
             return;
         end
 
@@ -564,14 +564,14 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
     %DOCURVEFIT  Execute the curve fit via fitting.curveFit.
         [xSeg, ySeg] = getDataSegment();
         if numel(xSeg) < 3
-            uialert(cfFig, 'Not enough data in range.', 'Fit Error');
+            bosonPlotter.quietAlert(cfFig, 'Not enough data in range.', 'Fit Error');
             return;
         end
 
         try
             [fcn, pNames, p0, lb, ub, fixedMask, constraintExprs] = resolveModel();
         catch ME
-            uialert(cfFig, ME.message, 'Fit Error');
+            bosonPlotter.quietAlert(cfFig, ME.message, 'Fit Error');
             return;
         end
 
@@ -684,7 +684,7 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
                 cfResult.model, char(178), res.R2));
         catch ME
             cfFig.Pointer = 'arrow';
-            uialert(cfFig, sprintf('Fit failed:\n%s', ME.message), 'Error');
+            bosonPlotter.quietAlert(cfFig, sprintf('Fit failed:\n%s', ME.message), 'Error');
         end
     end
 
@@ -801,7 +801,7 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
     function onCFDiagnostics()
     %ONCFDIAGNOSTICS  Open residual diagnostics window for the last fit.
         if isempty(cfResult.residuals)
-            uialert(cfFig, 'Run a fit first.', 'Diagnostics');
+            bosonPlotter.quietAlert(cfFig, 'Run a fit first.', 'Diagnostics');
             return
         end
 
@@ -984,7 +984,7 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
     %   Highlights the best model (lowest AIC).
     %   If exactly 2 models are in history, also shows F-test result.
         if isempty(cfHistory)
-            uialert(cfFig, 'No fit history yet. Run at least one fit first.', ...
+            bosonPlotter.quietAlert(cfFig, 'No fit history yet. Run at least one fit first.', ...
                 'Compare Models');
             return;
         end
@@ -1124,7 +1124,7 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
     %   Calls fitting.globalCurveFit and displays results.
 
         if numel(datasets) < 2
-            uialert(cfFig, ...
+            bosonPlotter.quietAlert(cfFig, ...
                 sprintf('Global Fit requires at least 2 loaded datasets (have %d).', ...
                     numel(datasets)), 'Global Fit');
             return;
@@ -1134,7 +1134,7 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
         try
             [gfcn, gParamNames, gP0, gLb, gUb, ~] = resolveModel();
         catch ME
-            uialert(cfFig, sprintf('Resolve model failed:\n%s', ME.message), ...
+            bosonPlotter.quietAlert(cfFig, sprintf('Resolve model failed:\n%s', ME.message), ...
                 'Global Fit');
             return;
         end
@@ -1236,7 +1236,7 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
             end
 
             if numel(selIdx) < 2
-                uialert(gfFig, 'Select at least 2 datasets.', 'Global Fit');
+                bosonPlotter.quietAlert(gfFig, 'Select at least 2 datasets.', 'Global Fit');
                 return;
             end
 
@@ -1300,7 +1300,7 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
             catch ME
                 gfFig.Pointer = 'arrow';
                 lblGFStatus.Text = 'Fit failed.';
-                uialert(gfFig, sprintf('Global fit failed:\n%s', ME.message), 'Error');
+                bosonPlotter.quietAlert(gfFig, sprintf('Global fit failed:\n%s', ME.message), 'Error');
             end
         end
 
@@ -1459,7 +1459,7 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
     %   heterogeneous parameter scales. Displays a corner plot of the
     %   free (unfixed) parameters.
         if isempty(cfResult.params) || isempty(cfResult.modelFcn)
-            uialert(cfFig, 'Run Fit first — MCMC samples around the current best fit.', ...
+            bosonPlotter.quietAlert(cfFig, 'Run Fit first — MCMC samples around the current best fit.', ...
                 'Sample Posterior');
             return;
         end
@@ -1472,7 +1472,7 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
         stepSz = str2double(defAns{3});
         if ~isfinite(nSteps) || nSteps < 100 || ~isfinite(nBurn) || ...
                 ~isfinite(stepSz) || stepSz <= 0
-            uialert(cfFig, 'Invalid MCMC settings.', 'Sample Posterior');
+            bosonPlotter.quietAlert(cfFig, 'Invalid MCMC settings.', 'Sample Posterior');
             return;
         end
 
@@ -1480,19 +1480,19 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
         try
             [fcn, pNames, ~, lb, ub, fixedMask, ~] = resolveModel();
         catch ME
-            uialert(cfFig, ME.message, 'Sample Posterior');
+            bosonPlotter.quietAlert(cfFig, ME.message, 'Sample Posterior');
             return;
         end
         [xSeg, ySeg] = getDataSegment();
         if numel(xSeg) < 3
-            uialert(cfFig, 'Not enough data in range.', 'Sample Posterior');
+            bosonPlotter.quietAlert(cfFig, 'Not enough data in range.', 'Sample Posterior');
             return;
         end
 
         pBest = cfResult.params(:)';
         nP    = numel(pBest);
         if numel(pNames) ~= nP || numel(lb) ~= nP || numel(ub) ~= nP
-            uialert(cfFig, ...
+            bosonPlotter.quietAlert(cfFig, ...
                 'Parameter table is out of sync with the fit — re-run Fit and try again.', ...
                 'Sample Posterior');
             return;
@@ -1500,7 +1500,7 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
 
         freeIdx = find(~fixedMask);
         if isempty(freeIdx)
-            uialert(cfFig, 'All parameters are fixed — nothing to sample.', ...
+            bosonPlotter.quietAlert(cfFig, 'All parameters are fixed — nothing to sample.', ...
                 'Sample Posterior');
             return;
         end
@@ -1533,7 +1533,7 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
                 size(freeSamples,1), 100*mcRes.acceptRate));
         catch ME
             cfFig.Pointer = 'arrow';
-            uialert(cfFig, sprintf('MCMC failed:\n%s', ME.message), 'Error');
+            bosonPlotter.quietAlert(cfFig, sprintf('MCMC failed:\n%s', ME.message), 'Error');
         end
     end
 

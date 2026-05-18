@@ -22,7 +22,7 @@ function onPoleFigure(appData, fig, callbacks)
     if isempty(appData.datasets) || appData.activeIdx < 1, return; end
     ds = appData.datasets{appData.activeIdx};
     if ~callbacks.is2DDataset(ds)
-        uialert(fig, 'Active dataset is not a 2D area-detector scan.', 'Pole Figure');
+        bosonPlotter.quietAlert(fig, 'Active dataset is not a 2D area-detector scan.', 'Pole Figure');
         return;
     end
 

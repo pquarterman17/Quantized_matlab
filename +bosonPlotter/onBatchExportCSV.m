@@ -30,7 +30,7 @@ function onBatchExportCSV(appData, fig, callbacks)
 %                 .guiSaveCSV(d, fp, dRaw, asymData, fmt)
 
     if isempty(appData.datasets)
-        uialert(fig,'Load a file first.','No data');
+        bosonPlotter.quietAlert(fig,'Load a file first.','No data');
         return;
     end
 
@@ -93,16 +93,16 @@ function onBatchExportCSV(appData, fig, callbacks)
     fig.Pointer = 'arrow';
     if nExported == 0
         callbacks.setStatus('Batch export: no datasets exported.');
-        uialert(fig, 'No datasets to export.', 'Batch Export');
+        bosonPlotter.quietAlert(fig, 'No datasets to export.', 'Batch Export');
     elseif isempty(failedFiles)
         callbacks.setStatus(sprintf('Batch export complete: %d file(s) saved.', nExported));
-        uialert(fig, sprintf('Successfully exported %d file(s) to CSV.', nExported), ...
+        bosonPlotter.quietAlert(fig, sprintf('Successfully exported %d file(s) to CSV.', nExported), ...
             'Batch Export Complete');
     else
         callbacks.setStatus(sprintf('Batch export partial: %d exported, %d failed.', nExported, numel(failedFiles)));
         msg = sprintf('Exported: %d\nFailed: %d\n\n', nExported, numel(failedFiles));
         msg = [msg, strjoin(failedFiles, '\n')];
-        uialert(fig, msg, 'Batch Export Partial');
+        bosonPlotter.quietAlert(fig, msg, 'Batch Export Partial');
     end
 end
 

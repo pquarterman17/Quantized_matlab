@@ -27,7 +27,7 @@ function onColumnCalculator(appData, fig, callbacks)
 %                 .recordAction(comment)
 
     if isempty(appData.datasets) || appData.activeIdx < 1
-        uialert(fig, 'Load a file first.', 'No data');
+        bosonPlotter.quietAlert(fig, 'Load a file first.', 'No data');
         return;
     end
     ds = appData.datasets{appData.activeIdx};
@@ -78,6 +78,6 @@ function onColumnCalculator(appData, fig, callbacks)
         callbacks.setStatus(sprintf('Added column "%s".', colName));
         callbacks.recordAction(sprintf('%% Column calculator: %s = %s', colName, expr));
     catch ME
-        uialert(fig, sprintf('Expression error:\n%s', ME.message), 'Column Calculator Error');
+        bosonPlotter.quietAlert(fig, sprintf('Expression error:\n%s', ME.message), 'Column Calculator Error');
     end
 end

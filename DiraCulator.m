@@ -1,4 +1,8 @@
-function varargout = DiraCulator()
+function varargout = DiraCulator(opts)
+arguments
+    opts.Visible (1,1) string {mustBeMember(opts.Visible, ["on","off","auto"])} = "auto"
+end
+opts.Visible = bosonPlotter.resolveVisible(opts.Visible);
 % ════════════════════════════════════════════════════════════════════════
 % DiraCulator — Materials property calculator GUI.
 % ════════════════════════════════════════════════════════════════════════
@@ -229,15 +233,17 @@ appData.api.exportReport = @(fp) exportReportToFile(fp);
 applyDarkInputTheme(fig, INPUT_BG, INPUT_FG);
 applyDarkPanelTheme(fig, FIG_BG, LABEL_FG);
 
-% Show the fully-built figure and force layout commit
-fig.Visible = 'on';
+% Show the fully-built figure and force layout commit. In headless mode
+% (opts.Visible='off') the figure stays hidden — tests can still drive it
+% via the api struct returned below.
+fig.Visible = char(opts.Visible);
 drawnow;
 
 % First-launch hint (shown once per user; flag stored in prefdir)
 hintFlag = fullfile(prefdir, 'diraculator_firstlaunch_seen');
 if exist(hintFlag, 'file') ~= 2 && nargout == 0
     try
-        uialert(fig, ...
+        bosonPlotter.quietAlert(fig, ...
             ['Welcome to DiraCulator.' newline newline ...
              '• Pick a panel from the sidebar on the left.' newline ...
              '• Press Enter to compute the primary action on any panel.' newline ...
@@ -5530,7 +5536,7 @@ fig.WindowKeyPressFcn = @onGlobalKeyPress;
             n = numel(appData.history);
             if n == 0, return; end
             if n == 1, noun = 'entry'; else, noun = 'entries'; end
-            choice = uiconfirm(fig, ...
+            choice = bosonPlotter.quietConfirm(fig, ...
                 sprintf('Clear %d history %s? This cannot be undone.', n, noun), ...
                 'Clear History', ...
                 'Options', {'Clear', 'Cancel'}, ...

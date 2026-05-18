@@ -27,7 +27,7 @@ function onBatchImportDir(appData, fig, callbacks)
 
     dirPath = uigetdir(pwd, 'Select directory to import');
     if isequal(dirPath, 0), return; end
-    answer = uiconfirm(fig, 'Scan subdirectories recursively?', ...
+    answer = bosonPlotter.quietConfirm(fig, 'Scan subdirectories recursively?', ...
         'Batch Import', 'Options', {'Yes', 'No', 'Cancel'}, ...
         'DefaultOption', 1, 'CancelOption', 3);
     if strcmp(answer, 'Cancel'), return; end
@@ -37,7 +37,7 @@ function onBatchImportDir(appData, fig, callbacks)
     try
         results = scripts.batchImport(dirPath, 'Recursive', recursive);
         if isempty(results)
-            uialert(fig, 'No supported files found in the selected directory.', 'Batch Import');
+            bosonPlotter.quietAlert(fig, 'No supported files found in the selected directory.', 'Batch Import');
             callbacks.setStatus('Batch import: no files found');
             return;
         end
@@ -61,7 +61,7 @@ function onBatchImportDir(appData, fig, callbacks)
         end
         callbacks.setStatus(sprintf('Batch import: %d files loaded from %s', nAdded, dirPath));
     catch ME
-        uialert(fig, sprintf('Batch import failed:\n%s', ME.message), 'Error');
+        bosonPlotter.quietAlert(fig, sprintf('Batch import failed:\n%s', ME.message), 'Error');
         callbacks.setStatus('Batch import failed');
     end
     callbacks.recordAction(sprintf("%% Batch import: '%s' (recursive=%d)", dirPath, recursive));

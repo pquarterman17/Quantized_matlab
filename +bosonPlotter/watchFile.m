@@ -9,7 +9,7 @@ function watchFile(appData, fig, cb)
 %     cb      - struct with fields: setStatus, rebuildDatasetList, onPlot
 
     if isempty(appData.datasets) || appData.activeIdx < 1
-        uialert(fig, 'Load a file first.', 'Watch File');
+        bosonPlotter.quietAlert(fig, 'Load a file first.', 'Watch File');
         return;
     end
 
@@ -29,7 +29,7 @@ function watchFile(appData, fig, cb)
     end
 
     if ~isfile(ds.filepath)
-        uialert(fig, sprintf('Cannot watch: file not found.\n%s', ds.filepath), 'Watch File');
+        bosonPlotter.quietAlert(fig, sprintf('Cannot watch: file not found.\n%s', ds.filepath), 'Watch File');
         return;
     end
 

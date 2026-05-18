@@ -202,7 +202,7 @@ function result = MetadataEditor(data, opts)
 
         tmpl.overrides = collectOverrides();
         templates.TemplateEngine.save(tmpl);
-        uialert(dlgFig, sprintf('Template "%s" saved.', tmpl.name), ...
+        bosonPlotter.quietAlert(dlgFig, sprintf('Template "%s" saved.', tmpl.name), ...
             'Saved', 'Icon', 'success');
     end
 

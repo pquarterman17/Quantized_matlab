@@ -13,7 +13,7 @@ function batchFigureExport(datasets, parentFig, getPlotDataFn, setStatusFn, btnC
 %       btnColors     - struct with .primary, .fg fields
 
     if isempty(datasets)
-        uialert(parentFig, 'Load files first.', 'No data'); return;
+        bosonPlotter.quietAlert(parentFig, 'Load files first.', 'No data'); return;
     end
 
     BTN_PRIMARY = btnColors.primary;

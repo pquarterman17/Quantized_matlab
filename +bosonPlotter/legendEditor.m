@@ -30,7 +30,7 @@ function legendEditor(parentFig, ctx)
 
     datasets = ctx.getDatasets();
     if isempty(datasets)
-        uialert(parentFig, 'Load at least one dataset first.', 'No data');
+        bosonPlotter.quietAlert(parentFig, 'Load at least one dataset first.', 'No data');
         return;
     end
 

@@ -9,7 +9,7 @@ function exportOriginScript(appData, fig, guiState)
 %     guiState - struct with fields: logX, logY
 
     if isempty(appData.datasets) || appData.activeIdx < 1
-        uialert(fig, 'Load a file first.', 'No data'); return;
+        bosonPlotter.quietAlert(fig, 'Load a file first.', 'No data'); return;
     end
     ds  = appData.datasets{appData.activeIdx};
     src = guiTernary_(~isempty(ds.corrData), ds.corrData, ds.data);
@@ -25,10 +25,10 @@ function exportOriginScript(appData, fig, guiState)
         utilities.exportOriginScript(src, scriptPath, ...
             'LogY', guiState.logY, ...
             'LogX', guiState.logX);
-        uialert(fig, sprintf('Origin script saved:\n%s\n\nRun in Origin: run.file("%s")', ...
+        bosonPlotter.quietAlert(fig, sprintf('Origin script saved:\n%s\n\nRun in Origin: run.file("%s")', ...
             scriptPath, outFile), 'Export Complete');
     catch ME
-        uialert(fig, sprintf('Export failed:\n%s', ME.message), 'Export Error');
+        bosonPlotter.quietAlert(fig, sprintf('Export failed:\n%s', ME.message), 'Export Error');
     end
 end
 

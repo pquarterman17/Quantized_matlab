@@ -356,7 +356,7 @@ updateROI();
         mask = xAll >= efXmin.Value & xAll <= efXmax.Value;
 
         if sum(mask) < 2
-            uialert(roiFig, 'Not enough points in region.', 'Export');
+            bosonPlotter.quietAlert(roiFig, 'Not enough points in region.', 'Export');
             return;
         end
 

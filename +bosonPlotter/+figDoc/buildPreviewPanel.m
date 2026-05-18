@@ -87,7 +87,7 @@ function buildPreviewPanel(fig, datasets, activeIdx, overlayOn, model)
         outFile = fullfile(fpath, fname);
         bosonPlotter.figDoc.exportRender(datasets, activeIdx, ...
             overlayOn, model, profName, outFile);
-        uialert(dlg, sprintf('Saved: %s', outFile), 'Exported');
+        bosonPlotter.quietAlert(dlg, sprintf('Saved: %s', outFile), 'Exported');
     end
 
     function w = checkIssues_(profile)

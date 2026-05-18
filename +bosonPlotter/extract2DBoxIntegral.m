@@ -60,7 +60,7 @@ function [newDs, cutLabel] = extract2DBoxIntegral(ds, bx0, by0, bx1, by1, profil
     if ~any(rowMask) || ~any(colMask)
         msg = 'No data points fall within the selected box.';
         if isvalid(fig) && strcmp(fig.Visible, 'on')
-            uialert(fig, msg, 'Empty Selection');
+            bosonPlotter.quietAlert(fig, msg, 'Empty Selection');
         else
             warning('BosonPlotter:emptyBox', '%s', msg);
         end
@@ -80,7 +80,7 @@ function [newDs, cutLabel] = extract2DBoxIntegral(ds, bx0, by0, bx1, by1, profil
     if isempty(profileAxis)
         opt1 = sprintf('Profile vs %s (sum along %s)', name1, name2);
         opt2 = sprintf('Profile vs %s (sum along %s)', name2, name1);
-        sel = uiconfirm(fig, ...
+        sel = bosonPlotter.quietConfirm(fig, ...
             'Choose integration direction:', 'Box Integration', ...
             'Options', {opt1, opt2, 'Cancel'}, ...
             'DefaultOption', 1, 'CancelOption', 3);

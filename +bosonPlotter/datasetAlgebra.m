@@ -26,7 +26,7 @@ function datasetAlgebra(appData, fig, callbacks)
 % ════════════════════════════════════════════════════════════════════════
 
     if isempty(appData.datasets) || numel(appData.datasets) < 2
-        uialert(fig, 'Load at least two files to use dataset math.', 'Need 2+ datasets');
+        bosonPlotter.quietAlert(fig, 'Load at least two files to use dataset math.', 'Need 2+ datasets');
         return;
     end
 
@@ -124,7 +124,7 @@ function datasetAlgebra(appData, fig, callbacks)
             delete(mathFig);
             callbacks.setStatusFn(sprintf('Math result added: %s', ddMathOp.Value));
         catch ME
-            uialert(mathFig, ME.message, 'Math Error');
+            bosonPlotter.quietAlert(mathFig, ME.message, 'Math Error');
         end
     end
 end

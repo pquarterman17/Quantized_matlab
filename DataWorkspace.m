@@ -37,9 +37,10 @@ function varargout = DataWorkspace(options)
 % ════════════════════════════════════════════════════════════════════════
 
 arguments
-    options.Visible (1,:) char {mustBeMember(options.Visible, {'on','off'})} = 'on'
+    options.Visible (1,:) char {mustBeMember(options.Visible, {'on','off','auto'})} = 'auto'
     options.Model         = []   % existing WorkspaceModel (shared with BosonPlotter)
 end
+options.Visible = char(bosonPlotter.resolveVisible(string(options.Visible)));
 
 % ════════════════════════════════════════════════════════════════════════
 %  Shared model
@@ -428,14 +429,14 @@ end
             writetable(T, fullfile(fdir, fname));
             setStatusBar(sprintf('Exported: %s', fname));
         catch ME
-            uialert(fig, ME.message, 'Export failed');
+            bosonPlotter.quietAlert(fig, ME.message, 'Export failed');
         end
     end
 
     function onAddColumn(~, ~)
     %ONADDCOLUMN  Open the Add Computed Column dialog.
         if model.activeIdx == 0
-            uialert(fig, 'No active dataset. Load a file first.', 'Add Column');
+            bosonPlotter.quietAlert(fig, 'No active dataset. Load a file first.', 'Add Column');
             return;
         end
         showAddColumnDialog();
@@ -444,7 +445,7 @@ end
     function onSaveWorkspace(~, ~)
     %ONSAVEWORKSPACE  Save all datasets to a .dwk workspace file.
         if model.count() == 0
-            uialert(fig, 'No datasets to save.', 'Save Workspace');
+            bosonPlotter.quietAlert(fig, 'No datasets to save.', 'Save Workspace');
             return;
         end
         % Suggest a filename derived from the first dataset
@@ -464,7 +465,7 @@ end
             save(fp, 'snap', '-v7.3');
             setStatusBar(sprintf('Workspace saved: %s', fname));
         catch ME
-            uialert(fig, ME.message, 'Save Workspace failed');
+            bosonPlotter.quietAlert(fig, ME.message, 'Save Workspace failed');
         end
     end
 
@@ -484,13 +485,13 @@ end
             dataWorkspace.WorkspaceAutosave.start(model);
             setStatusBar(sprintf('Workspace loaded: %s', fname));
         catch ME
-            uialert(fig, ME.message, 'Load Workspace failed');
+            bosonPlotter.quietAlert(fig, ME.message, 'Load Workspace failed');
         end
     end
 
     function offerAutosaveRecovery()
     %OFFERAUTOSAVERECOVERY  Offer to restore the last autosave on startup.
-        answer = uiconfirm(fig, ...
+        answer = bosonPlotter.quietConfirm(fig, ...
             ['A DataWorkspace autosave file was found. ' ...
              'This may indicate the previous session ended unexpectedly. ' ...
              'Restore the saved state?'], ...
@@ -504,7 +505,7 @@ end
                 dataWorkspace.WorkspaceAutosave.start(model);
                 setStatusBar('Autosave restored.');
             catch ME
-                uialert(fig, ME.message, 'Autosave restore failed');
+                bosonPlotter.quietAlert(fig, ME.message, 'Autosave restore failed');
                 dataWorkspace.WorkspaceAutosave.cleanup();
             end
         else
@@ -812,7 +813,7 @@ end
         if compIdx < 1 || compIdx > numel(cols), return; end
         colName  = cols{compIdx}.name;
 
-        answer = uiconfirm(fig, ...
+        answer = bosonPlotter.quietConfirm(fig, ...
             sprintf('Remove computed column "%s"?', colName), ...
             'Remove Column', ...
             'Options', {'Remove', 'Cancel'}, ...
@@ -852,7 +853,7 @@ end
         otherLbls = labels(otherIdx);
 
         if isempty(otherLbls)
-            uialert(fig, 'No other Y columns available.', 'Set Error Bar');
+            bosonPlotter.quietAlert(fig, 'No other Y columns available.', 'Set Error Bar');
             return;
         end
 
@@ -1018,7 +1019,7 @@ end
     function onDatasetMath(~, ~)
     %ONDATASETMATH  Open the dataset arithmetic dialog.
         if model.count() < 2
-            uialert(fig, 'At least two datasets are required.', 'Dataset Math');
+            bosonPlotter.quietAlert(fig, 'At least two datasets are required.', 'Dataset Math');
             return;
         end
         showDatasetMathDialog('+');
@@ -1091,7 +1092,7 @@ end
                 setStatusBar(sprintf('Created: %s', result.metadata.source));
                 delete(dlg);
             catch ME
-                uialert(dlg, sprintf('Dataset Math (%s %s %s) failed:\n\n%s', ...
+                bosonPlotter.quietAlert(dlg, sprintf('Dataset Math (%s %s %s) failed:\n\n%s', ...
                     ddA.Value, ddOp.Value, ddB.Value, ME.message), ...
                     'Dataset Math Error');
             end
@@ -1108,7 +1109,7 @@ end
     function onMergeDatasets(~, ~)
     %ONMERGEDATASETS  Open the merge-columns dialog.
         if model.count() < 2
-            uialert(fig, 'At least two datasets are required.', 'Merge Columns');
+            bosonPlotter.quietAlert(fig, 'At least two datasets are required.', 'Merge Columns');
             return;
         end
         showMergeDialog();
@@ -1174,7 +1175,7 @@ end
                 setStatusBar(sprintf('Created: %s', result.metadata.source));
                 delete(dlg);
             catch ME
-                uialert(dlg, sprintf('Merge (%s + %s) failed:\n\n%s', ...
+                bosonPlotter.quietAlert(dlg, sprintf('Merge (%s + %s) failed:\n\n%s', ...
                     ddA.Value, ddB.Value, ME.message), 'Merge Error');
             end
         end
@@ -1305,7 +1306,7 @@ end
             model.addDataset(data, 'clipboard', 'paste');
             setStatusBar(sprintf('Pasted %d rows from clipboard.', numel(data.time)));
         catch ME
-            uialert(fig, ME.message, 'Clipboard Import Failed');
+            bosonPlotter.quietAlert(fig, ME.message, 'Clipboard Import Failed');
         end
     end
 
@@ -1327,7 +1328,7 @@ end
             setStatusBar('Opened BosonPlotter with shared model.');
         catch ME
             if isvalid(fig)
-                uialert(fig, ME.message, 'BosonPlotter failed to open');
+                bosonPlotter.quietAlert(fig, ME.message, 'BosonPlotter failed to open');
             else
                 warning('DataWorkspace:bosonPlotterFailed', ...
                     'BosonPlotter failed to open: %s', ME.message);
@@ -1341,7 +1342,7 @@ end
             BosonPlotter(Model=model, Visible='on');
         catch ME
             if isvalid(fig)
-                uialert(fig, ME.message, 'BosonPlotter failed to open');
+                bosonPlotter.quietAlert(fig, ME.message, 'BosonPlotter failed to open');
             else
                 warning('DataWorkspace:bosonPlotterFailed', ...
                     'BosonPlotter failed to open: %s', ME.message);
@@ -1807,7 +1808,7 @@ end
             % (Re)start autosave timer now that the model has data
             dataWorkspace.WorkspaceAutosave.start(model);
         catch ME
-            uialert(fig, ME.message, sprintf('Import failed: %s', fp));
+            bosonPlotter.quietAlert(fig, ME.message, sprintf('Import failed: %s', fp));
         end
     end
 

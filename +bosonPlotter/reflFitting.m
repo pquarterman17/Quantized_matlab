@@ -515,7 +515,7 @@ updateSLDPlot();
             options.StatusFcn(sprintf('Refl fit: R%s=%.4f', char(178), R2lin));
         catch ME
             rfFig.Pointer = 'arrow';
-            uialert(rfFig, sprintf('Fit failed:\n%s', ME.message), 'Error');
+            bosonPlotter.quietAlert(rfFig, sprintf('Fit failed:\n%s', ME.message), 'Error');
         end
     end
 
@@ -529,7 +529,7 @@ updateSLDPlot();
         data = tblKnots.Data;
         nK   = size(data, 1);
         if nK < 2
-            uialert(rfFig, 'Spline mode needs at least 2 knots.', 'Fit');
+            bosonPlotter.quietAlert(rfFig, 'Spline mode needs at least 2 knots.', 'Fit');
             return;
         end
         zK0   = cellfun(@toNum, data(:, 1));
@@ -596,7 +596,7 @@ updateSLDPlot();
                 char(178), R2lin, nK));
         catch ME
             rfFig.Pointer = 'arrow';
-            uialert(rfFig, sprintf('Spline fit failed:\n%s', ME.message), 'Error');
+            bosonPlotter.quietAlert(rfFig, sprintf('Spline fit failed:\n%s', ME.message), 'Error');
         end
     end
 
@@ -607,14 +607,14 @@ updateSLDPlot();
     %   sampled; fixed params are held constant. Shows a corner plot on
     %   completion.
         if inSplineMode()
-            uialert(rfFig, ['MCMC is only supported in Layers mode for now. ' ...
+            bosonPlotter.quietAlert(rfFig, ['MCMC is only supported in Layers mode for now. ' ...
                 'Spline-mode posterior sampling needs a knot-aware ' ...
                 'parameter scaling and is on the W3 #11 follow-up list. ' ...
                 'Switch to Layers mode and re-fit to use MCMC.'], 'MCMC');
             return;
         end
         if isempty(rfResult.layers) || isempty(rfResult.R)
-            uialert(rfFig, 'Run Fit first — MCMC samples around the current best fit.', ...
+            bosonPlotter.quietAlert(rfFig, 'Run Fit first — MCMC samples around the current best fit.', ...
                 'MCMC');
             return;
         end
@@ -628,7 +628,7 @@ updateSLDPlot();
         stepSz  = str2double(defAns{3});
         if ~isfinite(nSteps) || nSteps < 100 || ~isfinite(nBurn) || ...
                 ~isfinite(stepSz) || stepSz <= 0
-            uialert(rfFig, 'Invalid MCMC settings.', 'MCMC');
+            bosonPlotter.quietAlert(rfFig, 'Invalid MCMC settings.', 'MCMC');
             return;
         end
 
@@ -647,7 +647,7 @@ updateSLDPlot();
         % Free-parameter indices and human labels
         freeIdx = find(~fixedMask);
         if isempty(freeIdx)
-            uialert(rfFig, 'All parameters are fixed — nothing to sample.', 'MCMC');
+            bosonPlotter.quietAlert(rfFig, 'All parameters are fixed — nothing to sample.', 'MCMC');
             return;
         end
         paramNames = repmat({''}, 1, numel(pBest));
@@ -697,7 +697,7 @@ updateSLDPlot();
                 size(freeSamples,1), 100*mcRes.acceptRate));
         catch ME
             rfFig.Pointer = 'arrow';
-            uialert(rfFig, sprintf('MCMC failed:\n%s', ME.message), 'Error');
+            bosonPlotter.quietAlert(rfFig, sprintf('MCMC failed:\n%s', ME.message), 'Error');
         end
     end
 

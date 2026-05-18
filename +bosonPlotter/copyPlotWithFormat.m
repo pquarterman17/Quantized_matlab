@@ -28,7 +28,7 @@ function copyPlotWithFormat(appData, fig, mode, callbacks)
 %                 .logGUIError(title, msg, ME)
 
     if isempty(appData.datasets) || appData.activeIdx < 1
-        uialert(fig, 'Load a file first.', 'No data');
+        bosonPlotter.quietAlert(fig, 'Load a file first.', 'No data');
         return;
     end
     tmpFig = figure('Visible', 'off', ...
@@ -57,7 +57,7 @@ function copyPlotWithFormat(appData, fig, mode, callbacks)
     catch ME
         delete(tmpFig);
         callbacks.logGUIError('Copy to clipboard', ME.message, ME);
-        uialert(fig, sprintf('Copy failed:\n%s', ME.message), 'Copy error');
+        bosonPlotter.quietAlert(fig, sprintf('Copy failed:\n%s', ME.message), 'Copy error');
         return;
     end
     delete(tmpFig);

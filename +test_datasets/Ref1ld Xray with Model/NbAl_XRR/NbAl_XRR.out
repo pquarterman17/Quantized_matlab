@@ -1,0 +1,123 @@
+.probe
+  .back_absorption = back_absorption NbAl_v4_150micron = 1
+  .background = background NbAl_v4_150micron = 5.9955e-07 in [2e-07,9e-07]
+  .intensity = intensity NbAl_v4_150micron = 1.18634 in [0.8,1.2]
+  .sample_broadening = sample_broadening NbAl_v4_150micron = 2.24913e-05 in [0,0.03]
+  .theta_offset = theta_offset NbAl_v4_150micron = -0.00424565 in [-0.02,0.02]
+.sample
+  .layers
+    [0]
+      .interface = Si interface = 1.15525 in [0.3,30]
+      .material
+        .irho = Si irho = 0.741
+        .rho = Si rho = 20
+      .thickness = Si thickness = 100
+    [1]
+      .interface = SiO2 interface = 6.8605 in [1,50]
+      .material
+        .irho = SiO2 irho = 0.294
+        .rho = SiO2 rho = 10.0821 in [10,30]
+      .thickness = SiO2 thickness = 18.6266 in [1,100]
+    [2]
+      .interface = Nb interface = 5.61071 in [0.3,50]
+      .material
+        .irho = Nb irho = 2.58439 in [0,6]
+        .rho = Nb rho = 62.8888 in [50,75]
+      .thickness = Nb thickness = 243.804 in [200,300]
+    [3]
+      .interface = Al interface = 5.59745 in [0.3,50]
+      .material
+        .irho = Al irho = 1.44332 in [0,2]
+        .rho = Al rho = 20.6857 in [12,30]
+      .thickness = Al thickness = 25.1804 in [15,35]
+    [4]
+      .interface = Nb interface = 7.43779 in [0.3,50]
+      .material
+        .irho = Nb irho = 2.58439 in [0,6]
+        .rho = Nb rho = 62.8888 in [50,75]
+      .thickness = Nb thickness = 259.198 in [200,300]
+    [5]
+      .interface = Al interface = 8.36487 in [0.3,50]
+      .material
+        .irho = Al irho = 1.44332 in [0,2]
+        .rho = Al rho = 20.6857 in [12,30]
+      .thickness = Al thickness = 22.4029 in [15,35]
+    [6]
+      .interface = Nb interface = 7.43779 in [0.3,50]
+      .material
+        .irho = Nb irho = 2.58439 in [0,6]
+        .rho = Nb rho = 62.8888 in [50,75]
+      .thickness = Nb thickness = 257.847 in [200,300]
+    [7]
+      .interface = Al interface = 8.36487 in [0.3,50]
+      .material
+        .irho = Al irho = 1.44332 in [0,2]
+        .rho = Al rho = 20.6857 in [12,30]
+      .thickness = Al thickness = 23.491 in [15,35]
+    [8]
+      .interface = Nb interface = 7.43779 in [0.3,50]
+      .material
+        .irho = Nb irho = 2.58439 in [0,6]
+        .rho = Nb rho = 62.8888 in [50,75]
+      .thickness = Nb thickness = 257.955 in [200,300]
+    [9]
+      .interface = Al interface = 8.36487 in [0.3,50]
+      .material
+        .irho = Al irho = 1.44332 in [0,2]
+        .rho = Al rho = 20.6857 in [12,30]
+      .thickness = Al thickness = 24.1044 in [15,35]
+    [10]
+      .interface = Nb interface = 7.43779 in [0.3,50]
+      .material
+        .irho = Nb irho = 2.58439 in [0,6]
+        .rho = Nb rho = 62.8888 in [50,75]
+      .thickness = Nb thickness = 256.755 in [200,300]
+    [11]
+      .interface = Al interface = 8.36487 in [0.3,50]
+      .material
+        .irho = Al irho = 1.44332 in [0,2]
+        .rho = Al rho = 20.6857 in [12,30]
+      .thickness = Al thickness = 23.6454 in [15,35]
+    [12]
+      .interface = Nb interface = 7.43779 in [0.3,50]
+      .material
+        .irho = Nb irho = 2.58439 in [0,6]
+        .rho = Nb rho = 62.8888 in [50,75]
+      .thickness = Nb thickness = 257.117 in [200,300]
+    [13]
+      .interface = Al interface = 8.36487 in [0.3,50]
+      .material
+        .irho = Al irho = 1.44332 in [0,2]
+        .rho = Al rho = 20.6857 in [12,30]
+      .thickness = Al thickness = 23.4574 in [15,35]
+    [14]
+      .interface = Nb interface = 6.32935 in [0.3,50]
+      .material
+        .irho = Nb irho = 2.58439 in [0,6]
+        .rho = Nb rho = 62.8888 in [50,75]
+      .thickness = Nb thickness = 254.914 in [200,300]
+    [15]
+      .interface = Al interface = 5.82125 in [0.3,50]
+      .material
+        .irho = Al irho = 1.44332 in [0,2]
+        .rho = Al rho = 20.6857 in [12,30]
+      .thickness = Al thickness = 24.981 in [1,35]
+    [16]
+      .interface = Nb interface = 17.3453 in [0.3,50]
+      .material
+        .irho = Nb irho = 4.01001 in [0,6]
+        .rho = Nb rho = 62.3476 in [50,75]
+      .thickness = Nb thickness = 251.364 in [200,300]
+    [17]
+      .interface = NbO interface = 5
+      .material
+        .irho = NbO irho = 0.0184672 in [0,5]
+        .rho = NbO rho = 36.2698 in [20,50]
+      .thickness = NbO thickness = 6.00157 in [1,50]
+    [18]
+      .interface = air interface = 0
+      .material = None
+      .thickness = air thickness = 0
+  .thickness = stack thickness = 2330.84
+
+[chisq=36.880(71), nllf=11119.2]

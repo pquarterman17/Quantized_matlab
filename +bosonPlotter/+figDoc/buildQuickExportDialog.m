@@ -69,11 +69,11 @@ function buildQuickExportDialog(fig, datasets, activeIdx, overlayMode, model)
             dlg.Pointer = 'watch'; drawnow;
             bosonPlotter.figDoc.copyForSlides(datasets, activeIdx, overlayMode, model);
             dlg.Pointer = 'arrow';
-            uialert(dlg, 'Plot copied to clipboard!', 'Success', 'Icon', 'success');
+            bosonPlotter.quietAlert(dlg, 'Plot copied to clipboard!', 'Success', 'Icon', 'success');
             model.lastExportProfile = pName;
         catch ME
             dlg.Pointer = 'arrow';
-            uialert(dlg, sprintf('Copy failed:\n%s', ME.message), 'Error', 'Icon', 'error');
+            bosonPlotter.quietAlert(dlg, sprintf('Copy failed:\n%s', ME.message), 'Error', 'Icon', 'error');
         end
     end
 
@@ -93,10 +93,10 @@ function buildQuickExportDialog(fig, datasets, activeIdx, overlayMode, model)
             dlg.Pointer = 'arrow';
             model.lastExportProfile = pName;
             model.lastExportPath = string(outPath);
-            uialert(dlg, sprintf('Saved: %s', outPath), 'Exported', 'Icon', 'success');
+            bosonPlotter.quietAlert(dlg, sprintf('Saved: %s', outPath), 'Exported', 'Icon', 'success');
         catch ME
             dlg.Pointer = 'arrow';
-            uialert(dlg, sprintf('Export failed:\n%s', ME.message), 'Error', 'Icon', 'error');
+            bosonPlotter.quietAlert(dlg, sprintf('Export failed:\n%s', ME.message), 'Error', 'Icon', 'error');
         end
     end
 end

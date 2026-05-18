@@ -24,7 +24,7 @@ function onSaveCSV(appData, fig, ui, callbacks)
 %                 .setStatus(msg)
 
     if isempty(appData.datasets) || appData.activeIdx < 1
-        uialert(fig, 'Load a file first.', 'No data');
+        bosonPlotter.quietAlert(fig, 'Load a file first.', 'No data');
         return;
     end
 
@@ -46,7 +46,7 @@ function onSaveCSV(appData, fig, ui, callbacks)
             if isempty(fp), return; end
             exportSingleDataset(appData, appData.activeIdx, fp, fmt, fig, callbacks);
             callbacks.recordAction(sprintf("%% Exported CSV: %s", fp));
-            uialert(fig, sprintf('Saved:\n%s', fp), 'Saved');
+            bosonPlotter.quietAlert(fig, sprintf('Saved:\n%s', fp), 'Saved');
 
         case 'separate'
             outDir = uigetdir(resolveStartDir(appData), ...
@@ -69,7 +69,7 @@ function onSaveCSV(appData, fig, ui, callbacks)
             end
             fig.Pointer = 'arrow';
             callbacks.recordAction(sprintf("%% Exported %d CSV files", nOk));
-            uialert(fig, sprintf('Exported %d of %d datasets.', nOk, numel(selIdx)), ...
+            bosonPlotter.quietAlert(fig, sprintf('Exported %d of %d datasets.', nOk, numel(selIdx)), ...
                 'Export Complete');
 
         case 'combined'
@@ -80,11 +80,11 @@ function onSaveCSV(appData, fig, ui, callbacks)
                 exportCombined(appData, selIdx, fp, fmt, callbacks);
                 fig.Pointer = 'arrow';
                 callbacks.recordAction(sprintf("%% Exported combined CSV: %s", fp));
-                uialert(fig, sprintf('Saved %d datasets to:\n%s', numel(selIdx), fp), 'Saved');
+                bosonPlotter.quietAlert(fig, sprintf('Saved %d datasets to:\n%s', numel(selIdx), fp), 'Saved');
             catch ME
                 fig.Pointer = 'arrow';
                 callbacks.logGUIError('Combined export', ME.message, ME);
-                uialert(fig, ME.message, 'Export error');
+                bosonPlotter.quietAlert(fig, ME.message, 'Export error');
             end
     end
 end
@@ -100,7 +100,7 @@ function mode = askExportMode(fig, nSel)
         sprintf('Each as separate file (%d files)', nSel), ...
         sprintf('Combined into one CSV (%d datasets side-by-side)', nSel), ...
         'Cancel'};
-    answer = uiconfirm(fig, ...
+    answer = bosonPlotter.quietConfirm(fig, ...
         sprintf('%d datasets selected. How should they be exported?', nSel), ...
         'CSV Export Mode', ...
         'Options', choices, 'DefaultOption', 1, 'CancelOption', 4);

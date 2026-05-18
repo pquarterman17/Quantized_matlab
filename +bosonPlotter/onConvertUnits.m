@@ -24,7 +24,7 @@ function onConvertUnits(appData, fig, callbacks)
 %                 .recordAction(comment)
 
     if isempty(appData.datasets) || appData.activeIdx < 1
-        uialert(fig, 'Load a dataset first.', 'Convert Units');
+        bosonPlotter.quietAlert(fig, 'Load a dataset first.', 'Convert Units');
         return;
     end
     answer = inputdlg({ ...
@@ -46,7 +46,7 @@ function onConvertUnits(appData, fig, callbacks)
                 d.units{ci} = newUnit;
                 converted = true;
             catch ME
-                uialert(fig, sprintf('Conversion failed for %s:\n%s', ...
+                bosonPlotter.quietAlert(fig, sprintf('Conversion failed for %s:\n%s', ...
                     d.labels{ci}, ME.message), 'Error');
                 return;
             end
@@ -69,7 +69,7 @@ function onConvertUnits(appData, fig, callbacks)
         callbacks.onPlot();
         callbacks.setStatus(sprintf('Converted %s to %s', fromUnit, toUnit));
     else
-        uialert(fig, sprintf('No columns with unit "%s" found.', fromUnit), 'Convert Units');
+        bosonPlotter.quietAlert(fig, sprintf('No columns with unit "%s" found.', fromUnit), 'Convert Units');
     end
     callbacks.recordAction(sprintf('%% Convert units: %s -> %s', fromUnit, toUnit));
 end

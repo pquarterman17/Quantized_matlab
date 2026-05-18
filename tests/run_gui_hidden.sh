@@ -27,4 +27,8 @@ if [ -z "${MATLAB_BIN:-}" ]; then
 fi
 
 echo "Running GUI tests (Group=$GROUP) via: $MATLAB_BIN"
-"$MATLAB_BIN" -batch "cd('$SCRIPT_DIR'); addpath(pwd); setupToolbox; runAllTests(Group='$GROUP')"
+# Headless mode: GUI launchers detect QUANTIZED_MATLAB_HEADLESS=1 and
+# default Visible='off'; quietAlert/quietConfirm bypass popups. The groot
+# default catches secondary uifigures opened by callbacks.
+export QUANTIZED_MATLAB_HEADLESS=1
+"$MATLAB_BIN" -batch "cd('$SCRIPT_DIR'); set(groot,'DefaultFigureVisible','off'); addpath(pwd); setupToolbox; runAllTests(Group='$GROUP')"

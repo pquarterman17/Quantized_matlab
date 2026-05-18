@@ -211,7 +211,7 @@ end
             state.T = sortrows(state.T, col);
             refreshWidget();
         catch ME
-            uialert(fig, ME.message, 'Sort failed');
+            bosonPlotter.quietAlert(fig, ME.message, 'Sort failed');
         end
     end
 
@@ -223,7 +223,7 @@ end
             state.T = sortrows(state.T, col, 'descend');
             refreshWidget();
         catch ME
-            uialert(fig, ME.message, 'Sort failed');
+            bosonPlotter.quietAlert(fig, ME.message, 'Sort failed');
         end
     end
 
@@ -242,12 +242,12 @@ end
             if numel(mask) == height(state.origT)
                 state.T = state.origT(mask, :);
             else
-                uialert(fig, 'Filter mask size mismatch. Using original data.', 'Filter warning');
+                bosonPlotter.quietAlert(fig, 'Filter mask size mismatch. Using original data.', 'Filter warning');
                 state.T = state.origT;
             end
             refreshWidget();
         catch ME
-            uialert(fig, ME.message, 'Filter error');
+            bosonPlotter.quietAlert(fig, ME.message, 'Filter error');
         end
     end
 
@@ -262,7 +262,7 @@ end
             clipStr = tableToTabDelimited(state.T);
             clipboard('copy', clipStr);
         catch ME
-            uialert(fig, ME.message, 'Copy failed');
+            bosonPlotter.quietAlert(fig, ME.message, 'Copy failed');
         end
     end
 
@@ -273,7 +273,7 @@ end
         try
             writetable(state.T, fullfile(fdir, fname));
         catch ME
-            uialert(fig, ME.message, 'Export failed');
+            bosonPlotter.quietAlert(fig, ME.message, 'Export failed');
         end
     end
 
