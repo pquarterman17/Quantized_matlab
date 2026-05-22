@@ -52,7 +52,7 @@ function result = fftFilter(xData, yData, options)
 %       % View power spectrum
 %       semilogy(r.freqPos, r.powerPos);
 %
-%   See also imaging.butterworthFilter, utilities.smoothData
+%   See also utilities.smoothData
 
 arguments
     xData    (:,1) double

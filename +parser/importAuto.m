@@ -112,14 +112,11 @@ function data = dispatchParser(parserName, filepath, varargin)
         case 'importBruker',     data = parser.importBruker(filepath, varargin{:});
         case 'importRigaku_raw', data = parser.importRigaku_raw(filepath, varargin{:});
         case 'importXRDML',      data = parser.importXRDML(filepath, varargin{:});
-        case 'importTIFF',       data = parser.importTIFF(filepath, varargin{:});
-        case 'importImage',      data = parser.importImage(filepath, varargin{:});
-        case 'importRawImage',   data = parser.importRawImage(filepath, varargin{:});
-        case 'importBCF',        data = parser.importBCF(filepath, varargin{:});
-        case 'importDM3',        data = parser.importDM3(filepath, varargin{:});
-        case 'importDM4',        data = parser.importDM4(filepath, varargin{:});
-        case 'importSER',        data = parser.importSER(filepath, varargin{:});
-        case 'importMRC',        data = parser.importMRC(filepath, varargin{:});
+        case {'importTIFF', 'importImage', 'importRawImage', 'importBCF', ...
+              'importDM3', 'importDM4', 'importSER', 'importMRC'}
+            error('parser:importAuto:movedToFermiViewer', ...
+                ['Parser "%s" moved to fermi-viewer:\n' ...
+                 '  https://github.com/pquarterman17/fermi-viewer'], parserName);
         case 'importAFM',        data = parser.importAFM(filepath, varargin{:});
         case 'importExcel',      data = parser.importExcel(filepath, varargin{:});
         case 'importCSV',        data = parser.importCSV(filepath, varargin{:});
