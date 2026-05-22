@@ -1,7 +1,7 @@
 function test_string_snapshots
 %TEST_STRING_SNAPSHOTS  Verify button labels and tooltips match expectations.
 %
-%   Enumerates all uibutton Text values in BosonPlotter and FermiViewer,
+%   Enumerates all uibutton Text values in BosonPlotter (FermiViewer moved to fermi-viewer),
 %   checks for common corruption patterns:
 %     - Buttons with empty Text that shouldn't be empty
 %     - Buttons with truncated "..." (MATLAB's silent truncation)
@@ -66,57 +66,18 @@ function test_string_snapshots
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  TEST 2: FermiViewer button labels
+    %  TEST 2: Source-level checks (no "..." in uibutton Text literals)
+    %  (FermiViewer button enumeration moved to fermi-viewer test suite)
     % ════════════════════════════════════════════════════════════════════
-    fprintf('\n== TEST 2: FermiViewer button labels ==\n');
-    try
-        preFigs2 = findall(groot, 'Type', 'figure');
-        api = FermiViewer();
-        api.fig.Visible = 'off';
-        cleanupFV = onCleanup(@() closeTestFigures(preFigs2));
-        drawnow;
-
-        allBtns = findall(api.fig, 'Type', 'uibutton');
-        fprintf('  Found %d uibuttons\n', numel(allBtns));
-
-        for ii = 1:numel(allBtns)
-            txt = allBtns(ii).Text;
-            if endsWith(txt, '...')
-                check(sprintf('FV button "%s" has no trailing ellipsis', txt), false);
-            end
-        end
-
-        iconOnly = allBtns(arrayfun(@(b) isempty(strtrim(b.Text)), allBtns));
-        for ii = 1:numel(iconOnly)
-            btn = iconOnly(ii);
-            tip = btn.Tooltip;
-            if isempty(strtrim(string(tip)))
-                check(sprintf('FV icon-only button (no text) has tooltip'), false);
-            end
-        end
-
-        check(sprintf('FV has %d uibuttons (sanity check > 40)', numel(allBtns)), ...
-            numel(allBtns) > 40);
-
-        api.close();
-        clear cleanupFV;
-    catch ME
-        recordCrash('TEST 2 (FermiViewer)', ME);
-    end
-
-    % ════════════════════════════════════════════════════════════════════
-    %  TEST 3: Source-level checks (no "..." in uibutton Text literals)
-    % ════════════════════════════════════════════════════════════════════
-    fprintf('\n== TEST 3: Source-level ellipsis scan ==\n');
+    fprintf('\n== TEST 2: Source-level ellipsis scan ==\n');
     try
         filesToScan = {
             fullfile(rootDir, 'BosonPlotter.m')
-            fullfile(rootDir, 'FermiViewer.m')
             fullfile(rootDir, 'DiraCulator.m')
             fullfile(rootDir, 'DataWorkspace.m')
             fullfile(rootDir, 'xrdConvertGUI.m')
         };
-        pkgDirs = {'+bosonPlotter', '+emViewer', '+templates', ...
+        pkgDirs = {'+bosonPlotter', '+templates', ...
                    '+dataWorkspace'};
         for pi = 1:numel(pkgDirs)
             pkgDir = fullfile(rootDir, pkgDirs{pi});

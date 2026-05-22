@@ -4,7 +4,7 @@
 %     - PANalytical XRDML (xrdtools, FAIRmat)
 %     - Bruker .brml (FAIRmat) and .raw binary (xylib)
 %     - Quantum Design MPMS .dat (qdsquid-dataplot, quantumPPMS)
-%     - Gatan DM3/DM4 (rosettasciio/HyperSpy)
+%   (EM formats — Gatan DM3/DM4, BCF, MRC, SER — moved to fermi-viewer.)
 %
 %   Run standalone:  run tests/test_external_datasets
 %   Run from root:   runAllTests(Group="external")
@@ -185,38 +185,8 @@ catch ME
     fprintf('  ✘ quantumPPMS: MPMS sample1  %s\n', ME.message);
 end
 
-% ══════════════════════════════════════════════════════════════════
-%  Gatan DM3 / DM4 — electron microscopy images
-% ══════════════════════════════════════════════════════════════════
-fprintf('\n  ── Gatan DM3/DM4 ──\n');
-
-% 12. rosettasciio 2D DM3
-fp = fullfile(dsDir, 'Microscopy', 'rosettasciio_2D_test1.dm3');
-try
-    assert(isfile(fp), 'file not found');
-    d = parser.importDM3(fp);
-    assert(isfield(d.metadata.parserSpecific, 'imageData'), 'missing imageData');
-    img = d.metadata.parserSpecific.imageData;
-    nPass = nPass + 1;
-    fprintf('  ✔ rosettasciio: 2D DM3  (%dx%d)\n', size(img.pixels, 1), size(img.pixels, 2));
-catch ME
-    nFail = nFail + 1;
-    fprintf('  ✘ rosettasciio: 2D DM3  %s\n', ME.message);
-end
-
-% 13. rosettasciio 2D DM4 — XFAIL: thumbnail-only detection too aggressive
-fp = fullfile(dsDir, 'Microscopy', 'rosettasciio_2D_test1.dm4');
-try
-    assert(isfile(fp), 'file not found');
-    d = parser.importDM3(fp);
-    assert(isfield(d.metadata.parserSpecific, 'imageData'), 'missing imageData');
-    img = d.metadata.parserSpecific.imageData;
-    nPass = nPass + 1;
-    fprintf('  ✔ rosettasciio: 2D DM4  (%dx%d)\n', size(img.pixels, 1), size(img.pixels, 2));
-catch ME
-    nXfail = nXfail + 1;
-    fprintf('  ⊘ rosettasciio: 2D DM4  (XFAIL: small test image filtered as thumbnail)\n');
-end
+% Gatan DM3/DM4 EM tests moved to fermi-viewer:
+% https://github.com/pquarterman17/fermi-viewer
 
 % ══════════════════════════════════════════════════════════════════
 %  Summary
@@ -224,7 +194,7 @@ end
 fprintf('\n  Results: %d passed, %d failed, %d xfail (known), %d skipped\n', nPass, nFail, nXfail, nSkip);
 if nXfail > 0
     fprintf('  Known parser gaps: Bruker RAW v3 304-byte header, brml XML variants,\n');
-    fprintf('    XRDML non-Completed scans, DM4 small-image filtering\n');
+    fprintf('    XRDML non-Completed scans\n');
 end
 fprintf('═══ test_external_datasets done ═══\n\n');
 if nFail > 0
