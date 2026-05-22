@@ -62,11 +62,17 @@ function [data, parserName] = guiImport(fp)
         case 'importMPMS'
             data = parser.importMPMS(fp, 'YAxis', 'all');
 
-        case {'importImage', 'importBCF', 'importDM3', 'importDM4'}
-            error('BosonPlotter:movedToFermiViewer', ...
-                ['Electron-microscopy formats moved to fermi-viewer:\n' ...
-                 '  https://github.com/pquarterman17/fermi-viewer\n' ...
-                 'Install fermi-viewer and load this file with FermiViewer.']);
+        case 'importImage'
+            data = parser.importImage(fp);
+
+        case 'importBCF'
+            data = parser.importBCF(fp);
+
+        case 'importDM3'
+            data = parser.importDM3(fp);
+
+        case 'importDM4'
+            data = parser.importDM4(fp);
 
         case 'importAFM'
             data = parser.importAFM(fp);
@@ -77,9 +83,7 @@ function [data, parserName] = guiImport(fp)
                 ['No parser for extension "%s" (resolved as "%s").\n' ...
                  'Supported: .raw, .xrdml, .brml, .xlsx/.xls/.xlsm/.xlsb/.ods, ' ...
                  '.csv/.tsv/.txt, .refl, .pnr, .datA/B/C/D, .dat, ' ...
-                 '.spm/.000/.001 (AFM).\n' ...
-                 'EM formats (.tif/.dm3/.dm4/.bcf/.ser/.mrc) are in fermi-viewer: ' ...
-                 'https://github.com/pquarterman17/fermi-viewer'], ...
+                 '.jpg/.jpeg/.png/.bmp/.gif, .bcf, .dm3, .dm4'], ...
                 lower(ext), parserName);
     end
 end

@@ -12,14 +12,17 @@ quantized_matlab/
 ├── BosonPlotter.m             # Main GUI: browse, preview, correct, peaks, export
 ├── xrdConvertGUI.m           # Batch XRD file converter GUI
 ├── DiraCulator.m              # Materials property calculator (18 panels)
+├── FermiViewer.m             # Electron microscopy image viewer
 ├── runAllTests.m             # Master test runner (see Testing section)
 ├── tests/                    # Test suites organized by domain
 │   ├── parser/               # Parser smoke tests, edge cases, round-trip
 │   ├── gui/                  # BosonPlotter headless API tests
+│   ├── imaging/              # EM parsers, imaging utils, EM GUI, EDS, EELS, diffraction
 │   ├── calc/                 # Calculator module tests (xray, superconductor, CIF, optics, ...)
 │   ├── batch/                # Batch import and XRD converter tests
 │   └── fitting/              # Curve fitting engine, models, auto-guess, equation parser
 ├── +parser/                  # Data import (see +parser/README.md)
+├── +imaging/                 # EM image processing (see +imaging/README.md)
 ├── +calc/                    # Calculator backend (see +calc/README.md)
 ├── +utilities/               # Data processing helpers (see +utilities/README.md)
 ├── +plotting/                # Plot formatting and export
@@ -27,19 +30,15 @@ quantized_matlab/
 ├── +scripts/                 # Batch workflows (see +scripts/README.md)
 ├── +fitting/                 # General curve fitting engine, model library, equation parser
 ├── +bosonPlotter/             # Extracted BosonPlotter subsystems
+├── +emViewer/                 # Extracted FermiViewer subsystems (see +emViewer/README.md)
 ├── +dataWorkspace/            # DataWorkspace model, formula engine, autosave (see +dataWorkspace/README.md)
 ├── DataWorkspace.m            # Standalone spreadsheet GUI (shares WorkspaceModel with BosonPlotter)
 ├── docs/                     # Detailed feature documentation
 │   ├── gui_bosonplotter.md    # BosonPlotter features, tools, figure builder
+│   ├── gui_emviewer.md       # FermiViewer features, EELS, EDS, diffraction
 │   └── architecture.md       # Data flow, state management, design patterns
 └── plans/                    # Feature roadmaps and organization plans
 ```
-
-**EM tooling** — the FermiViewer GUI, `+emViewer/`, `+imaging/`, and the
-EM-specific parsers (DM3/DM4, MRC, SER, BCF, TIFF, RawImage) live in a
-separate repository: [fermi-viewer](https://github.com/pquarterman17/fermi-viewer).
-Interop is via CSV: export a line profile from FermiViewer, import with
-`parser.importCSV` in BosonPlotter.
 
 ## Conventions
 
@@ -78,13 +77,13 @@ devReload DiraCulator                            % close+flush+relaunch after ed
 runAllTests                          % full suite
 runAllTests(Group="parser")          % parser smoke tests (fast)
 runAllTests(Group="gui")             % headless BosonPlotter API tests
+runAllTests(Group="em")              % EM parsers + imaging utilities
+runAllTests(Group="emgui")           % EM Viewer GUI API tests
 runAllTests(Group="batch")           % batch import + XRD converter
 runAllTests(Group="fitting")         % curve fitting engine + models + parser
 ```
 
-Groups: `parser`, `batch`, `xrd2d`, `gui`, `calcgui`, `sims`, `xrayneutron`, `superconductor`, `cif`, `optics`, `vacuum`, `electrochemistry`, `fitting`, `plotting`, `interp2d`, `baseline`, `errorprop`, `utilities`, `templates`
-
-EM-related groups (`em`, `emgui`, `eds`, `eels`, `eels_adv`, `diffindex`, `diff_sim`, `edsquant`, `contour`, `spectral`) moved to [fermi-viewer](https://github.com/pquarterman17/fermi-viewer).
+Groups: `parser`, `batch`, `xrd2d`, `gui`, `calcgui`, `sims`, `em`, `emgui`, `eds`, `xrayneutron`, `superconductor`, `cif`, `optics`, `vacuum`, `electrochemistry`, `eels`, `eels_adv`, `diffindex`, `diff_sim`, `edsquant`, `contour`, `fitting`, `plotting`, `spectral`, `interp2d`, `baseline`, `errorprop`, `utilities`, `templates`
 
 ## Tracking Work
 
@@ -109,7 +108,7 @@ machine; BACKLOG.md is shared.
 
 ## Key Design Decisions
 
-- **Functional approach** — pure functions returning structs; no heavy OOP for orchestrators (BosonPlotter, DiraCulator stay procedural). `handle` classes ARE used for state containers (`AppState`, `UndoManager`, `WorkspaceModel`, future `*WorkshopModel`). The rule prohibits class-ifying the orchestrator script, not all classes.
+- **Functional approach** — pure functions returning structs; no heavy OOP for orchestrators (BosonPlotter, FermiViewer, DiraCulator stay procedural). `handle` classes ARE used for state containers (`AppState`, `UndoManager`, `WorkspaceModel`, future `*WorkshopModel`). The rule prohibits class-ifying the orchestrator script, not all classes.
 - **Workshop pattern** — heavy GUI features (Peak, Curve Fit, Hysteresis, Reflectivity) live in their own `+bosonPlotter/+<feature>/` subpackage with three pieces: a `<Feature>WorkshopModel` handle class owning the feature's state, a functional view builder (e.g. `buildPeakWindow.m`), and callbacks that operate on `(model, hook)` rather than the parent's closure. The parent passes a small **hook API** (~9 named function handles for getActiveData / setStatus / drawOverlay / etc.) so the workshop never reaches into the parent's state directly. Two contract rules every workshop must follow: (1) the model's `bindFromDataset` must call a `normalizePeaks`-style helper that ensures incoming data has the canonical field set — so legacy sessions don't blow up assignments with "dissimilar structures"; (2) the model's test suite must include at least one regression case fed *legacy-shaped* input (not just freshly-constructed via the canonical helpers), since unit tests with helper-constructed data will silently miss shape mismatches at the bind boundary. Active conversion plan: `plans/workshop-conversion-plan.md`. Reference implementation: `+bosonPlotter/+peak/` (Peak shipped 2026-04-26).
 - **Auto-detection heuristics** — delimiter, header row, data start, units all inferred
 - **Unified data struct** — parser-agnostic GUI and plotting code
@@ -133,9 +132,12 @@ Feature-level docs are in separate files to keep this context compact:
 |-------|------|
 | BosonPlotter tools, figure builder, curve fitting, digitizer | [docs/gui_bosonplotter.md](docs/gui_bosonplotter.md) |
 | DataWorkspace features, formulas, masking, session management | [docs/gui_dataworkspace.md](docs/gui_dataworkspace.md) |
+| FermiViewer features, EELS, EDS, diffraction | [docs/gui_emviewer.md](docs/gui_emviewer.md) |
 | DiraCulator — 18-panel calculator, reflectivity builder, headless API | [docs/gui_diraculator.md](docs/gui_diraculator.md) |
 | Architecture, data flow, state management | [docs/architecture.md](docs/architecture.md) |
 | Parser formats and dispatch | [+parser/README.md](+parser/README.md) |
+| Imaging utilities | [+imaging/README.md](+imaging/README.md) |
+| FermiViewer extracted subsystems | [+emViewer/README.md](+emViewer/README.md) |
 | Calculator modules | [+calc/README.md](+calc/README.md) |
 | Data processing utilities | [+utilities/README.md](+utilities/README.md) |
 | Batch scripts | [+scripts/README.md](+scripts/README.md) |
@@ -168,27 +170,28 @@ MATLAB silently allows `uigridlayout` clipping: if a parent row allocates 22 px 
 - **Common fix:** if the detector reports `Nested grid needs N px but parent row allocates M px`, bump the parent `uigridlayout` `RowHeight{row}` entry from M to at least N.
 
 ### Cross-GUI theme system (Dark / Light / Auto)
-The three GUIs (BosonPlotter, DiraCulator, DataWorkspace) share a single theme preference via `+bosonPlotter/themePref.m` (read/write, persisted to `prefdir/boson_theme.mat`). `+bosonPlotter/resolveTheme.m` turns `'Auto'` into a concrete `'Dark'` or `'Light'` value at apply time (MATLAB R2025a+ `MATLABTheme` setting → Windows registry → macOS defaults → Dark fallback). Toolbar/menu quick toggles flip Dark↔Light explicitly (clearing Auto); the Settings dropdown round-trips Auto.
+All four GUIs (BosonPlotter, FermiViewer, DiraCulator, DataWorkspace) share a single theme preference via `+bosonPlotter/themePref.m` (read/write, persisted to `prefdir/boson_theme.mat`). `+bosonPlotter/resolveTheme.m` turns `'Auto'` into a concrete `'Dark'` or `'Light'` value at apply time (MATLAB R2025a+ `MATLABTheme` setting → Windows registry → macOS defaults → Dark fallback). Toolbar/menu quick toggles flip Dark↔Light explicitly (clearing Auto); the Settings dropdown round-trips Auto.
 
 Two layers always need updating together (see `feedback_matlab_two_theme_layers`):
 1. `theme(fig, 'dark'|'light')` — built-in MATLAB chrome (uitable empty viewport, scrollbars, dropdown overlays)
 2. Per-widget `BackgroundColor` / `FontColor` — cells, panels, buttons
 
-BosonPlotter uses `+bosonPlotter/uxTokens.m` as the single colour-token source; DiraCulator + DataWorkspace branch local FIG_BG/etc constants on the resolved value at startup. Adding a new GUI: see `memory/reference_theme_system.md` for the four-step recipe.
+BosonPlotter uses `+bosonPlotter/uxTokens.m` as the single colour-token source; FermiViewer's `applyTheme` also reads from `uxTokens(themeName)`. DiraCulator + DataWorkspace branch local FIG_BG/etc constants on the resolved value at startup. Adding a new GUI: see `memory/reference_theme_system.md` for the four-step recipe.
 
 ### BosonPlotter
 - `cla()` alone does not remove `HandleVisibility='off'` objects — use `delete(ax.Children)` before `cla()`
 - Each dataset stores axis limits in `ds.axLims` (persisted across switches)
 - Peak Analysis window: see [docs/gui_bosonplotter.md](docs/gui_bosonplotter.md)
 
-### BosonPlotter — where new code goes
-MASTERPLAN W5 #68 targets `BosonPlotter.m` under **6,000 lines**. Without a policy, new features tend to land inside the monolith as fast as extractions pull lines out and the target never arrives. Rule for any new BosonPlotter code:
+### BosonPlotter & FermiViewer — where new code goes
+MASTERPLAN W5 #68 (BosonPlotter) and #69 (FermiViewer) target each file under **6,000 lines**. Without a policy, new features tend to land inside the monolith as fast as extractions pull lines out and the target never arrives. Rule for any new BosonPlotter or FermiViewer code:
 
-- **Default to `+bosonPlotter/<feature>.m`** — implement the feature as a public package function that takes the handles/state it needs (typically the `ui` struct + callback structs like `corrCb_`, `ptCb_`, `anaCb_`). Call it from a minimal nested dispatcher in the parent file.
-- **Do not add new nested functions to `BosonPlotter.m`** unless they are one- or two-liners that merely forward to a package helper. The legacy nested-function pattern is closed for new code.
-- **Never add doubly-nested functions** (8-space indent) — see `matlab-gui-complexity.md` for why (parser-slot cost and worse refactorability).
+- **Default to `+bosonPlotter/<feature>.m`** (or `+emViewer/<feature>.m` for FermiViewer) — implement the feature as a public package function that takes the handles/state it needs (typically the `ui` struct + callback structs like `corrCb_`, `ptCb_`, `anaCb_`). Call it from a minimal nested dispatcher in the parent file.
+- **Do not add new nested functions to `BosonPlotter.m` or `FermiViewer.m`** unless they are one- or two-liners that merely forward to a package helper. The legacy nested-function pattern is closed for new code.
+- **Never add doubly-nested functions** (8-space indent) to either file — see `matlab-gui-complexity.md` for why (parser-slot cost and worse refactorability).
 - **Enforcement:**
   - `tests/gui/test_bosonPlotterSize.m` — `BosonPlotter.m <= 7,119 lines` and nested-fn total `<= 290`. Current baseline: 7,119 lines / 284 nested fns (2026-05-16).
+  - `tests/imaging/test_fermiViewerSize.m` — `FermiViewer.m <= 6,100 lines` and nested-fn total `<= 330` (doubly-nested `<= 6`). Current baseline: 6,082 lines / 324+6=330 nested fns (2026-05-16). Runs via `runAllTests(Group="emgui")`. **Ceiling is never raised — extract to `+emViewer/` to make room.**
   - **Ratchet the ceiling downward** as extractions lower the baseline; never raise it to accept growth.
 
 `DiraCulator.m` does not yet have a size ratchet — apply the same pattern if it grows unchecked.
@@ -209,3 +212,9 @@ MASTERPLAN W5 #68 targets `BosonPlotter.m` under **6,000 lines**. Without a poli
 - **Headless API pattern:** `if nargout > 0` at the end of the top-level function assembles the `api` struct from `appData.api` fields populated by tab builders. Tests call `api = DiraCulator()` to get the struct, then use `api.close()` to tear down. The GUI is fully functional even in headless mode — all buttons and callbacks work normally. See [docs/gui_diraculator.md](docs/gui_diraculator.md) for the full API method table.
 - **History entries:** stored as `{timestamp, tabKey, description, latexStr, matlabCall}` (5-element cell). `matlabCall` is empty for tabs that don't generate reproducible single-line calls (Magnetic, Thermal, Diffusion). Consumers must guard with `numel(e) >= 5`.
 
+### FermiViewer
+- Image pipeline: `rawPixels` → `filteredPixels` → `displayImg`
+- Enable/disable triad: `displayImage()`, `clearDisplay()`, `setToolsEnabled()`
+- `undoPush()` inside `try` blocks only — prevents phantom undo on failure
+- FFT mask uses `ButtonDownFcn`, not `ginput()` (unreliable in uifigure)
+- See [docs/gui_emviewer.md](docs/gui_emviewer.md) for full details

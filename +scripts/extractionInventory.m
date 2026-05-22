@@ -2,7 +2,7 @@ function result = extractionInventory(filePath, startLine, endLine, opts)
 % Analyze a line range for extraction: closure reads, writes, callbacks, widgets.
 %
 %   result = scripts.extractionInventory('BosonPlotter.m', 1808, 1969)
-%   result = scripts.extractionInventory('BosonPlotter.m', 500, 800, GenerateCode=true)
+%   result = scripts.extractionInventory('FermiViewer.m', 500, 800, GenerateCode=true)
 %
 % Returns a struct with:
 %   .closureReads   — variables read inside range but defined outside

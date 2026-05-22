@@ -10,7 +10,7 @@ function out = themePref(action, value)
 %
 % Behaviour
 %   The preference is stored as a tiny .mat file in `prefdir` so it is
-%   shared across BosonPlotter, DiraCulator, DataWorkspace, and any other GUI that
+%   shared across BosonPlotter, FermiViewer, and any other GUI that
 %   wants to honour the user's mode choice. On read failure (file
 %   missing, corrupted, etc.) returns 'Dark' — the historical default.
 %

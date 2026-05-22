@@ -7,7 +7,7 @@ function result = MetadataEditor(data, opts)
 %
 %   Opens a modal dialog showing current metadata from the image parser
 %   and lets the user override fields like sample name, pixel size,
-%   voltage, operator, etc.  Designed for the electron-microscopy use case where
+%   voltage, operator, etc.  Designed for the FermiViewer use case where
 %   instrument-burned metadata is wrong (e.g. stale sample name on SEM).
 %
 %   Returns the corrected data struct on Apply, or [] on Cancel.

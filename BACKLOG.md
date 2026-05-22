@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-05-22 (fermi-viewer split: W1 #1 + W5 #28/#65/#69 moved to the new [fermi-viewer](https://github.com/pquarterman17/fermi-viewer) repo. Previous: 2026-05-21 #66 + #67 dialog cutovers shipped.)
+**Last regenerated:** 2026-05-21 (#66 + #67 dialog cutovers shipped — curveFitting/reflFitting now route all algorithmic state through their workshop models. Previous: 2026-05-16 line-count update; 2026-05-01 goal revision added #68/#69.)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -17,8 +17,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 ### MASTERPLAN (MATLAB consolidated) — `plans/MASTERPLAN.md`
 - [ ] **#68** W5 Decomposition → Drive `BosonPlotter.m` below **6,000 lines** (current 7,119, -16% to go). Replaces achieved #22 <8k milestone.
-
-*(W5 #69 FermiViewer <6k moved to [fermi-viewer](https://github.com/pquarterman17/fermi-viewer) on 2026-05-22 as fv MASTERPLAN #3.)*
+- [ ] **#69** W5 Decomposition → Drive `FermiViewer.m` below **6,000 lines** (current 6,082 / 330 nested fns, **-1.4% to go** — 8 workshop models shipped, callback extraction ongoing)
 
 ### Origin parity (Python port, MATLAB side complete) — `plans/origin-feature-gap.md`
 - [ ] **#1** AIC/BIC/F-test fit comparison → Python
@@ -41,11 +40,14 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 ## Tier 2 — Medium Impact (open)
 
 ### MASTERPLAN (MATLAB consolidated) — `plans/MASTERPLAN.md`
-- [ ] **#4** W2 UX → Toolbar metrics consistent across the three GUIs (deferred)
+- [ ] **#1** W1 Bugs → FermiViewer right-side tools panel overcrowded (tabled)
+- [ ] **#4** W2 UX → Toolbar metrics consistent across all four GUIs (deferred)
 - [ ] **#9** W3 Features → Small-angle scattering (Guinier / Porod / IFT)
 - [ ] **#24** W5 Decomposition → Documentation coverage — package READMEs
 - [ ] **#63** W5 Decomposition → Cross-workshop test harness (unblocked 2026-04-26)
 - [ ] **#64** W5 Decomposition → Subfolder reorg of remaining `+bosonPlotter/` cross-cutters (after workshops carve out their pieces)
+- [ ] **#28** W5 Decomposition → Extract FermiViewer measurement subsystem (~10 nested fns; partial via `+emViewer/measurements.m`) — promoted T3 → T2 2026-05-01, drives #69
+- [ ] **#65** W5 Decomposition → Apply workshop pattern to FermiViewer heavy features (measurements / EELS / EDS / annotations / contrast) — promoted T3 → T2 2026-05-01, unblocked 2026-04-26, drives #69
 - [ ] **#47** W7 Parsers → `importOxford` (paused — awaiting example file)
 - [ ] **#48** W7 Parsers → `importOpus` (paused — awaiting example file)
 - [ ] **#50** W8 DataWorkspace → Shared model migration (PARTIAL)
@@ -95,7 +97,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 | Plan | Status | Open items | Notes |
 |------|--------|------------|-------|
-| MASTERPLAN (MATLAB consolidated) | Active | 1 T1 / 11 T2 / 7+4 T3 | 9 source plans consolidated 2026-04-19. W4 Physics shipped 2026-04-19; W3 #11 + W3 #8 + W6 theory-docs sweep + tutorials shipped 2026-04-24; W2 #5/#6/#7 + W3 #14/#15/#16 shipped 2026-04-25; **W5 #22 ratchet target reached + workshop conversions #59-#62 all shipped 2026-04-26**. **2026-05-22 fermi-viewer split:** W1 #1 + W5 #28/#65/#69 moved to fv repo (`plans/MASTERPLAN.md` in fermi-viewer). |
+| MASTERPLAN (MATLAB consolidated) | Active | 2 T1 / 14 T2 / 7+4 T3 | 9 source plans consolidated 2026-04-19; W4 Physics shipped 2026-04-19; W3 #11 + W3 #8 + W6 theory-docs sweep + tutorials shipped 2026-04-24; W2 #5/#6/#7 + W3 #14/#15/#16 shipped 2026-04-25; **W5 #22 ratchet target reached + workshop conversions #59-#62 all shipped 2026-04-26**. **2026-05-01 goal revision:** added #68 BosonPlotter <6k + #69 FermiViewer <6k as new T1 size goals (replaces shipped #22); promoted #28 + #65 T3 → T2 to drive #69. |
 | origin-feature-gap | Active (Python) | 6 T1 / 7 T2 / 1 T3 | MATLAB side complete; Python port pending — excluded from MASTERPLAN |
 | dataworkspace-python-port | Active (Python) | 3 T1 / 3 T2 / 2 T3 | Python-port architecture; excluded from MASTERPLAN |
 | porting_plan | Active (Python) | 7 phase-level items | Thin film toolkit architecture; excluded from MASTERPLAN |

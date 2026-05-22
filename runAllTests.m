@@ -7,12 +7,10 @@ function runAllTests(options)
 %
 %   Name-Value Options:
 %       Group    "all" (default) | "parser" | "batch" | "gui" | "xrd2d" |
-%                "sims" | "fitting" | "plotting"
+%                "sims" | "em" | "emgui" | "eds" | "eels" | "diffindex" |
+%                "edsquant" | "eels_adv" | "diff_sim" | "fitting" |
+%                "plotting" | "spectral"
 %                Run only the specified group of test suites.
-%
-%   Note: EM-related groups (em, emgui, eds, eels, eels_adv, diffindex,
-%   diff_sim, edsquant, contour, spectral) moved to fermi-viewer:
-%   https://github.com/pquarterman17/fermi-viewer
 %
 %   Groups:
 %       parser   — core parser smoke tests and edge cases (no GUI, fast)
@@ -20,6 +18,16 @@ function runAllTests(options)
 %       xrd2d    — 2D area-detector XRDML parser and edge-case tests
 %       gui      — headless GUI API tests (opens/closes figures)
 %       sims     — SIMS depth profile parser tests
+%       em       — EM image parsers: importTIFF, importRawImage (synthetic data)
+%       emgui    — headless FermiViewer API tests (opens/closes figures, slower)
+%       eds      — EDS multi-channel composite mode tests
+%       eels     — EELS imaging utilities (synthetic data, no files)
+%       eels_adv — Advanced EELS: Fourier-log, ELNES, Kramers-Kronig
+%       diffindex — diffraction indexing utilities (calcElectronWavelength,
+%                   findDiffractionSpots, indexDiffraction)
+%       diff_sim  — Diffraction simulation, virtual dark-field, ZAF correction
+%       edsquant  — EDS quantification (edsKFactorTable, cliffLorimer,
+%                   edsCompositionProfile)
 %       interp2d  — 2-D interpolation utilities (interpolate2D, regrid2D)
 %       baseline  — baseline estimation: ALS, rolling ball, modified polynomial
 %       errorprop — error propagation utilities (errorProp and wrappers)
@@ -36,6 +44,14 @@ function runAllTests(options)
 %       runAllTests                      % full suite
 %       runAllTests(Group="parser")      % fast parser checks only
 %       runAllTests(Group="gui")         % GUI tests only
+%       runAllTests(Group="em")          % EM image parser tests
+%       runAllTests(Group="emgui")       % EM Viewer GUI API tests
+%       runAllTests(Group="eds")         % EDS composite mode tests
+%       runAllTests(Group="eels")        % EELS utilities
+%       runAllTests(Group="eels_adv")    % advanced EELS (Fourier-log, ELNES, KK)
+%       runAllTests(Group="diffindex")   % diffraction indexing
+%       runAllTests(Group="diff_sim")    % diffraction simulation, VDF, ZAF
+%       runAllTests(Group="edsquant")    % EDS quantification
 %
 %   Throws an error if any suite fails so CI/scripts can detect failures.
 
@@ -44,14 +60,14 @@ arguments
 end
 
 options.Group = validatestring(options.Group, ...
-    ["all", "parser", "batch", "xrd2d", "gui", "calcgui", "sims", ...
+    ["all", "parser", "batch", "xrd2d", "gui", "calcgui", "sims", "em", "emgui", "eds", ...
      "xrayneutron", "superconductor", "cif", "optics", "vacuum", "electrochemistry", ...
-     "fitting", "plotting", "sigproc", "interp2d", "baseline", "errorprop", ...
-     "utilities", "templates", "workspace", "transport", "magnetic", "physics3", ...
-     "bugReport", "smoke", "app"]);
+     "eels", "eels_adv", "diffindex", "diff_sim", "edsquant", "contour", "fitting", "plotting", ...
+     "spectral", "sigproc", "interp2d", "baseline", "errorprop", "utilities", "templates", ...
+     "workspace", "transport", "magnetic", "physics3", "bugReport", "smoke", "app"]);
 
 % Build absolute paths to test scripts so `run` works regardless of CWD.
-% Tests are organized into subdirectories: parser/, gui/, calc/, batch/, fitting/
+% Tests are organized into subdirectories: parser/, gui/, imaging/, calc/, batch/
 ROOT  = fileparts(mfilename('fullpath'));
 T     = @(subdir, name) fullfile(ROOT, 'tests', subdir, name);
 
@@ -65,6 +81,7 @@ SUITES = {
     T('parser','test_csv_mixed_format'),    'parser', 'CSV mixed/awkward format handling'
     T('parser','test_new_features'),        'parser', 'Features 4-16: utilities and parser changes'
     T('parser','test_importAFM'),          'parser', 'AFM / NanoScope .spm parser'
+    T('parser','test_importBCF'),          'em',     'BCF EDS spectrum parser'
     T('parser','test_sims_parser'),         'sims',   'SIMS depth profile parser'
     T('parser','test_xrdml_2d'),            'xrd2d',  '2D XRDML parser (parser + Q-space)'
     T('parser','test_xrdml_2d_edge'),       'xrd2d',  '2D XRDML edge cases (shapes, cuts, session)'
@@ -98,6 +115,7 @@ SUITES = {
     T('gui','test_insetGraph'),             'gui',    'Inset graph: create, region limits, rect/connectors, remove, replacement, Position option'
     T('gui','test_2dMapStyling'),           'gui',    '2D heatmap axes pick up active template font/tick (Phase F)'
     T('gui','test_reflSplineMode'),         'gui',    'reflFitting Spline mode: reflBuildSplineLayers helper + headless dialog smoke test (MASTERPLAN W3 #11 GUI)'
+    T('gui','test_annotationColorDropdown'),'gui',    'FermiViewer annotation-colour dropdown: items, default, 5-way RGB lookup'
     T('gui','test_themeConformance'),       'gui',    'Theme conformance: every widget BG/FG comes from uxTokens palette in both dark and light'
     T('gui','test_resolveTheme'),           'gui',    'resolveTheme: Auto-mode resolution + Dark/Light passthrough (themePref Auto support)'
     T('gui','test_noNewColorLiterals'),     'gui',    'Static linter: no new hardcoded RGB literals in BosonPlotter.m / +bosonPlotter/ above the baseline ratchet'
@@ -105,6 +123,48 @@ SUITES = {
     T('gui','test_contour_features'),       'contour','Contour/heatmap: gridding, plot styles, edge cases, export'
     T('gui','test_diraculator'),            'calcgui','DiraCulator GUI API'
     % ── Imaging tests ─────────────────────────────────────────────────
+    T('imaging','test_renderingSharpness'),  'em',     'FermiViewer display pipeline: sharpness/variance preservation regression'
+    T('imaging','test_em_parsers'),         'em',     'EM image parsers: importTIFF + importRawImage'
+    T('imaging','test_imaging_utils'),      'em',     'Imaging utilities: contrast, filter, FFT, profile, scale bar, thumbnail'
+    T('imaging','test_imaging_advanced'),   'em',     'Imaging advanced: bin, unsharp, morph, Otsu, Butterworth, plane level, roughness, lattice, radial, azimuthal, interface fit, stitch, defect count'
+    T('imaging','test_tiltCorrection'),     'em',     'SEM/FIB stage tilt: getStageTilt parsing, measureDistance/lineProfile with TiltAngle'
+    T('imaging','test_tiltGeometryCorrection'), 'em', 'Tilt geometry: Surface (1/cos) vs Cross-section (1/sin) correction factors'
+    T('imaging','test_particle_clahe'),     'em',     'Imaging: CLAHE + connectedComponents + particleAnalysis (synthetic + real DM3/DM4)'
+    T('imaging','test_measurementWorkshopModel'), 'em', 'MeasurementWorkshopModel: handle-class state container for FermiViewer distance/angle/polyline/lineprofile measurements (workshop pattern, W5 #28)'
+    T('imaging','test_measurementWorkshop'), 'em', 'MeasurementWorkshop facade: hook contract + bind/select/clear lifecycle (workshop pattern, W5 #69 task 1b)'
+    T('imaging','test_diffractionWorkshop'), 'em', 'DiffractionWorkshop: model + facade for spot detection, indexing, GPA state (workshop pattern, W5 #69 task 2)'
+    T('imaging','test_contrastWorkshop'),   'em', 'ContrastWorkshop: model + facade for contrast limits, transform, gamma, invert (workshop pattern, W5 #69 task 4)'
+    T('imaging','test_annotationWorkshop'), 'em', 'AnnotationWorkshop: model + facade for text annotations CRUD, sync, selection (workshop pattern, W5 #69 task 8)'
+    T('imaging','test_eelsWorkshop'),       'em', 'EELSWorkshop: model + facade for EELS state, spectrum, cube, analysis results (workshop pattern, W5 #69 task 3)'
+    T('imaging','test_edsWorkshop'),        'em', 'EDSWorkshop: model + facade for EDS channels, composite, quantification (workshop pattern, W5 #69 task 4)'
+    T('imaging','test_processingWorkshop'),'em', 'ProcessingWorkshop: model + facade for FFT/Particle/Align state (workshop pattern, W5 #69 task 7)'
+    T('imaging','test_calibrationWorkshop'),'em','CalibrationWorkshop: model + facade for pixel calibration, scale bar (workshop pattern, W5 #69 task 5)'
+    T('imaging','test_em_gui_harness'),     'emgui',  'EM Viewer GUI API: load, contrast, filter, FFT, profile, export'
+    T('imaging','test_em_gui_phase2'),      'emgui',  'EM Viewer GUI Phase 2: stack nav, session, compare, EDS, EELS, diffraction, annotations'
+    T('imaging','test_em_measurements'),    'emgui',  'EM Viewer measurement/ROI API: measureDistance, dSpacing, ellipse/polygon ROI, annotRect'
+    T('imaging','test_em_contrast_stack'),  'emgui',  'EM Viewer contrast stack API: reset, colormap set/cycle, transform, invert, colorbar'
+    T('imaging','test_em_advanced_api'),    'emgui',  'EM Viewer advanced API: virtualDarkField, eelsDeconvolve, eelsKramersKronig (with injected data)'
+    T('imaging','test_em_priority3'),       'emgui',  'EM Viewer Priority-3 click-capture bypass: cropRect, zoomRect, resetZoom, fftMask (synthetic + real DM3/DM4)'
+    T('imaging','test_em_gui_real_dm'),     'emgui',  'EM Viewer driven by real DM3/DM4 files: per-file load + full button sweep (contrast, filters, FFT, rotate, crop, export, session)'
+    T('imaging','test_em_gui_button_wiring'), 'emgui','EM Viewer Processing-panel button wiring: every control present, enabled, callback set, parented to its expected tab'
+    T('imaging','test_em_angle_polyline_export'), 'emgui','EM Viewer measurement API: angle (90°/45°/135°), polyline path length, CSV export round-trip'
+    T('imaging','test_scaleBarPersistsThroughProcessing'), 'emgui','EM Viewer scale bar: persists across filters, rotate/flip, crop, and undo (regression)'
+    T('gui','test_measurementLabelDefaults'), 'emgui','EM Viewer distance label defaults: font size, transparent background, perpendicular offset, tilt tooltip'
+    T('imaging','test_transformToolbar'),     'emgui','EM Viewer icon transform toolbar: rotate/flip/zoom/fit/reset/crop wiring + capital-T geometry'
+    T('imaging','test_em_clear_overlays_diff_rings'), 'emgui','EM Viewer Clear Overlays removes diff_ring + diff_spot tagged handles (regression)'
+    T('imaging','test_fermiViewerSize'),    'emgui',  'Size ratchet: FermiViewer.m line count + nested-fn count stay under their ceilings (target <6,000 lines, MASTERPLAN W5)'
+    T('imaging','test_em_box_profile'),       'emgui','EM Viewer Box Profile: rotated-box overlay + runWidthAveragedProfile engine + clearOverlays cleanup'
+    T('imaging','test_em_zoom_toggle_marquee'),'emgui','EM Viewer zoom toggle + marquee multi-select: default drag selects, zoom toggle on reverts to box-zoom'
+    T('imaging','test_histogram_overlay'),   'emgui',  'FermiViewer histogram overlay: lo/hi handles, gamma midpoint, transfer ramp, clipping indicators (W2 #5/#7)'
+    T('imaging','test_em_rect_roi_polyline'), 'emgui','EM Viewer rectROI + polyline as measurements: registered, selectable, marquee, individual/bulk delete'
+    T('imaging','test_eds_composite'),      'eds',    'EDS multi-channel composite mode API tests'
+    T('imaging','test_real_dm3'),           'em',     'Real DM3/TIFF files from +test_datasets/Microscopy'
+    T('imaging','test_eels'),              'eels',   'EELS utilities: edge table, background, thickness, ZLP align, extract map'
+    T('imaging','test_eels_advanced'),     'eels_adv','EELS advanced: Fourier-log deconvolution, ELNES, Kramers-Kronig'
+    T('imaging','test_eelsSVD'),           'eels',   'EELS SVD decomposition: eigenspectra, score maps, denoising'
+    T('imaging','test_diffraction_index'), 'diffindex','Diffraction indexing: wavelength, spot finding, phase matching'
+    T('imaging','test_diffraction_sim'),   'diff_sim','Diffraction simulation, virtual dark-field, ZAF correction'
+    T('imaging','test_eds_quantification'),'edsquant','EDS quantification: k-factor table, Cliff-Lorimer, composition profile'
     % ── Calc tests ────────────────────────────────────────────────────
     T('calc','test_calc_xrayneutron'),     'xrayneutron', 'X-ray/Neutron calculation module'
     T('calc','test_superconductor'),       'superconductor', 'Superconductor calculation module'
@@ -185,6 +245,7 @@ SUITES = {
     % ── Smoke tests (full interaction sequences) ──────────────────────
     T('smoke','test_smokeRunner'),           'smoke',  'SmokeRunner framework self-test: widget lookup, callback invocation, snapshots, sequences'
     T('smoke','test_bp_smoke'),             'smoke',  'BosonPlotter smoke: fire every button + interaction sequences with real data'
+    T('smoke','test_fv_smoke'),             'smoke',  'FermiViewer smoke: fire every button + interaction sequences with real image'
     T('smoke','test_string_snapshots'),     'smoke',  'String snapshots: button labels, tooltips match expected values (catch refactoring regressions)'
 };
 
