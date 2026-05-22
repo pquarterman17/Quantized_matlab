@@ -183,8 +183,13 @@ btnClose = uibutton(bottomGL, 'Text', 'Close', 'FontSize', 9, ...
     'ButtonPushedFcn', @(~,~) delete(rfFig));
 btnClose.Layout.Column = 9;
 
-% State
-rfResult = struct('Q', [], 'R', [], 'layers', [], 'R2', NaN);
+% ── Workshop model (MASTERPLAN W5 #62 / #67 cutover) ───────────────────
+% ReflWorkshopModel owns the algorithmic state: layer/knot canonical
+% form, mode, and fit/simulate result. The dialog tables are the input
+% surface; doFit/doSimulate write outcomes through the model so
+% downstream consumers (Plot on Main, Copy, MCMC) read from one place.
+rfModel = bosonPlotter.reflectivity.ReflWorkshopModel();
+rfModel.bindFromDataset(ds);
 
 % Initialize with default 3-layer stack: air / 200Å SiO2 / Si
 initLayers();
@@ -440,7 +445,8 @@ updateSLDPlot();
             Scale=efScale.Value, Background=efBG.Value, ...
             Resolution=resArg);
         plotRQ(R, []);
-        rfResult.Q = xData; rfResult.R = R; rfResult.layers = layers;
+        rfModel.setMode(ddMode.Value);
+        rfModel.setSimulateOutcome(xData, R, layers);
         options.StatusFcn(['Simulation plotted' resolutionStatusSuffix(resArg)]);
     end
 
@@ -505,8 +511,9 @@ updateSLDPlot();
             plotRQ(Rfit, yData - Rfit);
             updateSLDPlot();
 
-            rfResult.Q = xData; rfResult.R = Rfit;
-            rfResult.layers = fitLayers; rfResult.R2 = R2lin;
+            rfModel.setMode(ddMode.Value);
+            rfModel.setFitOutcome(xData, Rfit, fitLayers, R2lin, ...
+                struct('chiSqRed', res.chiSqRed, 'exitFlag', res.exitFlag));
 
             lblFitStats.Text = sprintf('R%s=%.4f  %s%s=%.4g  Exit=%d', ...
                 char(178), R2lin, char(967), char(178), res.chiSqRed, res.exitFlag);
@@ -585,8 +592,10 @@ updateSLDPlot();
             updateSLDPlot();
 
             fitLayers = bosonPlotter.reflBuildSplineLayers(tblKnots.Data);
-            rfResult.Q = xData; rfResult.R = Rfit;
-            rfResult.layers = fitLayers; rfResult.R2 = R2lin;
+            rfModel.setMode(ddMode.Value);
+            rfModel.setFitOutcome(xData, Rfit, fitLayers, R2lin, ...
+                struct('chiSqRed', res.chiSqRed, 'exitFlag', res.exitFlag, ...
+                       'nKnots', nK));
 
             lblFitStats.Text = sprintf('R%s=%.4f  %s%s=%.4g  Exit=%d  [Spline %d kn]', ...
                 char(178), R2lin, char(967), char(178), res.chiSqRed, res.exitFlag, nK);
@@ -613,7 +622,7 @@ updateSLDPlot();
                 'Switch to Layers mode and re-fit to use MCMC.'], 'MCMC');
             return;
         end
-        if isempty(rfResult.layers) || isempty(rfResult.R)
+        if isempty(rfModel.result.layerMatrix) || isempty(rfModel.result.R)
             bosonPlotter.quietAlert(rfFig, 'Run Fit first — MCMC samples around the current best fit.', ...
                 'MCMC');
             return;
@@ -632,7 +641,7 @@ updateSLDPlot();
             return;
         end
 
-        fitLayers = rfResult.layers;
+        fitLayers = rfModel.result.layerMatrix;
         nR        = size(fitLayers, 1);
         pBest     = fitLayers(:)';       % [d1 sldR1 sldI1 sig1 d2 ...]
         fixedMask = getFixedMask();
@@ -661,7 +670,7 @@ updateSLDPlot();
 
         % Noise-level estimate: σ² from log-residuals at best fit
         logY   = log10(max(yData, 1e-15));
-        logR   = log10(max(rfResult.R, 1e-15));
+        logR   = log10(max(rfModel.result.R, 1e-15));
         sigma2 = max(var(logY - logR), eps);
 
         % Per-dim proposal scale; fixed params get 0 so they stay at pBest.
@@ -724,20 +733,20 @@ updateSLDPlot();
     end
 
     function plotOnMain()
-        if isempty(rfResult.R), return; end
+        if isempty(rfModel.result.R), return; end
         hold(mainAx, 'on');
-        plot(mainAx, rfResult.Q, rfResult.R, 'r-', 'LineWidth', 1.5, ...
+        plot(mainAx, rfModel.result.Q, rfModel.result.R, 'r-', 'LineWidth', 1.5, ...
             'DisplayName', 'Refl Fit', 'Tag', 'reflFitOverlay');
         hold(mainAx, 'off');
         options.StatusFcn('Reflectivity fit overlaid on main axes');
     end
 
     function copyResults()
-        if isempty(rfResult.layers), return; end
+        if isempty(rfModel.result.layerMatrix), return; end
         lines = {};
         if inSplineMode()
             lines{end+1} = 'Reflectivity Fit Results (Spline mode)';
-            lines{end+1} = sprintf('R² = %.6f', rfResult.R2);
+            lines{end+1} = sprintf('R² = %.6f', rfModel.result.R2);
             lines{end+1} = '';
             lines{end+1} = sprintf('%10s %14s %8s', 'z (Å)', 'SLD (×10⁻⁶)', 'Fixed');
             lines{end+1} = repmat('-', 1, 36);
@@ -749,7 +758,7 @@ updateSLDPlot();
             end
         else
             lines{end+1} = 'Reflectivity Fit Results';
-            lines{end+1} = sprintf('R² = %.6f', rfResult.R2);
+            lines{end+1} = sprintf('R² = %.6f', rfModel.result.R2);
             lines{end+1} = '';
             lines{end+1} = sprintf('%-20s %10s %12s %10s %8s', ...
                 'Material', 'd (Å)', 'SLD (×10⁻⁶)', 'SLD_imag', 'σ (Å)');
@@ -761,8 +770,8 @@ updateSLDPlot();
                     matName = '—';
                 end
                 lines{end+1} = sprintf('%-20s %10.2f %12.4f %10.4f %8.2f', ...
-                    matName, rfResult.layers(ri,1), rfResult.layers(ri,2)*1e6, ...
-                    rfResult.layers(ri,3)*1e6, rfResult.layers(ri,4)); %#ok<AGROW>
+                    matName, rfModel.result.layerMatrix(ri,1), rfModel.result.layerMatrix(ri,2)*1e6, ...
+                    rfModel.result.layerMatrix(ri,3)*1e6, rfModel.result.layerMatrix(ri,4)); %#ok<AGROW>
             end
         end
         clipboard('copy', strjoin(lines, newline));

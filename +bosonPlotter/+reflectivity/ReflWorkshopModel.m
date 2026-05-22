@@ -51,10 +51,21 @@ classdef ReflWorkshopModel < handle
         %BINDFROMDATASET  Reset to default 3-layer stack + 5-knot spline.
         %   The dataset is supplied for symmetry with other workshops;
         %   reflectivity does not auto-detect channels — caller passes
-        %   Q + R(Q) explicitly to fit() / simulate().
-            obj.layers = obj.defaultLayerStack();
-            obj.knots  = obj.defaultKnots();
-            obj.result = struct();
+        %   Q + R(Q) explicitly to fit() / simulate(). Defensively
+        %   normalizes pre-set layers/knots so legacy-shape input (a
+        %   session loader feeding 5-field layer structs) does not
+        %   break subsequent writes — workshop contract rule #1.
+            if isempty(obj.layers) || ~all(isfield(obj.layers, {'name','thick','sld','abs','rough','fixed'}))
+                obj.layers = obj.defaultLayerStack();
+            else
+                obj.layers = bosonPlotter.reflectivity.ReflWorkshopModel.normalizeLayers(obj.layers);
+            end
+            if isempty(obj.knots) || ~all(isfield(obj.knots, {'z','sld','fixed'}))
+                obj.knots = obj.defaultKnots();
+            else
+                obj.knots = bosonPlotter.reflectivity.ReflWorkshopModel.normalizeKnots(obj.knots);
+            end
+            obj.result = bosonPlotter.reflectivity.ReflWorkshopModel.emptyResult();
         end
 
         % ── Mode toggling ───────────────────────────────────────────
@@ -170,7 +181,53 @@ classdef ReflWorkshopModel < handle
 
         function tf = hasResult(obj)
             tf = ~isempty(obj.result) && isstruct(obj.result) ...
-                && isfield(obj.result, 'params');
+                && isfield(obj.result, 'R') && ~isempty(obj.result.R);
+        end
+
+        function setSimulateOutcome(obj, Q, R, L)
+        %SETSIMULATEOUTCOME  Store the (Q, R, layerMatrix) tuple produced
+        %   by a Simulate run. R2 stays NaN — there's no observed curve
+        %   to compare against in simulate mode.
+            if ~isstruct(obj.result), obj.result = struct(); end
+            obj.result.Q           = Q(:);
+            obj.result.R           = R(:);
+            obj.result.layerMatrix = L;
+            obj.result.R2          = NaN;
+            obj.result.mode        = obj.mode;
+        end
+
+        function setFitOutcome(obj, Q, R, L, R2, extras)
+        %SETFITOUTCOME  Store fit outputs on the result. `extras` is an
+        %   optional struct merged into result (e.g. chiSqRed, exitFlag
+        %   from fitting.curveFit). Used by the dialog after Layers- or
+        %   Spline-mode fits so all downstream consumers (Plot on Main,
+        %   Copy, MCMC) read from one place.
+            arguments
+                obj
+                Q  (:,1) double
+                R  (:,1) double
+                L  double
+                R2 double
+                extras struct = struct()
+            end
+            if ~isstruct(obj.result), obj.result = struct(); end
+            obj.result.Q           = Q;
+            obj.result.R           = R;
+            obj.result.layerMatrix = L;
+            obj.result.R2          = R2;
+            obj.result.mode        = obj.mode;
+            fns = fieldnames(extras);
+            for k = 1:numel(fns)
+                obj.result.(fns{k}) = extras.(fns{k});
+            end
+        end
+
+        function setMode(obj, mode)
+            arguments
+                obj
+                mode char {mustBeMember(mode, {'Layers', 'Spline'})}
+            end
+            obj.mode = mode;
         end
 
         % ── Conversions: struct array ↔ numeric matrix ──────────────
@@ -226,6 +283,15 @@ classdef ReflWorkshopModel < handle
     end
 
     methods (Static, Access = public)
+        function r = emptyResult()
+        %EMPTYRESULT  Canonical empty fit/simulate result.
+        %   Dialog and scripted consumers can read result.Q etc. without
+        %   isfield guards before any fit/simulate has run.
+            r = struct('Q', [], 'R', [], 'layerMatrix', [], ...
+                'R2', NaN, 'mode', 'Layers', ...
+                'params', [], 'errors', []);
+        end
+
         function s = emptyLayers()
             s = struct('name',{},'thick',{},'sld',{},'abs',{},'rough',{},'fixed',{});
         end

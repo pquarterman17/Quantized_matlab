@@ -146,6 +146,101 @@ catch ex
 end
 
 % ════════════════════════════════════════════════════════════════════
+%  BINDFROMDATASET — normalizes legacy 5-field layers (contract rule #1)
+% ════════════════════════════════════════════════════════════════════
+fprintf('\n--- bindFromDataset normalizes pre-set legacy layers ---\n');
+try
+    m = bosonPlotter.reflectivity.ReflWorkshopModel();
+    % Simulate a session loader feeding 5-field layers (no 'fixed'):
+    m.layers = struct('name', {'Air', 'SiO2', 'Si'}, ...
+        'thick', {0, 200, 0}, 'sld', {0, 3.47, 2.073}, ...
+        'abs', {0, 0, 0}, 'rough', {0, 5, 3});
+    ds = struct('corrData', [], 'data', ...
+        struct('time', (1:10)', 'values', (1:10)', 'labels', {{'R'}}));
+    m.bindFromDataset(ds);
+    assert(isfield(m.layers, 'fixed'), 'bindFromDataset must add fixed field');
+    assert(numel(m.layers) == 3, 'preserves count');
+    assert(strcmp(m.layers(2).name, 'SiO2'), 'preserves names');
+    assert(m.layers(2).fixed == false, 'default fixed=false');
+    fprintf('  PASS: legacy 5-field layers upgraded by bindFromDataset\n');
+    passed = passed + 1;
+catch ex
+    fprintf('  FAIL: %s\n', ex.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════
+%  EMPTYRESULT — result shape exposes Q/R/layerMatrix/R2/mode
+% ════════════════════════════════════════════════════════════════════
+fprintf('\n--- bindFromDataset seeds canonical empty result ---\n');
+try
+    m = bosonPlotter.reflectivity.ReflWorkshopModel();
+    ds = struct('corrData', [], 'data', ...
+        struct('time', (1:5)', 'values', (1:5)', 'labels', {{'R'}}));
+    m.bindFromDataset(ds);
+    needed = {'Q', 'R', 'layerMatrix', 'R2', 'mode', 'params', 'errors'};
+    missing = needed(~ismember(needed, fieldnames(m.result)));
+    assert(isempty(missing), sprintf('result missing fields: %s', strjoin(missing, ', ')));
+    assert(~m.hasResult(), 'hasResult false until simulate/fit runs');
+    assert(strcmp(m.result.mode, 'Layers'), 'default mode is Layers');
+    fprintf('  PASS: %d expected result fields present\n', numel(needed));
+    passed = passed + 1;
+catch ex
+    fprintf('  FAIL: %s\n', ex.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════
+%  SETSIMULATEOUTCOME / SETFITOUTCOME — dialog-side state on the model
+% ════════════════════════════════════════════════════════════════════
+fprintf('\n--- setSimulateOutcome / setFitOutcome round-trip ---\n');
+try
+    m = bosonPlotter.reflectivity.ReflWorkshopModel();
+    Q = linspace(0.01, 0.1, 30)';
+    R = m.simulate(Q);
+    L = m.layerMatrix();
+    m.setSimulateOutcome(Q, R, L);
+    assert(m.hasResult(), 'hasResult true after setSimulateOutcome');
+    assert(numel(m.result.Q) == 30 && numel(m.result.R) == 30, 'Q/R stored');
+    assert(isnan(m.result.R2), 'R2 NaN for simulate (no observed curve)');
+    assert(isequal(m.result.layerMatrix, L), 'layerMatrix stored');
+
+    m.setFitOutcome(Q, R, L, 0.987, struct('chiSqRed', 1.2, 'exitFlag', 1));
+    assert(abs(m.result.R2 - 0.987) < 1e-12, 'R2 stored from fit outcome');
+    assert(m.result.chiSqRed == 1.2, 'extras merged in');
+    assert(m.result.exitFlag == 1, 'extras merged in');
+    fprintf('  PASS: simulate + fit outcome round-trip + extras merge\n');
+    passed = passed + 1;
+catch ex
+    fprintf('  FAIL: %s\n', ex.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════
+%  SETMODE — validates membership, syncs result mode after outcome
+% ════════════════════════════════════════════════════════════════════
+fprintf('\n--- setMode + outcome reflects current mode ---\n');
+try
+    m = bosonPlotter.reflectivity.ReflWorkshopModel();
+    m.setMode('Spline');
+    assert(strcmp(m.mode, 'Spline'), 'setMode applied');
+    Q = linspace(0.01, 0.1, 20)';
+    R = ones(size(Q)) * 0.5;
+    L = m.layerMatrix();
+    m.setSimulateOutcome(Q, R, L);
+    assert(strcmp(m.result.mode, 'Spline'), 'result.mode reflects current mode');
+
+    err = '';
+    try
+        m.setMode('Garbage');
+    catch ex
+        err = ex.message;
+    end
+    assert(~isempty(err), 'setMode must reject invalid values');
+    fprintf('  PASS: setMode validates + propagates to result.mode\n');
+    passed = passed + 1;
+catch ex
+    fprintf('  FAIL: %s\n', ex.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════
 %  Summary
 % ════════════════════════════════════════════════════════════════════
 fprintf('\n=== test_reflWorkshopModel: %d passed, %d failed ===\n', passed, failed);
