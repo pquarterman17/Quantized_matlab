@@ -56,6 +56,11 @@ classdef CurveFitWorkshopModel < handle
     properties (SetAccess = protected)
         result          struct  = struct()
         catalog         struct  = struct([])    % cached fitting.models() catalog
+        history         cell    = {}            % last <=5 fit snapshots for Compare Models
+    end
+
+    properties (Constant, Access = private)
+        HISTORY_CAP = 5
     end
 
     methods
@@ -69,6 +74,9 @@ classdef CurveFitWorkshopModel < handle
 
         function bindFromDataset(obj, ds)
         %BINDFROMDATASET  Initialise channel + x-range from a dataset.
+        %   Defensively normalizes obj.params so legacy-shape input (a
+        %   session loader feeding 6-field structs) does not break the
+        %   first cell write — workshop contract rule #1.
             if ~isempty(ds.corrData) && ~isempty(ds.corrData.time)
                 d = ds.corrData;
             else
@@ -79,7 +87,10 @@ classdef CurveFitWorkshopModel < handle
                 obj.xMin = double(min(d.time));
                 obj.xMax = double(max(d.time));
             end
-            obj.result = struct();
+            obj.result  = bosonPlotter.curveFit.CurveFitWorkshopModel.emptyResult();
+            obj.history = {};
+            obj.params  = ...
+                bosonPlotter.curveFit.CurveFitWorkshopModel.normalizeParamArray(obj.params);
         end
 
         % ── Model picking ───────────────────────────────────────────
@@ -191,10 +202,15 @@ classdef CurveFitWorkshopModel < handle
                     Lower=lb, Upper=ub, Fixed=fixed, Weights=weights);
             end
 
-            % Cache fit metadata + handle
+            % Cache fit metadata + handle, seeding display fields so
+            % readers (Plot on Main, bands rendering) don't need
+            % isfield guards before setDenseGrid/setBands have run.
             res.model      = obj.modelName;
             res.modelFcn   = fcn;
             res.paramNames = pNames;
+            if ~isfield(res, 'xFit'),  res.xFit  = []; end
+            if ~isfield(res, 'yFit'),  res.yFit  = []; end
+            if ~isfield(res, 'bands'), res.bands = []; end
             obj.result     = res;
 
             % Update each param's fitted value + error
@@ -217,9 +233,52 @@ classdef CurveFitWorkshopModel < handle
             tf = ~isempty(obj.result) && isstruct(obj.result) ...
                 && isfield(obj.result, 'params') && ~isempty(obj.result.params);
         end
+
+        function setDenseGrid(obj, xFit, yFit)
+        %SETDENSEGRID  Store dense (xFit, yFit) on result for plotters.
+        %   Called by the dialog after fit() so Plot-on-Main and Bands
+        %   can read xFit/yFit from the model rather than a parallel
+        %   local struct.
+            if ~isstruct(obj.result), obj.result = struct(); end
+            obj.result.xFit = xFit(:);
+            obj.result.yFit = yFit(:);
+            if ~isfield(obj.result, 'bands'), obj.result.bands = []; end
+        end
+
+        function setBands(obj, bands)
+        %SETBANDS  Store confidence/prediction bands on result.
+            if ~isstruct(obj.result), obj.result = struct(); end
+            obj.result.bands = bands;
+        end
+
+        function pushHistorySnapshot(obj, snap)
+        %PUSHHISTORYSNAPSHOT  Append a fit snapshot for Compare Models.
+        %   Caps the cell at HISTORY_CAP (newest at end).
+            obj.history{end+1} = snap;
+            cap = bosonPlotter.curveFit.CurveFitWorkshopModel.HISTORY_CAP;
+            if numel(obj.history) > cap
+                obj.history = obj.history(end-cap+1:end);
+            end
+        end
+
+        function clearHistory(obj)
+            obj.history = {};
+        end
     end
 
     methods (Static, Access = public)
+        function r = emptyResult()
+        %EMPTYRESULT  Canonical empty fit-result struct.
+        %   Used by bindFromDataset so the dialog (and any scripted
+        %   consumer) can read result.field without isfield guards
+        %   before a fit has run.
+            r = struct('params', [], 'errors', [], 'model', '', ...
+                'xFit', [], 'yFit', [], 'R2', NaN, 'RMSE', NaN, ...
+                'chiSqRed', NaN, 'AIC', NaN, 'paramNames', {{}}, ...
+                'residuals', [], 'covar', [], 'nPoints', 0, ...
+                'nFree', 0, 'modelFcn', [], 'bands', []);
+        end
+
         function s = emptyParamArray()
         %EMPTYPARAMARRAY  Canonical empty parameter struct array.
             s = struct('name',{},'p0',{},'lb',{},'ub',{},'fixed',{}, ...

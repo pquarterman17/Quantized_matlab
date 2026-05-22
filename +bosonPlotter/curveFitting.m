@@ -76,19 +76,16 @@ catalog = fitting.models();
 categories = unique({catalog.category}, 'stable');
 categories = ['All', categories, 'Custom'];
 
-% Active model state (updated by dropdowns)
-activeModel = catalog(1);
-customFcn   = [];       % function handle from parseEquation
-customNames = {};       % parameter names from parseEquation
-
-% ── Workshop model (MASTERPLAN W5 #60) ─────────────────────────────────
-% CurveFitWorkshopModel owns the algorithmic state. The dialog widgets
-% remain canonical for input (uitable, dropdowns) but doCurveFit/the
-% custom-equation parser write through the model so its `result` is
-% always current. Allows scripted batch curve fits + isolation tests
-% without a GUI.
+% ── Workshop model (MASTERPLAN W5 #60 / #66 cutover) ───────────────────
+% CurveFitWorkshopModel owns ALL algorithmic state: catalog selection,
+% custom equation parse result, last fit result (with dense xFit/yFit
+% + optional bands), and the history of fit snapshots for Compare
+% Models. The dialog widgets are the canonical input surface (uitable,
+% dropdowns) but every state mutation flows through model methods so
+% the workshop is fully scriptable / testable without a GUI.
 cfModel = bosonPlotter.curveFit.CurveFitWorkshopModel();
 cfModel.bindFromDataset(ds);
+cfModel.selectModel(catalog(1).name);  % seeds modelName + params
 
 % ════════════════════════════════════════════════════════════════════════
 % Build dialog
@@ -320,16 +317,6 @@ uibutton(cfBottom2GL, 'Text', 'Sample Posterior', ...
 % Cursor state (created after axes exist; [] when cursors are off or removed)
 cfCursors = [];
 
-% State for fit results
-cfResult = struct('params', [], 'errors', [], 'model', '', ...
-    'xFit', [], 'yFit', [], 'R2', NaN, 'RMSE', NaN, ...
-    'chiSqRed', NaN, 'AIC', NaN, 'paramNames', {{}}, 'residuals', [], ...
-    'covar', [], 'nPoints', 0, 'nFree', 0, 'modelFcn', [], ...
-    'bands', []);  % bands struct from fitting.fitBands (empty until computed)
-
-% History for model comparison (stores last 5 fit snapshots)
-cfHistory = {};   % cell array of structs; newest at end
-
 % Initialise parameter table for the default model
 onCFModelChanged();
 
@@ -368,10 +355,10 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
 
         if strcmp(modelName, 'Custom Equation')
             % Custom mode: show whatever was last parsed
-            if ~isempty(customFcn) && ~isempty(customNames)
-                populateTable(customNames, zeros(1, numel(customNames)), ...
-                    repmat(-Inf, 1, numel(customNames)), ...
-                    repmat(Inf, 1, numel(customNames)));
+            if ~isempty(cfModel.customFcn) && ~isempty(cfModel.customNames)
+                populateTable(cfModel.customNames, zeros(1, numel(cfModel.customNames)), ...
+                    repmat(-Inf, 1, numel(cfModel.customNames)), ...
+                    repmat(Inf, 1, numel(cfModel.customNames)));
                 lblCFEqn.Text = efCFCustom.Value;
             else
                 tblCFParams.Data = {};
@@ -410,12 +397,12 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
         modelName = ddCFModel.Value;
 
         if strcmp(modelName, 'Custom Equation')
-            if isempty(customFcn)
+            if isempty(cfModel.customFcn)
                 error('bosonPlotter:curveFitting:noCustom', ...
                     'No custom equation parsed. Click Parse first.');
             end
-            fcn = customFcn;
-            pNames = customNames;
+            fcn = cfModel.customFcn;
+            pNames = cfModel.customNames;
         else
             idx = find(strcmp({catalog.name}, modelName), 1);
             m = catalog(idx);
@@ -512,16 +499,17 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
             return;
         end
         try
-            [customFcn, customNames] = fitting.parseEquation(eqn);
+            cfModel.setCustomEquation(eqn);
             ddCFCat.Value = 'Custom';
             ddCFModel.Items = {'Custom Equation'};
             ddCFModel.Value = 'Custom Equation';
             lblCFEqn.Text = eqn;
-            populateTable(customNames, zeros(1, numel(customNames)), ...
-                repmat(-Inf, 1, numel(customNames)), ...
-                repmat(Inf, 1, numel(customNames)));
+            names = cfModel.customNames;
+            populateTable(names, zeros(1, numel(names)), ...
+                repmat(-Inf, 1, numel(names)), ...
+                repmat(Inf, 1, numel(names)));
             options.StatusFcn(sprintf('Parsed: %d parameters (%s)', ...
-                numel(customNames), strjoin(customNames, ', ')));
+                numel(names), strjoin(names, ', ')));
         catch ME
             bosonPlotter.quietAlert(cfFig, sprintf('Parse error:\n%s', ME.message), 'Parse Error');
         end
@@ -583,14 +571,9 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
         cfFig.Pointer = 'watch'; drawnow;
         try
             % Sync dialog state into the workshop model so model.fit is
-            % the canonical entry point (testable + scriptable). The
-            % model holds its own copy of params/result; dialog widgets
-            % keep their existing data for now.
+            % the canonical entry point. The model owns params + result;
+            % dialog widgets are the input surface that writes through.
             cfModel.modelName = ddCFModel.Value;
-            if strcmp(cfModel.modelName, 'Custom Equation')
-                cfModel.customFcn   = customFcn;
-                cfModel.customNames = customNames;
-            end
             cfModel.params = bosonPlotter.curveFit.CurveFitWorkshopModel.makeParamArray(pNames);
             for pi = 1:numel(pNames)
                 cfModel.params(pi).p0         = p0(pi);
@@ -601,27 +584,12 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
             end
             res = cfModel.fit(xSeg, ySeg, w);
 
-            % Dense x grid for smooth fit curve display
+            % Dense x grid for smooth fit curve display — stored on the
+            % model so readers (Plot on Main, Bands) read from one place.
             xFit = linspace(min(xSeg), max(xSeg), 500)';
             yFit = fcn(xFit, res.params);
-
-            % Store result
-            cfResult.params     = res.params;
-            cfResult.errors     = res.errors;
-            cfResult.model      = ddCFModel.Value;
-            cfResult.xFit       = xFit;
-            cfResult.yFit       = yFit;
-            cfResult.R2         = res.R2;
-            cfResult.RMSE       = res.RMSE;
-            cfResult.chiSqRed   = res.chiSqRed;
-            cfResult.AIC        = res.AIC;
-            cfResult.paramNames = pNames;
-            cfResult.residuals  = res.residuals;
-            cfResult.covar      = res.covar;
-            cfResult.nPoints    = res.nPoints;
-            cfResult.nFree      = res.nFree;
-            cfResult.modelFcn   = fcn;
-            cfResult.bands      = [];  % cleared; recomputed by onShowBandsChanged
+            cfModel.setDenseGrid(xFit, yFit);
+            cfModel.setBands([]);  % recomputed by onShowBandsChanged
 
             % Update parameter table with fitted values and errors
             for pi = 1:numel(pNames)
@@ -663,25 +631,22 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
                 char(967), char(178), res.chiSqRed, cmpM.aic, cmpM.aicc, cmpM.bic, ...
                 res.nFree, numel(pNames), res.exitFlag);
 
-            % Push snapshot to history (keep last 5)
-            snap.model    = ddCFModel.Value;
-            snap.R2       = res.R2;
-            snap.adjR2    = cmpM.adjR2;
-            snap.aic      = cmpM.aic;
-            snap.aicc     = cmpM.aicc;
-            snap.bic      = cmpM.bic;
-            snap.rmse     = res.RMSE;
-            snap.nParams  = res.nFree;
-            snap.nPoints  = res.nPoints;
+            % Push snapshot to history (model caps at 5)
+            snap.model     = ddCFModel.Value;
+            snap.R2        = res.R2;
+            snap.adjR2     = cmpM.adjR2;
+            snap.aic       = cmpM.aic;
+            snap.aicc      = cmpM.aicc;
+            snap.bic       = cmpM.bic;
+            snap.rmse      = res.RMSE;
+            snap.nParams   = res.nFree;
+            snap.nPoints   = res.nPoints;
             snap.residuals = res.residuals;
-            cfHistory{end+1} = snap;
-            if numel(cfHistory) > 5
-                cfHistory = cfHistory(end-4:end);  % keep newest 5
-            end
+            cfModel.pushHistorySnapshot(snap);
 
             cfFig.Pointer = 'arrow';
             options.StatusFcn(sprintf('Fit: %s  R%s=%.6f', ...
-                cfResult.model, char(178), res.R2));
+                cfModel.result.model, char(178), res.R2));
         catch ME
             cfFig.Pointer = 'arrow';
             bosonPlotter.quietAlert(cfFig, sprintf('Fit failed:\n%s', ME.message), 'Error');
@@ -721,18 +686,18 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
         hold(cfAxFit, 'off');
         legend(cfAxFit, 'Location', 'best');
         title(cfAxFit, sprintf('%s  (R%s = %.6f)', ...
-            cfResult.model, char(178), cfResult.R2));
+            cfModel.result.model, char(178), cfModel.result.R2));
         cfAxFit.Box = 'on'; grid(cfAxFit, 'on');
     end
 
     function onShowBandsChanged()
     %ONSHOWBANDSCHANGED  Recompute and render bands when checkbox or level changes.
-        if isempty(cfResult.xFit), return; end
+        if isempty(cfModel.result.xFit), return; end
 
         [xSeg, ySeg] = getDataSegment();
         bands = [];
 
-        if cbShowBands.Value && ~isempty(cfResult.covar) && cfResult.nFree > 0
+        if cbShowBands.Value && ~isempty(cfModel.result.covar) && cfModel.result.nFree > 0
             levelStr = ddCFBandLevel.Value;
             switch levelStr
                 case '90%', level = 0.90;
@@ -740,54 +705,54 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
                 otherwise,  level = 0.95;
             end
             try
-                bands = fitting.fitBands(cfResult.xFit, cfResult.modelFcn, ...
-                    cfResult.params(:), cfResult.covar, ...
-                    cfResult.nPoints, cfResult.nFree, Level=level);
-                cfResult.bands = bands;
+                bands = fitting.fitBands(cfModel.result.xFit, cfModel.result.modelFcn, ...
+                    cfModel.result.params(:), cfModel.result.covar, ...
+                    cfModel.result.nPoints, cfModel.result.nFree, Level=level);
+                cfModel.setBands(bands);
             catch ME
                 options.StatusFcn(sprintf('Bands failed: %s', ME.message));
-                cfResult.bands = [];
+                cfModel.setBands([]);
             end
         else
-            cfResult.bands = [];
+            cfModel.setBands([]);
         end
 
-        renderFitAxes(xSeg, ySeg, cfResult.xFit, cfResult.yFit, cfResult.bands);
+        renderFitAxes(xSeg, ySeg, cfModel.result.xFit, cfModel.result.yFit, cfModel.result.bands);
     end
 
     function onCFPlotOnMain()
     %ONCFPLOTONMAIN  Overlay the fit curve (and optional bands) on the main axes.
-        if isempty(cfResult.xFit), return; end
+        if isempty(cfModel.result.xFit), return; end
         hold(mainAx, 'on');
 
         % CI band on main axes
-        if ~isempty(cfResult.bands) && ~all(isnan(cfResult.bands.ciLo))
-            xPatch = [cfResult.xFit; flipud(cfResult.xFit)];
+        if ~isempty(cfModel.result.bands) && ~all(isnan(cfModel.result.bands.ciLo))
+            xPatch = [cfModel.result.xFit; flipud(cfModel.result.xFit)];
             fill(mainAx, xPatch, ...
-                [cfResult.bands.ciLo; flipud(cfResult.bands.ciHi)], ...
+                [cfModel.result.bands.ciLo; flipud(cfModel.result.bands.ciHi)], ...
                 [0.2 0.5 0.9], 'FaceAlpha', 0.22, 'EdgeColor', 'none', ...
-                'DisplayName', sprintf('%.0f%% CI', cfResult.bands.level*100), ...
+                'DisplayName', sprintf('%.0f%% CI', cfModel.result.bands.level*100), ...
                 'HandleVisibility', 'on', 'Tag', 'curveFitBandCI');
         end
 
         % PI band on main axes
-        if ~isempty(cfResult.bands) && ~all(isnan(cfResult.bands.piLo))
-            xPatch = [cfResult.xFit; flipud(cfResult.xFit)];
+        if ~isempty(cfModel.result.bands) && ~all(isnan(cfModel.result.bands.piLo))
+            xPatch = [cfModel.result.xFit; flipud(cfModel.result.xFit)];
             fill(mainAx, xPatch, ...
-                [cfResult.bands.piLo; flipud(cfResult.bands.piHi)], ...
+                [cfModel.result.bands.piLo; flipud(cfModel.result.bands.piHi)], ...
                 [0.6 0.8 1.0], 'FaceAlpha', 0.15, 'EdgeColor', 'none', ...
-                'DisplayName', sprintf('%.0f%% PI', cfResult.bands.level*100), ...
+                'DisplayName', sprintf('%.0f%% PI', cfModel.result.bands.level*100), ...
                 'HandleVisibility', 'on', 'Tag', 'curveFitBandPI');
         end
 
-        plot(mainAx, cfResult.xFit, cfResult.yFit, 'r-', 'LineWidth', 1.5, ...
+        plot(mainAx, cfModel.result.xFit, cfModel.result.yFit, 'r-', 'LineWidth', 1.5, ...
             'DisplayName', sprintf('%s fit (R%s=%.4f)', ...
-                cfResult.model, char(178), cfResult.R2), ...
+                cfModel.result.model, char(178), cfModel.result.R2), ...
             'HandleVisibility', 'on', 'Tag', 'curveFitOverlay');
         hold(mainAx, 'off');
         % Add full fit results text box (parameters + errors + metrics)
         delete(findobj(mainAx, 'Tag', 'curveFitLabel'));
-        resultsTxt = bosonPlotter.formatFitResultsText(cfResult);
+        resultsTxt = bosonPlotter.formatFitResultsText(cfModel.result);
         text(mainAx, 0.02, 0.95, resultsTxt, ...
             'Units', 'normalized', 'FontSize', 8, 'FontName', 'FixedWidth', ...
             'Color', [0.1 0.1 0.1], 'BackgroundColor', [1 1 1 0.85], ...
@@ -795,19 +760,19 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
             'VerticalAlignment', 'top', ...
             'HandleVisibility', 'off', 'Tag', 'curveFitLabel');
         options.StatusFcn(sprintf('Fit overlaid: %s (R%s=%.6f)', ...
-            cfResult.model, char(178), cfResult.R2));
+            cfModel.result.model, char(178), cfModel.result.R2));
     end
 
     function onCFDiagnostics()
     %ONCFDIAGNOSTICS  Open residual diagnostics window for the last fit.
-        if isempty(cfResult.residuals)
+        if isempty(cfModel.result.residuals)
             bosonPlotter.quietAlert(cfFig, 'Run a fit first.', 'Diagnostics');
             return
         end
 
-        d = fitting.residualDiagnostics(cfResult.residuals);
+        d = fitting.residualDiagnostics(cfModel.result.residuals);
 
-        diagFig = figure('Name', sprintf('Residual Diagnostics — %s', cfResult.model), ...
+        diagFig = figure('Name', sprintf('Residual Diagnostics — %s', cfModel.result.model), ...
             'NumberTitle', 'off', 'Color', [1 1 1], ...
             'Position', [250 120 820 600]);
 
@@ -826,18 +791,18 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
         % ── Subplot 2: Residuals vs X (data-point order) ────────────
         ax2 = subplot(2, 2, 2, 'Parent', diagFig);
         [xSeg, ~] = getDataSegment();
-        plot(ax2, xSeg, cfResult.residuals, 'b.', 'MarkerSize', 5);
+        plot(ax2, xSeg, cfModel.result.residuals, 'b.', 'MarkerSize', 5);
         hold(ax2, 'on');
         yline(ax2, 0, 'r--');
         hold(ax2, 'off');
         xlabel(ax2, 'X (data points)');
         ylabel(ax2, 'Residual');
-        title(ax2, sprintf('Residuals vs X  (RMSE = %.4g)', cfResult.RMSE));
+        title(ax2, sprintf('Residuals vs X  (RMSE = %.4g)', cfModel.result.RMSE));
         grid(ax2, 'on'); box(ax2, 'on');
 
         % ── Subplot 3: Residuals vs order, runs colour-coded ─────────
         ax3 = subplot(2, 2, 3, 'Parent', diagFig);
-        r = cfResult.residuals;
+        r = cfModel.result.residuals;
         nR = numel(r);
         hold(ax3, 'on');
         % Compute run membership
@@ -877,21 +842,21 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
 
     function onCFCopyResults()
     %ONCFCOPYRESULTS  Copy fit parameters, errors, and statistics to clipboard.
-        if isnan(cfResult.R2), return; end
+        if isnan(cfModel.result.R2), return; end
         lines = {};
-        lines{end+1} = sprintf('Model: %s', cfResult.model);
-        lines{end+1} = sprintf('R² = %.8f', cfResult.R2);
-        lines{end+1} = sprintf('RMSE = %.6g', cfResult.RMSE);
-        lines{end+1} = sprintf('χ²_red = %.6g', cfResult.chiSqRed);
-        lines{end+1} = sprintf('AIC = %.2f', cfResult.AIC);
+        lines{end+1} = sprintf('Model: %s', cfModel.result.model);
+        lines{end+1} = sprintf('R² = %.8f', cfModel.result.R2);
+        lines{end+1} = sprintf('RMSE = %.6g', cfModel.result.RMSE);
+        lines{end+1} = sprintf('χ²_red = %.6g', cfModel.result.chiSqRed);
+        lines{end+1} = sprintf('AIC = %.2f', cfModel.result.AIC);
         lines{end+1} = 'Parameters:';
-        for pi = 1:numel(cfResult.paramNames)
-            if isfinite(cfResult.errors(pi))
+        for pi = 1:numel(cfModel.result.paramNames)
+            if isfinite(cfModel.result.errors(pi))
                 lines{end+1} = sprintf('  %s = %.8g ± %.4g', ...
-                    cfResult.paramNames{pi}, cfResult.params(pi), cfResult.errors(pi)); %#ok<AGROW>
+                    cfModel.result.paramNames{pi}, cfModel.result.params(pi), cfModel.result.errors(pi)); %#ok<AGROW>
             else
                 lines{end+1} = sprintf('  %s = %.8g', ...
-                    cfResult.paramNames{pi}, cfResult.params(pi)); %#ok<AGROW>
+                    cfModel.result.paramNames{pi}, cfModel.result.params(pi)); %#ok<AGROW>
             end
         end
         clipboard('copy', strjoin(lines, newline));
@@ -983,13 +948,13 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
     %ONCOMPAREMODELS  Open a figure showing a comparison table of stored fits.
     %   Highlights the best model (lowest AIC).
     %   If exactly 2 models are in history, also shows F-test result.
-        if isempty(cfHistory)
+        if isempty(cfModel.history)
             bosonPlotter.quietAlert(cfFig, 'No fit history yet. Run at least one fit first.', ...
                 'Compare Models');
             return;
         end
 
-        nH = numel(cfHistory);
+        nH = numel(cfModel.history);
 
         % ── Build table data ──────────────────────────────────────────
         colNames = {'#', 'Model', 'R²', 'adj-R²', 'AIC', 'AICc', 'BIC', ...
@@ -997,7 +962,7 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
         tData = cell(nH, numel(colNames));
         aicVals = zeros(1, nH);
         for hi = 1:nH
-            s = cfHistory{hi};
+            s = cfModel.history{hi};
             aicVals(hi) = s.aic;
             tData{hi,1}  = hi;
             tData{hi,2}  = s.model;
@@ -1019,8 +984,8 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
         % ── F-test between 2 models (if exactly 2 in history) ─────────
         fLine = '';
         if nH == 2
-            s1 = cfHistory{1};
-            s2 = cfHistory{2};
+            s1 = cfModel.history{1};
+            s2 = cfModel.history{2};
             % Compare the model with more params against the simpler one
             if s1.nParams ~= s2.nParams && s1.nPoints == s2.nPoints
                 if s1.nParams > s2.nParams
@@ -1099,7 +1064,7 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
             'FaceColor', [0.85 1.0 0.85], 'EdgeColor', [0 0.5 0]);
         annotation(cmpFig, 'textbox', [0.17, 0.12, 0.80, 0.05], ...
             'String', sprintf('Best model by AIC: #%d (%s)', bestIdx, ...
-                cfHistory{bestIdx}.model), ...
+                cfModel.history{bestIdx}.model), ...
             'EdgeColor', 'none', 'FontSize', 9, 'FitBoxToText', 'on');
 
         % F-test line (if available)
@@ -1111,7 +1076,7 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
         end
 
         options.StatusFcn(sprintf('Model comparison: %d fits — best by AIC: %s', ...
-            nH, cfHistory{bestIdx}.model));
+            nH, cfModel.history{bestIdx}.model));
     end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -1452,13 +1417,13 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
 
     function onCFMCMCSample()
     %ONCFMCMCSAMPLE  Sample the posterior around the current fit.
-    %   Requires a successful fit first (cfResult must be populated).
+    %   Requires a successful fit first (cfModel.result must be populated).
     %   Uses a Gaussian likelihood with σ² = RMSE²  and a flat prior
     %   inside the table's [Lower, Upper] box. Samples in whitened
     %   coordinates so mcmcSample's scalar StepSize can handle
     %   heterogeneous parameter scales. Displays a corner plot of the
     %   free (unfixed) parameters.
-        if isempty(cfResult.params) || isempty(cfResult.modelFcn)
+        if isempty(cfModel.result.params) || isempty(cfModel.result.modelFcn)
             bosonPlotter.quietAlert(cfFig, 'Run Fit first — MCMC samples around the current best fit.', ...
                 'Sample Posterior');
             return;
@@ -1489,7 +1454,7 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
             return;
         end
 
-        pBest = cfResult.params(:)';
+        pBest = cfModel.result.params(:)';
         nP    = numel(pBest);
         if numel(pNames) ~= nP || numel(lb) ~= nP || numel(ub) ~= nP
             bosonPlotter.quietAlert(cfFig, ...
@@ -1506,7 +1471,7 @@ cfFig.CloseRequestFcn = @(~,~) onCFClose();
         end
 
         % Noise level from fit residuals (profile-likelihood fixed-σ approx)
-        sigma2 = max(var(cfResult.residuals), eps);
+        sigma2 = max(var(cfModel.result.residuals), eps);
         if sigma2 == 0, sigma2 = eps; end
 
         scaleVec = zeros(1, nP);

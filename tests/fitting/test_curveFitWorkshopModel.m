@@ -153,6 +153,103 @@ catch ex
 end
 
 % ════════════════════════════════════════════════════════════════════
+%  HISTORY — pushHistorySnapshot caps at 5
+% ════════════════════════════════════════════════════════════════════
+fprintf('\n--- pushHistorySnapshot caps history at 5 newest ---\n');
+try
+    m = bosonPlotter.curveFit.CurveFitWorkshopModel();
+    assert(isempty(m.history), 'history starts empty');
+    for k = 1:7
+        m.pushHistorySnapshot(struct('tag', k, 'R2', 0.5 + k/100));
+    end
+    assert(numel(m.history) == 5, sprintf('expected 5 entries; got %d', numel(m.history)));
+    tags = cellfun(@(s) s.tag, m.history);
+    assert(isequal(tags, 3:7), sprintf('expected tags 3:7 (newest 5); got %s', mat2str(tags)));
+    m.clearHistory();
+    assert(isempty(m.history), 'clearHistory empties');
+    fprintf('  PASS: 7 pushed, kept newest 5 (tags 3..7), clearHistory works\n');
+    passed = passed + 1;
+catch ex
+    fprintf('  FAIL: %s\n', ex.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════
+%  BINDFROMDATASET — legacy-shaped params normalized (contract rule #1)
+% ════════════════════════════════════════════════════════════════════
+fprintf('\n--- bindFromDataset normalizes pre-set legacy params ---\n');
+try
+    m = bosonPlotter.curveFit.CurveFitWorkshopModel();
+    % Simulate a session loader feeding legacy 6-field params before bind:
+    m.params = struct('name', {'A', 'mu'}, 'p0', {1, 0}, ...
+        'lb', {-Inf, -Inf}, 'ub', {Inf, Inf}, ...
+        'fixed', {false, false}, 'constraint', {'', ''});
+    % Build a minimal dataset shape the dialog feeds to bindFromDataset:
+    ds = struct('corrData', [], 'data', ...
+        struct('time', (1:10)', 'values', (1:10)', 'labels', {{'y'}}));
+    m.bindFromDataset(ds);
+    assert(isfield(m.params, 'fitted') && isfield(m.params, 'fittedErr'), ...
+        'bindFromDataset must normalize legacy 6-field params to 8-field');
+    assert(numel(m.params) == 2, 'preserves param length');
+    assert(strcmp(m.params(1).name, 'A'), 'preserves existing fields');
+    assert(isnan(m.params(1).fitted), 'fitted defaults to NaN');
+    fprintf('  PASS: legacy 6-field params upgraded by bindFromDataset\n');
+    passed = passed + 1;
+catch ex
+    fprintf('  FAIL: %s\n', ex.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════
+%  EMPTYRESULT — result has all dialog-readable fields after bind
+% ════════════════════════════════════════════════════════════════════
+fprintf('\n--- bindFromDataset seeds result with all expected fields ---\n');
+try
+    m = bosonPlotter.curveFit.CurveFitWorkshopModel();
+    ds = struct('corrData', [], 'data', ...
+        struct('time', (1:5)', 'values', (1:5)', 'labels', {{'y'}}));
+    m.bindFromDataset(ds);
+    needed = {'params','errors','model','xFit','yFit','R2','RMSE', ...
+        'chiSqRed','AIC','paramNames','residuals','covar', ...
+        'nPoints','nFree','modelFcn','bands'};
+    missing = needed(~ismember(needed, fieldnames(m.result)));
+    assert(isempty(missing), sprintf('result missing fields: %s', strjoin(missing, ', ')));
+    assert(~m.hasResult(), 'hasResult false until fit runs');
+    fprintf('  PASS: %d expected result fields present, hasResult=false\n', numel(needed));
+    passed = passed + 1;
+catch ex
+    fprintf('  FAIL: %s\n', ex.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════
+%  SETDENSEGRID / SETBANDS — dialog-side state on the model
+% ════════════════════════════════════════════════════════════════════
+fprintf('\n--- setDenseGrid / setBands store dialog state on the model ---\n');
+try
+    m = bosonPlotter.curveFit.CurveFitWorkshopModel();
+    m.selectModel('Gaussian');
+    x = linspace(-2, 2, 50)';
+    y = exp(-x.^2);
+    m.autoGuess(x, y);
+    m.fit(x, y);
+
+    xFit = linspace(-2, 2, 200)';
+    yFit = exp(-xFit.^2);
+    m.setDenseGrid(xFit, yFit);
+    assert(numel(m.result.xFit) == 200, 'xFit stored');
+    assert(numel(m.result.yFit) == 200, 'yFit stored');
+
+    fakeBands = struct('ciLo', yFit-0.1, 'ciHi', yFit+0.1, ...
+                       'piLo', yFit-0.2, 'piHi', yFit+0.2, 'level', 0.95);
+    m.setBands(fakeBands);
+    assert(isstruct(m.result.bands) && m.result.bands.level == 0.95, 'bands stored');
+    m.setBands([]);
+    assert(isempty(m.result.bands), 'bands cleared');
+    fprintf('  PASS: setDenseGrid + setBands round-trip\n');
+    passed = passed + 1;
+catch ex
+    fprintf('  FAIL: %s\n', ex.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════
 %  Summary
 % ════════════════════════════════════════════════════════════════════
 fprintf('\n=== test_curveFitWorkshopModel: %d passed, %d failed ===\n', passed, failed);
