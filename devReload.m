@@ -11,7 +11,7 @@ function devReload(guiName)
 %       devReload                 % default: DiraCulator
 %       devReload DiraCulator
 %       devReload BosonPlotter
-%       devReload FermiViewer
+%       devReload DataWorkspace
 %
 %   Equivalent one-liner:
 %       close all force; clear DiraCulator; DiraCulator
@@ -23,8 +23,8 @@ function devReload(guiName)
 %   corrupted — devReload is the right first step for 99% of edits.
 %
 %   Known GUIs in this toolbox:
-%       DiraCulator, BosonPlotter, FermiViewer, DataWorkspace,
-%       xrdConvertGUI
+%       DiraCulator, BosonPlotter, DataWorkspace, xrdConvertGUI
+%       (FermiViewer moved to fermi-viewer repo)
 
     arguments
         guiName (1,:) char = 'DiraCulator'
