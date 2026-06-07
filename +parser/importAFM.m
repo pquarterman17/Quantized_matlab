@@ -58,7 +58,7 @@ function data = importAFM(filepath, options)
 %   Bruker NanoScope V5+ (.spm) and numbered exports (.000, .001, ...).
 %   Files must begin with '\*Force file list' or '\*File list' header.
 %
-%   See also parser.createDataStruct, imaging.planeLevel, imaging.surfaceRoughness
+%   See also parser.createDataStruct
 
     arguments
         filepath              (1,1) string {mustBeFile}

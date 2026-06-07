@@ -166,7 +166,7 @@ function tf = isNeutralButtonColor(rgb)
 %ISNEUTRALBUTTONCOLOR  True if rgb is one of the "tool" / default greys.
 %  We re-theme buttons whose BackgroundColor matches either the dark or
 %  the light "tool" colour from uxTokens, plus the legacy neutral greys
-%  and the surface colours that other GUIs (FermiViewer / DiraCulator)
+%  and the surface colours that other GUIs (DiraCulator / DataWorkspace)
 %  may have leaked as the global widget default in this MATLAB session.
 %  Without the latter, buttons constructed AFTER a sibling GUI was opened
 %  end up with that GUI's figure colour and never repaint on theme swap.
@@ -178,7 +178,7 @@ function tf = isNeutralButtonColor(rgb)
         0.25 0.25 0.28;   % legacy dark grey
         0.18 0.18 0.18;   % uxTokens dark bgPanel (section-header buttons)
         0.97 0.97 0.97;   % uxTokens light bgPanel
-        0.13 0.13 0.13;   % uxTokens dark bgFigure (FermiViewer leak)
+        0.13 0.13 0.13;   % uxTokens dark bgFigure (legacy leak from FermiViewer split)
         0.16 0.16 0.16];  % older dark bg used in some legacy spots
     tol = 0.05;
     tf = any(all(abs(refs - rgb) < tol, 2));

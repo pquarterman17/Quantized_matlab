@@ -92,26 +92,12 @@ function result = resolveParser(filepath)
                     filepath);
             end
 
-        case {'.tif', '.tiff'}
-            result.name = 'importTIFF';
-
-        case {'.jpg', '.jpeg', '.png', '.bmp', '.gif'}
-            result.name = 'importImage';
-
-        case '.bcf'
-            result.name = 'importBCF';
-
-        case '.dm3'
-            result.name = 'importDM3';
-
-        case '.dm4'
-            result.name = 'importDM4';
-
-        case '.ser'
-            result.name = 'importSER';
-
-        case {'.mrc', '.mrcs'}
-            result.name = 'importMRC';
+        case {'.tif', '.tiff', '.jpg', '.jpeg', '.png', '.bmp', '.gif', ...
+              '.bcf', '.dm3', '.dm4', '.ser', '.mrc', '.mrcs'}
+            error('parser:resolveParser:movedToFermiViewer', ...
+                ['Electron-microscopy formats (%s) moved to fermi-viewer:\n' ...
+                 '  https://github.com/pquarterman17/fermi-viewer\n' ...
+                 'Install fermi-viewer and use FermiViewer / parser.importAuto there.'], ext);
 
         case {'.spm', '.000', '.001', '.002', '.003'}
             result.name = 'importAFM';
@@ -167,12 +153,12 @@ function result = resolveParser(filepath)
         otherwise
             error('parser:resolveParser:unknownExtension', ...
                 ['No parser registered for extension "%s".\n' ...
-                 'Supported: .xrdml, .brml, .raw, .tif/.tiff, ' ...
-                 '.jpg/.jpeg/.png/.bmp/.gif, .bcf, .dm3/.dm4, ' ...
-                 '.ser, .mrc/.mrcs, .spm/.000/.001 (AFM), ' ...
+                 'Supported: .xrdml, .brml, .raw, ' ...
+                 '.spm/.000/.001 (AFM), ' ...
                  '.xlsx/.xls/.xlsm/.xlsb/.ods, .csv/.tsv/.txt, ' ...
                  '.refl, .pnr, .datA/B/C/D, .dat\n' ...
-                 'For headerless binary images use parser.importRawImage directly.'], ext);
+                 'EM formats (.tif/.dm3/.dm4/.ser/.mrc/.bcf/...) live in ' ...
+                 'fermi-viewer: https://github.com/pquarterman17/fermi-viewer'], ext);
     end
 end
 

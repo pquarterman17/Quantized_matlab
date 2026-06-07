@@ -2,7 +2,7 @@ function out = generateExtraction(filePath, startLine, endLine, functionName, op
 % Generate complete extraction artifacts: build function + caller replacement.
 %
 %   out = scripts.generateExtraction('BosonPlotter.m', 1042, 1165, 'buildAxesContextMenu')
-%   out = scripts.generateExtraction('FermiViewer.m', 500, 800, 'buildAnnotationsPanel', Package="+emViewer")
+%   out = scripts.generateExtraction('BosonPlotter.m', 500, 800, 'buildPanel', Package="+bosonPlotter")
 %
 % Writes to disk:
 %   +bosonPlotter/<functionName>.m   (the extracted function)

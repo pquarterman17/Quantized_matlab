@@ -2,7 +2,7 @@ function plan = extractionPlan(filePath, opts)
 % Scan a MATLAB file for extractable UI-construction blocks and rank them.
 %
 %   plan = scripts.extractionPlan('BosonPlotter.m')
-%   plan = scripts.extractionPlan('FermiViewer.m', MinLines=30)
+%   plan = scripts.extractionPlan('BosonPlotter.m', MinLines=30)
 %
 % Finds contiguous regions of widget creation, groups them by parent
 % layout container, and ranks by line count (biggest wins first).
