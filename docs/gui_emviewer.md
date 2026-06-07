@@ -1,5 +1,7 @@
 # FermiViewer — Detailed Feature Reference
 
+> **⚠️ No longer maintained here.** FermiViewer development has moved to the standalone [fermi-viewer](https://github.com/pquarterman17/fermi-viewer) repository (split 2026-05-22). The copy in quantized_matlab is a frozen working fallback — bug fixes only. New features and up-to-date documentation live in the fermi-viewer repo.
+
 > Extracted from CLAUDE.md. For core conventions and quick-start workflows, see the main [CLAUDE.md](../CLAUDE.md).
 
 ## Usage

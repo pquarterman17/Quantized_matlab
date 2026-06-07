@@ -1,5 +1,7 @@
 # +imaging/ — EM Image Processing Utilities
 
+> **⚠️ No longer maintained here.** EM tooling development has moved to the standalone [fermi-viewer](https://github.com/pquarterman17/fermi-viewer) repository (split 2026-05-22). This package is a frozen working fallback — bug fixes only. New features go in the fermi-viewer repo.
+
 No external toolboxes required. All functions use MATLAB built-ins.
 
 ## Core Image Processing

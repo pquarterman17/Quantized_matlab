@@ -1,5 +1,7 @@
 # +emViewer/ — Extracted FermiViewer Subsystems
 
+> **⚠️ No longer maintained here.** FermiViewer development has moved to the standalone [fermi-viewer](https://github.com/pquarterman17/fermi-viewer) repository (split 2026-05-22). This package is a frozen working fallback — bug fixes only. New features go in the fermi-viewer repo.
+
 Extracted package functions that implement FermiViewer's core logic. Each function
 takes `(action, appData, ctx/fig/cb, varargin)` and returns updated `appData`.
 The parent `FermiViewer.m` builds context structs and delegates here.

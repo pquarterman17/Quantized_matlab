@@ -12,7 +12,7 @@ quantized_matlab/
 ├── BosonPlotter.m             # Main GUI: browse, preview, correct, peaks, export
 ├── xrdConvertGUI.m           # Batch XRD file converter GUI
 ├── DiraCulator.m              # Materials property calculator (18 panels)
-├── FermiViewer.m             # Electron microscopy image viewer
+├── FermiViewer.m             # EM image viewer (frozen — moved to fermi-viewer repo)
 ├── runAllTests.m             # Master test runner (see Testing section)
 ├── tests/                    # Test suites organized by domain
 │   ├── parser/               # Parser smoke tests, edge cases, round-trip
@@ -184,7 +184,7 @@ BosonPlotter uses `+bosonPlotter/uxTokens.m` as the single colour-token source; 
 - Peak Analysis window: see [docs/gui_bosonplotter.md](docs/gui_bosonplotter.md)
 
 ### BosonPlotter & FermiViewer — where new code goes
-MASTERPLAN W5 #68 (BosonPlotter) and #69 (FermiViewer) target each file under **6,000 lines**. Without a policy, new features tend to land inside the monolith as fast as extractions pull lines out and the target never arrives. Rule for any new BosonPlotter or FermiViewer code:
+MASTERPLAN W5 #68 (BosonPlotter) and #69 (FermiViewer) target each file under **6,000 lines**. Without a policy, new features tend to land inside the monolith as fast as extractions pull lines out and the target never arrives. (FermiViewer note: new EM *features* belong in the [fermi-viewer](https://github.com/pquarterman17/fermi-viewer) repo — the rules below apply to bug fixes on the fallback copy here.) Rule for any new BosonPlotter or FermiViewer code:
 
 - **Default to `+bosonPlotter/<feature>.m`** (or `+emViewer/<feature>.m` for FermiViewer) — implement the feature as a public package function that takes the handles/state it needs (typically the `ui` struct + callback structs like `corrCb_`, `ptCb_`, `anaCb_`). Call it from a minimal nested dispatcher in the parent file.
 - **Do not add new nested functions to `BosonPlotter.m` or `FermiViewer.m`** unless they are one- or two-liners that merely forward to a package helper. The legacy nested-function pattern is closed for new code.
@@ -213,6 +213,7 @@ MASTERPLAN W5 #68 (BosonPlotter) and #69 (FermiViewer) target each file under **
 - **History entries:** stored as `{timestamp, tabKey, description, latexStr, matlabCall}` (5-element cell). `matlabCall` is empty for tabs that don't generate reproducible single-line calls (Magnetic, Thermal, Diffusion). Consumers must guard with `numel(e) >= 5`.
 
 ### FermiViewer
+- **⚠️ No longer maintained here.** Development moved to the standalone [fermi-viewer](https://github.com/pquarterman17/fermi-viewer) repo (split 2026-05-22). The copy in this repo (`FermiViewer.m`, `+emViewer/`, `+imaging/`, EM parsers/tests) is kept as a working fallback while fermi-viewer is in alpha — bug fixes only. **New EM features go in the fermi-viewer repo**, not here.
 - Image pipeline: `rawPixels` → `filteredPixels` → `displayImg`
 - Enable/disable triad: `displayImage()`, `clearDisplay()`, `setToolsEnabled()`
 - `undoPush()` inside `try` blocks only — prevents phantom undo on failure
