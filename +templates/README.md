@@ -10,7 +10,7 @@ user fix it once and reuse the fix automatically for similar files.
 +templates/
 ├── TemplateEngine.m    — Static class: load, save, match, apply, fingerprint
 ├── ColumnMapper.m      — Modal GUI for tabular column role/label/unit overrides
-├── MetadataEditor.m    — Modal GUI for image metadata overrides (FermiViewer)
+├── MetadataEditor.m    — Modal GUI for image metadata overrides
 ├── defaults/           — Shipped JSON templates (read-only)
 └── README.md
 ```

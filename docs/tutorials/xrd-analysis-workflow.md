@@ -354,7 +354,7 @@ xlabel('2\theta (deg)'); ylabel('Intensity (cps)');
 title(sprintf('Overlay: %s reference reflections', matches(1).phaseName));
 ```
 
-**Important: do not confuse `calc.crystal.matchPhases` with `imaging.simulateDiffraction`.** The latter generates 2D *electron* diffraction spot patterns from a zone axis (for use with TEM data in FermiViewer), not 1D powder XRD intensities. For powder simulation use `calc.crystal.planeSpacings` to enumerate reflections, then weight by multiplicity and Lorentz-polarisation if you need synthetic patterns:
+**For powder simulation** use `calc.crystal.planeSpacings` to enumerate reflections, then weight by multiplicity and Lorentz-polarisation if you need synthetic patterns. (Electron-diffraction spot-pattern simulation from a zone axis is a [fermi-viewer](https://github.com/pquarterman17/fermi-viewer) feature, not a 1D powder tool.)
 
 ```matlab
 % Reference reflections for FCC Si (a = 5.431 Å)

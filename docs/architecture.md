@@ -6,27 +6,31 @@
 ## System Overview
 
 ```
-                    ┌──────────────┐
-                    │  User / CLI  │
-                    └──────┬───────┘
-                           │
-              ┌────────────┼────────────┐
-              │            │            │
-    ┌─────────▼──┐  ┌──────▼─────┐  ┌──▼──────────┐
-    │ BosonPlotter │  │ FermiViewer│  │ DiraCulator  │
-    │   (main)    │  │  (EM imgs) │  │    (calc)    │
-    └──────┬──────┘  └─────┬──────┘  └──────┬──────┘
-           │               │               │
-    ┌──────▼──────┐  ┌─────▼──────┐  ┌──────▼──────┐
-    │ +bosonPlotter│  │ +emViewer/  │  │   +calc/    │
-    │ (extracted) │  │ (extracted) │  │             │
-    └──────┬──────┘  └─────┬──────┘  └──────┬──────┘
-           │               │               │
-    ┌──────▼──────────────▼────────────────▼──────┐
-    │           +parser/  +utilities/  +scripts/   │
-    │              (shared data layer)             │
-    └──────────────────────────────────────────────┘
+                ┌──────────────┐
+                │  User / CLI  │
+                └──────┬───────┘
+                       │
+              ┌────────┴────────┐
+              │                 │
+    ┌─────────▼───┐      ┌─────▼────────┐
+    │ BosonPlotter │      │ DiraCulator  │
+    │   (main)    │      │    (calc)    │
+    └──────┬──────┘      └──────┬───────┘
+           │                    │
+    ┌──────▼──────┐      ┌──────▼──────┐
+    │ +bosonPlotter│      │   +calc/    │
+    │ (extracted) │      │             │
+    └──────┬──────┘      └──────┬──────┘
+           │                    │
+    ┌──────▼────────────────────▼──────┐
+    │  +parser/  +utilities/  +scripts/ │
+    │       (shared data layer)        │
+    └──────────────────────────────────┘
 ```
+
+> Electron-microscopy tooling (FermiViewer, `+emViewer/`, `+imaging/`) lives in
+> the separate [fermi-viewer](https://github.com/pquarterman17/fermi-viewer)
+> repository and has its own architecture doc there.
 
 ## Data Flow: Import → Correct → Plot
 
@@ -59,9 +63,6 @@
      │        │
      │        ▼
      │    bosonPlotter.renderPlot(ax) ← renders to plot
-     │
-     ├──► FermiViewer loads as image
-     │        rawPixels → filteredPixels → displayImg
      │
      └──► scripts.batchImport / scripts.quickPlot
 ```
@@ -219,80 +220,22 @@ The package contains 37 files. Below is the full function index grouped by area.
 | `datasetGroups.m` | Dataset grouping logic (group-by, batch operations) |
 | `filterRows.m` | Row-level data masking and filter application |
 
-## FermiViewer Image Pipeline
+## Accept-and-return pattern (closure mutation fix)
 
-```
-loadImages()
-    │
-    ▼
-rawPixels ← imread / parser.importTIFF / parser.importDM3
-    │
-    ▼
-filteredPixels ← rawPixels after filters (gaussian, median, CLAHE, FFT mask)
-    │         Filters are destructive: each modifies filteredPixels in-place.
-    │         undoPush() saves state before each filter.
-    │
-    ▼
-displayImg ← adjustContrast(filteredPixels, low, high)
-    │         Normalized to [0,1] double for display.
-    │
-    ▼
-imagesc(ax, displayImg) ← rendered to axes
-    │
-    ├── Scale bar overlay (imaging.addScaleBar)
-    ├── Measurement overlays (line profile, distance, angle)
-    └── Annotation text
-```
-
-### Key patterns:
-- **Enable/disable triad**: When adding new buttons, update `displayImage()`, `clearDisplay()`, and `setToolsEnabled()`.
-- **Undo**: `undoPush()` called **inside** try blocks, not before. Cap 5 entries.
-- **Capture modes**: `appData.captureMode` gates mouse click behavior.
-- **FFT masking**: Uses `ButtonDownFcn` on axes, not `ginput()`.
-
-## Extracted Subsystems (+emViewer/)
-
-FermiViewer's logic is extracted to `+emViewer/` (47 files). The orchestrator
-builds context structs and delegates; package functions return modified appData.
-
-```
-FermiViewer.m (6,082 lines — orchestrator + closure state)
-    │
-    ├── ctx = struct(fig, ax, sliders, callbacks...)
-    │
-    └── appData = emViewer.<module>(action, appData, ctx, ...)
-```
-
-### Accept-and-return pattern (closure mutation fix)
-
-MATLAB structs are value-type: extracted functions hold local copies. Callbacks
-that modify appData in the closure (rebuildScaleBar, refreshDisplay) must accept
-and return appData so the caller's copy stays current:
+MATLAB structs are value-type: extracted package functions hold local copies of
+`appData`. Callbacks that modify appData in the orchestrator's closure must
+accept and return appData so the caller's copy stays current:
 
 ```matlab
-% WRONG — closure's scale bar updates lost when filterOps returns its stale copy
+% WRONG — closure's updates lost when the package fn returns its stale copy
 cb.refreshDisplay();
 
 % CORRECT — state flows back through the return value
 appData = cb.refreshDisplay(appData);
 ```
 
-For `displayImage.m`, the `closureReturn_` bridge provides:
-- `pushAppData(appData)` — write local state TO closure before callbacks fire
-- `pullAppData()` — read closure state back after callbacks modify it
-
-### Module groups (see `+emViewer/README.md` for full index)
-
-| Area | Key modules |
-|------|-------------|
-| Display | `displayImage`, `displayHelpers`, `displayStackFrame`, `clearDisplay` |
-| Processing | `filterOps`, `processActions`, `rotateFlip`, `contrastOps` |
-| Interaction | `mouseOps`, `measInteract`, `measExecute`, `captureDispatch` |
-| UI build | `buildToolbar`, `buildContrastPanel`, `buildEDSPanel`, `buildEELSPanel` |
-| Scale bar | `scaleBarOps`, `applyScaleBarPos`, `snapScaleBarPos` |
-| Session | `sessionOps`, `onKeyPress`, `export` |
-| Compare | `compareImage`, `compareDispatch` |
-| Domain | `onDiffractionAction`, `onAnnotationAction`, `applyColorChannel` |
+This applies to every `+bosonPlotter/` extraction that receives callback structs
+(`corrCb_`, `ptCb_`, `anaCb_`) wrapping closure functions that mutate appData.
 
 ## Testing Architecture
 
@@ -302,7 +245,6 @@ Tests are organized into subdirectories under `tests/`:
 tests/
 ├── parser/     — parser smoke tests, edge cases, round-trip, SIMS, 2D XRDML
 ├── gui/        — BosonPlotter headless API tests, contour, materials calc
-├── imaging/    — EM parsers, imaging utils, EM GUI, EDS, EELS, diffraction
 ├── calc/       — calculator module tests (xray, superconductor, CIF, optics, ...)
 └── batch/      — batch import and XRD converter tests
 ```
@@ -316,12 +258,9 @@ tests/
 +utilities/ ← standalone
 +plotting/ ← depends on +styles/
 +styles/ ← standalone
-+imaging/ ← standalone
 +calc/ ← standalone
 +scripts/ ← depends on +parser/, +utilities/
 +bosonPlotter/ ← depends on +parser/, +utilities/
-+emViewer/ ← depends on +imaging/, +parser/
 BosonPlotter.m ← depends on all packages
-FermiViewer.m ← depends on +emViewer/, +parser/, +imaging/
 DiraCulator.m ← depends on +calc/
 ```

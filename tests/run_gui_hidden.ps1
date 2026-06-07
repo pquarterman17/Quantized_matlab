@@ -3,7 +3,7 @@
 #   group defaults to "gui" if omitted.
 #
 # Sets QUANTIZED_MATLAB_HEADLESS=1 for the MATLAB child process. Every GUI
-# launcher (FermiViewer, BosonPlotter, DiraCulator, DataWorkspace) detects
+# launcher (BosonPlotter, DiraCulator, DataWorkspace) detects
 # this via bosonPlotter.isHeadless() and defaults Visible='off'.
 # tests/shadows/ is added to the MATLAB path so that bare uialert() /
 # uiconfirm() calls in source files are intercepted by the path-shadow files
