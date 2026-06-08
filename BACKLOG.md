@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-05-22 (fermi-viewer split: W1 #1 + W5 #28/#65/#69 moved to the new [fermi-viewer](https://github.com/pquarterman17/fermi-viewer) repo. Previous: 2026-05-21 #66 + #67 dialog cutovers shipped.)
+**Last regenerated:** 2026-06-07 (FermiViewer scrub finalized — all EM code deleted from qm, FV plans archived. MASTERPLAN #45 (+imaging docstrings) moved to fv. Added previously-missing sections for the three BosonPlotter plans created in May: ui-construction-extraction, ux-cleanup, smoke-testing. Previous: 2026-05-22 fermi-viewer split.)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -16,9 +16,17 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 ## Tier 1 — High Impact (open)
 
 ### MASTERPLAN (MATLAB consolidated) — `plans/MASTERPLAN.md`
-- [ ] **#68** W5 Decomposition → Drive `BosonPlotter.m` below **6,000 lines** (current 7,119, -16% to go). Replaces achieved #22 <8k milestone.
+- [ ] **#68** W5 Decomposition → Drive `BosonPlotter.m` below **6,000 lines** (current 7,084, -15% to go). Replaces achieved #22 <8k milestone.
 
-*(W5 #69 FermiViewer <6k moved to [fermi-viewer](https://github.com/pquarterman17/fermi-viewer) on 2026-05-22 as fv MASTERPLAN #3.)*
+*(W5 #69 FermiViewer <6k moved to [fermi-viewer](https://github.com/pquarterman17/fermi-viewer) on 2026-05-22 as fv MASTERPLAN #3; qm-side scrub finalized 2026-06-07.)*
+
+### BosonPlotter UX cleanup — `plans/bosonplotter-ux-cleanup.md`
+- [ ] **#1** Centralize font-size scale (`tk.font.*` tokens)
+- [ ] **#2** Fix corrGL 62-px label clipping (BG Intercept, Thick. Unit)
+- [ ] **#3** Add top-level menu bar via `+bosonPlotter/buildMenuBar.m`
+
+### Smoke testing & CI — `plans/smoke-testing-plan.md`
+- [ ] **#4** exportapp snapshot infrastructure — manifest.json + metadata + cleanup remain (dir/naming/capture shipped with #1)
 
 ### Origin parity (Python port, MATLAB side complete) — `plans/origin-feature-gap.md`
 - [ ] **#1** AIC/BIC/F-test fit comparison → Python
@@ -53,6 +61,20 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#54** W9 Bug-reporting → Screenshot capture (opt-in)
 - [ ] **#55** W9 Bug-reporting → Standalone `reportBug` command
 
+### BosonPlotter UI-construction extraction — `plans/bosonplotter-ui-construction-extraction.md`
+- [ ] **#4** Extract Data Table panel → `+bosonPlotter/buildDataTablePanel.m`
+- [ ] **#5** Extract Axes context menu → `+bosonPlotter/buildAxesContextMenu.m`
+
+### BosonPlotter UX cleanup — `plans/bosonplotter-ux-cleanup.md`
+- [ ] **#4** Centralize label/text color palette
+- [ ] **#5** Document & token-ize padding/spacing (`tk.pad.*`)
+- [ ] **#6** Audit `'1x'` flex columns in narrow analysisGL panels
+
+### Smoke testing & CI — `plans/smoke-testing-plan.md`
+- [ ] **#6** JUnit XML output from `runAllTests` (CI prerequisite)
+- [ ] **#7** GitHub Actions CI workflow (self-hosted runner)
+- [ ] **#8** Claude agent visual review step (screenshot inspection)
+
 ### Origin parity (Python) — `plans/origin-feature-gap.md`
 - [ ] **#7** Unlimited undo → Python
 - [ ] **#8** Data filter (expression rows) → Python
@@ -83,8 +105,24 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 #### Deprioritized — theory docs (lowest priority, pick up only when no other T3 work remains)
 - [ ] **#42** W6 Docs → Docstring upgrade: `+calc/` formulas
 - [ ] **#44** W6 Docs → Docstring upgrade: `+utilities/` physics functions
-- [ ] **#45** W6 Docs → Docstring upgrade: `+imaging/` physics functions
 - [ ] **#46** W6 Docs → Plan hygiene: update physics-analysis-gaps.md
+
+### BosonPlotter UI-construction extraction — `plans/bosonplotter-ui-construction-extraction.md`
+- [ ] **#7** Extract Peak Analysis window scaffolding → `+bosonPlotter/peak/buildPeakScaffold.m`
+- [ ] **#9** Extract palette + token initialization → `+bosonPlotter/initPalettes.m`
+
+### BosonPlotter UX cleanup — `plans/bosonplotter-ux-cleanup.md`
+- [ ] **#7** Convert section-header buttons (▼ / ▶) into a shared helper
+- [ ] **#8** Drop redundant trailing colons on form labels
+- [ ] **#9** Audit `+bosonPlotter/` dialog windows for token conformance
+- [ ] **#10** Add `tk.color.btn*` aliases for existing `BTN_*` constants
+- [ ] **#12** Audit other small-numeric editfields for the `'1x'` width issue
+
+### Smoke testing & CI — `plans/smoke-testing-plan.md`
+- [ ] **#9** Dialog auto-responder framework (configurable per-dialog defaults; basic timer responder shipped with #1)
+- [ ] **#10** Parameterized parser smoke tests (every parser × every test file)
+- [ ] **#11** Performance baseline tests (launch/load time regression)
+- [ ] **#12** Post-refactor diff validator
 
 ### Origin parity (Python) — `plans/origin-feature-gap.md`
 - [ ] **#14** Column formulas → Python
@@ -95,7 +133,11 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 
 | Plan | Status | Open items | Notes |
 |------|--------|------------|-------|
-| MASTERPLAN (MATLAB consolidated) | Active | 1 T1 / 11 T2 / 7+4 T3 | 9 source plans consolidated 2026-04-19. W4 Physics shipped 2026-04-19; W3 #11 + W3 #8 + W6 theory-docs sweep + tutorials shipped 2026-04-24; W2 #5/#6/#7 + W3 #14/#15/#16 shipped 2026-04-25; **W5 #22 ratchet target reached + workshop conversions #59-#62 all shipped 2026-04-26**. **2026-05-22 fermi-viewer split:** W1 #1 + W5 #28/#65/#69 moved to fv repo (`plans/MASTERPLAN.md` in fermi-viewer). |
+| MASTERPLAN (MATLAB consolidated) | Active | 1 T1 / 11 T2 / 7+3 T3 | 9 source plans consolidated 2026-04-19. W5 #22 ratchet reached + workshops #59-#62 shipped 2026-04-26. **2026-05-22 fermi-viewer split / 2026-06-07 scrub final:** W1 #1 + W5 #28/#65/#69 + W6 #45 moved to fv repo. BosonPlotter/DiraCulator/DataWorkspace only now. |
+| bosonplotter-ux-cleanup | Active | 3 T1 / 3 T2 / 5 T3 | Token conformance + layout fixes; #11 shipped |
+| bosonplotter-ui-construction-extraction | Active | 2 T2 / 2 T3 | Feeds MASTERPLAN W5 #68 (<6k lines) |
+| smoke-testing-plan | Active | 1 T1 / 3 T2 / 4 T3 | #1/#2/#5 shipped 2026-05-04; #3 moved to fv |
+| workshop-conversion-plan | Active | (mirrored as MASTERPLAN W5 #63/#64) | #1–#4 shipped; #7 moved to fv |
 | origin-feature-gap | Active (Python) | 6 T1 / 7 T2 / 1 T3 | MATLAB side complete; Python port pending — excluded from MASTERPLAN |
 | dataworkspace-python-port | Active (Python) | 3 T1 / 3 T2 / 2 T3 | Python-port architecture; excluded from MASTERPLAN |
 | porting_plan | Active (Python) | 7 phase-level items | Thin film toolkit architecture; excluded from MASTERPLAN |

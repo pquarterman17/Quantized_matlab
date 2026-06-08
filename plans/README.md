@@ -9,24 +9,21 @@ context section, Tier 1/2/3 with continuous numbering, completed section at bott
 
 ## Active Plans
 
+> Last reorganized 2026-06-07: FermiViewer/EM plans closed after the
+> fermi-viewer scrub finalized — that work lives in the
+> [fermi-viewer](https://github.com/pquarterman17/fermi-viewer) repo now.
+> Everything MATLAB-side here is BosonPlotter / DiraCulator / DataWorkspace.
+
 | Plan | Focus | Status |
 |------|-------|--------|
-| [known-bugs.md](known-bugs.md) | BosonPlotter + FermiViewer papercuts and regressions | Active |
-| [bosonplotter-decomposition.md](bosonplotter-decomposition.md) | Drive BosonPlotter under 8k lines; extract subsystems | Active |
-| [fermiviewer-decomposition-2026-04-16.md](fermiviewer-decomposition-2026-04-16.md) | Extract EELS/EDS from FermiViewer | Active |
-| [fermiviewer-interactive-histogram.md](fermiviewer-interactive-histogram.md) | Transfer ramp, drag-for-contrast, clipping indicators | Active (T3 only) |
-| [fermiviewer-measurement-polish-2026-04-17.md](fermiviewer-measurement-polish-2026-04-17.md) | Panel controls + annotation right-panel sync | Active |
-| [data-workspace.md](data-workspace.md) | Shared model migration + legacy table removal | Active |
-| [dataset-templates.md](dataset-templates.md) | Template analytics + Python port contract | Active (T3 only) |
-| [dataworkspace-python-port.md](dataworkspace-python-port.md) | DataWorkspace → thin_film_toolkit | Active |
-| [retroactive-docs.md](retroactive-docs.md) | Theory docs + tutorials | Active |
-| [origin-feature-gap.md](origin-feature-gap.md) | OriginPro parity — Python ports remaining | Active |
-| [software-feature-gaps.md](software-feature-gaps.md) | Provenance log, 2D histogram, label rendering | Active |
-| [repo-audit-2026-04-13.md](repo-audit-2026-04-13.md) | Pre-checkpoint multi-workstream audit | Active |
-| [codebase-roadmap.md](codebase-roadmap.md) | Rolling umbrella: extraction + docs | Active |
-| [bug-reporting.md](bug-reporting.md) | Stage 2 — Worker relay + submit-directly | Active (Stage 2 deferred) |
-| [parser-roadmap.md](parser-roadmap.md) | New parsers (Raman, Oxford, OPUS) | Paused |
-| [porting_plan.md](porting_plan.md) | MATLAB → Python+Tauri architecture | Active |
+| [MASTERPLAN.md](MASTERPLAN.md) | Consolidated MATLAB backlog (W1–W9) — single source for open MATLAB work | Active |
+| [workshop-conversion-plan.md](workshop-conversion-plan.md) | BosonPlotter workshop pattern — harness + subfolder reorg remain | Active |
+| [bosonplotter-ui-construction-extraction.md](bosonplotter-ui-construction-extraction.md) | Extract BosonPlotter UI-construction blocks to `+bosonPlotter/` | Active |
+| [bosonplotter-ux-cleanup.md](bosonplotter-ux-cleanup.md) | BosonPlotter UX audit follow-ups | Active |
+| [smoke-testing-plan.md](smoke-testing-plan.md) | Smoke sequences, snapshot manifest, CI pipeline | Active |
+| [porting_plan.md](porting_plan.md) | MATLAB → Python+Tauri architecture | Active (Python) |
+| [dataworkspace-python-port.md](dataworkspace-python-port.md) | DataWorkspace → thin_film_toolkit | Active (Python) |
+| [origin-feature-gap.md](origin-feature-gap.md) | OriginPro parity — Python ports remaining | Active (Python) |
 
 ## Archive
 
@@ -34,6 +31,10 @@ Completed plans kept for reference in [`archive/`](archive/):
 
 | Plan | Completed | Description |
 |------|-----------|-------------|
+| fermi-viewer-split-2026-05.md | 2026-06-07 | FermiViewer + EM tooling split to the fermi-viewer repo; qm scrub finalized |
+| fermiviewer-workshop-conversion.md | 2026-06-07 | Moved to fermi-viewer `plans/MASTERPLAN.md` (8 workshop models shipped pre-handoff) |
+| audit-2026-05-17.md | 2026-05-17 | Repo audit pass |
+| overnight-sweep-summary-2026-04-13.md | 2026-04-14 | Overnight sweep summary (merged b7bad9e) |
 | diraculator-ux-polish-2026-04-17.md | 2026-04-17 | 17 items — sidebar, home panel, cross-tab hooks, persistence, contrast |
 | fermiviewer-ux-pass-2026-04-16.md | 2026-04-16 | FermiViewer UX pass |
 | materialscalc-improvements.md | 2026-04-12 | DiraCulator: 33 items — UX, backend cards, cross-tab, docs, rename |
