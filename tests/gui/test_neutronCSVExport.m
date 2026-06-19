@@ -16,7 +16,7 @@ end
 
 tmpDir = fullfile(tempdir, 'neutroncsv_test_' + string(datetime('now','Format','yyyyMMdd_HHmmss')));
 if ~isfolder(tmpDir), mkdir(tmpDir); end
-cleanupTmp = onCleanup(@() rmdir(tmpDir, 's')); %#ok<NASGU>
+cleanupTmp = onCleanup(@() rmdir(tmpDir, 's'));   % removes tmpDir on exit
 
 passed = 0;
 failed = 0;
