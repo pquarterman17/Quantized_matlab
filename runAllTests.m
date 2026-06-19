@@ -85,6 +85,7 @@ SUITES = {
     T('gui','test_sendToOrigin'),           'gui',    'Send to Origin: multi-dataset via mock COM — worksheet-per-dataset (AddSheet) and combined (ColTypes) layouts'
     T('gui','test_legendEditor'),           'gui',    'Legend editor: bulk ops (strip/replace), metadata fill, swatch column, Apply round-trip'
     T('gui','test_waterfallExport'),        'gui',    'Waterfall CSV export: waterfallOffsets levels + exportCombinedCSV offset on signal (not error/X), additive + log'
+    T('gui','test_combinedCSVExport'),      'gui',    'Combined CSV export: ragged blank-padding (no NaN), xColumnName header, per-block Origin designations (X/Y/yEr/xEr), quoted comma tags'
     T('gui','test_toolbarConfig'),          'gui',    'Toolbar customisation: defaults, buildToolbar, save/load, stale IDs'
     T('gui','test_undoManager'),            'gui',    'UndoManager: push, undo, redo, branch discard, cap, clear, labels'
     T('gui','test_filterRows'),             'gui',    'filterRows: expression parser, operators, functions, edge cases'
