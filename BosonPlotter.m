@@ -4338,11 +4338,11 @@ function onLoadBackground(~,~)
     end
 
 function onSendToOrigin(~,~)
-    %ONSENDTOORIGIN  Delegate to +bosonPlotter/sendToOrigin.m.
-        gs.xLabel = efCustomXLabel.Value;
-        gs.yLabel = efCustomYLabel.Value;
-        gs.logX = strcmp(ddScaleX.Value, 'Log');
-        gs.logY = strcmp(ddScaleY.Value, 'Log');
+    %ONSENDTOORIGIN  Delegate to +bosonPlotter/sendToOrigin.m (all selected).
+        sel = lbDatasets.Value; if ~iscell(sel), sel = {sel}; end
+        gs = struct('xLabel', efCustomXLabel.Value, 'yLabel', efCustomYLabel.Value, ...
+            'logX', strcmp(ddScaleX.Value, 'Log'), 'logY', strcmp(ddScaleY.Value, 'Log'), ...
+            'selIdx', cell2mat(sel));
         bosonPlotter.sendToOrigin(appData, fig, gs);
     end
 

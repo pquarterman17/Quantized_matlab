@@ -34,6 +34,8 @@ function success = toOrigin(data, options)
         options.LogX          (1,1) logical = false
         options.Visible       (1,1) logical = true
         options.OriginObj                   = []
+        options.AddSheet      (1,1) logical = false   % add a worksheet to the active book instead of creating a new book
+        options.ColTypes                    = {}      % optional cellstr of per-column designations ('X'/'Y'/'yErr'); overrides auto-typing
     end
 
     success = false;
@@ -105,26 +107,36 @@ function success = toOrigin(data, options)
             sheetName = sheetName(1:32);
         end
 
-        % ── Create workbook ───────────────────────────────────────────
-        % `name:=` without `option:=lsname` sets the short name directly,
-        % which is what range references like [BookName]Sheet! require.
-        origin.Execute(sprintf('newbook name:="%s" sheet:=1;', bookName));
-
-        origin.Execute(sprintf('win -a %s;', bookName));
-
-        % ── Rename the default sheet ──────────────────────────────────
-        origin.Execute(sprintf('wks.name$ = "%s";', escapeLT(sheetName)));
-
-        % ── Set up columns ────────────────────────────────────────────
-        nYCols = size(data.values, 2);
+        % ── Column count up front (newsheet needs cols:= at creation) ──
+        nYCols    = size(data.values, 2);
         totalCols = 1 + nYCols;
+        ct        = options.ColTypes;
+        haveCT    = iscell(ct) && numel(ct) == totalCols;
 
-        if totalCols > 2
-            origin.Execute(sprintf('wks.nCols = %d;', totalCols));
+        % ── Create the destination worksheet ──────────────────────────
+        if options.AddSheet
+            % Add a new worksheet to the (already-existing) active book so
+            % multiple datasets land in one workbook as separate sheets.
+            origin.Execute(sprintf('win -a %s;', bookName));
+            origin.Execute(sprintf('newsheet name:="%s" cols:=%d;', ...
+                escapeLT(sheetName), totalCols));
+        else
+            % `name:=` without `option:=lsname` sets the short name directly,
+            % which is what range references like [BookName]Sheet! require.
+            origin.Execute(sprintf('newbook name:="%s" sheet:=1;', bookName));
+            origin.Execute(sprintf('win -a %s;', bookName));
+            origin.Execute(sprintf('wks.name$ = "%s";', escapeLT(sheetName)));
+            if totalCols > 2
+                origin.Execute(sprintf('wks.nCols = %d;', totalCols));
+            end
         end
 
-        % Column 1 = X  (Origin type code: 3 = X)
-        origin.Execute('wks.col1.type = 3;');
+        % ── Column 1 (X by default; overridable via ColTypes) ─────────
+        if haveCT
+            origin.Execute(sprintf('wks.col1.type = %d;', originTypeCode(ct{1})));
+        else
+            origin.Execute('wks.col1.type = 3;');   % 3 = X
+        end
         xName = 'X';
         xUnit = '';
         if isfield(data, 'metadata')
@@ -141,17 +153,20 @@ function success = toOrigin(data, options)
         origin.Execute(sprintf('wks.col1.lname$ = "%s";', escapeLT(xName)));
         origin.Execute(sprintf('wks.col1.unit$ = "%s";', escapeLT(xUnit)));
 
-        % Y columns (Origin type codes: 0 = Y, 2 = yErr)
+        % ── Y columns (type codes: 0 = Y, 2 = yErr, 3 = X) ────────────
         for k = 1:nYCols
-            cn = k + 1;
+            cn  = k + 1;
             lbl = char(data.labels{k});
             unt = char(data.units{k});
 
-            if contains(lower(lbl), {'err', 'dr', 'std', 'sigma'})
-                origin.Execute(sprintf('wks.col%d.type = 2;', cn));
+            if haveCT
+                tc = originTypeCode(ct{cn});
+            elseif contains(lower(lbl), {'err', 'dr', 'std', 'sigma'})
+                tc = 2;
             else
-                origin.Execute(sprintf('wks.col%d.type = 0;', cn));
+                tc = 0;
             end
+            origin.Execute(sprintf('wks.col%d.type = %d;', cn, tc));
             origin.Execute(sprintf('wks.col%d.lname$ = "%s";', cn, escapeLT(lbl)));
             origin.Execute(sprintf('wks.col%d.unit$ = "%s";', cn, escapeLT(unt)));
         end
@@ -220,6 +235,17 @@ end
 
 function name = sanitiseLTName(name)
     name = regexprep(name, '[^\w]', '_');
+end
+
+function code = originTypeCode(desig)
+%ORIGINTYPECODE  Map a designation string to an Origin column type code.
+%   'X' → 3, 'yErr'/'err' → 2, anything else → 0 (Y).
+    d = lower(strtrim(char(desig)));
+    switch d
+        case 'x',                   code = 3;
+        case {'yerr', 'yer', 'err'}, code = 2;
+        otherwise,                  code = 0;
+    end
 end
 
 function tf = wroteOk(wrote)
