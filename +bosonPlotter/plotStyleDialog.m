@@ -387,7 +387,7 @@ function plotStyleDialog(parentFig, ctx)
 
     function items = listAllTemplates()
         items = {'screen','aps','aps_double','nature','nature_double', ...
-                 'thesis','presentation','poster'};
+                 'thesis','presentation','poster','report','web'};
         try
             userList = bosonPlotter.userTemplates.list();
             for k = 1:numel(userList)

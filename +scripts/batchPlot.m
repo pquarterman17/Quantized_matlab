@@ -246,7 +246,7 @@ end
 function [tmpl, isJournalPreset] = resolveTemplate(templateStr)
 %RESOLVETEMPLATE  Return a template struct and flag if it is a journal preset.
     JOURNAL_PRESETS = {'aps','aps_double','nature','nature_double', ...
-                       'thesis','presentation','poster','screen'};
+                       'thesis','presentation','poster','report','web','screen'};
 
     if templateStr == ""
         tmpl           = styles.default();

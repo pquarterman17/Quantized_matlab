@@ -156,7 +156,7 @@ function test_styleResolution
     fprintf('\n== TEST 7: all built-in templates ==\n');
     try
         names = {'screen','aps','aps_double','nature','nature_double', ...
-                 'thesis','presentation','poster'};
+                 'thesis','presentation','poster','report','web'};
         for i = 1:numel(names)
             t = styles.template(names{i});
             a = bosonPlotter.resolveStyle(t);

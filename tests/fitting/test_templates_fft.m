@@ -25,7 +25,7 @@ fprintf('\n--- styles.template ---\n');
 
 % All template names load without error
 templateNames = {'aps', 'aps_double', 'nature', 'nature_double', ...
-    'thesis', 'presentation', 'poster', 'screen'};
+    'thesis', 'presentation', 'poster', 'report', 'web', 'screen'};
 allLoadOk = true;
 for i = 1:numel(templateNames)
     try
@@ -113,6 +113,54 @@ if ~tAps.legendBox && ~tNat.legendBox
     fprintf('  PASS: journal templates have legend box off\n'); passed = passed + 1;
 else
     fprintf('  FAIL: journal templates should have legendBox=false\n'); failed = failed + 1;
+end
+
+% report preset — written-report body figure (Times 10pt, 12 cm, 300 dpi, no grid, boxed legend)
+tReport = styles.template('report');
+if strcmp(tReport.fontName, 'Times New Roman') && tReport.fontSize == 10 && ...
+   abs(tReport.figWidth_cm - 12.0) < 0.01 && tReport.dpi == 300 && ...
+   tReport.gridAlpha == 0 && tReport.legendBox
+    fprintf('  PASS: report preset = Times 10pt, 12 cm, 300 dpi, grid off, legend boxed\n');
+    passed = passed + 1;
+else
+    fprintf('  FAIL: report preset values incorrect (%s %dpt, %.2f cm, %d dpi, grid %.2f, box %d)\n', ...
+        tReport.fontName, tReport.fontSize, tReport.figWidth_cm, tReport.dpi, ...
+        tReport.gridAlpha, tReport.legendBox);
+    failed = failed + 1;
+end
+
+% web preset — website/blog figure (Arial 13pt, 16 cm, 150 dpi, faint grid, no legend box)
+tWeb = styles.template('web');
+if strcmp(tWeb.fontName, 'Arial') && tWeb.fontSize == 13 && ...
+   abs(tWeb.figWidth_cm - 16.0) < 0.01 && tWeb.dpi == 150 && ...
+   abs(tWeb.gridAlpha - 0.12) < 1e-9 && ~tWeb.legendBox
+    fprintf('  PASS: web preset = Arial 13pt, 16 cm, 150 dpi, faint grid, legend box off\n');
+    passed = passed + 1;
+else
+    fprintf('  FAIL: web preset values incorrect (%s %dpt, %.2f cm, %d dpi, grid %.2f, box %d)\n', ...
+        tWeb.fontName, tWeb.fontSize, tWeb.figWidth_cm, tWeb.dpi, ...
+        tWeb.gridAlpha, tWeb.legendBox);
+    failed = failed + 1;
+end
+
+% saveFigure resolves dimensions from theme when Width/Height omitted.
+% Regression: the arguments-block default of 0 must pass validation
+% (mustBeNonnegative, not mustBePositive) — otherwise the documented recipe
+% saveFigure(fig, path, 'DPI', n) throws on MATLAB releases that validate defaults.
+try
+    sfFig  = figure('Visible', 'off');
+    plot(axes(sfFig), 1:10, (1:10).^2);
+    sfPath = fullfile(tempdir(), sprintf('tft_savefig_%d.pdf', round(rand()*1e6)));
+    plotting.saveFigure(sfFig, sfPath, 'DPI', 150);   % no Width/Height on purpose
+    if isfile(sfPath)
+        fprintf('  PASS: saveFigure works with omitted Width/Height\n'); passed = passed + 1;
+        delete(sfPath);
+    else
+        fprintf('  FAIL: saveFigure did not create file\n'); failed = failed + 1;
+    end
+    close(sfFig);
+catch ME
+    fprintf('  FAIL: saveFigure without Width threw: %s\n', ME.message); failed = failed + 1;
 end
 
 % ════════════════════════════════════════════════════════════════════

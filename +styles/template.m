@@ -17,6 +17,8 @@ function t = template(name)
 %       'thesis'       — Dissertation figures: Times, 15 cm
 %       'presentation' — Conference slides: Arial 18pt, 25 cm
 %       'poster'       — Research posters: Arial 24pt, 30 cm
+%       'report'       — Written report (Word/LaTeX body): Times 10pt, 12 cm, 300 dpi
+%       'web'          — Website/blog figure: Arial 13pt, 16 cm, 150 dpi (SVG-first)
 %       'screen'       — Default screen display (= styles.default)
 %
 %   Template struct fields (superset of styles.default):
@@ -114,6 +116,24 @@ switch lower(name)
         t.gridAlpha  = 0.15;
         t.legendBox  = false;
 
+    case 'report'
+        % Written-report body figure (Word / LaTeX): serif, 300 dpi raster,
+        % clean (no grid), boxed legend.  Pure baseTemplate — no toolbox.
+        t = baseTemplate('report', 'Times New Roman', 10, 11, 9, ...
+            1.4, 0.7, 5, 12.0, 8.5, 300, cbPalette);
+        t.tickLength = [0.015 0.008];
+        t.gridAlpha  = 0;          % clean body figure
+        t.legendBox  = true;
+
+    case 'web'
+        % Website / blog figure: sans, SVG-first at screen DPI, faint grid,
+        % slightly larger fonts for screens, no legend box.
+        t = baseTemplate('web', 'Arial', 13, 15, 11, ...
+            2.0, 0.9, 6, 16.0, 10.0, 150, cbPalette);
+        t.tickLength = [0.012 0.006];
+        t.gridAlpha  = 0.12;       % faint, reads on screens
+        t.legendBox  = false;
+
     case 'screen'
         % Thin wrapper around styles.default()
         s = styles.default();
@@ -129,7 +149,7 @@ switch lower(name)
 
     otherwise
         error('styles:template:unknown', ...
-            'Unknown template "%s". Available: aps, aps_double, nature, nature_double, thesis, presentation, poster, screen.', name);
+            'Unknown template "%s". Available: aps, aps_double, nature, nature_double, thesis, presentation, poster, report, web, screen.', name);
 end
 
 end
