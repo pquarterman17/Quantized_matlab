@@ -76,6 +76,10 @@ function plotInteractions(ax, fig, callbacks)
             'MenuSelectedFcn', @(~,~) changeLineColor(lh));
         uimenu(cm, 'Text', 'Copy data to clipboard', ...
             'MenuSelectedFcn', @(~,~) copyTraceData(lh));
+        if isfield(callbacks, 'onEditLegend') && ~isempty(callbacks.onEditLegend)
+            uimenu(cm, 'Text', 'Edit Legend Labels...', 'Separator', 'on', ...
+                'MenuSelectedFcn', @(~,~) callbacks.onEditLegend());
+        end
 
         lh.ContextMenu = cm;
 

@@ -1,4 +1,4 @@
-function legendEditor(parentFig, ctx)
+function api = legendEditor(parentFig, ctx)
 %LEGENDEDITOR  Unified legend editor — all datasets at once.
 %
 %   bosonPlotter.legendEditor(parentFig, ctx)
@@ -39,8 +39,8 @@ function legendEditor(parentFig, ctx)
     effective = bosonPlotter.resolveStyle(tpl, ctx.getStyleOverrides());
 
     % ── Build dialog ──────────────────────────────────────────────
-    dlgW = 520;
-    dlgH = 460;
+    dlgW = 580;
+    dlgH = 470;
     figPos = parentFig.Position;
     dlgX = figPos(1) + max(50, (figPos(3) - dlgW)/2);
     dlgY = figPos(2) + max(50, (figPos(4) - dlgH)/2);
@@ -48,10 +48,10 @@ function legendEditor(parentFig, ctx)
     dlg = uifigure('Name', 'Edit Legend', 'Position', [dlgX dlgY dlgW dlgH], ...
         'Resize', 'on', 'WindowStyle', 'modal');
 
-    root = uigridlayout(dlg, [4 1], ...
+    root = uigridlayout(dlg, [5 1], ...
         'Padding',    [12 12 12 8], ...
         'RowSpacing', 8, ...
-        'RowHeight',  {26, '1x', 'fit', 36});
+        'RowHeight',  {26, 30, '1x', 'fit', 36});
 
     % Row 1: header
     uilabel(root, ...
@@ -59,15 +59,46 @@ function legendEditor(parentFig, ctx)
         'FontWeight', 'bold', ...
         'FontSize',   12);
 
-    % Row 2: per-dataset table
+    % Row 2: bulk-edit tools (operate on the "Legend name" column; the table
+    % updates immediately, Apply commits to the plot).
+    bulkGL = uigridlayout(root, [1 9], ...
+        'Padding', [0 0 0 0], 'ColumnSpacing', 4, ...
+        'ColumnWidth', {32, '1x', 52, '1x', 64, 104, '1x', 42, 116});
+    uilabel(bulkGL, 'Text', 'Find:');
+    efFind = uieditfield(bulkGL, 'text');
+    uilabel(bulkGL, 'Text', 'Replace:');
+    efRepl = uieditfield(bulkGL, 'text');
+    uibutton(bulkGL, 'Text', 'Replace', 'ButtonPushedFcn', @(~,~) doReplace());
+    uibutton(bulkGL, 'Text', 'Strip common', ...
+        'Tooltip', 'Remove the shared prefix/suffix from every label', ...
+        'ButtonPushedFcn', @(~,~) bulkApply('stripCommon'));
+    metaKeys = unionMetaKeys(datasets);
+    ddMeta  = uidropdown(bulkGL, 'Items', metaKeys, ...
+        'Tooltip', 'Fill labels from a metadata field (temperature, field, ...)');
+    btnFill = uibutton(bulkGL, 'Text', 'Fill', 'ButtonPushedFcn', @(~,~) fillFromMeta(ddMeta.Value));
+    uibutton(bulkGL, 'Text', 'Reset to Auto', 'ButtonPushedFcn', @(~,~) resetAuto());
+    if isscalar(metaKeys) && strcmp(metaKeys{1}, '(no metadata)')
+        ddMeta.Enable = 'off'; btnFill.Enable = 'off';
+    end
+
+    % Row 3: per-dataset table (swatch + Show + Source + editable Legend name)
     N = numel(datasets);
-    tblData = cell(N, 3);
+    % Swatch colour per dataset — same resolution as the dataset list / plot
+    % lines, so the colours here match what's on screen.
+    swatchColors = plotting.lineColors(max(N, 1));
+    for i = 1:N
+        ci = datasets{i};
+        if isfield(ci, 'color') && isnumeric(ci.color) && numel(ci.color) == 3
+            swatchColors(i, :) = ci.color;
+        end
+    end
+    tblData = cell(N, 4);
     for i = 1:N
         dsi = datasets{i};
         % "Visible" — ds.visible (defaults to true if missing)
         vis = true;
         if isfield(dsi, 'visible'), vis = logical(dsi.visible); end
-        % "Dataset" — legendName if set, else displayName, else filename
+        % "Source" — displayName if set, else filename
         baseName = '';
         if isfield(dsi, 'displayName') && ~isempty(dsi.displayName)
             baseName = dsi.displayName;
@@ -77,17 +108,19 @@ function legendEditor(parentFig, ctx)
         end
         legName = '';
         if isfield(dsi, 'legendName'), legName = dsi.legendName; end
-        tblData{i, 1} = vis;
-        tblData{i, 2} = baseName;       % read-only source name
-        tblData{i, 3} = legName;        % editable legend override
+        tblData{i, 1} = char(9679);     % ● colour swatch (styled per row)
+        tblData{i, 2} = vis;
+        tblData{i, 3} = baseName;       % read-only source name
+        tblData{i, 4} = legName;        % editable legend override
     end
     tbl = uitable(root, ...
         'Data',              tblData, ...
-        'ColumnName',        {'Show', 'Source', 'Legend name'}, ...
-        'ColumnEditable',    [true, false, true], ...
-        'ColumnFormat',      {'logical', 'char', 'char'}, ...
-        'ColumnWidth',       {'1x', '3x', '5x'}, ...
+        'ColumnName',        {'', 'Show', 'Source', 'Legend name'}, ...
+        'ColumnEditable',    [false, true, false, true], ...
+        'ColumnFormat',      {'char', 'logical', 'char', 'char'}, ...
+        'ColumnWidth',       {26, 46, '3x', '5x'}, ...
         'RowName',           'numbered');
+    applySwatchStyles();
 
     % Row 3: shared legend-style controls
     styleP = uipanel(root, 'Title', 'Shared legend style', 'FontWeight', 'bold');
@@ -138,6 +171,16 @@ function legendEditor(parentFig, ctx)
         bosonPlotter.applyDialogTheme(dlg, ctx.theme);
     catch
     end
+    applySwatchStyles();   % reapply after theming so swatch colours win
+
+    % Optional handle struct for headless testing / scripting.
+    if nargout > 0
+        api = struct('fig', dlg, 'tbl', tbl, 'efFind', efFind, 'efRepl', efRepl, ...
+            'ddMeta', ddMeta, 'doReplace', @doReplace, ...
+            'doStripCommon', @() bulkApply('stripCommon'), ...
+            'doFillMeta', @fillFromMeta, 'doResetAuto', @resetAuto, ...
+            'legendColumn', @() tbl.Data(:, 4).');
+    end
 
     function onApply()
         % Commit per-dataset edits. Re-fetch the dataset list now (do
@@ -151,8 +194,8 @@ function legendEditor(parentFig, ctx)
         nRows        = min(size(tblNow, 1), numel(liveDatasets));
         for k = 1:nRows
             dsK = liveDatasets{k};
-            dsK.visible     = logical(tblNow{k, 1});
-            dsK.legendName  = char(tblNow{k, 3});
+            dsK.visible     = logical(tblNow{k, 2});
+            dsK.legendName  = char(tblNow{k, 4});
             ctx.setDataset(k, dsK);
         end
         % Commit shared legend style
@@ -165,6 +208,70 @@ function legendEditor(parentFig, ctx)
 
         ctx.replot();
         delete(dlg);
+    end
+
+    % ── Bulk-tool helpers (nested) ─────────────────────────────────────
+    function applySwatchStyles()
+        if ~isvalid(tbl), return; end
+        try, removeStyle(tbl); catch, end
+        for i = 1:min(N, size(tbl.Data, 1))
+            addStyle(tbl, uistyle('FontColor', swatchColors(i, :)), 'cell', [i 1]);
+        end
+    end
+
+    function eff = getEffective(d)
+        % Per row: the override (col 4) if set, else the Source name (col 3).
+        eff = cell(1, size(d, 1));
+        for i = 1:numel(eff)
+            ov = char(d{i, 4});
+            if isempty(ov), eff{i} = char(d{i, 3}); else, eff{i} = ov; end
+        end
+    end
+
+    function writeBack(res)
+        d = tbl.Data;
+        for i = 1:min(numel(res), size(d, 1)), d{i, 4} = res{i}; end
+        tbl.Data = d;
+        applySwatchStyles();
+    end
+
+    function doReplace()
+        writeBack(bosonPlotter.legendBulkOps('findReplace', ...
+            getEffective(tbl.Data), efFind.Value, efRepl.Value));
+    end
+
+    function bulkApply(opName)
+        writeBack(bosonPlotter.legendBulkOps(opName, getEffective(tbl.Data)));
+    end
+
+    function fillFromMeta(key)
+        key = char(key);
+        d = tbl.Data;
+        for i = 1:size(d, 1)
+            mf = bosonPlotter.datasetMetaFields(datasets{i});
+            if isstruct(mf) && isfield(mf, key) && ~isempty(mf.(key))
+                d{i, 4} = char(mf.(key));
+            end
+        end
+        tbl.Data = d;
+        applySwatchStyles();
+    end
+
+    function resetAuto()
+        d = tbl.Data;
+        for i = 1:size(d, 1), d{i, 4} = ''; end
+        tbl.Data = d;
+        applySwatchStyles();
+    end
+
+    function keys = unionMetaKeys(dss)
+        seen = {};
+        for i = 1:numel(dss)
+            mf = bosonPlotter.datasetMetaFields(dss{i});
+            if isstruct(mf), seen = [seen, fieldnames(mf).']; end %#ok<AGROW>
+        end
+        keys = unique(seen, 'stable');
+        if isempty(keys), keys = {'(no metadata)'}; end
     end
 end
 

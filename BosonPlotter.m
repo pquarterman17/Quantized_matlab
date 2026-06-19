@@ -3238,15 +3238,13 @@ function varargout = BosonPlotter(options)
             bosonPlotter.quietAlert(fig, 'Load at least one dataset first.', 'No data');
             return;
         end
-        legCtx = struct();
-        legCtx.fig               = fig;
-        legCtx.theme             = appData.theme;
-        legCtx.getDatasets       = @() appData.datasets;
-        legCtx.setDataset        = @(idx, d) assignDataset(idx, d);
-        legCtx.getStyleOverrides = @() appData.styleOverrides;
-        legCtx.setStyleOverrides = @(s) assignStyleOverrides(s);
-        legCtx.getActiveTemplate = @() appData.activeTemplate;
-        legCtx.replot            = @() onPlot([],[]);
+        legCtx = struct('fig', fig, 'theme', appData.theme, ...
+            'getDatasets', @() appData.datasets, ...
+            'setDataset', @(idx, d) assignDataset(idx, d), ...
+            'getStyleOverrides', @() appData.styleOverrides, ...
+            'setStyleOverrides', @(s) assignStyleOverrides(s), ...
+            'getActiveTemplate', @() appData.activeTemplate, ...
+            'replot', @() onPlot([],[]));
         try
             bosonPlotter.legendEditor(fig, legCtx);
         catch ME
@@ -4581,6 +4579,7 @@ function onSendToOrigin(~,~)
                 piCb_.setCustomTitle  = @(s) setIfChanged(efCustomTitle,  s);
                 piCb_.onAutoLimits    = @() onAutoLimits([],[]);
                 piCb_.isContextMenuSupported = cmSupported_;
+                piCb_.onEditLegend    = @onOpenLegendEditor;
                 bosonPlotter.plotInteractions(targetAx, fig, piCb_);
             catch piME
                 logGUIError('plotInteractions', piME.message, piME);
@@ -6194,6 +6193,7 @@ function onSendToOrigin(~,~)
         ospomCb_.onPolarPlot     = @onPolarPlot;
         ospomCb_.onConvertUnits  = @onConvertUnits;
         ospomCb_.onWriteXRDcsv   = @onWriteXRDcsv;
+        ospomCb_.onEditLegend    = @onOpenLegendEditor;
         bosonPlotter.showPlotOptionsMenu(appData, fig, headless, ospomCb_);
     end
 
