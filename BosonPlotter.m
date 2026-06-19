@@ -3541,12 +3541,10 @@ function varargout = BosonPlotter(options)
     %  just mark Apply as dirty and wait for click.
         mode = applyMode_();
         if strcmp(mode, 'Live')
-            % Coalesce rapid keystrokes into one recompute ~0.1 s after the
-            % last change (feels immediate; avoids per-keystroke full render).
-            scheduleAutoRecalc(0.1);
+            onApplyCorrections([], []);
             return;
         end
-        if strcmp(mode, 'Auto'), scheduleAutoRecalc(0.3); end
+        if strcmp(mode, 'Auto'), scheduleAutoRecalc(); end
         if isvalid(btnApply)
             btnApply.Text      = 'Apply  *';
             btnApply.FontColor = [1 0.85 0.2];
@@ -3563,10 +3561,11 @@ function varargout = BosonPlotter(options)
         end
     end
 
-    function scheduleAutoRecalc(delaySec)
-    %SCHEDULEAUTORECALC  Debounced recalc trigger (delaySec, default 0.3 s);
-    %   restarting before it fires resets the delay.  Live mode passes ~0.1 s.
-        if nargin < 1 || isempty(delaySec), delaySec = 0.3; end
+    function scheduleAutoRecalc()
+    %SCHEDULEAUTORECALC  Debounced auto-recalculate trigger.
+    %   Stops any pending timer and starts a new 0.3 s single-shot timer
+    %   whose callback fires onApplyCorrections.  Rapid successive changes
+    %   restart the delay, so recalculation happens once the user pauses.
         % Stop and discard any pending timer
         if ~isempty(appData.autoRecalcTimer) && isvalid(appData.autoRecalcTimer)
             stop(appData.autoRecalcTimer);
@@ -3574,7 +3573,7 @@ function varargout = BosonPlotter(options)
         end
         appData.autoRecalcTimer = timer( ...
             'ExecutionMode', 'singleShot', ...
-            'StartDelay',    delaySec, ...
+            'StartDelay',    0.3, ...
             'TimerFcn',      @(~,~) onAutoRecalcFire());
         start(appData.autoRecalcTimer);
     end
