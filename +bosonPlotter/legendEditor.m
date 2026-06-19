@@ -214,23 +214,23 @@ function api = legendEditor(parentFig, ctx)
     function applySwatchStyles()
         if ~isvalid(tbl), return; end
         try, removeStyle(tbl); catch, end
-        for i = 1:min(N, size(tbl.Data, 1))
-            addStyle(tbl, uistyle('FontColor', swatchColors(i, :)), 'cell', [i 1]);
+        for ii = 1:min(N, size(tbl.Data, 1))
+            addStyle(tbl, uistyle('FontColor', swatchColors(ii, :)), 'cell', [ii 1]);
         end
     end
 
     function eff = getEffective(d)
         % Per row: the override (col 4) if set, else the Source name (col 3).
         eff = cell(1, size(d, 1));
-        for i = 1:numel(eff)
-            ov = char(d{i, 4});
-            if isempty(ov), eff{i} = char(d{i, 3}); else, eff{i} = ov; end
+        for ii = 1:numel(eff)
+            ov = char(d{ii, 4});
+            if isempty(ov), eff{ii} = char(d{ii, 3}); else, eff{ii} = ov; end
         end
     end
 
     function writeBack(res)
         d = tbl.Data;
-        for i = 1:min(numel(res), size(d, 1)), d{i, 4} = res{i}; end
+        for ii = 1:min(numel(res), size(d, 1)), d{ii, 4} = res{ii}; end
         tbl.Data = d;
         applySwatchStyles();
     end
@@ -247,10 +247,10 @@ function api = legendEditor(parentFig, ctx)
     function fillFromMeta(key)
         key = char(key);
         d = tbl.Data;
-        for i = 1:size(d, 1)
-            mf = bosonPlotter.datasetMetaFields(datasets{i});
+        for ii = 1:size(d, 1)
+            mf = bosonPlotter.datasetMetaFields(datasets{ii});
             if isstruct(mf) && isfield(mf, key) && ~isempty(mf.(key))
-                d{i, 4} = char(mf.(key));
+                d{ii, 4} = char(mf.(key));
             end
         end
         tbl.Data = d;
@@ -259,15 +259,15 @@ function api = legendEditor(parentFig, ctx)
 
     function resetAuto()
         d = tbl.Data;
-        for i = 1:size(d, 1), d{i, 4} = ''; end
+        for ii = 1:size(d, 1), d{ii, 4} = ''; end
         tbl.Data = d;
         applySwatchStyles();
     end
 
     function keys = unionMetaKeys(dss)
         seen = {};
-        for i = 1:numel(dss)
-            mf = bosonPlotter.datasetMetaFields(dss{i});
+        for ii = 1:numel(dss)
+            mf = bosonPlotter.datasetMetaFields(dss{ii});
             if isstruct(mf), seen = [seen, fieldnames(mf).']; end %#ok<AGROW>
         end
         keys = unique(seen, 'stable');
