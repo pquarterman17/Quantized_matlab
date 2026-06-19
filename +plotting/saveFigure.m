@@ -31,10 +31,10 @@ function saveFigure(fig, filepath, options)
     arguments
         fig      (1,1)
         filepath (1,1) string
-        options.DPI    (1,1) double  {mustBePositive} = 300
-        options.Width  (1,1) double  {mustBePositive} = 0
-        options.Height (1,1) double  {mustBePositive} = 0
-        options.Theme                                  = []
+        options.DPI    (1,1) double  {mustBePositive}    = 300
+        options.Width  (1,1) double  {mustBeNonnegative} = 0   % 0 = resolve from theme/default
+        options.Height (1,1) double  {mustBeNonnegative} = 0   % 0 = resolve from theme/default
+        options.Theme                                    = []
     end
 
     % Resolve dimensions from theme defaults when not explicitly specified
