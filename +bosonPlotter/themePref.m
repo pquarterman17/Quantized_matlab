@@ -57,16 +57,33 @@ function out = themePref(action, value)
             end
             % Normalise.
             if strcmpi(value, 'Dark')
-                themeName = 'Dark'; %#ok<NASGU>
+                themeName = 'Dark';
             elseif strcmpi(value, 'Auto')
-                themeName = 'Auto'; %#ok<NASGU>
+                themeName = 'Auto';
             else
-                themeName = 'Light'; %#ok<NASGU>
+                themeName = 'Light';
             end
+            % Persist, then verify the file actually holds the new value.
+            % A silent failure here is exactly what makes the theme "revert"
+            % on the next launch (it applies in-session via appData.theme but
+            % was never written), so surface the cause instead of swallowing.
+            persisted = false;
+            hadError  = false;
             try
                 save(CACHED_PATH, 'themeName');
-            catch
-                % Best-effort: silent on write failure.
+                v = load(CACHED_PATH, 'themeName');
+                persisted = isfield(v, 'themeName') && strcmp(v.themeName, themeName);
+            catch ME
+                hadError = true;
+                warning('bosonPlotter:themePref:writeFailed', ...
+                    ['Could not save theme preference to\n  %s\n%s\n' ...
+                     'The theme will apply now but may not persist to the next session.'], ...
+                    CACHED_PATH, ME.message);
+            end
+            if ~persisted && ~hadError
+                warning('bosonPlotter:themePref:notVerified', ...
+                    ['Theme preference write to\n  %s\ndid not verify; it may not ' ...
+                     'persist across sessions.'], CACHED_PATH);
             end
             if nargout > 0, out = value; end
         otherwise
