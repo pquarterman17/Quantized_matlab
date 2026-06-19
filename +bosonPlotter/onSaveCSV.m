@@ -109,8 +109,14 @@ function [mode, applyWf] = askExportMode(fig, nSel, wfOn, theme)
         return;
     end
 
+    pos = [300 300 390 230];
+    try
+        fp = fig.Position;
+        pos(1:2) = [fp(1) + (fp(3)-pos(3))/2, fp(2) + (fp(4)-pos(4))/2];
+    catch
+    end
     dlg = uifigure('Name', 'CSV Export', 'WindowStyle', 'modal', ...
-        'Resize', 'off', 'Position', [300 300 390 230]);
+        'Resize', 'off', 'Position', pos);
     gl = uigridlayout(dlg, [4 1], 'RowHeight', {34, 96, 26, 36}, ...
         'Padding', [14 12 14 12], 'RowSpacing', 8);
 
