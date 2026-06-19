@@ -84,4 +84,8 @@ function onFigSizeChanged(appData, fig, widgets, constants, callbacks)
         widgets.dataTablePanel.Visible = 'on';
     end
 
+    % Panel pixel positions just changed — drop the resize-border bounds
+    % cache so the next hover recomputes them (see detectResizeBorder).
+    appData.panelBoundsCacheTic = uint64(0);
+
 end

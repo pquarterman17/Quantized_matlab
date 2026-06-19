@@ -77,6 +77,25 @@ classdef AppState < handle
         corrPanelWidth    double = 357
         axLimPanelWidth   double = 200
 
+        % ── Hover performance caches (perf optimization) ───────────
+        % Panel pixel bounds are recomputed at most every PANEL_BOUNDS_TTL
+        % seconds (or when explicitly invalidated) instead of on every
+        % mouse-move, sparing ~5 getpixelposition() container walks per
+        % hover event.  See +bosonPlotter/detectResizeBorder.m.
+        panelBoundsCache    struct = struct()
+        panelBoundsCacheTic uint64 = uint64(0)
+        % Tic gating the throttled hover-readout work (~30 Hz cap).
+        hoverThrottleTic    uint64 = uint64(0)
+        % Cached wavelength (Å) of the active dataset for hover d-spacing —
+        % refreshed on dataset switch and wavelength-override edits.
+        activeWavelength_A  double = NaN
+        % Signature of the last dataset selection that triggered a replot;
+        % lets onSelectDataset skip redundant re-renders. [] = force replot.
+        lastSelectionSig    double = []
+        % Key (style#is2D) of the last applied analysis-panel config; lets
+        % updateControlsForActiveDataset skip redundant reconfiguration.
+        lastCorrConfigKey   char   = ''
+
         % ── Min panel dimensions ───────────────────────────────────
         MIN_CORR_W      double = 280
         MIN_PREVIEW_H   double = 150

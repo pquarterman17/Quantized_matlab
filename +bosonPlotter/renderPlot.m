@@ -180,18 +180,15 @@ function renderPlot(targetAx, ctx)
         end
 
         % ── Draw ──────────────────────────────────────────────────────────
-        delete(findall(targetAx, 'Tag', 'GUIPeakAnnotation'));
-        delete(findall(targetAx, 'Tag', 'GUISNIPBackground'));
-        delete(findall(targetAx, 'Tag', 'GUIZoomBox'));
-        delete(findall(targetAx, 'Tag', 'GUIRefLine'));
-        delete(findall(targetAx, 'Tag', 'GUIMaskedPoints'));
-        delete(findall(targetAx, 'Tag', 'GUIMaskBox'));
-        delete(findall(targetAx, 'Tag', 'GUIFringeMarker'));
-        delete(findall(targetAx, 'Tag', 'GUIFringeAnnotation'));
-        delete(findall(targetAx, 'Tag', 'GUIFringeSpan'));
-        delete(findall(targetAx, 'Tag', 'GUIPhaseTickMark'));
-        delete(findall(targetAx, 'Tag', 'GUIPhaseLabel'));
-        delete(findall(targetAx, 'Tag', 'GUISmoothPreview'));
+        % Remove tagged overlays in a single tree walk.  findall (not
+        % delete(targetAx.Children)) is required because several of these
+        % are created with HandleVisibility='off' and would otherwise
+        % survive both delete(ax.Children) and cla().  The anchored regexp
+        % matches exactly the overlay tags and nothing else.
+        delete(findall(targetAx, '-regexp', 'Tag', ...
+            ['^GUI(PeakAnnotation|SNIPBackground|ZoomBox|RefLine|' ...
+             'MaskedPoints|MaskBox|FringeMarker|FringeAnnotation|' ...
+             'FringeSpan|PhaseTickMark|PhaseLabel|SmoothPreview)$']));
         appData.smoothPreviewLine = [];
         delete(targetAx.Children);
         cla(targetAx);

@@ -25,6 +25,10 @@ function rebuildDatasetList(appData, ui, keepActiveIdx)
     btnRemoveDS = ui.btnRemoveDS;
     btnMerge    = ui.btnMerge;
 
+    % Listbox indices are about to change meaning — force the next
+    % onSelectDataset to replot rather than matching a stale signature.
+    appData.lastSelectionSig = [];
+
     N = numel(appData.datasets);
     if N == 0
         lbDatasets.Items     = {'(no files loaded — click  Add File(s)...  to begin)'};
@@ -102,11 +106,17 @@ function rebuildDatasetList(appData, ui, keepActiveIdx)
         lbDatasets.Value  = {visIdx(1)};
     end
 
-    % Apply color swatches via uistyle per visible item
+    % Apply color swatches via uistyle.  Group visible rows by colour so
+    % each distinct colour is one addStyle bridge call rather than one per
+    % row — datasets cycling a 7-colour palette cost 7 calls, not N.  The
+    % row positions passed to addStyle are 1-based within the visible list,
+    % matching lbDatasets.Items order.
     removeStyle(lbDatasets);
-    for si = 1:numel(visIdx)
-        s = uistyle('FontColor', dsColors(visIdx(si),:));
-        addStyle(lbDatasets, s, 'item', si);
+    visColors = dsColors(visIdx, :);
+    [uniqueCols, ~, grpIdx] = unique(visColors, 'rows', 'stable');
+    for ci = 1:size(uniqueCols, 1)
+        rows = find(grpIdx == ci);
+        addStyle(lbDatasets, uistyle('FontColor', uniqueCols(ci, :)), 'item', rows(:)');
     end
 end
 

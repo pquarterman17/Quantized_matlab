@@ -96,10 +96,13 @@ function applyCorrectionsAll(appData, fig, ui, callbacks)
         ds.normMethod    = normVal;
 
         appData.datasets{di} = ds;
-        try
-            appData.model.updateDataset(di, ds);
-        catch
-        end
+    end
+
+    % Sync the shared model in one shot — a linked DataWorkspace rebuilds a
+    % single time instead of once per dataset (N DataChanged events → 1).
+    try
+        appData.model.updateDatasetsBatch(appData.datasets);
+    catch
     end
 
     % Refresh plot

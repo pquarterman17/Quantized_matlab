@@ -2255,8 +2255,14 @@ function varargout = BosonPlotter(options)
         end
         lbDatasets.Tooltip = tipStr;
 
-        % Always replot — selection may have changed even if active didn't
-        onPlot([],[]);
+        % Replot only when the rendered selection set changed (active may be
+        % unchanged yet the overlay set differs — ctrl-click).
+        if iscell(rawVal), selVec = cell2mat(rawVal(:)'); else, selVec = rawVal(:)'; end
+        selSig = sort(selVec);
+        if activeChanged || ~isequal(selSig, appData.lastSelectionSig)
+            appData.lastSelectionSig = selSig;
+            onPlot([],[]);
+        end
     end
 
     function onSearchChanged(~,~)
@@ -2488,6 +2494,9 @@ function varargout = BosonPlotter(options)
 
     function applyParserAnalysisConfig(pName)
     %APPLYPARSERANALYSISCONFIG  Delegate to extracted +bosonPlotter module.
+        % Invalidate the reconfigure-skip cache so any direct call forces a
+        % fresh apply; updateControls re-sets the key after its own call.
+        appData.lastCorrConfigKey = '';
         bosonPlotter.applyParserAnalysisConfig(pName, appData, ui, CROW, peakFig, apacCb_);
     end
 
@@ -2773,6 +2782,7 @@ function varargout = BosonPlotter(options)
         v  = src.Value;
         ds.wavelengthOverride_A = guiTernary(isnan(v) || v <= 0, NaN, v);
         appData.datasets{appData.activeIdx} = ds;
+        appData.activeWavelength_A = extractWavelength_A(ds);  % keep hover cache fresh
         % Sync dropdown: if value matches a preset, select it; else set Custom
         matchIdx = find(abs([XRAY_SOURCES{:,2}] - v) < 1e-4, 1);
         if ~isempty(matchIdx)
@@ -2796,6 +2806,7 @@ function varargout = BosonPlotter(options)
                 ds = appData.datasets{appData.activeIdx};
                 ds.wavelengthOverride_A = wl;
                 appData.datasets{appData.activeIdx} = ds;
+                appData.activeWavelength_A = extractWavelength_A(ds);  % keep hover cache fresh
                 peakCb.refreshPeakTable();
             end
         end
@@ -3530,10 +3541,12 @@ function varargout = BosonPlotter(options)
     %  just mark Apply as dirty and wait for click.
         mode = applyMode_();
         if strcmp(mode, 'Live')
-            onApplyCorrections([], []);
+            % Coalesce rapid keystrokes into one recompute ~0.1 s after the
+            % last change (feels immediate; avoids per-keystroke full render).
+            scheduleAutoRecalc(0.1);
             return;
         end
-        if strcmp(mode, 'Auto'), scheduleAutoRecalc(); end
+        if strcmp(mode, 'Auto'), scheduleAutoRecalc(0.3); end
         if isvalid(btnApply)
             btnApply.Text      = 'Apply  *';
             btnApply.FontColor = [1 0.85 0.2];
@@ -3550,11 +3563,10 @@ function varargout = BosonPlotter(options)
         end
     end
 
-    function scheduleAutoRecalc()
-    %SCHEDULEAUTORECALC  Debounced auto-recalculate trigger.
-    %   Stops any pending timer and starts a new 0.3 s single-shot timer
-    %   whose callback fires onApplyCorrections.  Rapid successive changes
-    %   restart the delay, so recalculation happens once the user pauses.
+    function scheduleAutoRecalc(delaySec)
+    %SCHEDULEAUTORECALC  Debounced recalc trigger (delaySec, default 0.3 s);
+    %   restarting before it fires resets the delay.  Live mode passes ~0.1 s.
+        if nargin < 1 || isempty(delaySec), delaySec = 0.3; end
         % Stop and discard any pending timer
         if ~isempty(appData.autoRecalcTimer) && isvalid(appData.autoRecalcTimer)
             stop(appData.autoRecalcTimer);
@@ -3562,7 +3574,7 @@ function varargout = BosonPlotter(options)
         end
         appData.autoRecalcTimer = timer( ...
             'ExecutionMode', 'singleShot', ...
-            'StartDelay',    0.3, ...
+            'StartDelay',    delaySec, ...
             'TimerFcn',      @(~,~) onAutoRecalcFire());
         start(appData.autoRecalcTimer);
     end
@@ -5015,20 +5027,26 @@ function onSendToOrigin(~,~)
     %ONMOUSEHOVER  Update x,y readout and set resize cursor near panel borders.
     %  Fires continuously while the mouse moves over the figure in idle (non-drag) mode.
 
-        % -- Panel resize border detection: update cursor and store hover direction --
+        % -- Panel resize border detection (cached bounds; see detectResizeBorder) --
         dir = bosonPlotter.detectResizeBorder(fig, struct( ...
             'fileListPanel',  fileListPanel, ...
             'ctrlPanel',      ctrlPanel, ...
             'corrPanel',      corrPanel, ...
             'savePanel',      savePanel, ...
             'analysisPanel',  analysisPanel, ...
-            'dataTablePanel', dataTablePanel));
+            'dataTablePanel', dataTablePanel), appData);
         appData.panelResizeDir = dir;
         if     strcmp(dir, 'h_row12'), fig.Pointer = 'top';
         elseif any(strcmp(dir, {'v_col12', 'v_col23', 'v_content12', 'v_content23'}))
                                                           fig.Pointer = 'left';
         else,                                             fig.Pointer = 'arrow';
         end
+
+        % ── Throttle readout to ~30 Hz (border detection above stays live) ─
+        if appData.hoverThrottleTic ~= 0 && toc(appData.hoverThrottleTic) < 0.033
+            return;
+        end
+        appData.hoverThrottleTic = tic;
 
         % -- x,y readout in top-right of axes --
         if isempty(appData.cursorText) || ~isvalid(appData.cursorText), return; end
@@ -5073,8 +5091,8 @@ function onSendToOrigin(~,~)
                 if ~isnan(bestPk.fwhm) && bestPk.fwhm > 0
                     pkInfo = [pkInfo, sprintf('\nFWHM = %.4f', bestPk.fwhm)];
                 end
-                % d-spacing if wavelength is available
-                wl = extractWavelength_A(ds);
+                % d-spacing if wavelength is available (cached; see activeWavelength_A)
+                wl = appData.activeWavelength_A;
                 if ~isnan(wl) && wl > 0 && bestPk.center > 0
                     dSpacing = wl / (2 * sind(bestPk.center / 2));
                     pkInfo = [pkInfo, sprintf('\nd = %.4f %s', dSpacing, char(197))];
@@ -5529,6 +5547,8 @@ function onSendToOrigin(~,~)
 
     function startPanelResize()
     %STARTPANELRESIZE  Delegate to extracted +bosonPlotter module.
+        % Panel bounds shift during the drag — invalidate the bounds cache.
+        appData.panelBoundsCacheTic = uint64(0);
         sprWidgets_.rootGL         = rootGL;
         sprWidgets_.analysisGL     = analysisGL;
         sprWidgets_.contentGL      = contentGL;

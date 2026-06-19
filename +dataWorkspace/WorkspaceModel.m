@@ -215,6 +215,27 @@ classdef WorkspaceModel < handle
             notify(obj, 'DataChanged');
         end
 
+        function updateDatasetsBatch(obj, dsCell)
+        %UPDATEDATASETSBATCH  Replace many datasets, firing DataChanged once.
+        %
+        %   model.updateDatasetsBatch(dsCell)
+        %
+        %   Equivalent to calling updateDataset for each entry, but notifies
+        %   listeners a single time after all writes complete.  Use for bulk
+        %   operations (e.g. "Apply corrections to all datasets") so a linked
+        %   DataWorkspace rebuilds once instead of once per dataset.  Updates
+        %   the first min(numel(dsCell), numel(obj.datasets)) slots in order.
+            arguments
+                obj    (1,1) dataWorkspace.WorkspaceModel
+                dsCell cell
+            end
+            n = min(numel(dsCell), numel(obj.datasets));
+            for k = 1:n
+                obj.datasets{k} = dsCell{k};
+            end
+            notify(obj, 'DataChanged');
+        end
+
         function setMask(obj, idx, maskVec)
         %SETMASK  Set the row mask for dataset idx and fire MaskChanged.
         %

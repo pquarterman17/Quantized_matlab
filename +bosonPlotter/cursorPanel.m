@@ -82,6 +82,14 @@ function panel = cursorPanel(parentGL, row, ~, getAppDataFn)
     panel.lblRight  = lblRight;
     panel.update    = @updateReadout;
 
+    % ── Per-panel name cache ──────────────────────────────────────────────
+    % updateReadout fires on every (throttled) hover tick; the active
+    % dataset name changes only on a switch, so resolve it once per index
+    % and reuse — sparing a fileparts() per tick.  These live in the
+    % closure scope (not persistent) so each cursor panel has its own.
+    dsNameCacheIdx = -1;
+    dsNameCache    = '';
+
     % ── Inner update function ─────────────────────────────────────────────
     function updateReadout(x, y)
     %UPDATEREADOUT  Refresh the cursor panel from the current hover point.
@@ -119,22 +127,25 @@ function panel = cursorPanel(parentGL, row, ~, getAppDataFn)
             rightParts{end+1} = sprintf('DX: %+-.5g    DY: %+-.5g', dx, dy);
         end
 
-        % Dataset name
+        % Dataset name (resolved once per active index, then cached)
         if isfield(appData, 'datasets') && isfield(appData, 'activeIdx') && ...
                 appData.activeIdx >= 1 && ...
                 appData.activeIdx <= numel(appData.datasets)
-            ds = appData.datasets{appData.activeIdx};
-            dsName = '';
-            if isfield(ds, 'name') && ~isempty(ds.name)
-                dsName = ds.name;
-            elseif isfield(ds, 'data') && isfield(ds.data, 'metadata') && ...
-                    isfield(ds.data.metadata, 'filepath') && ...
-                    ~isempty(ds.data.metadata.filepath)
-                [~, fn, ext] = fileparts(ds.data.metadata.filepath);
-                dsName = [fn ext];
+            if ~isequal(appData.activeIdx, dsNameCacheIdx)
+                ds = appData.datasets{appData.activeIdx};
+                dsNameCache = '';
+                if isfield(ds, 'name') && ~isempty(ds.name)
+                    dsNameCache = ds.name;
+                elseif isfield(ds, 'data') && isfield(ds.data, 'metadata') && ...
+                        isfield(ds.data.metadata, 'filepath') && ...
+                        ~isempty(ds.data.metadata.filepath)
+                    [~, fn, ext] = fileparts(ds.data.metadata.filepath);
+                    dsNameCache = [fn ext];
+                end
+                dsNameCacheIdx = appData.activeIdx;
             end
-            if ~isempty(dsName)
-                rightParts{end+1} = dsName;
+            if ~isempty(dsNameCache)
+                rightParts{end+1} = dsNameCache;
             end
         end
 

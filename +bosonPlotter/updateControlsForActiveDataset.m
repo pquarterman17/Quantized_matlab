@@ -31,6 +31,10 @@ function updateControlsForActiveDataset(appData, ui, callbacks)
     ds = appData.datasets{appData.activeIdx};
     d  = ds.data;
 
+    % A dataset switch can flip 1D/2D mode and re-flow the panel columns,
+    % so the cached resize-border bounds may be stale — invalidate them.
+    appData.panelBoundsCacheTic = uint64(0);
+
     % Suppress value-change callbacks during bulk update
     ui.ddX.ValueChangedFcn  = [];
     ui.lbY.ValueChangedFcn  = [];
@@ -127,6 +131,9 @@ function updateControlsForActiveDataset(appData, ui, callbacks)
     else
         ui.efWavelength.Value = 0;
     end
+    % Cache the active dataset's wavelength for the hover d-spacing readout
+    % (avoids re-walking metadata on every throttled mouse-move tick).
+    appData.activeWavelength_A = wl_meta;
 
     % Restore per-dataset axis limits (auto-scale if not yet saved)
     if isfield(ds, 'axLims')
@@ -159,7 +166,19 @@ function updateControlsForActiveDataset(appData, ui, callbacks)
         ui.efSavePath.Value = fullfile(fp2, [fn2, '_export.csv']);
     end
 
-    callbacks.applyParserAnalysisConfig(callbacks.resolvedCorrStyle());
+    % Reconfigure the Analysis panel only when the parser style or the
+    % 1D/2D dimensionality actually changed.  Switching between same-type
+    % datasets (e.g. stepping through a homogeneous batch or animating)
+    % otherwise re-applies ~30 identical widget property writes each time.
+    % The nested applyParserAnalysisConfig dispatcher clears
+    % lastCorrConfigKey on every call, so any out-of-band reconfigure
+    % (corr-style change, layout restore) forces a fresh apply next switch.
+    corrStyle  = callbacks.resolvedCorrStyle();
+    corrCfgKey = sprintf('%s#%d', corrStyle, callbacks.is2DDataset(ds));
+    if ~strcmp(corrCfgKey, appData.lastCorrConfigKey)
+        callbacks.applyParserAnalysisConfig(corrStyle);
+        appData.lastCorrConfigKey = corrCfgKey;
+    end
 
     % Pull the per-dataset plot-state struct (may be empty for legacy
     % sessions loaded from disk before this field existed).
