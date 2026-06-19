@@ -84,6 +84,7 @@ SUITES = {
     T('gui','test_neutronCSVExport'),       'gui',    'Neutron CSV export: per-dataset blocks (own Q) for unpolarized scans vs shared-Q consolidation + asymmetry for true PNR'
     T('gui','test_sendToOrigin'),           'gui',    'Send to Origin: multi-dataset via mock COM — worksheet-per-dataset (AddSheet) and combined (ColTypes) layouts'
     T('gui','test_legendEditor'),           'gui',    'Legend editor: bulk ops (strip/replace), metadata fill, swatch column, Apply round-trip'
+    T('gui','test_waterfallExport'),        'gui',    'Waterfall CSV export: waterfallOffsets levels + exportCombinedCSV offset on signal (not error/X), additive + log'
     T('gui','test_toolbarConfig'),          'gui',    'Toolbar customisation: defaults, buildToolbar, save/load, stale IDs'
     T('gui','test_undoManager'),            'gui',    'UndoManager: push, undo, redo, branch discard, cap, clear, labels'
     T('gui','test_filterRows'),             'gui',    'filterRows: expression parser, operators, functions, edge cases'

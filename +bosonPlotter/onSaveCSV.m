@@ -31,11 +31,12 @@ function onSaveCSV(appData, fig, ui, callbacks)
     selIdx = resolveSelectedIndices(ui.lbDatasets, appData);
     multiSelected = numel(selIdx) > 1;
 
+    wfOn = isfield(callbacks, 'waterfall') && isstruct(callbacks.waterfall) && callbacks.waterfall.on;
     if multiSelected
-        mode = askExportMode(fig, numel(selIdx));
+        [mode, applyWf] = askExportMode(fig, numel(selIdx), wfOn, appData.theme);
         if isempty(mode), return; end
     else
-        mode = 'active';
+        mode = 'active'; applyWf = false;
     end
 
     fmt = callbacks.resolvedExportFormat();
@@ -77,10 +78,12 @@ function onSaveCSV(appData, fig, ui, callbacks)
             if isempty(fp), return; end
             fig.Pointer = 'watch'; drawnow;
             try
-                exportCombined(appData, selIdx, fp, fmt, callbacks);
+                wf = resolveWaterfall(callbacks, appData, selIdx, applyWf);
+                bosonPlotter.exportCombinedCSV(appData, selIdx, fp, fmt, wf);
                 fig.Pointer = 'arrow';
-                callbacks.recordAction(sprintf("%% Exported combined CSV: %s", fp));
-                bosonPlotter.quietAlert(fig, sprintf('Saved %d datasets to:\n%s', numel(selIdx), fp), 'Saved');
+                noteWf = guiTernary(wf.apply, ' (waterfall offset applied)', '');
+                callbacks.recordAction(sprintf("%% Exported combined CSV: %s%s", fp, noteWf));
+                bosonPlotter.quietAlert(fig, sprintf('Saved %d datasets to:\n%s%s', numel(selIdx), fp, noteWf), 'Saved');
             catch ME
                 fig.Pointer = 'arrow';
                 callbacks.logGUIError('Combined export', ME.message, ME);
@@ -93,23 +96,89 @@ end
 % Local helpers
 % ════════════════════════════════════════════════════════════════════════
 
-function mode = askExportMode(fig, nSel)
-%ASKEXPORTMODE  Prompt the user how to export multiple selected datasets.
-    choices = { ...
-        sprintf('Active dataset only'), ...
-        sprintf('Each as separate file (%d files)', nSel), ...
-        sprintf('Combined into one CSV (%d datasets side-by-side)', nSel), ...
-        'Cancel'};
-    answer = bosonPlotter.quietConfirm(fig, ...
-        sprintf('%d datasets selected. How should they be exported?', nSel), ...
-        'CSV Export Mode', ...
-        'Options', choices, 'DefaultOption', 1, 'CancelOption', 4);
-    switch answer
-        case choices{1}, mode = 'active';
-        case choices{2}, mode = 'separate';
-        case choices{3}, mode = 'combined';
-        otherwise,       mode = '';
+function [mode, applyWf] = askExportMode(fig, nSel, wfOn, theme)
+%ASKEXPORTMODE  Modal dialog: pick export mode + optional waterfall offset.
+%   Returns mode 'active'|'separate'|'combined' ('' = cancelled) and a
+%   logical applyWf (the waterfall-offset checkbox; only enabled when
+%   waterfall is on and Combined is selected).
+    mode = ''; applyWf = false;
+    if nargin < 3, wfOn = false; end
+    if nargin < 4, theme = 'Dark'; end
+    if bosonPlotter.isHeadless()
+        mode = 'active';   % matches the previous default option
+        return;
     end
+
+    dlg = uifigure('Name', 'CSV Export', 'WindowStyle', 'modal', ...
+        'Resize', 'off', 'Position', [300 300 390 230]);
+    gl = uigridlayout(dlg, [4 1], 'RowHeight', {34, 96, 26, 36}, ...
+        'Padding', [14 12 14 12], 'RowSpacing', 8);
+
+    uilabel(gl, 'Text', sprintf('%d datasets selected. How should they be exported?', nSel), ...
+        'WordWrap', 'on');
+
+    bg = uibuttongroup(gl, 'BorderType', 'none');
+    rbActive = uiradiobutton(bg, 'Text', 'Active dataset only', 'Position', [6 70 350 20]);
+    rbSep    = uiradiobutton(bg, 'Text', sprintf('Each as separate file (%d files)', nSel), 'Position', [6 42 350 20]); %#ok<NASGU>
+    rbComb   = uiradiobutton(bg, 'Text', sprintf('Combined into one CSV (%d side-by-side)', nSel), 'Position', [6 14 350 20]);
+    bg.SelectedObject = rbActive;
+
+    cbWf = uicheckbox(gl, 'Text', 'Apply waterfall offset to Y values', 'Enable', 'off', ...
+        'Tooltip', 'Bake the on-screen waterfall stacking into the written data (Combined mode)');
+    bg.SelectionChangedFcn = @(~,~) syncWf();
+
+    btnGL = uigridlayout(gl, [1 3], 'ColumnWidth', {'1x', 90, 90}, 'Padding', [0 0 0 0]);
+    uilabel(btnGL);
+    uibutton(btnGL, 'Text', 'Cancel', 'ButtonPushedFcn', @(~,~) finish(false));
+    uibutton(btnGL, 'Text', 'Export', 'FontWeight', 'bold', 'ButtonPushedFcn', @(~,~) finish(true));
+
+    try, bosonPlotter.applyDialogTheme(dlg, theme); catch, end
+    syncWf();
+    uiwait(dlg);
+
+    function syncWf()
+        if wfOn && bg.SelectedObject == rbComb
+            cbWf.Enable = 'on';
+        else
+            cbWf.Enable = 'off';
+        end
+    end
+
+    function finish(ok)
+        if ok
+            so = bg.SelectedObject;
+            if     so == rbComb, mode = 'combined';
+            elseif so == rbActive, mode = 'active';
+            else,                  mode = 'separate';
+            end
+            applyWf = strcmp(cbWf.Enable, 'on') && cbWf.Value;
+        else
+            mode = '';
+        end
+        if isvalid(dlg), uiresume(dlg); delete(dlg); end
+    end
+end
+
+function wf = resolveWaterfall(callbacks, appData, selIdx, applyWf)
+%RESOLVEWATERFALL  Build the waterfall-offset spec for exportCombinedCSV.
+    wf = struct('apply', false, 'levels', [], 'spacing', 0, 'logMode', false);
+    if ~applyWf || ~isfield(callbacks, 'waterfall') || ~callbacks.waterfall.on
+        return;
+    end
+    w  = callbacks.waterfall;
+    sp = w.rawSpacing;
+    if isempty(sp) || ~isnumeric(sp) || sp <= 0
+        if isfield(callbacks, 'computeAutoWaterfallSpacing')
+            sp = callbacks.computeAutoWaterfallSpacing();
+        else
+            sp = 0;
+        end
+    end
+    if isempty(sp) || sp <= 0, return; end
+    wf.apply   = true;
+    wf.spacing = sp;
+    wf.logMode = isfield(w, 'logMode') && w.logMode;
+    wf.levels  = bosonPlotter.waterfallOffsets(appData.datasets, selIdx);
 end
 
 function fp = pickSaveFile(~, appData, dsIdx, suffix)
@@ -170,100 +239,6 @@ function exportSingleDataset(appData, dsIdx, fp, fmt, ~, callbacks)
     end
 end
 
-function exportCombined(appData, selIdx, fp, fmt, ~)
-%EXPORTCOMBINED  Write multiple datasets side-by-side into one CSV.
-    allHdrs = {};
-    allCols = {};
-    maxRows = 0;
-    for k = 1:numel(selIdx)
-        di = selIdx(k);
-        ds = appData.datasets{di};
-        hasCorrected = ~isempty(ds.corrData);
-        d = guiTernary(hasCorrected, ds.corrData, ds.data);
-        d = bosonPlotter.applyDisplayUnits(d, ds, appData);
-        [~, fn, fext] = fileparts(ds.filepath);
-        tag = guiTernary(isfield(ds,'legendName') && ~isempty(ds.legendName), ...
-            ds.legendName, [fn fext]);
-
-        xName = 'X';
-        if isfield(d, 'metadata') && isfield(d.metadata, 'xName')
-            xName = d.metadata.xName;
-        end
-        allHdrs{end+1} = sprintf('%s [%s]', xName, tag); %#ok<AGROW>
-        allCols{end+1} = d.time(:); %#ok<AGROW>
-
-        for ci = 1:numel(d.labels)
-            lbl = d.labels{ci};
-            if ~isempty(d.units{ci})
-                lbl = sprintf('%s (%s)', lbl, d.units{ci});
-            end
-            allHdrs{end+1} = sprintf('%s [%s]', lbl, tag); %#ok<AGROW>
-            allCols{end+1} = d.values(:, ci); %#ok<AGROW>
-        end
-        maxRows = max(maxRows, numel(d.time));
-    end
-
-    dirPart = fileparts(fp);
-    if ~isempty(dirPart) && ~isfolder(dirPart)
-        error('exportCombined:badDir', 'Output directory does not exist:\n%s', dirPart);
-    end
-    fid = fopen(fp, 'w');
-    if fid < 0
-        error('exportCombined:cannotOpen', 'Cannot open file for writing:\n%s', fp);
-    end
-    closeGuard = onCleanup(@() fclose(fid));
-
-    if strcmp(fmt, 'origin')
-        longNames = cellfun(@(h) strtrim(regexprep(h, '\s*\([^)]+\)', '')), ...
-                            allHdrs, 'UniformOutput', false);
-        units = cellfun(@(h) extractUnit(h), allHdrs, 'UniformOutput', false);
-        desigs = cell(size(allHdrs));
-        isX = true;
-        for ci = 1:numel(allHdrs)
-            if isX, desigs{ci} = 'X'; isX = false;
-            elseif contains(lower(allHdrs{ci}), {'err','std','sigma'}), desigs{ci} = 'yEr';
-            else, desigs{ci} = 'Y';
-            end
-            if ci < numel(allHdrs) && ~isempty(regexp(allHdrs{ci+1}, '^\s*X\b', 'once'))
-                isX = true;
-            end
-        end
-        fprintf(fid, '%s\n', strjoin(longNames, ','));
-        fprintf(fid, '%s\n', strjoin(units, ','));
-        fprintf(fid, '%s\n', strjoin(desigs, ','));
-    else
-        fprintf(fid, '%s\n', strjoin(allHdrs, ','));
-    end
-
-    hasDatetime = any(cellfun(@isdatetime, allCols));
-    if hasDatetime
-        for r = 1:maxRows
-            parts = cell(1, numel(allCols));
-            for ci = 1:numel(allCols)
-                col = allCols{ci};
-                if r <= numel(col)
-                    if isdatetime(col)
-                        parts{ci} = datestr(col(r), 'yyyy-mm-dd HH:MM:SS'); %#ok<DATST>
-                    else
-                        parts{ci} = sprintf('%.10g', col(r));
-                    end
-                else
-                    parts{ci} = '';
-                end
-            end
-            fprintf(fid, '%s\n', strjoin(parts, ','));
-        end
-    else
-        mat = NaN(maxRows, numel(allCols));
-        for ci = 1:numel(allCols)
-            col = allCols{ci};
-            mat(1:numel(col), ci) = col;
-        end
-        rowFmt = ['%.10g', repmat(',%.10g', 1, size(mat, 2) - 1), '\n'];
-        fprintf(fid, rowFmt, mat.');
-    end
-end
-
 function selIdx = resolveSelectedIndices(lbDatasets, appData)
 %RESOLVESELECTEDINDICES  Get selected dataset indices from the listbox.
     rawVal = lbDatasets.Value;
@@ -289,9 +264,4 @@ function d = resolveStartDir(appData)
     else
         d = pwd;
     end
-end
-
-function u = extractUnit(hdr)
-    tok = regexp(hdr, '\(([^)]+)\)', 'tokens', 'once');
-    if ~isempty(tok), u = tok{1}; else, u = ''; end
 end

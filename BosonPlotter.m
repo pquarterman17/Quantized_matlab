@@ -4297,12 +4297,12 @@ function onLoadBackground(~,~)
 
     function onSaveCSV(~,~)
     %ONSAVECSV  Delegate — see +bosonPlotter/onSaveCSV.m.
-        oscsvCb_.resolvedExportFormat    = @resolvedExportFormat;
-        oscsvCb_.findPolarizationPairs   = @findPolarizationPairs;
-        oscsvCb_.recordAction            = @recordAction;
-        oscsvCb_.logGUIError             = @logGUIError;
-        oscsvCb_.guiSaveCSV              = @guiSaveCSV;
-        oscsvCb_.setStatus               = @setStatus;
+        oscsvCb_ = struct('resolvedExportFormat', @resolvedExportFormat, ...
+            'findPolarizationPairs', @findPolarizationPairs, 'recordAction', @recordAction, ...
+            'logGUIError', @logGUIError, 'guiSaveCSV', @guiSaveCSV, 'setStatus', @setStatus, ...
+            'computeAutoWaterfallSpacing', @computeAutoWaterfallSpacing, ...
+            'waterfall', struct('on', cbWaterfall.Value, 'rawSpacing', efWaterfallSpacing.Value, ...
+                'logMode', strcmp(ddScaleY.Value, 'Log')));
         bosonPlotter.onSaveCSV(appData, fig, ui, oscsvCb_);
     end
 
