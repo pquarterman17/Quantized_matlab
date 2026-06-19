@@ -89,9 +89,9 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
-%  3. Origin format: per-dataset blocks get correct X/Y/yEr designations
+%  3. Origin format: 4 header rows (Long Name / Units / File Name / Comments)
 % ════════════════════════════════════════════════════════════════════════
-fprintf('\n== TEST 3: origin format designations for per-dataset blocks ==\n');
+fprintf('\n== TEST 3: origin format multi-row header for per-dataset blocks ==\n');
 try
     Q1 = (0.01:0.01:0.04)';
     Q2 = (0.01:0.01:0.04)';
@@ -104,15 +104,68 @@ try
     txt = fileread(fp);
     lines = regexp(txt, '\r?\n', 'split');
     lines = lines(~cellfun(@(l) isempty(strtrim(l)), lines));
-    assert(numel(lines) >= 3, 'origin format needs >= 3 header rows');
-    desig = strsplit(lines{3}, ',', 'CollapseDelimiters', false);
+    assert(numel(lines) >= 4, 'origin format needs 4 header rows');
 
-    % Layout: Q R dR | Q R dR  →  X Y yEr X Y yEr
+    % Row 1 (Long Name): clean — no file tag brackets, no unit parentheses.
+    assert(~any(ismember('[]()', lines{1})), ...
+        sprintf('Long Name row not clean: %s', lines{1}));
+    longNames = strsplit(lines{1}, ',', 'CollapseDelimiters', false);
+    assert(isequal(longNames(:)', {'Q','R','dR','Q','R','dR'}), ...
+        sprintf('Long Name row mismatch: got %s', strjoin(longNames, ',')));
+
+    % Row 3 (File Name): source file per column.
+    fileRow = strsplit(lines{3}, ',', 'CollapseDelimiters', false);
+    expectFiles = {'org_a.refl','org_a.refl','org_a.refl','org_b.refl','org_b.refl','org_b.refl'};
+    assert(isequal(fileRow(:)', expectFiles), ...
+        sprintf('File Name row mismatch: got %s', strjoin(fileRow, ',')));
+
+    % Row 4 (Comments): Q R dR | Q R dR  →  X Y yEr X Y yEr
+    desig = strsplit(lines{4}, ',', 'CollapseDelimiters', false);
     expect = {'X','Y','yEr','X','Y','yEr'};
     assert(isequal(desig(:)', expect), ...
         sprintf('designation row mismatch: got %s', strjoin(desig, ',')));
 
-    fprintf('  Designations: %s\n', strjoin(desig, ', '));
+    fprintf('  Long Name: %s\n', strjoin(longNames, ', '));
+    fprintf('  File Name: %s\n', strjoin(fileRow, ', '));
+    fprintf('  Comments : %s\n', strjoin(desig, ', '));
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  3b. Origin designations for real NCNR column names → X / Y / yEr / xEr
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n== TEST 3b: origin designations for Intensity/uncertainty/resolution ==\n');
+try
+    Q = (0.01:0.01:0.05)';
+    ds = makeReflDs(fullfile(tmpDir,'refl_real.refl'), Q, ...
+        {'Intensity','uncertainty','resolution'}, {'counts','counts','1/Ang'}, ...
+        [0.9*ones(5,1), 0.01*ones(5,1), 0.001*ones(5,1)]);
+
+    fp = fullfile(tmpDir, 'refl_real_origin.csv');
+    bosonPlotter.saveConsolidatedNeutronCSV(ds, fp, 'origin', {ds});
+
+    txt = fileread(fp);
+    lines = regexp(txt, '\r?\n', 'split');
+    lines = lines(~cellfun(@(l) isempty(strtrim(l)), lines));
+
+    longNames = strsplit(lines{1}, ',', 'CollapseDelimiters', false);
+    units     = strsplit(lines{2}, ',', 'CollapseDelimiters', false);
+    desig     = strsplit(lines{4}, ',', 'CollapseDelimiters', false);
+
+    assert(isequal(longNames(:)', {'Q','Intensity','uncertainty','resolution'}), ...
+        sprintf('Long Name mismatch: %s', strjoin(longNames, ',')));
+    assert(isequal(units(:)', {'1/Ang','counts','counts','1/Ang'}), ...
+        sprintf('Units mismatch: %s', strjoin(units, ',')));
+    assert(isequal(desig(:)', {'X','Y','yEr','xEr'}), ...
+        sprintf('Designation mismatch (want X,Y,yEr,xEr): %s', strjoin(desig, ',')));
+
+    fprintf('  Long Name: %s\n', strjoin(longNames, ', '));
+    fprintf('  Units    : %s\n', strjoin(units, ', '));
+    fprintf('  Comments : %s\n', strjoin(desig, ', '));
     fprintf('  PASS\n');
     passed = passed + 1;
 catch ME
@@ -174,6 +227,25 @@ function ds = makeNeutronDs(filepath, pol, Q, R, dR)
         'values', [R(:), dR(:)], ...
         'labels', {{'R', 'dR'}}, ...
         'units',  {{'', ''}}, ...
+        'metadata', meta);
+    ds = struct( ...
+        'filepath',   filepath, ...
+        'parserName', 'importNCNRRefl', ...
+        'data',       data, ...
+        'corrData',   []);
+end
+
+function ds = makeReflDs(filepath, Q, labels, units, values)
+%MAKEREFLDS  Neutron dataset with explicit value labels/units (real .refl names).
+    meta = struct();
+    meta.parserName = 'importNCNRRefl';
+    meta.xColumnUnit = '1/Ang';
+    meta.parserSpecific = struct('dataSource', 'NCNR reductus');
+    data = struct( ...
+        'time',   Q(:), ...
+        'values', values, ...
+        'labels', {labels}, ...
+        'units',  {units}, ...
         'metadata', meta);
     ds = struct( ...
         'filepath',   filepath, ...

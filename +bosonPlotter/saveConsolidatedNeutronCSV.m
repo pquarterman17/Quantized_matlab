@@ -13,6 +13,17 @@ function saveConsolidatedNeutronCSV(activeDs, fp, fmt, datasets)
 %       followed by its R/dR/theory.  No interpolation, so the raw sampling
 %       of every scan is preserved (no shared-grid resampling).
 %
+%   Header format
+%     'standard' (default) — one header row of '<Long Name> (<unit>)'.  The
+%        source file is NOT crammed into the header (it lives in the file name
+%        and, for multi-scan files, in the Origin header below).
+%     'origin' — four header rows so nothing is stuffed into one line:
+%        Row 1  Long Name  (clean column name, no units / no file tag)
+%        Row 2  Units
+%        Row 3  File Name  (source file for that column; blank for derived
+%               columns such as Asymmetry)
+%        Row 4  Comments   (Origin column designation: X / Y / yEr / xEr)
+%
 % Syntax
 %   bosonPlotter.saveConsolidatedNeutronCSV(activeDs, fp, fmt, datasets)
 %
@@ -70,19 +81,26 @@ function saveConsolidatedNeutronCSV(activeDs, fp, fmt, datasets)
     pols = {collected.pol};
     distinctPols = unique(pols(~cellfun(@isempty, pols)));
     if numel(distinctPols) >= 2
-        [allHdrs, allCols, desigs] = buildPolarizedColumns(collected, polOrder, polSuffix);
+        cols = buildPolarizedColumns(collected, polOrder, polSuffix);
     else
-        [allHdrs, allCols, desigs] = buildPerDatasetColumns(collected);
+        cols = buildPerDatasetColumns(collected);
     end
 
-    writeColumnsCSV(fp, fmt, allHdrs, allCols, desigs);
+    writeColumnsCSV(fp, fmt, cols);
 end
 
 % ════════════════════════════════════════════════════════════════════════════
 % Column builders
 % ════════════════════════════════════════════════════════════════════════════
+%
+% Both builders return a struct array of columns with fields:
+%   .name   long name (clean, no units, no file tag)
+%   .unit   unit string ('' if none)
+%   .file   source file name ('' for derived columns)
+%   .desig  Origin column designation ('X' / 'Y' / 'yEr' / 'xEr')
+%   .data   numeric column vector
 
-function [allHdrs, allCols, desigs] = buildPolarizedColumns(collected, polOrder, polSuffix)
+function cols = buildPolarizedColumns(collected, polOrder, polSuffix)
 %BUILDPOLARIZEDCOLUMNS  Shared-Q table with R/dR/theory per polarization plus
 %   spin asymmetry.  Cross-sections are interpolated onto the first dataset's
 %   Q grid (required so asymmetry can be computed point-by-point).
@@ -92,18 +110,11 @@ function [allHdrs, allCols, desigs] = buildPolarizedColumns(collected, polOrder,
                       collected(1).ds.corrData, collected(1).ds.data);
     Q = src0.time(:);
     nRows = numel(Q);
+    qUnit = resolveXUnit(src0);
+    qFile = datasetFileName(collected(1).ds);
 
-    % ── Determine Q unit ──────────────────────────────────────────────────
-    qUnit = '';
-    if isfield(src0.metadata, 'parserSpecific') && ...
-       isfield(src0.metadata.parserSpecific, 'xUnit')
-        qUnit = src0.metadata.parserSpecific.xUnit;
-    end
-    qHdr = guiTernary(~isempty(qUnit), sprintf('Q (%s)', qUnit), 'Q');
+    cols = newColumn('Q', qUnit, qFile, 'X', Q);
 
-    % ── Collect columns per polarization ──────────────────────────────────
-    allHdrs = {qHdr};
-    allCols = {Q};
     hasPP = false; hasMM = false;
     RPP = []; RMM = []; dRPP = []; dRMM = []; thPP = []; thMM = [];
 
@@ -113,6 +124,7 @@ function [allHdrs, allCols, desigs] = buildPolarizedColumns(collected, polOrder,
         src    = guiTernary(~isempty(dsi.corrData), dsi.corrData, dsi.data);
         pidx   = find(strcmp(polOrder, pol), 1);
         suffix = polSuffix{pidx};
+        file   = datasetFileName(dsi);
 
         iR  = find(strcmp(src.labels, 'R'), 1);
         idR = find(strcmp(src.labels, 'dR'), 1);
@@ -125,24 +137,21 @@ function [allHdrs, allCols, desigs] = buildPolarizedColumns(collected, polOrder,
         if ~isempty(iR)
             Rcol = src.values(:, iR);
             if needInterp, Rcol = interp1(Qi, Rcol, Q, 'linear', NaN); end
-            allHdrs{end+1} = sprintf('R_%s', suffix); %#ok<AGROW>
-            allCols{end+1} = Rcol(:); %#ok<AGROW>
+            cols(end+1) = newColumn(sprintf('R_%s', suffix), '', file, 'Y', Rcol(:)); %#ok<AGROW>
             if strcmp(pol, '++'), RPP = Rcol(:); hasPP = true; end
             if strcmp(pol, '--'), RMM = Rcol(:); hasMM = true; end
         end
         if ~isempty(idR)
             dRcol = src.values(:, idR);
             if needInterp, dRcol = interp1(Qi, dRcol, Q, 'linear', NaN); end
-            allHdrs{end+1} = sprintf('dR_%s', suffix); %#ok<AGROW>
-            allCols{end+1} = dRcol(:); %#ok<AGROW>
+            cols(end+1) = newColumn(sprintf('dR_%s', suffix), '', file, 'yEr', dRcol(:)); %#ok<AGROW>
             if strcmp(pol, '++'), dRPP = dRcol(:); end
             if strcmp(pol, '--'), dRMM = dRcol(:); end
         end
         if ~isempty(iTh)
             thcol = src.values(:, iTh);
             if needInterp, thcol = interp1(Qi, thcol, Q, 'linear', NaN); end
-            allHdrs{end+1} = sprintf('theory_%s', suffix); %#ok<AGROW>
-            allCols{end+1} = thcol(:); %#ok<AGROW>
+            cols(end+1) = newColumn(sprintf('theory_%s', suffix), '', file, 'Y', thcol(:)); %#ok<AGROW>
             if strcmp(pol, '++'), thPP = thcol(:); end
             if strcmp(pol, '--'), thMM = thcol(:); end
         end
@@ -154,16 +163,14 @@ function [allHdrs, allCols, desigs] = buildPolarizedColumns(collected, polOrder,
         asymVal = NaN(nRows, 1);
         sumR = RPP + RMM;
         asymVal(valid) = (RPP(valid) - RMM(valid)) ./ sumR(valid);
-        allHdrs{end+1} = 'Asymmetry';
-        allCols{end+1} = asymVal;
+        cols(end+1) = newColumn('Asymmetry', '', '', 'Y', asymVal);
 
         % Propagated error: dA = 2/(R+++R--)^2 * sqrt((R--*dR++)^2 + (R++*dR--)^2)
         if ~isempty(dRPP) && ~isempty(dRMM)
             dAsym = NaN(nRows, 1);
             dAsym(valid) = 2 ./ sumR(valid).^2 .* ...
                 sqrt((RMM(valid) .* dRPP(valid)).^2 + (RPP(valid) .* dRMM(valid)).^2);
-            allHdrs{end+1} = 'dAsymmetry';
-            allCols{end+1} = dAsym;
+            cols(end+1) = newColumn('dAsymmetry', '', '', 'yEr', dAsym);
         end
 
         % Theory asymmetry
@@ -172,42 +179,28 @@ function [allHdrs, allCols, desigs] = buildPolarizedColumns(collected, polOrder,
             asymTh = NaN(nRows, 1);
             sumTh = thPP + thMM;
             asymTh(validTh) = (thPP(validTh) - thMM(validTh)) ./ sumTh(validTh);
-            allHdrs{end+1} = 'Asymmetry_theory';
-            allCols{end+1} = asymTh;
+            cols(end+1) = newColumn('Asymmetry_theory', '', '', 'Y', asymTh);
         end
     end
-
-    desigs = buildColumnDesignations(allHdrs);
 end
 
-function [allHdrs, allCols, desigs] = buildPerDatasetColumns(collected)
+function cols = buildPerDatasetColumns(collected)
 %BUILDPERDATASETCOLUMNS  One Q + values block per dataset, each keeping its own
 %   Q column.  No interpolation onto a shared grid — every scan's native
-%   sampling is preserved.  Columns: Q [tag], <label> [tag], ... per dataset.
-    allHdrs = {};
-    allCols = {};
-    desigs  = {};
+%   sampling is preserved.
+    cols = newColumn();   % empty 0x0 struct array with the right fields
     for ci = 1:numel(collected)
-        dsi = collected(ci).ds;
-        src = guiTernary(~isempty(dsi.corrData), dsi.corrData, dsi.data);
-        tag = datasetTag(dsi);
+        dsi  = collected(ci).ds;
+        src  = guiTernary(~isempty(dsi.corrData), dsi.corrData, dsi.data);
+        file = datasetFileName(dsi);
 
-        qUnit = '';
-        if isfield(src, 'metadata') && isfield(src.metadata, 'parserSpecific') && ...
-           isfield(src.metadata.parserSpecific, 'xUnit')
-            qUnit = src.metadata.parserSpecific.xUnit;
-        end
-        allHdrs{end+1} = headerWithUnit('Q', tag, qUnit); %#ok<AGROW>
-        allCols{end+1} = src.time(:);                      %#ok<AGROW>
-        desigs{end+1}  = 'X';                              %#ok<AGROW>
+        cols(end+1) = newColumn('Q', resolveXUnit(src), file, 'X', src.time(:)); %#ok<AGROW>
 
         for li = 1:numel(src.labels)
             lbl = src.labels{li};
             u = '';
             if li <= numel(src.units), u = src.units{li}; end
-            allHdrs{end+1} = headerWithUnit(lbl, tag, u); %#ok<AGROW>
-            allCols{end+1} = src.values(:, li);            %#ok<AGROW>
-            desigs{end+1}  = columnRole(lbl);              %#ok<AGROW>
+            cols(end+1) = newColumn(lbl, u, file, columnRole(lbl), src.values(:, li)); %#ok<AGROW>
         end
     end
 end
@@ -216,11 +209,13 @@ end
 % CSV writer
 % ════════════════════════════════════════════════════════════════════════════
 
-function writeColumnsCSV(fp, fmt, hdrs, cols, desigs)
+function writeColumnsCSV(fp, fmt, cols)
 %WRITECOLUMNSCSV  Write header(s) + numeric columns to fp.  Columns may have
 %   different lengths (per-dataset blocks); shorter columns leave trailing
-%   cells blank rather than printing NaN.  Origin format adds long-name / unit
-%   / designation header rows.
+%   cells blank rather than printing NaN.
+%
+%   'origin' writes four header rows (Long Name / Units / File Name /
+%   Comments); 'standard' writes a single '<name> (<unit>)' row.
     dirPart = fileparts(fp);
     if ~isempty(dirPart) && ~isfolder(dirPart)
         error('saveConsolidatedNeutronCSV:badDir', ...
@@ -231,28 +226,39 @@ function writeColumnsCSV(fp, fmt, hdrs, cols, desigs)
         error('saveConsolidatedNeutronCSV:cannotOpen', ...
             'Cannot open file for writing:\n%s', fp);
     end
-    closeGuard = onCleanup(@() fclose(fid)); %#ok<NASGU>
+    closeGuard = onCleanup(@() fclose(fid));   % closes fid on any exit path
+
+    names = {cols.name};
+    units = {cols.unit};
+    files = {cols.file};
+    desig = {cols.desig};
 
     if strcmp(fmt, 'origin')
-        longNames = cellfun(@(h) strtrim(regexprep(h, '\s*\([^)]+\)', '')), ...
-                            hdrs, 'UniformOutput', false);
-        units = cellfun(@extractUnitFromHeader, hdrs, 'UniformOutput', false);
-        fprintf(fid, '%s\n', strjoin(longNames, ','));
-        fprintf(fid, '%s\n', strjoin(units, ','));
-        fprintf(fid, '%s\n', strjoin(desigs, ','));
+        writeHeaderRow(fid, names);   % Long Name
+        writeHeaderRow(fid, units);   % Units
+        writeHeaderRow(fid, files);   % File Name
+        writeHeaderRow(fid, desig);   % Comments (Origin column designation)
     else
-        fprintf(fid, '%s\n', strjoin(hdrs, ','));
+        hdr = cell(1, numel(names));
+        for k = 1:numel(names)
+            if ~isempty(units{k})
+                hdr{k} = sprintf('%s (%s)', names{k}, units{k});
+            else
+                hdr{k} = names{k};
+            end
+        end
+        writeHeaderRow(fid, hdr);
     end
 
     nCols = numel(cols);
     maxRows = 0;
     for c = 1:nCols
-        maxRows = max(maxRows, numel(cols{c}));
+        maxRows = max(maxRows, numel(cols(c).data));
     end
     for r = 1:maxRows
         parts = cell(1, nCols);
         for c = 1:nCols
-            col = cols{c};
+            col = cols(c).data;
             if r <= numel(col)
                 parts{c} = sprintf('%.10g', col(r));
             else
@@ -263,9 +269,24 @@ function writeColumnsCSV(fp, fmt, hdrs, cols, desigs)
     end
 end
 
+function writeHeaderRow(fid, cells)
+%WRITEHEADERROW  Join header cells with commas (CSV-escaping each) and write.
+    fprintf(fid, '%s\n', strjoin(cellfun(@csvField, cells, 'UniformOutput', false), ','));
+end
+
 % ════════════════════════════════════════════════════════════════════════════
-% Local helpers (duplicated from BosonPlotter.m local function scope)
+% Local helpers
 % ════════════════════════════════════════════════════════════════════════════
+
+function col = newColumn(name, unit, file, desig, data)
+%NEWCOLUMN  Construct a column descriptor struct.  With no arguments returns an
+%   empty 0x0 struct array carrying the canonical field set (for accumulation).
+    if nargin == 0
+        col = struct('name', {}, 'unit', {}, 'file', {}, 'desig', {}, 'data', {});
+        return;
+    end
+    col = struct('name', name, 'unit', unit, 'file', file, 'desig', desig, 'data', data);
+end
 
 function v = guiTernary(cond, a, b)
     if cond, v = a; else, v = b; end
@@ -288,59 +309,61 @@ function baseName = neutronBaseName(filepath)
     baseName = fn;
 end
 
-function tag = datasetTag(dsi)
-%DATASETTAG  Short provenance label for a dataset: legend name or file name.
-    if isfield(dsi, 'legendName') && ~isempty(dsi.legendName)
-        tag = dsi.legendName;
-    else
-        [~, fn, fext] = fileparts(dsi.filepath);
-        tag = [fn fext];
+function nm = datasetFileName(dsi)
+%DATASETFILENAME  Source file name (with extension) for a dataset.  Falls back
+%   to the legend name, then a generic label, when no file path is present.
+    nm = '';
+    if isfield(dsi, 'filepath') && ~isempty(dsi.filepath)
+        [~, fn, fext] = fileparts(char(dsi.filepath));   % char(): tolerate string paths
+        nm = [fn, fext];
+    end
+    if isempty(nm) && isfield(dsi, 'legendName') && ~isempty(dsi.legendName)
+        nm = char(dsi.legendName);
+    end
+    if isempty(nm)
+        nm = 'dataset';
     end
 end
 
-function h = headerWithUnit(name, tag, unit)
-%HEADERWITHUNIT  '<name> [<tag>]' with an optional ' (<unit>)' suffix.
-    h = sprintf('%s [%s]', name, tag);
-    if ~isempty(unit)
-        h = sprintf('%s (%s)', h, unit);
+function u = resolveXUnit(src)
+%RESOLVEXUNIT  X-axis unit from a data struct's metadata.  Prefers the
+%   parser-specific xUnit, then the canonical xColumnUnit field.
+    u = '';
+    if ~isfield(src, 'metadata'), return; end
+    m = src.metadata;
+    if isfield(m, 'parserSpecific') && isfield(m.parserSpecific, 'xUnit') && ...
+       ~isempty(m.parserSpecific.xUnit)
+        u = char(m.parserSpecific.xUnit);
+    elseif isfield(m, 'xColumnUnit') && ~isempty(m.xColumnUnit)
+        u = char(m.xColumnUnit);
     end
 end
 
 function role = columnRole(lbl)
 %COLUMNROLE  Origin column designation for a value column label.
-%   dR / error-like → 'yEr'; everything else → 'Y'.
-    l = lower(lbl);
-    if strcmp(l, 'dr') || contains(l, {'err', 'std', 'sigma'})
+%   uncertainty / error-like → 'yEr';  resolution / dQ → 'xEr' (X error);
+%   everything else → 'Y'.
+    l = lower(char(lbl));
+    if any(strcmp(l, {'dr', 'di'})) || contains(l, {'uncert', 'err', 'std', 'sigma'})
         role = 'yEr';
+    elseif contains(l, {'resolution', 'dq'})
+        role = 'xEr';
     else
         role = 'Y';
     end
 end
 
-function unit = extractUnitFromHeader(hdr)
-%EXTRACTUNITFROMHEADER  Extract text inside parentheses from a header string.
-%   'Moment (emu) [corr]' → 'emu';  'X [raw]' → ''
-    tok = regexp(hdr, '\(([^)]+)\)', 'tokens', 'once');
-    if ~isempty(tok)
-        unit = tok{1};
+function s = csvField(s)
+%CSVFIELD  Coerce a header cell to a single char row and quote it when it
+%   contains a comma, quote, or newline.  Flattens string arrays (e.g. a
+%   stray ["a" "b"]) to one row so strjoin never sees a multi-row char block.
+    if isstring(s) || iscell(s)
+        s = char(join(string(s), ''));
     else
-        unit = '';
+        s = char(s);
     end
-end
-
-function desigs = buildColumnDesignations(hdrs)
-%BUILDCOLUMNDESIGNATIONS  Map header names to Origin column designations.
-%   First column → 'X'.  Headers containing error-like keywords → 'yEr'.
-%   Any column named 'X [raw]' → 'X'.  All others → 'Y'.
-    desigs = cell(size(hdrs));
-    for k = 1:numel(hdrs)
-        lbl = lower(hdrs{k});
-        if k == 1 || startsWith(lbl, 'x ')
-            desigs{k} = 'X';
-        elseif contains(lbl, {'err', 'dr_', 'dr ', 'dasym', 'std', 'sigma'})
-            desigs{k} = 'yEr';
-        else
-            desigs{k} = 'Y';
-        end
+    s = reshape(s, 1, []);
+    if any(ismember(s, sprintf(',"\n\r')))
+        s = ['"', strrep(s, '"', '""'), '"'];
     end
 end
