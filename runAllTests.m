@@ -81,6 +81,7 @@ SUITES = {
     T('gui','test_gui_buttons'),            'gui',    'GUI buttons: dataset mgmt, plot controls, corrections, toolbar, macros'
     T('gui','test_actionlog_replay'),       'gui',    'actionLog replay (W3 #14): serializeArg, recordCall, exportScript(fig, path)'
     T('gui','test_dataset_provenance'),     'gui',    'Dataset provenance log (W3 #15): appendHistory, getHistoryScript, exportHistoryScript, formatHistory + BosonPlotter import/correction hooks'
+    T('gui','test_neutronCSVExport'),       'gui',    'Neutron CSV export: per-dataset blocks (own Q) for unpolarized scans vs shared-Q consolidation + asymmetry for true PNR'
     T('gui','test_toolbarConfig'),          'gui',    'Toolbar customisation: defaults, buildToolbar, save/load, stale IDs'
     T('gui','test_undoManager'),            'gui',    'UndoManager: push, undo, redo, branch discard, cap, clear, labels'
     T('gui','test_filterRows'),             'gui',    'filterRows: expression parser, operators, functions, edge cases'

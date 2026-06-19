@@ -1,7 +1,17 @@
 function saveConsolidatedNeutronCSV(activeDs, fp, fmt, datasets)
-%SAVECONSOLIDATEDNEUTRONCSV  Write all polarization channels to one CSV.
-%   Gathers loaded neutron datasets from the same measurement and writes
-%   a single file with Q, R/dR/theory per polarization, plus spin asymmetry.
+%SAVECONSOLIDATEDNEUTRONCSV  Write neutron reflectometry datasets to one CSV.
+%   Gathers loaded neutron datasets from the same measurement and writes one
+%   file.  The layout depends on whether the data is genuinely polarized:
+%
+%     * Polarized (>=2 distinct polarizations of one measurement): a single
+%       shared-Q table with R/dR/theory per polarization plus spin asymmetry.
+%       Cross-sections are interpolated onto a common Q grid so the asymmetry
+%       can be computed point-by-point.
+%
+%     * Unpolarized / independent scans (0 or 1 distinct polarization — e.g.
+%       XRR .refl): per-dataset blocks, each scan keeping its OWN Q column
+%       followed by its R/dR/theory.  No interpolation, so the raw sampling
+%       of every scan is preserved (no shared-grid resampling).
 %
 % Syntax
 %   bosonPlotter.saveConsolidatedNeutronCSV(activeDs, fp, fmt, datasets)
@@ -53,6 +63,30 @@ function saveConsolidatedNeutronCSV(activeDs, fp, fmt, datasets)
     [~, si] = sort([collected.sortKey]);
     collected = collected(si);
 
+    % ── Choose layout ──────────────────────────────────────────────────────
+    % Genuine polarized measurement = at least two distinct, non-empty
+    % polarization states.  Everything else (single channel, or several
+    % unpolarized/independent scans) uses per-dataset blocks.
+    pols = {collected.pol};
+    distinctPols = unique(pols(~cellfun(@isempty, pols)));
+    if numel(distinctPols) >= 2
+        [allHdrs, allCols, desigs] = buildPolarizedColumns(collected, polOrder, polSuffix);
+    else
+        [allHdrs, allCols, desigs] = buildPerDatasetColumns(collected);
+    end
+
+    writeColumnsCSV(fp, fmt, allHdrs, allCols, desigs);
+end
+
+% ════════════════════════════════════════════════════════════════════════════
+% Column builders
+% ════════════════════════════════════════════════════════════════════════════
+
+function [allHdrs, allCols, desigs] = buildPolarizedColumns(collected, polOrder, polSuffix)
+%BUILDPOLARIZEDCOLUMNS  Shared-Q table with R/dR/theory per polarization plus
+%   spin asymmetry.  Cross-sections are interpolated onto the first dataset's
+%   Q grid (required so asymmetry can be computed point-by-point).
+
     % ── Build shared Q vector from first dataset ───────────────────────────
     src0 = guiTernary(~isempty(collected(1).ds.corrData), ...
                       collected(1).ds.corrData, collected(1).ds.data);
@@ -61,9 +95,6 @@ function saveConsolidatedNeutronCSV(activeDs, fp, fmt, datasets)
 
     % ── Determine Q unit ──────────────────────────────────────────────────
     qUnit = '';
-    if isfield(src0, 'units') && ~isempty(src0.units)
-        % X-axis unit is in metadata for neutron data
-    end
     if isfield(src0.metadata, 'parserSpecific') && ...
        isfield(src0.metadata.parserSpecific, 'xUnit')
         qUnit = src0.metadata.parserSpecific.xUnit;
@@ -146,7 +177,50 @@ function saveConsolidatedNeutronCSV(activeDs, fp, fmt, datasets)
         end
     end
 
-    % ── Write CSV ──────────────────────────────────────────────────────────
+    desigs = buildColumnDesignations(allHdrs);
+end
+
+function [allHdrs, allCols, desigs] = buildPerDatasetColumns(collected)
+%BUILDPERDATASETCOLUMNS  One Q + values block per dataset, each keeping its own
+%   Q column.  No interpolation onto a shared grid — every scan's native
+%   sampling is preserved.  Columns: Q [tag], <label> [tag], ... per dataset.
+    allHdrs = {};
+    allCols = {};
+    desigs  = {};
+    for ci = 1:numel(collected)
+        dsi = collected(ci).ds;
+        src = guiTernary(~isempty(dsi.corrData), dsi.corrData, dsi.data);
+        tag = datasetTag(dsi);
+
+        qUnit = '';
+        if isfield(src, 'metadata') && isfield(src.metadata, 'parserSpecific') && ...
+           isfield(src.metadata.parserSpecific, 'xUnit')
+            qUnit = src.metadata.parserSpecific.xUnit;
+        end
+        allHdrs{end+1} = headerWithUnit('Q', tag, qUnit); %#ok<AGROW>
+        allCols{end+1} = src.time(:);                      %#ok<AGROW>
+        desigs{end+1}  = 'X';                              %#ok<AGROW>
+
+        for li = 1:numel(src.labels)
+            lbl = src.labels{li};
+            u = '';
+            if li <= numel(src.units), u = src.units{li}; end
+            allHdrs{end+1} = headerWithUnit(lbl, tag, u); %#ok<AGROW>
+            allCols{end+1} = src.values(:, li);            %#ok<AGROW>
+            desigs{end+1}  = columnRole(lbl);              %#ok<AGROW>
+        end
+    end
+end
+
+% ════════════════════════════════════════════════════════════════════════════
+% CSV writer
+% ════════════════════════════════════════════════════════════════════════════
+
+function writeColumnsCSV(fp, fmt, hdrs, cols, desigs)
+%WRITECOLUMNSCSV  Write header(s) + numeric columns to fp.  Columns may have
+%   different lengths (per-dataset blocks); shorter columns leave trailing
+%   cells blank rather than printing NaN.  Origin format adds long-name / unit
+%   / designation header rows.
     dirPart = fileparts(fp);
     if ~isempty(dirPart) && ~isfolder(dirPart)
         error('saveConsolidatedNeutronCSV:badDir', ...
@@ -157,26 +231,35 @@ function saveConsolidatedNeutronCSV(activeDs, fp, fmt, datasets)
         error('saveConsolidatedNeutronCSV:cannotOpen', ...
             'Cannot open file for writing:\n%s', fp);
     end
-    closeGuard = onCleanup(@() fclose(fid));
+    closeGuard = onCleanup(@() fclose(fid)); %#ok<NASGU>
 
     if strcmp(fmt, 'origin')
         longNames = cellfun(@(h) strtrim(regexprep(h, '\s*\([^)]+\)', '')), ...
-                            allHdrs, 'UniformOutput', false);
-        units = cellfun(@extractUnitFromHeader, allHdrs, 'UniformOutput', false);
-        desigs = buildColumnDesignations(allHdrs);
+                            hdrs, 'UniformOutput', false);
+        units = cellfun(@extractUnitFromHeader, hdrs, 'UniformOutput', false);
         fprintf(fid, '%s\n', strjoin(longNames, ','));
         fprintf(fid, '%s\n', strjoin(units, ','));
         fprintf(fid, '%s\n', strjoin(desigs, ','));
     else
-        fprintf(fid, '%s\n', strjoin(allHdrs, ','));
+        fprintf(fid, '%s\n', strjoin(hdrs, ','));
     end
-    nCols = numel(allCols);
-    for r = 1:nRows
-        fprintf(fid, '%.10g', allCols{1}(r));
-        for c = 2:nCols
-            fprintf(fid, ',%.10g', allCols{c}(r));
+
+    nCols = numel(cols);
+    maxRows = 0;
+    for c = 1:nCols
+        maxRows = max(maxRows, numel(cols{c}));
+    end
+    for r = 1:maxRows
+        parts = cell(1, nCols);
+        for c = 1:nCols
+            col = cols{c};
+            if r <= numel(col)
+                parts{c} = sprintf('%.10g', col(r));
+            else
+                parts{c} = '';   % shorter column — leave blank, not NaN
+            end
         end
-        fprintf(fid, '\n');
+        fprintf(fid, '%s\n', strjoin(parts, ','));
     end
 end
 
@@ -203,6 +286,35 @@ function baseName = neutronBaseName(filepath)
     fn = regexprep(fn, '[_-](NSF|SF)$',   '', 'ignorecase');
     fn = regexprep(fn, '[_-][a-z]$',       '', 'ignorecase');
     baseName = fn;
+end
+
+function tag = datasetTag(dsi)
+%DATASETTAG  Short provenance label for a dataset: legend name or file name.
+    if isfield(dsi, 'legendName') && ~isempty(dsi.legendName)
+        tag = dsi.legendName;
+    else
+        [~, fn, fext] = fileparts(dsi.filepath);
+        tag = [fn fext];
+    end
+end
+
+function h = headerWithUnit(name, tag, unit)
+%HEADERWITHUNIT  '<name> [<tag>]' with an optional ' (<unit>)' suffix.
+    h = sprintf('%s [%s]', name, tag);
+    if ~isempty(unit)
+        h = sprintf('%s (%s)', h, unit);
+    end
+end
+
+function role = columnRole(lbl)
+%COLUMNROLE  Origin column designation for a value column label.
+%   dR / error-like → 'yEr'; everything else → 'Y'.
+    l = lower(lbl);
+    if strcmp(l, 'dr') || contains(l, {'err', 'std', 'sigma'})
+        role = 'yEr';
+    else
+        role = 'Y';
+    end
 end
 
 function unit = extractUnitFromHeader(hdr)
