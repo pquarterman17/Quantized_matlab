@@ -7,9 +7,10 @@ function [success, bookUsed] = toOrigin(data, options)
 %       'AxisLabels', struct('x','Field (Oe)','y','Moment (emu)'), ...
 %       'LogY', true)
 %
-%   Attempts to connect to a running OriginPro instance or start a new one
-%   via actxserver('Origin.Application'). Returns true on success, false
-%   if Origin is not installed or COM connection fails.
+%   Attempts to connect to a running OriginPro instance (or start one) via
+%   utilities.connectOrigin — which prefers 'Origin.ApplicationSI' (Single
+%   Instance) over 'Origin.Application'. Returns true on success, false if
+%   Origin is not installed or COM connection fails.
 %
 %   INPUTS:
 %       data — unified data struct (.time, .values, .labels, .units, .metadata)
@@ -77,14 +78,13 @@ function [success, bookUsed] = toOrigin(data, options)
     % ── Obtain Origin handle (real COM or injected mock) ──────────────
     weOwnHandle = false;
     if isempty(options.OriginObj)
-        try
-            origin = actxserver('Origin.Application');
-            weOwnHandle = true;
-        catch ME
+        origin = utilities.connectOrigin();   % prefers the running instance
+        if isempty(origin)
             utilities.logError('toOrigin:noCom', ...
-                sprintf('actxserver(''Origin.Application'') failed: %s', ME.message), ME);
+                'Could not connect to OriginPro (Origin.ApplicationSI / Origin.Application).', []);
             return;
         end
+        weOwnHandle = true;
     else
         origin = options.OriginObj;
     end
@@ -253,17 +253,20 @@ function [success, bookUsed] = toOrigin(data, options)
             % plot:=200 → line plot; iy:=(1,2) → col1 (X) vs col2 (first Y).
             origin.Execute(sprintf('plotxy iy:=[%s]%s!(1,2) plot:=200;', ...
                 bookName, sheetName));
+            % Axis scale type code: 0 = Linear, 2 = Log10 (NOT 1).
             if options.LogX
-                origin.Execute('layer.x.type = 1;');
+                origin.Execute('layer.x.type = 2;');
             end
             if options.LogY
-                origin.Execute('layer.y.type = 1;');
+                origin.Execute('layer.y.type = 2;');
             end
+            % Axis titles via the `label` command (the X-bottom / Y-left title);
+            % escapeLT guards ; and % so they don't terminate or substitute.
             if isfield(options.AxisLabels, 'x') && ~isempty(options.AxisLabels.x)
-                origin.Execute(sprintf('xb.text$ = "%s";', escapeLT(char(options.AxisLabels.x))));
+                origin.Execute(sprintf('label -xb %s;', escapeLT(char(options.AxisLabels.x))));
             end
             if isfield(options.AxisLabels, 'y') && ~isempty(options.AxisLabels.y)
-                origin.Execute(sprintf('yl.text$ = "%s";', escapeLT(char(options.AxisLabels.y))));
+                origin.Execute(sprintf('label -yl %s;', escapeLT(char(options.AxisLabels.y))));
             end
         end
 

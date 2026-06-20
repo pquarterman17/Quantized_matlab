@@ -436,8 +436,8 @@ function test_toOrigin
         check('toOrigin returned true',           ok == true);
         check('plotxy issued',                    mock.findCall('Execute', 'plotxy') > 0);
         check('plotxy targets [B]S! (col1,col2)', mock.findCall('Execute', 'plotxy iy:=\[B\]S!\(1,2\)') > 0);
-        check('LogY applied to graph layer',      mock.findCall('Execute', 'layer\.y\.type\s*=\s*1') > 0);
-        check('Y axis label applied to graph',    mock.findCall('Execute', 'yl\.text\$') > 0);
+        check('LogY = Log10 (type 2) on graph',   mock.findCall('Execute', 'layer\.y\.type\s*=\s*2') > 0);
+        check('Y axis title via label -yl',       mock.findCall('Execute', 'label -yl') > 0);
     catch ME
         recordCrash('TEST 17', ME);
     end

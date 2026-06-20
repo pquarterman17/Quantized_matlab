@@ -64,12 +64,8 @@ function sendToOrigin(appData, fig, guiState)
     if isfield(guiState, 'originObj') && ~isempty(guiState.originObj)
         origin = guiState.originObj;
     else
-        try
-            origin = actxserver('Origin.Application');
-            weOwn  = true;
-        catch
-            origin = [];
-        end
+        origin = utilities.connectOrigin();   % prefers the running instance
+        weOwn  = ~isempty(origin);
     end
 
     if isempty(origin)
