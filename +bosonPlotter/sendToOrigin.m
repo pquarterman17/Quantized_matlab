@@ -43,11 +43,12 @@ function sendToOrigin(appData, fig, guiState)
     if isempty(selIdx), selIdx = appData.activeIdx; end
 
     % ── Choose how to lay the datasets out ─────────────────────────────
+    makePlot = isfield(guiState, 'makePlot') && guiState.makePlot;
     if numel(selIdx) > 1
         if isfield(guiState, 'mode') && ~isempty(guiState.mode)
             mode = guiState.mode;
         else
-            mode = askSendMode(fig, numel(selIdx), appData.theme);
+            [mode, makePlot] = askSendMode(fig, numel(selIdx), appData.theme);
             if isempty(mode), return; end
         end
     else
@@ -101,6 +102,7 @@ function sendToOrigin(appData, fig, guiState)
             'ColTypes',   colTypes, ...
             'AxisLabels', axLabels, ...
             'LogY', logY, 'LogX', logX, ...
+            'MakePlot', makePlot, ...
             'OriginObj', origin);
         if ok
             bosonPlotter.quietAlert(fig, ...
@@ -151,6 +153,7 @@ function sendToOrigin(appData, fig, guiState)
             'AddSheet',   addSheet, ...
             'AxisLabels', axLabels, ...
             'LogY', logY, 'LogX', logX, ...
+            'MakePlot', makePlot, ...
             'OriginObj', origin);
         if ok
             nOk = nOk + 1;
@@ -183,20 +186,22 @@ end
 %  Local helpers
 % ════════════════════════════════════════════════════════════════════════
 
-function mode = askSendMode(fig, nSel, theme)
+function [mode, makePlot] = askSendMode(fig, nSel, theme)
 %ASKSENDMODE  Modal dialog: how to lay out multiple datasets in Origin.
-%   Returns 'active' | 'books' | 'sheets' | 'combined', or '' if cancelled.
-%   Uses radio buttons (not uiconfirm) so all four distinct layouts read
-%   clearly — separate workbooks vs. tabs in one workbook were previously
-%   conflated under a single "one worksheet per dataset" wording.
+%   Returns 'active' | 'books' | 'sheets' | 'combined' (or '' if cancelled),
+%   and makePlot (logical) for the "also create a graph" checkbox.  Uses radio
+%   buttons (not uiconfirm) so all four distinct layouts read clearly —
+%   separate workbooks vs. tabs in one workbook were previously conflated under
+%   a single "one worksheet per dataset" wording.
     mode = '';
+    makePlot = false;
     if nargin < 3 || isempty(theme), theme = 'Dark'; end
     if bosonPlotter.isHeadless()
         mode = 'books';   % scripted/headless multi-select default
         return;
     end
 
-    pos = [300 300 440 250];
+    pos = [300 300 460 290];
     try
         fp = fig.Position;
         pos(1:2) = [fp(1) + (fp(3)-pos(3))/2, fp(2) + (fp(4)-pos(4))/2];
@@ -204,7 +209,7 @@ function mode = askSendMode(fig, nSel, theme)
     end
     dlg = uifigure('Name', 'Send to Origin', 'WindowStyle', 'modal', ...
         'Resize', 'off', 'Position', pos);
-    gl = uigridlayout(dlg, [3 1], 'RowHeight', {30, 120, 36}, ...
+    gl = uigridlayout(dlg, [4 1], 'RowHeight', {30, 120, 26, 36}, ...
         'Padding', [14 12 14 12], 'RowSpacing', 8);
 
     uilabel(gl, 'Text', sprintf('%d datasets selected. How should they be sent to Origin?', nSel), ...
@@ -212,14 +217,17 @@ function mode = askSendMode(fig, nSel, theme)
 
     bg = uibuttongroup(gl, 'BorderType', 'none');
     rbActive = uiradiobutton(bg, 'Text', 'Active dataset only', ...
-        'Position', [6 96 410 20]); %#ok<NASGU>
+        'Position', [6 96 430 20]); %#ok<NASGU>
     rbBooks  = uiradiobutton(bg, 'Text', sprintf('Separate workbook per dataset (%d workbooks)', nSel), ...
-        'Position', [6 66 410 20]);
+        'Position', [6 66 430 20]);
     rbSheets = uiradiobutton(bg, 'Text', sprintf('One workbook, a worksheet tab per dataset (%d tabs)', nSel), ...
-        'Position', [6 36 410 20]); %#ok<NASGU>
+        'Position', [6 36 430 20]); %#ok<NASGU>
     rbComb   = uiradiobutton(bg, 'Text', sprintf('Combined into one worksheet (%d datasets)', nSel), ...
-        'Position', [6 6 410 20]); %#ok<NASGU>
+        'Position', [6 6 430 20]); %#ok<NASGU>
     bg.SelectedObject = rbBooks;   % "own workbook" is the natural multi-select choice
+
+    cbPlot = uicheckbox(gl, 'Text', 'Also create a line graph for each', 'Value', false, ...
+        'Tooltip', 'Plot the first Y column vs X on a new graph in Origin after sending');
 
     btnGL = uigridlayout(gl, [1 3], 'ColumnWidth', {'1x', 90, 90}, 'Padding', [0 0 0 0]);
     uilabel(btnGL);
@@ -237,6 +245,7 @@ function mode = askSendMode(fig, nSel, theme)
                 case rbComb.Text,   mode = 'combined';
                 otherwise,          mode = 'active';
             end
+            makePlot = cbPlot.Value;
         else
             mode = '';
         end

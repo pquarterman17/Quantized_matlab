@@ -16,7 +16,10 @@ classdef MockOriginCom < handle
         ActiveSheetName   char = ''
         SupportsCreatePage logical = false   % off by default → toOrigin uses the
                                              % newbook fallback (legacy behaviour)
+        SupportsFindWorksheet logical = false% off by default → toOrigin uses the
+                                             % PutWorksheet fallback (legacy)
         ExistingBooks     cell = {}          % short names already taken (collision sim)
+        LastWorksheet                        % most recent MockWorksheet from FindWorksheet
     end
 
     methods
@@ -72,6 +75,19 @@ classdef MockOriginCom < handle
         function r = PutWorksheet(obj, range, mat, r0, c0)
             obj.Calls{end+1} = {'PutWorksheet', range, size(mat), r0, c0};
             r = obj.PutResult;
+        end
+
+        function wks = FindWorksheet(obj, name)
+        %FINDWORKSHEET  Mock of Application.FindWorksheet.  '' → active sheet.
+        %   Errors when SupportsFindWorksheet is false so toOrigin falls back to
+        %   PutWorksheet (legacy path the existing tests exercise).
+            if ~obj.SupportsFindWorksheet
+                error('MockOriginCom:noFindWorksheet', ...
+                    'FindWorksheet not supported by this mock instance.');
+            end
+            obj.Calls{end+1} = {'FindWorksheet', char(name)};
+            wks = MockWorksheet(obj.ActiveSheetName, obj.PutResult);
+            obj.LastWorksheet = wks;
         end
 
         function release(obj)

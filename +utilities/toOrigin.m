@@ -21,6 +21,11 @@ function [success, bookUsed] = toOrigin(data, options)
 %       LogY        — logical; set Y axis to log scale (default false)
 %       LogX        — logical; set X axis to log scale (default false)
 %       Visible     — logical; make Origin visible (default true)
+%       MakePlot    — logical; after writing data, create a line graph of the
+%                     first Y column vs X for the sheet (default false).  Axis
+%                     scales (LogX/LogY) and AxisLabels apply to that graph —
+%                     on a bare worksheet they are no-ops, so they only take
+%                     visible effect when MakePlot is true.
 %
 %   OUTPUTS:
 %       success  — true if data was sent; false if Origin not available
@@ -40,6 +45,7 @@ function [success, bookUsed] = toOrigin(data, options)
         options.OriginObj                   = []
         options.AddSheet      (1,1) logical = false   % add a worksheet to the active book instead of creating a new book
         options.ColTypes                    = {}      % optional cellstr of per-column designations ('X'/'Y'/'yErr'); overrides auto-typing
+        options.MakePlot      (1,1) logical = false   % create a line graph of the data after writing it
     end
 
     success  = false;
@@ -202,36 +208,63 @@ function [success, bookUsed] = toOrigin(data, options)
 
         % ── Write data ────────────────────────────────────────────────
         mat = [timeVec, data.values];
-        rangePath = sprintf('[%s]%s!', bookName, sheetName);
-        wrote = origin.PutWorksheet(rangePath, mat, 0, 0);
-        if ~wroteOk(wrote)
-            wrote = origin.PutWorksheet(sheetName, mat, 0, 0);
-        end
-        if ~wroteOk(wrote)
-            wrote = origin.PutWorksheet(sprintf('[%s]Sheet1!', bookName), mat, 0, 0);
-        end
-        if ~wroteOk(wrote)
-            msg = sprintf(['Origin.PutWorksheet failed for range %s ' ...
-                '(matrix %dx%d, %d Y columns) — workbook is likely empty.'], ...
-                rangePath, size(mat,1), size(mat,2), nYCols);
-            warning('toOrigin:putWorksheetFailed', '%s', msg);
-            utilities.logError('toOrigin:putWorksheetFailed', msg, []);
+
+        % Preferred: write through the worksheet OBJECT.  FindWorksheet('')
+        % returns the ACTIVE worksheet — which is exactly the sheet we just
+        % created / renamed / added — so there is no name-string resolution at
+        % write time (Worksheet.SetData == Application.PutWorksheet).
+        wroteObj = false;
+        try
+            wksObj = origin.FindWorksheet('');
+            if ~isempty(wksObj)
+                res = wksObj.SetData(mat, 0, 0);
+                wroteObj = wroteOk(res);
+            end
+        catch
+            wroteObj = false;
         end
 
-        % ── Optional: axis scales ─────────────────────────────────────
-        if options.LogX
-            origin.Execute('layer.x.type = 1;');
-        end
-        if options.LogY
-            origin.Execute('layer.y.type = 1;');
+        % Fallback: PutWorksheet by range name (older Origin / object call
+        % unavailable).  Tries qualified [book]sheet!, bare sheet, then Sheet1.
+        if ~wroteObj
+            rangePath = sprintf('[%s]%s!', bookName, sheetName);
+            wrote = origin.PutWorksheet(rangePath, mat, 0, 0);
+            if ~wroteOk(wrote)
+                wrote = origin.PutWorksheet(sheetName, mat, 0, 0);
+            end
+            if ~wroteOk(wrote)
+                wrote = origin.PutWorksheet(sprintf('[%s]Sheet1!', bookName), mat, 0, 0);
+            end
+            if ~wroteOk(wrote)
+                msg = sprintf(['Origin.PutWorksheet failed for range %s ' ...
+                    '(matrix %dx%d, %d Y columns) — workbook is likely empty.'], ...
+                    rangePath, size(mat,1), size(mat,2), nYCols);
+                warning('toOrigin:putWorksheetFailed', '%s', msg);
+                utilities.logError('toOrigin:putWorksheetFailed', msg, []);
+            end
         end
 
-        % ── Optional: axis labels ─────────────────────────────────────
-        if isfield(options.AxisLabels, 'x') && ~isempty(options.AxisLabels.x)
-            origin.Execute(sprintf('xb.text$ = "%s";', escapeLT(char(options.AxisLabels.x))));
-        end
-        if isfield(options.AxisLabels, 'y') && ~isempty(options.AxisLabels.y)
-            origin.Execute(sprintf('yl.text$ = "%s";', escapeLT(char(options.AxisLabels.y))));
+        % ── Optional: line graph of the first Y vs X for this sheet ────
+        % A worksheet has no axis scale or axis labels, so LogX/LogY and
+        % AxisLabels are applied to the GRAPH layer plotxy creates.  Without a
+        % plot they would target a worksheet and do nothing, so they are only
+        % emitted here, gated on MakePlot.
+        if options.MakePlot
+            % plot:=200 → line plot; iy:=(1,2) → col1 (X) vs col2 (first Y).
+            origin.Execute(sprintf('plotxy iy:=[%s]%s!(1,2) plot:=200;', ...
+                bookName, sheetName));
+            if options.LogX
+                origin.Execute('layer.x.type = 1;');
+            end
+            if options.LogY
+                origin.Execute('layer.y.type = 1;');
+            end
+            if isfield(options.AxisLabels, 'x') && ~isempty(options.AxisLabels.x)
+                origin.Execute(sprintf('xb.text$ = "%s";', escapeLT(char(options.AxisLabels.x))));
+            end
+            if isfield(options.AxisLabels, 'y') && ~isempty(options.AxisLabels.y)
+                origin.Execute(sprintf('yl.text$ = "%s";', escapeLT(char(options.AxisLabels.y))));
+            end
         end
 
         bookUsed = bookName;   % the actual workbook name the data landed in

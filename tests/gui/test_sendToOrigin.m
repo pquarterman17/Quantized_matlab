@@ -222,6 +222,23 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  8. makePlot threads through to a plotxy per dataset
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n== TEST 8: "also create a graph" issues a plot per dataset ==\n');
+try
+    mock = MockOriginCom();
+    gs = struct('mode','books','selIdx',[1 2],'makePlot',true,'originObj',mock, ...
+                'logX',false,'logY',true,'xLabel','','yLabel','');
+    bosonPlotter.sendToOrigin(appData, fig, gs);
+
+    nPlot = countCalls(mock, 'Execute', 'plotxy');
+    assert(nPlot == 2, sprintf('expected 2 plotxy (one per dataset), got %d', nPlot));
+    fprintf('  PASS (plotxy=%d)\n', nPlot); passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  SUMMARY
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n%s\n', repmat(char(9552), 1, 72));

@@ -401,6 +401,61 @@ function test_toOrigin
     end
 
     % ════════════════════════════════════════════════════════════════════
+    %  TEST 16: object-handle write — FindWorksheet('') + SetData, no PutWorksheet
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 16: object-handle write (FindWorksheet/SetData) ==\n');
+    try
+        mock = MockOriginCom();
+        mock.SupportsFindWorksheet = true;
+        data = makeData(4, 2);
+        ok = utilities.toOrigin(data, 'OriginObj', mock, ...
+            'BookName', 'B', 'SheetName', 'S');
+
+        check('toOrigin returned true',              ok == true);
+        check('FindWorksheet was used',              mock.findCall('FindWorksheet') > 0);
+        check('no PutWorksheet when SetData wrote',   mock.findCall('PutWorksheet') == 0);
+        check('SetData recorded on the worksheet', ...
+            ~isempty(mock.LastWorksheet) && mock.LastWorksheet.countCalls('SetData') == 1);
+    catch ME
+        recordCrash('TEST 16', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  TEST 17: MakePlot issues plotxy and applies scale/labels to the graph
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 17: MakePlot creates a line graph ==\n');
+    try
+        mock = MockOriginCom();
+        mock.SupportsCreatePage    = true;
+        mock.SupportsFindWorksheet = true;
+        data = makeData(5, 1);
+        ok = utilities.toOrigin(data, 'OriginObj', mock, ...
+            'BookName', 'B', 'SheetName', 'S', 'MakePlot', true, ...
+            'LogY', true, 'AxisLabels', struct('x', 'Q', 'y', 'R'));
+
+        check('toOrigin returned true',           ok == true);
+        check('plotxy issued',                    mock.findCall('Execute', 'plotxy') > 0);
+        check('plotxy targets [B]S! (col1,col2)', mock.findCall('Execute', 'plotxy iy:=\[B\]S!\(1,2\)') > 0);
+        check('LogY applied to graph layer',      mock.findCall('Execute', 'layer\.y\.type\s*=\s*1') > 0);
+        check('Y axis label applied to graph',    mock.findCall('Execute', 'yl\.text\$') > 0);
+    catch ME
+        recordCrash('TEST 17', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  TEST 18: no plot is created unless MakePlot is requested
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 18: no plotxy by default ==\n');
+    try
+        mock = MockOriginCom();
+        data = makeData(3, 1);
+        utilities.toOrigin(data, 'OriginObj', mock, 'BookName', 'B', 'SheetName', 'S');
+        check('no plotxy when MakePlot is false', mock.findCall('Execute', 'plotxy') == 0);
+    catch ME
+        recordCrash('TEST 18', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
     %  Summary
     % ════════════════════════════════════════════════════════════════════
     fprintf('\n%s\n', repmat('=', 1, 68));
