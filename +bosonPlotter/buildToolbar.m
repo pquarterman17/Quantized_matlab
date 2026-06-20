@@ -1,4 +1,4 @@
-function buildToolbar(parentGL, config, registry, btnColor, iconColor)
+function buildToolbar(parentGL, config, registry, btnColor, iconColor, captionColor)
 %BUILDTOOLBAR  Clear and repopulate a toolbar grid with action buttons.
 %
 % Syntax
@@ -42,6 +42,9 @@ function buildToolbar(parentGL, config, registry, btnColor, iconColor)
     if nargin < 5 || isempty(iconColor)
         iconColor = [];   % skip tinting; render source PNG as-is
     end
+    if nargin < 6 || isempty(captionColor)
+        captionColor = iconColor;   % themed text colour for group captions
+    end
 
     if isempty(config)
         config = bosonPlotter.toolbarDefaultConfig();
@@ -68,19 +71,25 @@ function buildToolbar(parentGL, config, registry, btnColor, iconColor)
     % ── Compute column layout in one pass ──────────────────────────────
     % Column 1 is a flex spacer ('1x') that pushes the buttons to the right.
     % Subsequent columns are either:
+    %   - a 'fit' group caption label at the start of each functional group
     %   - an icon-only button: 28 px
     %   - an icon+text button: 'fit' (auto-sized to icon + label)
-    %   - a 6 px spacer between adjacent buttons whose .group differs
+    % The caption doubles as the visual group divider (replacing the old 6 px
+    % blank spacer), giving the "captioned groups" the design system specifies.
     colWidths = {'1x'};
     btnCols   = zeros(1, nBtns);
+    capCols   = [];
+    capTexts  = {};
     prevGroup = '';
     for bi = 1:nBtns
         idx = find(strcmp(allRegIds, config{bi}), 1);
         if isempty(idx); continue; end
         act = registry(idx);
 
-        if bi > 1 && ~strcmp(act.group, prevGroup)
-            colWidths{end+1} = 6; %#ok<AGROW>  group separator
+        if ~strcmp(act.group, prevGroup)
+            colWidths{end+1} = 'fit'; %#ok<AGROW>   group caption column
+            capCols(end+1)   = numel(colWidths); %#ok<AGROW>
+            capTexts{end+1}  = groupCaption(act.group); %#ok<AGROW>
         end
 
         if act.iconOnly
@@ -93,9 +102,25 @@ function buildToolbar(parentGL, config, registry, btnColor, iconColor)
     end
     parentGL.ColumnWidth = colWidths;
 
-    % Spacer label in col 1 (uilabel — does not count as a button child)
-    spacer = uilabel(parentGL, 'Text', '');
-    spacer.Layout.Column = 1;
+    % Column 1 is an empty '1x' flex column that right-aligns the buttons.
+    % No widget is placed in it: an empty spacer uilabel collapses to zero
+    % width when the buttons fill the toolbar (wider grouped default), which
+    % checkClippedLayouts flags as a zero-size leaf. The flex column reserves
+    % the space on its own, so the spacer widget is unnecessary.
+
+    % Group caption labels (uilabel — excluded from button-count assertions).
+    % FontColor is a themed TEXT token (captionColor, passed as uxTokens
+    % textMuted) so captions track the palette and pass test_themeConformance;
+    % the toolbar is rebuilt with the themed colour on every theme switch.
+    capColor = captionColor;
+    if isempty(capColor); capColor = [0.6 0.6 0.6]; end
+    for ci = 1:numel(capCols)
+        if isempty(capTexts{ci}); continue; end
+        capLbl = uilabel(parentGL, 'Text', capTexts{ci}, ...
+            'FontSize', 9, 'FontColor', capColor, ...
+            'HorizontalAlignment', 'center');
+        capLbl.Layout.Column = capCols(ci);
+    end
 
     % Resolve icon directory once
     rootDir = fileparts(fileparts(mfilename('fullpath')));
@@ -157,5 +182,21 @@ function buildToolbar(parentGL, config, registry, btnColor, iconColor)
         end
         btn.Tag           = act.id;
         btn.Layout.Column = btnCols(bi);
+    end
+end
+
+% ────────────────────────────────────────────────────────────────────────
+function s = groupCaption(key)
+%GROUPCAPTION  Human-readable caption for a toolbar group key. Falls back to
+%   capitalising the key so a future group renders sensibly without an edit.
+    switch lower(char(key))
+        case 'navigate', s = 'Navigate';
+        case 'view',     s = 'View';
+        case 'analyze',  s = 'Analyze';
+        case 'output',   s = 'Export';
+        case 'history',  s = 'History';
+        otherwise
+            k = char(key);
+            if isempty(k), s = ''; else, s = [upper(k(1)) k(2:end)]; end
     end
 end
