@@ -6,7 +6,8 @@ function sendToOrigin(appData, fig, guiState)
 %   One selected dataset  → sent as a single worksheet.
 %   Multiple selected     → a popup offers:
 %       • Active dataset only
-%       • One worksheet per dataset   (all in workbook "ThinFilmToolkit")
+%       • Separate workbook per dataset (each dataset → its OWN workbook)
+%       • One workbook, one worksheet tab per dataset (all in "ThinFilmToolkit")
 %       • Combined into one worksheet (X1 Y1 | X2 Y2 | ... side by side)
 %   Falls back to copying the active dataset to the clipboard when
 %   OriginPro is not available.
@@ -18,8 +19,10 @@ function sendToOrigin(appData, fig, guiState)
 %                  .xLabel, .yLabel  axis label strings ('' = derive)
 %                  .logX, .logY      logical axis-scale flags
 %                  .selIdx           (optional) selected dataset indices
-%                  .mode             (optional) 'active'|'sheets'|'combined'
-%                                    — skips the popup (tests / scripting)
+%                  .mode             (optional) 'active'|'books'|'sheets'|'combined'
+%                                    — skips the popup (tests / scripting).
+%                                    'books'  = separate workbook per dataset;
+%                                    'sheets' = one workbook, a tab per dataset.
 %                  .originObj        (optional) injected COM handle (tests)
 
     if isempty(appData.datasets) || appData.activeIdx < 1
@@ -44,7 +47,7 @@ function sendToOrigin(appData, fig, guiState)
         if isfield(guiState, 'mode') && ~isempty(guiState.mode)
             mode = guiState.mode;
         else
-            mode = askSendMode(fig, numel(selIdx));
+            mode = askSendMode(fig, numel(selIdx), appData.theme);
             if isempty(mode), return; end
         end
     else
@@ -109,29 +112,49 @@ function sendToOrigin(appData, fig, guiState)
         return;
     end
 
-    % ── One worksheet per dataset ──────────────────────────────────────
-    nOk = 0;
+    % ── Per-dataset layout: separate workbooks ('books') OR one workbook
+    %    with a worksheet tab per dataset ('sheets') ─────────────────────
+    %    'books' routes every dataset through the single-dataset newbook
+    %    path (AddSheet=false, unique BookName), which avoids the shared-book
+    %    AddSheet sequence that could drop datasets when several were sent.
+    perBook   = strcmp(mode, 'books');
+    nOk       = 0;
     usedNames = {};
+    usedBooks = {};
     for k = 1:numel(selIdx)
         di  = selIdx(k);
         ds  = appData.datasets{di};
         src = guiTernary_(~isempty(ds.corrData), ds.corrData, ds.data);
         src = bosonPlotter.applyDisplayUnits(src, ds, appData);
-        sheet = uniqueSheetName(ds, usedNames);
-        usedNames{end+1} = sheet; %#ok<AGROW>
+
+        if perBook
+            book     = uniqueName(ds, usedBooks, 'Book');
+            usedBooks{end+1} = book; %#ok<AGROW>
+            sheet    = 'Sheet1';
+            addSheet = false;        % each dataset → its OWN new workbook
+        else
+            book     = 'ThinFilmToolkit';
+            sheet    = uniqueName(ds, usedNames, 'Sheet');
+            usedNames{end+1} = sheet; %#ok<AGROW>
+            addSheet = k > 1;        % first creates the book; rest add tabs
+        end
+
         ok = utilities.toOrigin(src, ...
             'SheetName',  sheet, ...
-            'BookName',   'ThinFilmToolkit', ...
-            'AddSheet',   k > 1, ...   % first creates the book; rest add sheets
+            'BookName',   book, ...
+            'AddSheet',   addSheet, ...
             'AxisLabels', axLabels, ...
             'LogY', logY, 'LogX', logX, ...
             'OriginObj', origin);
         if ok, nOk = nOk + 1; end
     end
 
+    where = guiTernary_(perBook, ...
+        sprintf('%d separate workbook(s)', nOk), ...
+        'workbook "ThinFilmToolkit"');
     if nOk == numel(selIdx)
         bosonPlotter.quietAlert(fig, ...
-            sprintf('Sent %d dataset(s) to OriginPro\n(workbook: ThinFilmToolkit).', nOk), ...
+            sprintf('Sent %d dataset(s) to OriginPro\n(%s).', nOk, where), ...
             'Origin Export');
     elseif nOk > 0
         bosonPlotter.quietAlert(fig, ...
@@ -147,22 +170,64 @@ end
 %  Local helpers
 % ════════════════════════════════════════════════════════════════════════
 
-function mode = askSendMode(fig, nSel)
-%ASKSENDMODE  Prompt how to lay out multiple datasets in Origin.
-    choices = { ...
-        'Active dataset only', ...
-        sprintf('One worksheet per dataset (%d sheets)', nSel), ...
-        sprintf('Combined into one worksheet (%d datasets)', nSel), ...
-        'Cancel'};
-    answer = bosonPlotter.quietConfirm(fig, ...
-        sprintf('%d datasets selected. How should they be sent to Origin?', nSel), ...
-        'Send to Origin', ...
-        'Options', choices, 'DefaultOption', 2, 'CancelOption', 4);
-    switch answer
-        case choices{1}, mode = 'active';
-        case choices{2}, mode = 'sheets';
-        case choices{3}, mode = 'combined';
-        otherwise,       mode = '';
+function mode = askSendMode(fig, nSel, theme)
+%ASKSENDMODE  Modal dialog: how to lay out multiple datasets in Origin.
+%   Returns 'active' | 'books' | 'sheets' | 'combined', or '' if cancelled.
+%   Uses radio buttons (not uiconfirm) so all four distinct layouts read
+%   clearly — separate workbooks vs. tabs in one workbook were previously
+%   conflated under a single "one worksheet per dataset" wording.
+    mode = '';
+    if nargin < 3 || isempty(theme), theme = 'Dark'; end
+    if bosonPlotter.isHeadless()
+        mode = 'books';   % scripted/headless multi-select default
+        return;
+    end
+
+    pos = [300 300 440 250];
+    try
+        fp = fig.Position;
+        pos(1:2) = [fp(1) + (fp(3)-pos(3))/2, fp(2) + (fp(4)-pos(4))/2];
+    catch
+    end
+    dlg = uifigure('Name', 'Send to Origin', 'WindowStyle', 'modal', ...
+        'Resize', 'off', 'Position', pos);
+    gl = uigridlayout(dlg, [3 1], 'RowHeight', {30, 120, 36}, ...
+        'Padding', [14 12 14 12], 'RowSpacing', 8);
+
+    uilabel(gl, 'Text', sprintf('%d datasets selected. How should they be sent to Origin?', nSel), ...
+        'WordWrap', 'on');
+
+    bg = uibuttongroup(gl, 'BorderType', 'none');
+    rbActive = uiradiobutton(bg, 'Text', 'Active dataset only', ...
+        'Position', [6 96 410 20]); %#ok<NASGU>
+    rbBooks  = uiradiobutton(bg, 'Text', sprintf('Separate workbook per dataset (%d workbooks)', nSel), ...
+        'Position', [6 66 410 20]);
+    rbSheets = uiradiobutton(bg, 'Text', sprintf('One workbook, a worksheet tab per dataset (%d tabs)', nSel), ...
+        'Position', [6 36 410 20]); %#ok<NASGU>
+    rbComb   = uiradiobutton(bg, 'Text', sprintf('Combined into one worksheet (%d datasets)', nSel), ...
+        'Position', [6 6 410 20]); %#ok<NASGU>
+    bg.SelectedObject = rbBooks;   % "own workbook" is the natural multi-select choice
+
+    btnGL = uigridlayout(gl, [1 3], 'ColumnWidth', {'1x', 90, 90}, 'Padding', [0 0 0 0]);
+    uilabel(btnGL);
+    uibutton(btnGL, 'Text', 'Cancel', 'ButtonPushedFcn', @(~,~) finish(false));
+    uibutton(btnGL, 'Text', 'Send', 'FontWeight', 'bold', 'ButtonPushedFcn', @(~,~) finish(true));
+
+    try, bosonPlotter.applyDialogTheme(dlg, theme); catch, end
+    uiwait(dlg);
+
+    function finish(ok)
+        if ok
+            switch bg.SelectedObject.Text
+                case rbBooks.Text,  mode = 'books';
+                case rbSheets.Text, mode = 'sheets';
+                case rbComb.Text,   mode = 'combined';
+                otherwise,          mode = 'active';
+            end
+        else
+            mode = '';
+        end
+        if isvalid(dlg), uiresume(dlg); delete(dlg); end
     end
 end
 
@@ -213,8 +278,11 @@ function [cData, colTypes] = buildCombined(appData, selIdx)
     colTypes = types;   % length == 1 + size(cData.values,2)
 end
 
-function name = uniqueSheetName(ds, usedNames)
-%UNIQUESHEETNAME  Sanitised, <=32-char, collision-free worksheet name.
+function name = uniqueName(ds, usedNames, fallback)
+%UNIQUENAME  Sanitised, <=32-char, collision-free workbook/worksheet name.
+%   Used for both worksheet tabs ('sheets' mode) and workbooks ('books'
+%   mode); Origin imposes the same 32-char / word-char constraints on each.
+    if nargin < 3 || isempty(fallback), fallback = 'Sheet'; end
     if isfield(ds, 'legendName') && ~isempty(ds.legendName)
         base = ds.legendName;
     else
@@ -222,7 +290,7 @@ function name = uniqueSheetName(ds, usedNames)
         base = fn;
     end
     base = regexprep(base, '[^\w]', '_');   % mirror toOrigin's sanitisation
-    if isempty(base), base = 'Sheet'; end
+    if isempty(base), base = fallback; end
     if numel(base) > 28, base = base(1:28); end
     name = base;
     n = 1;

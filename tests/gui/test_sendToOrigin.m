@@ -109,6 +109,77 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  5. Separate workbook per dataset ('books') — 4 datasets → 4 workbooks
+%     Regression: 'sheets' mode (shared book + AddSheet) could drop datasets;
+%     'books' routes each through the single-dataset newbook path.
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n== TEST 5: separate workbook per dataset (4 datasets) ==\n');
+try
+    app4 = bosonPlotter.AppState();
+    app4.datasets = { ...
+        makeDs('one.csv',   (1:4)', (10:10:40)'), ...
+        makeDs('two.csv',   (1:5)', (11:10:51)'), ...
+        makeDs('three.csv', (1:3)', (12:10:32)'), ...
+        makeDs('four.csv',  (1:6)', (13:10:63)') };
+    app4.activeIdx = 1;
+
+    mock = MockOriginCom();
+    gs = struct('mode','books','selIdx',[1 2 3 4],'originObj',mock, ...
+                'logX',false,'logY',false,'xLabel','','yLabel','');
+    bosonPlotter.sendToOrigin(app4, fig, gs);
+
+    nBook  = countCalls(mock, 'Execute', 'newbook');
+    nSheet = countCalls(mock, 'Execute', 'newsheet');
+    nPut   = countCalls(mock, 'PutWorksheet', '');
+    assert(nBook == 4,  sprintf('expected 4 newbook (one per dataset), got %d', nBook));
+    assert(nSheet == 0, sprintf('books mode must not add sheets, got %d newsheet', nSheet));
+    assert(nPut == 4,   sprintf('expected 4 PutWorksheet, got %d', nPut));
+
+    % All four workbook names distinct
+    books = {};
+    for i = 1:numel(mock.Calls)
+        c = mock.Calls{i};
+        if strcmp(c{1},'Execute')
+            tk = regexp(c{2}, 'newbook\s+name:="([^"]+)"', 'tokens', 'once');
+            if ~isempty(tk), books{end+1} = tk{1}; end %#ok<SAGROW>
+        end
+    end
+    assert(numel(unique(books)) == 4, ...
+        sprintf('expected 4 distinct workbook names, got %s', strjoin(books, ',')));
+    fprintf('  PASS (newbook=%d newsheet=%d put=%d, books={%s})\n', ...
+        nBook, nSheet, nPut, strjoin(books, ', '));
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  6. 'sheets' mode with 4 datasets → 1 book, 3 added tabs, 4 writes
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n== TEST 6: one workbook, a tab per dataset (4 datasets) ==\n');
+try
+    app4 = bosonPlotter.AppState();
+    app4.datasets = { ...
+        makeDs('one.csv',   (1:4)', (10:10:40)'), ...
+        makeDs('two.csv',   (1:5)', (11:10:51)'), ...
+        makeDs('three.csv', (1:3)', (12:10:32)'), ...
+        makeDs('four.csv',  (1:6)', (13:10:63)') };
+    app4.activeIdx = 1;
+
+    mock = MockOriginCom();
+    gs = struct('mode','sheets','selIdx',[1 2 3 4],'originObj',mock, ...
+                'logX',false,'logY',false,'xLabel','','yLabel','');
+    bosonPlotter.sendToOrigin(app4, fig, gs);
+
+    assert(countCalls(mock,'Execute','newbook')  == 1, 'sheets mode → exactly 1 book');
+    assert(countCalls(mock,'Execute','newsheet') == 3, 'sheets mode → 3 added tabs for 4 datasets');
+    assert(countCalls(mock,'PutWorksheet','')    == 4, 'sheets mode → 4 writes (one per dataset)');
+    fprintf('  PASS\n'); passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  SUMMARY
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n%s\n', repmat(char(9552), 1, 72));
