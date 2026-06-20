@@ -3227,7 +3227,7 @@ function varargout = BosonPlotter(options)
         end
     end
 
-    function onOpenLegendEditor()
+    function onOpenLegendEditor(~, ~)   % (src,evt): showPlotOptionsMenu calls cb([],[])
     %ONOPENLEGENDEDITOR  Open the multi-dataset legend editor dialog.
     %   Lets the user edit every dataset's legend name / visibility at
     %   once, and adjust shared legend style (location, font, box,

@@ -1547,6 +1547,56 @@ catch ME
 end
 end
 
+% ── G46b. Edit Legend button invokes editor without arity error ──────────
+%   Regression: onOpenLegendEditor was zero-arg, but the Plot Options popup
+%   dispatches callbacks as cb([],[]) → "Too many input arguments".
+fprintf('\n══ TEST G46b: Edit Legend button opens editor (callback arity) ══\n');
+if ~canPopup
+    fprintf('  SKIP (headless — popup uifigures not available)\n'); skipped = skipped + 1;
+else
+try
+    closePopups(api.fig);
+    api.reset(); drawnow;
+    api.addFiles({XRDML}); drawnow;   % >=1 dataset so the editor actually builds
+    showTestFig(api.fig);
+    plotBtn = findPlotOptionsButton(api.fig);
+    assert(~isempty(plotBtn), 'Plot Options button not found');
+    plotBtn.ButtonPushedFcn(plotBtn, []);
+    drawnow; pause(0.2);
+
+    poFig = findall(groot, 'Type', 'figure', 'Name', 'Plot Options');
+    assert(~isempty(poFig), 'Plot Options popup not open');
+
+    allPoBtns = findobj(poFig, 'Type', 'uibutton');
+    legBtn = [];
+    for k = 1:numel(allPoBtns)
+        if contains(allPoBtns(k).Text, 'Legend', 'IgnoreCase', true)
+            legBtn = allPoBtns(k); break;
+        end
+    end
+    assert(~isempty(legBtn), 'Edit Legend button not found in Plot Options popup');
+
+    % Invoke exactly as the popup does. Pre-fix this threw "Too many input
+    % arguments"; localAction closes the popup then calls onOpenLegendEditor([],[]).
+    legBtn.ButtonPushedFcn(legBtn, []);
+    drawnow; pause(0.2);
+
+    legDlg = findall(groot, 'Type', 'figure', 'Name', 'Edit Legend');
+    assert(~isempty(legDlg) && isvalid(legDlg(1)), 'Legend editor dialog did not open');
+    fprintf('  Edit Legend opened without arity error\n');
+    delete(legDlg);
+
+    closePopups(api.fig);
+    hideTestFig(api.fig);
+    fprintf('  PASS\n'); passed = passed + 1;
+catch ME
+    closePopups(api.fig);
+    delete(findall(groot, 'Type', 'figure', 'Name', 'Edit Legend'));
+    hideTestFig(api.fig);
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+end
+
 % ════════════════════════════════════════════════════════════════════════
 %  H. Batch Operations
 % ════════════════════════════════════════════════════════════════════════
