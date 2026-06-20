@@ -9,7 +9,7 @@ function s = buildExportPanel(parent, fig, tk, palette, callbacks)
 %                       size width/height
 %     ▸ Session       — Save / Load / Send to Origin / Origin Script
 %     ▸ Tools         — Figures / Templates / Overlay / Batch Figs /
-%                       Plot Options
+%                       Batch XRD Convert / Plot Options
 %
 %   The first two sections are open by default (Save figure is daily work
 %   per audit W2 #19); Session and Tools are collapsed.
@@ -38,7 +38,8 @@ function s = buildExportPanel(parent, fig, tk, palette, callbacks)
 %                  .efFigHeight, .btnSaveSession, .btnLoadSession,
 %                  .btnSendOrigin, .btnExportOriginScript, .btnAdvFigure,
 %                  .btnTemplates, .cbOverlayMode, .btnBatchFigExport,
-%                  .btnPlotOpt2, .saveSectionRows, .saveSectionHeights.
+%                  .btnBatchConvertXRD, .btnPlotOpt2, .saveSectionRows,
+%                  .saveSectionHeights.
 
     arguments
         parent
@@ -50,6 +51,7 @@ function s = buildExportPanel(parent, fig, tk, palette, callbacks)
 
     SAVE_SEC_H = 20;    % header row height
     SAVE_ROW_H = 78;    % content block height (3 rows of 24 + spacing)
+    TOOLS_ROW_H = 104;  % Tools block is taller — 4 rows (adds Batch XRD Convert)
 
     s.panel = uipanel(parent, 'Title', 'Save / Export', ...
         'FontSize', tk.font.title, 'Scrollable', 'on');
@@ -71,12 +73,12 @@ function s = buildExportPanel(parent, fig, tk, palette, callbacks)
     % Section row + height bookkeeping (caller assigns to appData)
     s.saveSectionRows    = struct('dataExport', 2, 'figExport', 4, 'session', 6, 'tools', 8);
     s.saveSectionHeights = struct('dataExport', SAVE_ROW_H, 'figExport', SAVE_ROW_H, ...
-                                  'session', SAVE_ROW_H, 'tools', SAVE_ROW_H);
+                                  'session', SAVE_ROW_H, 'tools', TOOLS_ROW_H);
 
     % ── Header: Data Export (open by default) ────────────────────────
     s.btnSaveHdrData = bosonPlotter.sectionHeader(s.saveGL, [char(9660) ' Data Export'], ...
         callbacks.toggleDataExport, ...
-        'FontColor', tk.color.textHighlight);
+        'BackgroundColor', s.saveGL.BackgroundColor, 'FontColor', tk.color.textHighlight);
     s.btnSaveHdrData.Layout.Row = 1;
 
     s.saveDataGL = uigridlayout(s.saveGL, [3 2], ...
@@ -126,7 +128,7 @@ function s = buildExportPanel(parent, fig, tk, palette, callbacks)
     % ── Header: Figure Export (open by default — W2 #19) ─────────────
     s.btnSaveHdrFig = bosonPlotter.sectionHeader(s.saveGL, [char(9660) ' Figure Export'], ...
         callbacks.toggleFigExport, ...
-        'FontColor', tk.color.textHighlight);
+        'BackgroundColor', s.saveGL.BackgroundColor, 'FontColor', tk.color.textHighlight);
     s.btnSaveHdrFig.Layout.Row = 3;
 
     s.saveFigGL = uigridlayout(s.saveGL, [3 2], ...
@@ -180,7 +182,7 @@ function s = buildExportPanel(parent, fig, tk, palette, callbacks)
     % ── Header: Session (collapsed by default) ───────────────────────
     s.btnSaveHdrSession = bosonPlotter.sectionHeader(s.saveGL, [char(9654) ' Session'], ...
         callbacks.toggleSession, ...
-        'FontColor', tk.color.textHighlight);
+        'BackgroundColor', s.saveGL.BackgroundColor, 'FontColor', tk.color.textHighlight);
     s.btnSaveHdrSession.Layout.Row = 5;
 
     s.saveSessionGL = uigridlayout(s.saveGL, [3 2], ...
@@ -219,11 +221,11 @@ function s = buildExportPanel(parent, fig, tk, palette, callbacks)
     % ── Header: Tools (collapsed by default) ─────────────────────────
     s.btnSaveHdrTools = bosonPlotter.sectionHeader(s.saveGL, [char(9654) ' Tools'], ...
         callbacks.toggleTools, ...
-        'FontColor', tk.color.textHighlight);
+        'BackgroundColor', s.saveGL.BackgroundColor, 'FontColor', tk.color.textHighlight);
     s.btnSaveHdrTools.Layout.Row = 7;
 
-    s.saveToolsGL = uigridlayout(s.saveGL, [3 2], ...
-        'RowHeight', {24, 24, 24}, 'ColumnWidth', {'1x','1x'}, ...
+    s.saveToolsGL = uigridlayout(s.saveGL, [4 2], ...
+        'RowHeight', {24, 24, 24, 24}, 'ColumnWidth', {'1x','1x'}, ...
         'Padding', tk.pad.flush, 'RowSpacing', 2, 'ColumnSpacing', 3);
     s.saveToolsGL.Layout.Row = 8;
 
@@ -251,7 +253,16 @@ function s = buildExportPanel(parent, fig, tk, palette, callbacks)
         'Tooltip', 'Export all datasets as individual figures with consistent formatting');
     s.btnBatchFigExport.Layout.Row = 2; s.btnBatchFigExport.Layout.Column = 2;
 
-    % Row 3: Plot Options (full width). The "Advanced Analysis" button used
+    % Row 3: Batch XRD Convert (full width). Standalone file→file converter
+    % (XRD files on disk → CSV/Origin). Lives here rather than the file-list
+    % panel because it produces output files and does not act on loaded data.
+    s.btnBatchConvertXRD = uibutton(s.saveToolsGL, 'Text', 'Batch XRD Convert', ...
+        'ButtonPushedFcn', callbacks.onBatchConvertXRD, ...
+        'BackgroundColor', palette.tool, 'FontColor', palette.fg, ...
+        'Tooltip', 'Batch convert XRD files between formats (Rigaku/XRDML/Bruker → CSV)');
+    s.btnBatchConvertXRD.Layout.Row = 3; s.btnBatchConvertXRD.Layout.Column = [1 2];
+
+    % Row 4: Plot Options (full width). The "Advanced Analysis" button used
     % to live next to it but was removed — it duplicated the corrections
     % panel's Advanced row and confused users.
     s.btnPlotOpt2 = uibutton(s.saveToolsGL, 'Text', ['Plot Options ' char(9662)], ...
@@ -259,7 +270,7 @@ function s = buildExportPanel(parent, fig, tk, palette, callbacks)
         'BackgroundColor', [0.22 0.35 0.55], 'FontColor', [1 1 1], ...
         'FontWeight', 'bold', ...
         'Tooltip', 'Plot types, visualization options, and unit conversion');
-    s.btnPlotOpt2.Layout.Row = 3; s.btnPlotOpt2.Layout.Column = [1 2];
+    s.btnPlotOpt2.Layout.Row = 4; s.btnPlotOpt2.Layout.Column = [1 2];
 
     bosonPlotter.applyDefaultFont(s.saveGL, tk.font.body);
 end

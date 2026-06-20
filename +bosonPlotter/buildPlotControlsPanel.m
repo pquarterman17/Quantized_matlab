@@ -63,9 +63,11 @@ function s = buildPlotControlsPanel(ctrlGL, contentGL, tk, palette, callbacks)
     YTICKFMT_NAMES = {'Auto', 'Scientific', 'Fixed 4dp', 'Fixed 2dp', 'Integer', 'Exp = 0'};
     YTICKFMT_DATA  = {'',     '%.2e',       '%.4f',      '%.2f',      '%d',      '__exp0'};
 
-    % Dark-on-dark colour scheme for axis-limit edit fields
-    AXLIM_BG = [0.17 0.17 0.17];
-    AXLIM_FG = [0.92 0.92 0.92];
+    % Axis-limit edit-field colours follow the active theme (token-driven so
+    % light mode shows white fields with dark text, not the old hardcoded
+    % dark-on-dark which ignored the theme and looked wrong in light mode).
+    AXLIM_BG = tk.color.bgInput;
+    AXLIM_FG = tk.color.text;
 
     % ── Row 6: Axis limits (X/Y/Y2 min/max + fmt) + Auto/Reset ──────────────
     % Limits live next to the Linear/Log scale dropdowns they're paired with.

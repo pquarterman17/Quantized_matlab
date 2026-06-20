@@ -5,7 +5,7 @@ function s = buildFileListPanel(parent, fig, tk, palette, callbacks)
 %
 %   Builds the left-column file-list sidebar:
 %     • Add / Recent
-%     • Batch Import / Batch XRD
+%     • Batch Import (full width)
 %     • Remove Selected
 %     • Filter (search field + clear)
 %     • Merge / Dataset Math
@@ -63,17 +63,13 @@ function s = buildFileListPanel(parent, fig, tk, palette, callbacks)
         'Tooltip', 'Open a recently loaded file');
     s.ddRecent.Layout.Row = 1; s.ddRecent.Layout.Column = 2;
 
+    % Batch Import spans both columns now that Batch XRD Convert moved to the
+    % Save / Export → Tools section (it's a file→file converter, not an import).
     s.btnBatchImport = uibutton(s.tbGL, 'Text', 'Batch Import', ...
         'ButtonPushedFcn', callbacks.onBatchImportDir, ...
         'BackgroundColor', palette.primary, 'FontColor', palette.fg, ...
         'Tooltip', 'Import all supported files from a directory (recursive)');
-    s.btnBatchImport.Layout.Row = 2; s.btnBatchImport.Layout.Column = 1;
-
-    s.btnBatchConvertXRD = uibutton(s.tbGL, 'Text', 'Batch XRD', ...
-        'ButtonPushedFcn', callbacks.onBatchConvertXRD, ...
-        'BackgroundColor', palette.primary, 'FontColor', palette.fg, ...
-        'Tooltip', 'Batch convert XRD files between formats');
-    s.btnBatchConvertXRD.Layout.Row = 2; s.btnBatchConvertXRD.Layout.Column = 2;
+    s.btnBatchImport.Layout.Row = 2; s.btnBatchImport.Layout.Column = [1 2];
 
     s.btnRemoveDS = uibutton(s.tbGL, 'Text', 'Remove Selected', ...
         'ButtonPushedFcn', callbacks.onRemoveDataset, ...
