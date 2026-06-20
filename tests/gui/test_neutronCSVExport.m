@@ -199,6 +199,86 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  5. Polarized PNR with REAL .refl labels (Intensity/uncertainty/resolution)
+%     — not the synthetic {'R','dR'} of TEST 2.  Regression: buildPolarizedColumns
+%     used to match labels 'R'/'dR' exactly and emitted empty R_pp/R_mm columns.
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n== TEST 5: polarized PNR with real .refl labels → populated R_pp/R_mm + Asymmetry ==\n');
+try
+    Q = (0.01:0.01:0.06)';
+    dsPP = makePolReflDs(fullfile(tmpDir,'pnrR_a.refl'), '++', Q, linspace(0.9,0.5,6)', 0.01*ones(6,1));
+    dsMM = makePolReflDs(fullfile(tmpDir,'pnrR_b.refl'), '--', Q, linspace(0.8,0.4,6)', 0.02*ones(6,1));
+
+    fp = fullfile(tmpDir, 'pnr_reallabels.csv');
+    bosonPlotter.saveConsolidatedNeutronCSV(dsPP, fp, 'standard', {dsPP, dsMM});
+    [hdr, rows] = readCSV(fp);
+
+    assert(any(strcmp(hdr, 'R_pp')), 'missing R_pp (real .refl signal label not recognised)');
+    assert(any(strcmp(hdr, 'R_mm')), 'missing R_mm');
+    assert(any(strcmp(hdr, 'dR_pp')), 'missing dR_pp (uncertainty label not recognised)');
+    assert(any(strcmp(hdr, 'Asymmetry')), 'missing Asymmetry (consolidation produced no signal)');
+
+    iRpp = find(strcmp(hdr, 'R_pp'), 1);
+    assert(~all(isnan(rows(:, iRpp))), 'R_pp column empty — signal column not located');
+    assert(abs(rows(1, iRpp) - 0.9) < 1e-9, 'R_pp carries wrong values (located the wrong column)');
+    iA = find(strcmp(hdr, 'Asymmetry'), 1);
+    assert(~all(isnan(rows(:, iA))), 'Asymmetry all-NaN — R_pp/R_mm not captured');
+
+    fprintf('  Header: %s\n', strjoin(hdr, ', '));
+    fprintf('  PASS\n'); passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  6. NCNR polarization spellings (UP_UP / DOWN_DOWN) normalize to ++/--
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n== TEST 6: UP_UP / DOWN_DOWN polarization tags → ++/-- consolidation ==\n');
+try
+    Q = (0.01:0.01:0.05)';
+    dsUP = makePolReflDs(fullfile(tmpDir,'pnrU_a.refl'), 'UP_UP',     Q, 0.9*ones(5,1), 0.01*ones(5,1));
+    dsDN = makePolReflDs(fullfile(tmpDir,'pnrU_b.refl'), 'DOWN_DOWN', Q, 0.7*ones(5,1), 0.01*ones(5,1));
+
+    fp = fullfile(tmpDir, 'pnr_updown.csv');
+    bosonPlotter.saveConsolidatedNeutronCSV(dsUP, fp, 'standard', {dsUP, dsDN});
+    [hdr, ~] = readCSV(fp);
+
+    assert(any(strcmp(hdr, 'R_pp')), 'UP_UP did not normalize to ++ (no R_pp)');
+    assert(any(strcmp(hdr, 'R_mm')), 'DOWN_DOWN did not normalize to -- (no R_mm)');
+    assert(any(strcmp(hdr, 'Asymmetry')), 'missing Asymmetry for UP_UP/DOWN_DOWN');
+
+    fprintf('  Header: %s\n', strjoin(hdr, ', '));
+    fprintf('  PASS\n'); passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  7. Mixed canonical + 'unpolarized' → per-dataset blocks (no crash, no asym)
+%     Regression: a non-canonical tag among the distinct pols used to index
+%     polSuffix{[]} and error out.
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n== TEST 7: mixed ++ / unpolarized → per-dataset blocks, no crash ==\n');
+try
+    Q = (0.01:0.01:0.05)';
+    ds1 = makePolReflDs(fullfile(tmpDir,'mix_a.refl'), '++',          Q, 0.9*ones(5,1), 0.01*ones(5,1));
+    ds2 = makePolReflDs(fullfile(tmpDir,'mix_b.refl'), 'unpolarized', Q, 0.8*ones(5,1), 0.02*ones(5,1));
+
+    fp = fullfile(tmpDir, 'pnr_mixed.csv');
+    bosonPlotter.saveConsolidatedNeutronCSV(ds1, fp, 'standard', {ds1, ds2});
+    [hdr, ~] = readCSV(fp);
+
+    nQ = sum(cellfun(@(h) isQHeader(h), hdr));
+    assert(nQ == 2, 'mixed pol should fall back to per-dataset (expected 2 Q cols, got %d)', nQ);
+    assert(~any(contains(hdr, 'Asymmetry')), 'asymmetry should not appear for mixed/unpolarized');
+
+    fprintf('  Header: %s\n', strjoin(hdr, ', '));
+    fprintf('  PASS\n'); passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  SUMMARY
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n%s\n', repmat(char(9552), 1, 72));
@@ -246,6 +326,28 @@ function ds = makeReflDs(filepath, Q, labels, units, values)
         'values', values, ...
         'labels', {labels}, ...
         'units',  {units}, ...
+        'metadata', meta);
+    ds = struct( ...
+        'filepath',   filepath, ...
+        'parserName', 'importNCNRRefl', ...
+        'data',       data, ...
+        'corrData',   []);
+end
+
+function ds = makePolReflDs(filepath, pol, Q, R, dR)
+%MAKEPOLREFLDS  Polarized .refl-shaped dataset using the REAL reductus column
+%   names ('Intensity'/'uncertainty'/'resolution'), with a polarization tag in
+%   metadata.  Mirrors importNCNRRefl output for a single PNR cross-section.
+    res = 0.001 * ones(numel(Q), 1);
+    meta = struct();
+    meta.parserName  = 'importNCNRRefl';
+    meta.xColumnUnit = '1/Ang';
+    meta.parserSpecific = struct('dataSource', 'NCNR reductus', 'polarization', pol);
+    data = struct( ...
+        'time',   Q(:), ...
+        'values', [R(:), dR(:), res], ...
+        'labels', {{'Intensity', 'uncertainty', 'resolution'}}, ...
+        'units',  {{'counts per second', 'counts per second', '1/Ang'}}, ...
         'metadata', meta);
     ds = struct( ...
         'filepath',   filepath, ...

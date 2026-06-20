@@ -42,7 +42,7 @@ function saveConsolidatedNeutronCSV(activeDs, fp, fmt, datasets)
     % ── Gather datasets from the same measurement ──────────────────────────
     baseName = neutronBaseName(activeDs.filepath);
     nDS = numel(datasets);
-    collected = struct('ds', {}, 'pol', {}, 'sortKey', {});
+    collected = struct('ds', {}, 'pol', {}, 'polKey', {}, 'sortKey', {});
 
     for di = 1:nDS
         dsi = datasets{di};
@@ -57,10 +57,12 @@ function saveConsolidatedNeutronCSV(activeDs, fp, fmt, datasets)
            isfield(dsi.data.metadata.parserSpecific, 'polarization')
             pol = dsi.data.metadata.parserSpecific.polarization;
         end
-        idx = find(strcmp(polOrder, pol), 1);
+        polKey = normPol(pol);   % '++'/'+-'/'-+'/'--' or '' (unpolarized/other)
+        idx = find(strcmp(polOrder, polKey), 1);
         if isempty(idx), idx = numel(polOrder); end
         entry.ds      = dsi;
         entry.pol     = pol;
+        entry.polKey  = polKey;
         entry.sortKey = idx;
         collected(end+1) = entry; %#ok<AGROW>
     end
@@ -75,11 +77,13 @@ function saveConsolidatedNeutronCSV(activeDs, fp, fmt, datasets)
     collected = collected(si);
 
     % ── Choose layout ──────────────────────────────────────────────────────
-    % Genuine polarized measurement = at least two distinct, non-empty
-    % polarization states.  Everything else (single channel, or several
-    % unpolarized/independent scans) uses per-dataset blocks.
-    pols = {collected.pol};
-    distinctPols = unique(pols(~cellfun(@isempty, pols)));
+    % Genuine polarized measurement = at least two distinct CANONICAL spin
+    % states (++/+-/-+/--).  'unpolarized' and any other tag do NOT count, so
+    % several unpolarized scans — or an unpolarized scan sitting beside one
+    % polarized channel — fall through to the per-dataset block layout instead
+    % of the shared-Q asymmetry consolidation.
+    polKeys = {collected.polKey};
+    distinctPols = unique(polKeys(~cellfun(@isempty, polKeys)));
     if numel(distinctPols) >= 2
         cols = buildPolarizedColumns(collected, polOrder, polSuffix);
     else
@@ -119,16 +123,18 @@ function cols = buildPolarizedColumns(collected, polOrder, polSuffix)
     RPP = []; RMM = []; dRPP = []; dRMM = []; thPP = []; thMM = [];
 
     for ci = 1:numel(collected)
-        pol    = collected(ci).pol;
+        pol    = collected(ci).polKey;   % canonical '++'/'--'/... ('' = other)
         dsi    = collected(ci).ds;
         src    = guiTernary(~isempty(dsi.corrData), dsi.corrData, dsi.data);
         pidx   = find(strcmp(polOrder, pol), 1);
+        if isempty(pidx), pidx = numel(polSuffix); end   % '' / unrecognised → 'unpol'
         suffix = polSuffix{pidx};
         file   = datasetFileName(dsi);
 
-        iR  = find(strcmp(src.labels, 'R'), 1);
-        idR = find(strcmp(src.labels, 'dR'), 1);
-        iTh = find(strcmp(src.labels, 'theory'), 1);
+        % Identify columns by role, not by exact label: real .refl files name
+        % the signal 'Intensity' or 'counts per incident count' (not 'R') and
+        % the error 'uncertainty' (not 'dR').  See findReflColumns.
+        [iR, idR, iTh] = findReflColumns(src.labels);
 
         % Interpolate onto shared Q grid if needed
         Qi = src.time(:);
@@ -350,6 +356,39 @@ function role = columnRole(lbl)
         role = 'xEr';
     else
         role = 'Y';
+    end
+end
+
+function [iR, idR, iTh] = findReflColumns(labels)
+%FINDREFLCOLUMNS  Locate the reflectivity signal, its error, and the theory
+%   column in a value-label list — tolerant of the naming each parser uses:
+%     importNCNRRefl  →  'Intensity' | 'counts per incident count',
+%                        'uncertainty', 'resolution'
+%     importRefl1dDat →  'R', 'dR', 'theory', 'fresnel'
+%     synthetic/tests →  'R', 'dR'
+%   Returns [] for any column not present.
+%     iR  = first signal column (role 'Y' that is not theory/fresnel)
+%     idR = first error column  (role 'yEr')
+%     iTh = explicit 'theory' column
+    iTh = find(strcmpi(labels, 'theory'), 1);
+    idR = find(cellfun(@(l) strcmp(columnRole(l), 'yEr'), labels), 1);
+    isSig = cellfun(@(l) strcmp(columnRole(l), 'Y') && ...
+                         ~any(strcmpi(l, {'theory', 'fresnel'})), labels);
+    iR = find(isSig, 1);
+end
+
+function k = normPol(pol)
+%NORMPOL  Map a polarization tag to a canonical spin-state key.
+%   Accepts reductus / NCNR spellings ('++', 'pp', 'UP_UP', 'unpolarized', …)
+%   and returns one of '++' '+-' '-+' '--', or '' when the tag is not a
+%   recognised spin state (unpolarized, blank, or anything else).
+    p = lower(regexprep(char(pol), '[\s_]', ''));
+    switch p
+        case {'++', 'pp', 'upup'},        k = '++';
+        case {'--', 'mm', 'downdown'},    k = '--';
+        case {'+-', 'pm', 'updown'},      k = '+-';
+        case {'-+', 'mp', 'downup'},      k = '-+';
+        otherwise,                        k = '';
     end
 end
 
