@@ -1,7 +1,11 @@
-function origin = connectOrigin()
+function [origin, progId] = connectOrigin()
 %CONNECTORIGIN  Connect to OriginPro via COM, preferring the running instance.
 %
-%   origin = utilities.connectOrigin()
+%   origin            = utilities.connectOrigin()
+%   [origin, progId]  = utilities.connectOrigin()
+%
+%   progId is the ProgID that succeeded ('' on failure) — callers log it so a
+%   fallback to 'Origin.Application' (a possibly-separate instance) is visible.
 %
 %   Tries the ProgIDs in order:
 %     1. 'Origin.ApplicationSI' — Single Instance.  Attaches to the OriginPro
@@ -16,10 +20,12 @@ function origin = connectOrigin()
 %   See also UTILITIES.TOORIGIN, BOSONPLOTTER.SENDTOORIGIN.
 
     origin  = [];
+    progId  = '';
     progIds = {'Origin.ApplicationSI', 'Origin.Application'};
     for k = 1:numel(progIds)
         try
             origin = actxserver(progIds{k});
+            progId = progIds{k};
             return;
         catch
             origin = [];

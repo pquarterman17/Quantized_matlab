@@ -28,13 +28,10 @@ function logError(title, msg, ME, options)
         options.LogFile    (1,:) char = ''
     end
 
-    % Resolve default log file: <toolbox_root>/gui_bug_log.txt.
-    % +utilities/logError.m  →  +utilities/  →  <toolbox_root>
+    % Resolve default log file: <toolbox_root>/gui_bug_log.txt (shared with
+    % utilities.errorLogPath so user-facing "see <path>" messages stay in sync).
     if isempty(options.LogFile)
-        thisFile     = mfilename('fullpath');
-        utilitiesDir = fileparts(thisFile);
-        toolboxRoot  = fileparts(utilitiesDir);
-        logFile      = fullfile(toolboxRoot, 'gui_bug_log.txt');
+        logFile = utilities.errorLogPath();
     else
         logFile = options.LogFile;
     end

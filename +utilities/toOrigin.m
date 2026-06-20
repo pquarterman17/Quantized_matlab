@@ -47,7 +47,11 @@ function [success, bookUsed] = toOrigin(data, options)
         options.AddSheet      (1,1) logical = false   % add a worksheet to the active book instead of creating a new book
         options.ColTypes                    = {}      % optional cellstr of per-column designations ('X'/'Y'/'yErr'); overrides auto-typing
         options.MakePlot      (1,1) logical = false   % create a line graph of the data after writing it
+        options.Diagnostic    (1,1) logical = false   % log each COM step (milestones + fallbacks) to gui_bug_log.txt
+        options.LogFile       (1,:) char    = ''      % override diagnostic log destination (tests)
     end
+
+    dbg = @(msg) diagLog(options.Diagnostic, msg, options.LogFile);   % milestone logger (no-op unless Diagnostic)
 
     success  = false;
     bookUsed = '';
@@ -78,13 +82,20 @@ function [success, bookUsed] = toOrigin(data, options)
     % ── Obtain Origin handle (real COM or injected mock) ──────────────
     weOwnHandle = false;
     if isempty(options.OriginObj)
-        origin = utilities.connectOrigin();   % prefers the running instance
+        [origin, progId] = utilities.connectOrigin();   % prefers the running instance
         if isempty(origin)
             utilities.logError('toOrigin:noCom', ...
                 'Could not connect to OriginPro (Origin.ApplicationSI / Origin.Application).', []);
             return;
         end
         weOwnHandle = true;
+        dbg(sprintf('connected via %s', progId));
+        if strcmp(progId, 'Origin.Application')
+            % SI failed → this may be a NEW (possibly hidden) instance, not the
+            % one the user has open.  Worth flagging even outside Diagnostic.
+            utilities.logError('toOrigin:newInstance', ...
+                'Connected via Origin.Application (ApplicationSI unavailable) — data may go to a separate Origin instance.', []);
+        end
     else
         origin = options.OriginObj;
     end
@@ -147,14 +158,19 @@ function [success, bookUsed] = toOrigin(data, options)
             realBook = '';
             try
                 realBook = char(origin.CreatePage(2, bookName, 'Origin'));
-            catch
+                dbg(sprintf('CreatePage(2,"%s","Origin") -> "%s"', bookName, realBook));
+            catch ME
                 realBook = '';
+                dbg(sprintf('createPageFallback: CreatePage failed for "%s" (%s); using newbook', ...
+                    bookName, ME.message));
             end
             if isempty(realBook)
                 origin.Execute(sprintf('newbook name:="%s" sheet:=1;', bookName));
                 try
                     origin.Execute(sprintf('page.name$ = "%s";', bookName));
-                catch
+                catch ME
+                    dbg(sprintf('pageNameFailed: page.name$ pin failed for "%s" (%s)', ...
+                        bookName, ME.message));
                 end
                 realBook = bookName;
             end
@@ -219,9 +235,13 @@ function [success, bookUsed] = toOrigin(data, options)
             if ~isempty(wksObj)
                 res = wksObj.SetData(mat, 0, 0);
                 wroteObj = wroteOk(res);
+                dbg(sprintf('SetData %dx%d -> %d (active sheet of [%s]%s)', ...
+                    size(mat,1), size(mat,2), wroteObj, bookName, sheetName));
             end
-        catch
+        catch ME
             wroteObj = false;
+            dbg(sprintf('setDataFallback: FindWorksheet/SetData unavailable (%s); using PutWorksheet', ...
+                ME.message));
         end
 
         % Fallback: PutWorksheet by range name (older Origin / object call
@@ -250,28 +270,39 @@ function [success, bookUsed] = toOrigin(data, options)
         % plot they would target a worksheet and do nothing, so they are only
         % emitted here, gated on MakePlot.
         if options.MakePlot
-            % plot:=200 → line plot; iy:=(1,2) → col1 (X) vs col2 (first Y).
-            origin.Execute(sprintf('plotxy iy:=[%s]%s!(1,2) plot:=200;', ...
-                bookName, sheetName));
-            % Axis scale type code: 0 = Linear, 2 = Log10 (NOT 1).
-            if options.LogX
-                origin.Execute('layer.x.type = 2;');
-            end
-            if options.LogY
-                origin.Execute('layer.y.type = 2;');
-            end
-            % Axis titles via the `label` command (the X-bottom / Y-left title);
-            % escapeLT guards ; and % so they don't terminate or substitute.
-            if isfield(options.AxisLabels, 'x') && ~isempty(options.AxisLabels.x)
-                origin.Execute(sprintf('label -xb %s;', escapeLT(char(options.AxisLabels.x))));
-            end
-            if isfield(options.AxisLabels, 'y') && ~isempty(options.AxisLabels.y)
-                origin.Execute(sprintf('label -yl %s;', escapeLT(char(options.AxisLabels.y))));
+            % Wrapped so a graph failure does NOT discard the data write (which
+            % already succeeded above) — it is logged and the send still counts.
+            try
+                % plot:=200 → line plot; iy:=(1,2) → col1 (X) vs col2 (first Y).
+                origin.Execute(sprintf('plotxy iy:=[%s]%s!(1,2) plot:=200;', ...
+                    bookName, sheetName));
+                % Axis scale type code: 0 = Linear, 2 = Log10 (NOT 1).
+                if options.LogX
+                    origin.Execute('layer.x.type = 2;');
+                end
+                if options.LogY
+                    origin.Execute('layer.y.type = 2;');
+                end
+                % Axis titles via the `label` command (X-bottom / Y-left title);
+                % escapeLT guards ; and % so they don't terminate or substitute.
+                if isfield(options.AxisLabels, 'x') && ~isempty(options.AxisLabels.x)
+                    origin.Execute(sprintf('label -xb %s;', escapeLT(char(options.AxisLabels.x))));
+                end
+                if isfield(options.AxisLabels, 'y') && ~isempty(options.AxisLabels.y)
+                    origin.Execute(sprintf('label -yl %s;', escapeLT(char(options.AxisLabels.y))));
+                end
+                dbg(sprintf('plotxy [%s]%s!(1,2) plot:=200 done', bookName, sheetName));
+            catch ME
+                utilities.logError('toOrigin:plotFailed', ...
+                    sprintf('Graph creation failed for [%s]%s (data was still written).', ...
+                        bookName, sheetName), ME);
             end
         end
 
         bookUsed = bookName;   % the actual workbook name the data landed in
         success  = true;
+        dbg(sprintf('SUCCESS book="%s" sheet="%s" rows=%d cols=%d objWrite=%d', ...
+            bookName, sheetName, size(mat,1), size(mat,2), wroteObj));
     catch ME
         warning('toOrigin:comError', 'Origin COM error: %s', ME.message);
         utilities.logError('toOrigin:comError', ...
@@ -311,6 +342,18 @@ function code = originTypeCode(desig)
         case 'x',                   code = 3;
         case {'yerr', 'yer', 'err'}, code = 2;
         otherwise,                  code = 0;
+    end
+end
+
+function diagLog(on, msg, logFile)
+%DIAGLOG  Append a milestone line to the error log only when Diagnostic is on.
+%   Titled 'toOrigin:diag' so the trace is greppable and clearly separate from
+%   genuine failures.  Never throws (logError swallows I/O errors).
+    if ~on, return; end
+    if nargin >= 3 && ~isempty(logFile)
+        utilities.logError('toOrigin:diag', msg, [], 'LogFile', logFile);
+    else
+        utilities.logError('toOrigin:diag', msg);
     end
 end
 

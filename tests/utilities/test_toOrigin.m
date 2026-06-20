@@ -456,6 +456,57 @@ function test_toOrigin
     end
 
     % ════════════════════════════════════════════════════════════════════
+    %  TEST 19: errorLogPath resolves the shared log file
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 19: errorLogPath resolves gui_bug_log.txt ==\n');
+    try
+        p = utilities.errorLogPath();
+        check('errorLogPath is non-empty',          ~isempty(p));
+        check('errorLogPath ends in gui_bug_log.txt', endsWith(p, 'gui_bug_log.txt'));
+    catch ME
+        recordCrash('TEST 19', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  TEST 20: Diagnostic=true writes a greppable COM trace to the log
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 20: Diagnostic trace (milestones + fallbacks) ==\n');
+    try
+        tmpLog = [tempname '.txt'];
+        cleanupLog = onCleanup(@() delLog(tmpLog)); %#ok<NASGU>
+        mock = MockOriginCom();   % default mock → CreatePage/SetData fall back
+        data = makeData(6, 1);
+        utilities.toOrigin(data, 'OriginObj', mock, ...
+            'BookName', 'TFK', 'SheetName', 'S', ...
+            'Diagnostic', true, 'LogFile', tmpLog);
+
+        check('diagnostic log file was created', exist(tmpLog, 'file') == 2);
+        txt = fileread(tmpLog);
+        check('trace tagged toOrigin:diag',      contains(txt, 'toOrigin:diag'));
+        check('trace records CreatePage fallback', contains(txt, 'createPageFallback'));
+        check('trace records SetData fallback',    contains(txt, 'setDataFallback'));
+        check('trace records SUCCESS milestone',   contains(txt, 'SUCCESS'));
+    catch ME
+        recordCrash('TEST 20', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  TEST 21: Diagnostic=false writes nothing to the override log
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 21: no trace when Diagnostic is off ==\n');
+    try
+        tmpLog = [tempname '.txt'];
+        cleanupLog2 = onCleanup(@() delLog(tmpLog)); %#ok<NASGU>
+        mock = MockOriginCom();
+        data = makeData(3, 1);
+        utilities.toOrigin(data, 'OriginObj', mock, ...
+            'BookName', 'TFK', 'SheetName', 'S', 'LogFile', tmpLog);  % Diagnostic default false
+        check('no diagnostic file when Diagnostic off', exist(tmpLog, 'file') ~= 2);
+    catch ME
+        recordCrash('TEST 21', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
     %  Summary
     % ════════════════════════════════════════════════════════════════════
     fprintf('\n%s\n', repmat('=', 1, 68));
@@ -485,6 +536,11 @@ function test_toOrigin
     end
 end
 
+
+function delLog(p)
+%DELLOG  Remove a temp log file if it exists (onCleanup-safe).
+    if exist(p, 'file') == 2, delete(p); end
+end
 
 function d = makeData(nRows, nYCols)
     d = struct();
