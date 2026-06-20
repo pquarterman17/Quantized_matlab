@@ -163,6 +163,77 @@ catch ME
     fprintf('  FAIL: saveFigure without Width threw: %s\n', ME.message); failed = failed + 1;
 end
 
+% saveFigure honors the 'qmExportSizeCm' stamp when Width/Height omitted.
+% Regression: previously it reset to styles.default (14x10), discarding the
+% preset size. The stamp is read in cm directly, so this is exact/DPI-independent.
+try
+    szFig = figure('Visible', 'off');
+    plot(axes(szFig), 1:10, 1:10);
+    setappdata(szFig, 'qmExportSizeCm', [12 8]);   % what applyTemplate stamps
+    szPath = fullfile(tempdir(), sprintf('tft_savefigsize_%d.pdf', round(rand()*1e6)));
+    plotting.saveFigure(szFig, szPath, 'DPI', 150);   % no Width/Height
+    ps = szFig.PaperSize;
+    if abs(ps(1) - 12) < 0.1 && abs(ps(2) - 8) < 0.1
+        fprintf('  PASS: saveFigure honors qmExportSizeCm stamp (%.1fx%.1f cm)\n', ps(1), ps(2));
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: saveFigure size = %.2fx%.2f cm (exp 12x8 from stamp)\n', ps(1), ps(2));
+        failed = failed + 1;
+    end
+    if isfile(szPath), delete(szPath); end
+    close(szFig);
+catch ME
+    fprintf('  FAIL: saveFigure stamp test threw: %s\n', ME.message); failed = failed + 1;
+end
+
+% End-to-end: the documented applyTemplate -> saveFigure recipe must export at
+% the template's preset size, not styles.default. applyTemplate stamps the cm
+% size, so saveFigure reads exactly 12 cm (no px<->cm round-trip involved).
+try
+    tplFig = figure('Visible', 'off');
+    tplAx  = axes(tplFig);
+    plot(tplAx, 1:10, (1:10).^0.5);
+    plotting.applyTemplate(tplFig, tplAx, styles.template('report'));  % 12 cm wide
+    tplPath = fullfile(tempdir(), sprintf('tft_savefigtpl_%d.pdf', round(rand()*1e6)));
+    plotting.saveFigure(tplFig, tplPath, 'DPI', 150);   % no Width/Height
+    w = tplFig.PaperSize(1);
+    if abs(w - 12) < 0.1
+        fprintf('  PASS: applyTemplate(report) size survives saveFigure (%.1f cm)\n', w);
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: templated figure exported at %.2f cm (exp 12)\n', w);
+        failed = failed + 1;
+    end
+    if isfile(tplPath), delete(tplPath); end
+    close(tplFig);
+catch ME
+    fprintf('  FAIL: applyTemplate->saveFigure size test threw: %s\n', ME.message); failed = failed + 1;
+end
+
+% Deterministic fallback: an UNtemplated figure (no stamp, no Theme, no explicit
+% size) must export at styles.default (14x10), NOT the figure's machine-dependent
+% on-screen size — so basic-recipe output is reproducible across machines.
+try
+    dfFig = figure('Visible', 'off');
+    plot(axes(dfFig), 1:10, 1:10);
+    dfPath = fullfile(tempdir(), sprintf('tft_savefigdef_%d.pdf', round(rand()*1e6)));
+    plotting.saveFigure(dfFig, dfPath, 'DPI', 150);   % no Width/Height/Theme/stamp
+    d  = styles.default();
+    ps = dfFig.PaperSize;
+    if abs(ps(1) - d.figWidth) < 0.1 && abs(ps(2) - d.figHeight) < 0.1
+        fprintf('  PASS: untemplated figure falls back to styles.default (%.0fx%.0f cm)\n', ps(1), ps(2));
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: untemplated size = %.2fx%.2f cm (exp %.0fx%.0f default)\n', ...
+            ps(1), ps(2), d.figWidth, d.figHeight);
+        failed = failed + 1;
+    end
+    if isfile(dfPath), delete(dfPath); end
+    close(dfFig);
+catch ME
+    fprintf('  FAIL: saveFigure default-fallback test threw: %s\n', ME.message); failed = failed + 1;
+end
+
 % ════════════════════════════════════════════════════════════════════
 %  FFT FILTER
 % ════════════════════════════════════════════════════════════════════

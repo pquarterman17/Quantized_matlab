@@ -60,6 +60,10 @@ fig.PaperSize = [tmpl.figWidth_cm, tmpl.figHeight_cm];
 fig.PaperPosition = [0 0 tmpl.figWidth_cm tmpl.figHeight_cm];
 fig.Renderer = 'painters';
 
+% Stamp the preset cm size so plotting.saveFigure can export at the template
+% size when Width/Height are omitted, instead of resetting to styles.default.
+setappdata(fig, 'qmExportSizeCm', [tmpl.figWidth_cm, tmpl.figHeight_cm]);
+
 % ════════════════════════════════════════════════════════════════════════
 % Axes-level properties (loop for multi-panel support)
 % ════════════════════════════════════════════════════════════════════════
