@@ -121,9 +121,20 @@ function success = toOrigin(data, options)
             origin.Execute(sprintf('newsheet name:="%s" cols:=%d;', ...
                 escapeLT(sheetName), totalCols));
         else
-            % `name:=` without `option:=lsname` sets the short name directly,
-            % which is what range references like [BookName]Sheet! require.
+            % `name:=` sets the short name directly for a FRESH name, which is
+            % what range references like [BookName]Sheet! and `win -a Book`
+            % require.  But if bookName is already taken (e.g. a prior send) or
+            % Origin treats name:= as the long name, the short name diverges to
+            % an auto value (Book1…) and subsequent `win -a bookName` activates
+            % the wrong (or no) window — datasets then scatter or overwrite.
+            % page.name$ pins the short name to bookName.  Wrapped so a
+            % duplicate-name rejection is non-fatal (we fall back to whatever
+            % short name Origin assigned, plus the bare-sheet PutWorksheet path).
             origin.Execute(sprintf('newbook name:="%s" sheet:=1;', bookName));
+            try
+                origin.Execute(sprintf('page.name$ = "%s";', bookName));
+            catch
+            end
             origin.Execute(sprintf('win -a %s;', bookName));
             origin.Execute(sprintf('wks.name$ = "%s";', escapeLT(sheetName)));
             if totalCols > 2

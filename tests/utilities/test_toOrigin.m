@@ -320,6 +320,43 @@ function test_toOrigin
     end
 
     % ════════════════════════════════════════════════════════════════════
+    %  TEST 12: workbook SHORT name pinned via page.name$ (new-book path)
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 12: page.name$ pins workbook short name ==\n');
+    try
+        mock = MockOriginCom();
+        data = makeData(4, 1);
+        utilities.toOrigin(data, 'OriginObj', mock, ...
+            'BookName', 'TFK', 'SheetName', 'S');
+
+        newbookIdx = mock.findCall('Execute', 'newbook name:="TFK"');
+        pinIdx     = mock.findCall('Execute', 'page\.name\$\s*=\s*"TFK"');
+        activateIdx= mock.findCall('Execute', 'win -a TFK');
+        check('page.name$ pin was issued',          pinIdx > 0);
+        check('pin AFTER newbook, BEFORE activate', newbookIdx < pinIdx && pinIdx < activateIdx);
+    catch ME
+        recordCrash('TEST 12', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  TEST 13: AddSheet path adds a worksheet, does NOT create a book or re-pin
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 13: AddSheet=true → newsheet, no newbook/page.name$ ==\n');
+    try
+        mock = MockOriginCom();
+        data = makeData(4, 1);
+        utilities.toOrigin(data, 'OriginObj', mock, ...
+            'BookName', 'TFK', 'SheetName', 'S2', 'AddSheet', true);
+
+        check('newsheet issued',          mock.findCall('Execute', 'newsheet name:="S2"') > 0);
+        check('no newbook on AddSheet',    mock.findCall('Execute', 'newbook') == 0);
+        check('no page.name$ on AddSheet', mock.findCall('Execute', 'page\.name\$') == 0);
+        check('win -a issued to target the book', mock.findCall('Execute', 'win -a TFK') > 0);
+    catch ME
+        recordCrash('TEST 13', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
     %  Summary
     % ════════════════════════════════════════════════════════════════════
     fprintf('\n%s\n', repmat('=', 1, 68));

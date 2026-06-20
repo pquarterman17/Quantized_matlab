@@ -32,6 +32,12 @@ classdef MockOriginCom < handle
                 obj.ActiveSheetName = 'Sheet1';
             end
 
+            % page.name$ = "X" pins the active workbook SHORT name to X.
+            tok = regexp(cmd, 'page\.name\$\s*=\s*"([^"]+)"', 'tokens', 'once');
+            if ~isempty(tok)
+                obj.ActiveBookName = tok{1};
+            end
+
             tok = regexp(cmd, 'wks\.name\$\s*=\s*"([^"]+)"', 'tokens', 'once');
             if ~isempty(tok)
                 obj.ActiveSheetName = tok{1};
