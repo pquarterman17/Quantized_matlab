@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from `plans/*.md`.
 Regenerate whenever a plan changes; archived plans are excluded automatically.
 
-**Last regenerated:** 2026-06-07 (FermiViewer scrub finalized — all EM code deleted from qm, FV plans archived. MASTERPLAN #45 (+imaging docstrings) moved to fv. Added previously-missing sections for the three BosonPlotter plans created in May: ui-construction-extraction, ux-cleanup, smoke-testing. Previous: 2026-05-22 fermi-viewer split.)
+**Last regenerated:** 2026-06-20 (reconciled bosonplotter-ux-cleanup against its plan Completed section + git: #1–7, 10–12 shipped 2026-04-25 but were never struck from this dashboard — removed them; only #8/#9 remain, both deferred. Previous: 2026-06-07 FermiViewer scrub finalized — all EM code deleted from qm, FV plans archived; MASTERPLAN #45 moved to fv; added sections for the three May BosonPlotter plans. 2026-05-22 fermi-viewer split.)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -19,11 +19,6 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#68** W5 Decomposition → Drive `BosonPlotter.m` below **6,000 lines** (current 7,084, -15% to go). Replaces achieved #22 <8k milestone.
 
 *(W5 #69 FermiViewer <6k moved to [fermi-viewer](https://github.com/pquarterman17/fermi-viewer) on 2026-05-22 as fv MASTERPLAN #3; qm-side scrub finalized 2026-06-07.)*
-
-### BosonPlotter UX cleanup — `plans/bosonplotter-ux-cleanup.md`
-- [ ] **#1** Centralize font-size scale (`tk.font.*` tokens)
-- [ ] **#2** Fix corrGL 62-px label clipping (BG Intercept, Thick. Unit)
-- [ ] **#3** Add top-level menu bar via `+bosonPlotter/buildMenuBar.m`
 
 ### Smoke testing & CI — `plans/smoke-testing-plan.md`
 - [ ] **#4** exportapp snapshot infrastructure — manifest.json + metadata + cleanup remain (dir/naming/capture shipped with #1)
@@ -64,11 +59,6 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 ### BosonPlotter UI-construction extraction — `plans/bosonplotter-ui-construction-extraction.md`
 - [ ] **#4** Extract Data Table panel → `+bosonPlotter/buildDataTablePanel.m`
 - [ ] **#5** Extract Axes context menu → `+bosonPlotter/buildAxesContextMenu.m`
-
-### BosonPlotter UX cleanup — `plans/bosonplotter-ux-cleanup.md`
-- [ ] **#4** Centralize label/text color palette
-- [ ] **#5** Document & token-ize padding/spacing (`tk.pad.*`)
-- [ ] **#6** Audit `'1x'` flex columns in narrow analysisGL panels
 
 ### Smoke testing & CI — `plans/smoke-testing-plan.md`
 - [ ] **#6** JUnit XML output from `runAllTests` (CI prerequisite)
@@ -112,11 +102,8 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 - [ ] **#9** Extract palette + token initialization → `+bosonPlotter/initPalettes.m`
 
 ### BosonPlotter UX cleanup — `plans/bosonplotter-ux-cleanup.md`
-- [ ] **#7** Convert section-header buttons (▼ / ▶) into a shared helper
-- [ ] **#8** Drop redundant trailing colons on form labels
-- [ ] **#9** Audit `+bosonPlotter/` dialog windows for token conformance
-- [ ] **#10** Add `tk.color.btn*` aliases for existing `BTN_*` constants
-- [ ] **#12** Audit other small-numeric editfields for the `'1x'` width issue
+- [ ] **#8** Drop redundant trailing colons on form labels (deferred — cosmetic, low ROI)
+- [ ] **#9** Migrate `+bosonPlotter/*.m` dialogs to `uxTokens` (deferred — ~380 sites)
 
 ### Smoke testing & CI — `plans/smoke-testing-plan.md`
 - [ ] **#9** Dialog auto-responder framework (configurable per-dialog defaults; basic timer responder shipped with #1)
@@ -134,7 +121,7 @@ Regenerate whenever a plan changes; archived plans are excluded automatically.
 | Plan | Status | Open items | Notes |
 |------|--------|------------|-------|
 | MASTERPLAN (MATLAB consolidated) | Active | 1 T1 / 11 T2 / 7+3 T3 | 9 source plans consolidated 2026-04-19. W5 #22 ratchet reached + workshops #59-#62 shipped 2026-04-26. **2026-05-22 fermi-viewer split / 2026-06-07 scrub final:** W1 #1 + W5 #28/#65/#69 + W6 #45 moved to fv repo. BosonPlotter/DiraCulator/DataWorkspace only now. |
-| bosonplotter-ux-cleanup | Active | 3 T1 / 3 T2 / 5 T3 | Token conformance + layout fixes; #11 shipped |
+| bosonplotter-ux-cleanup | Active | 2 T3 (both deferred) | 10/12 shipped 2026-04-25 (#1–7, 10–12, verified in git); only #8 (drop colons) + #9 (dialog token sweep) remain |
 | bosonplotter-ui-construction-extraction | Active | 2 T2 / 2 T3 | Feeds MASTERPLAN W5 #68 (<6k lines) |
 | smoke-testing-plan | Active | 1 T1 / 3 T2 / 4 T3 | #1/#2/#5 shipped 2026-05-04; #3 moved to fv |
 | workshop-conversion-plan | Active | (mirrored as MASTERPLAN W5 #63/#64) | #1–#4 shipped; #7 moved to fv |
