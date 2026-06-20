@@ -117,10 +117,11 @@ function sendToOrigin(appData, fig, guiState)
     %    'books' routes every dataset through the single-dataset newbook
     %    path (AddSheet=false, unique BookName), which avoids the shared-book
     %    AddSheet sequence that could drop datasets when several were sent.
-    perBook   = strcmp(mode, 'books');
-    nOk       = 0;
-    usedNames = {};
-    usedBooks = {};
+    perBook    = strcmp(mode, 'books');
+    nOk        = 0;
+    usedNames  = {};
+    usedBooks  = {};
+    sharedBook = '';   % ACTUAL short name of the shared workbook (sheets mode)
     for k = 1:numel(selIdx)
         di  = selIdx(k);
         ds  = appData.datasets{di};
@@ -133,20 +134,32 @@ function sendToOrigin(appData, fig, guiState)
             sheet    = 'Sheet1';
             addSheet = false;        % each dataset → its OWN new workbook
         else
-            book     = 'ThinFilmToolkit';
             sheet    = uniqueName(ds, usedNames, 'Sheet');
             usedNames{end+1} = sheet; %#ok<AGROW>
-            addSheet = k > 1;        % first creates the book; rest add tabs
+            if isempty(sharedBook)
+                book     = 'ThinFilmToolkit';   % first dataset creates the book
+                addSheet = false;
+            else
+                book     = sharedBook;          % reuse the name Origin assigned
+                addSheet = true;                % rest add tabs to that book
+            end
         end
 
-        ok = utilities.toOrigin(src, ...
+        [ok, bookUsed] = utilities.toOrigin(src, ...
             'SheetName',  sheet, ...
             'BookName',   book, ...
             'AddSheet',   addSheet, ...
             'AxisLabels', axLabels, ...
             'LogY', logY, 'LogX', logX, ...
             'OriginObj', origin);
-        if ok, nOk = nOk + 1; end
+        if ok
+            nOk = nOk + 1;
+            % Thread the real workbook name to the sibling tabs — CreatePage may
+            % have assigned a variant (e.g. ThinFilmToolkit2 if the name existed).
+            if ~perBook && isempty(sharedBook) && ~isempty(bookUsed)
+                sharedBook = bookUsed;
+            end
+        end
     end
 
     where = guiTernary_(perBook, ...

@@ -180,6 +180,48 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  7. 'sheets' with CreatePage + name collision → all tabs share ONE real book
+%     Regression: previously a stale "ThinFilmToolkit" made win -a target the
+%     wrong book and datasets scattered. Now CreatePage returns the variant
+%     name and every sibling tab is threaded to it.
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n== TEST 7: sheets mode threads CreatePage variant name ==\n');
+try
+    app4 = bosonPlotter.AppState();
+    app4.datasets = { ...
+        makeDs('one.csv',   (1:4)', (10:10:40)'), ...
+        makeDs('two.csv',   (1:5)', (11:10:51)'), ...
+        makeDs('three.csv', (1:3)', (12:10:32)'), ...
+        makeDs('four.csv',  (1:6)', (13:10:63)') };
+    app4.activeIdx = 1;
+
+    mock = MockOriginCom();
+    mock.SupportsCreatePage = true;
+    mock.ExistingBooks = {'ThinFilmToolkit'};   % a prior send already took the name
+    gs = struct('mode','sheets','selIdx',[1 2 3 4],'originObj',mock, ...
+                'logX',false,'logY',false,'xLabel','','yLabel','');
+    bosonPlotter.sendToOrigin(app4, fig, gs);
+
+    assert(countCalls(mock,'CreatePage','') == 1, 'one CreatePage for the shared book');
+    assert(countCalls(mock,'Execute','newbook') == 0, 'no legacy newbook when CreatePage available');
+    assert(countCalls(mock,'Execute','newsheet') == 3, '3 added tabs for 4 datasets');
+    assert(countCalls(mock,'PutWorksheet','') == 4, '4 writes (one per dataset)');
+
+    % Every PutWorksheet must target the SAME real book: ThinFilmToolkit2
+    putRanges = {};
+    for i = 1:numel(mock.Calls)
+        c = mock.Calls{i};
+        if strcmp(c{1},'PutWorksheet'), putRanges{end+1} = c{2}; end %#ok<SAGROW>
+    end
+    assert(all(contains(putRanges, 'ThinFilmToolkit2')), ...
+        sprintf('all tabs must land in the variant book; got %s', strjoin(putRanges, ' | ')));
+    fprintf('  PASS (CreatePage=1, newsheet=3, put=4, all in ThinFilmToolkit2)\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  SUMMARY
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n%s\n', repmat(char(9552), 1, 72));

@@ -14,11 +14,36 @@ classdef MockOriginCom < handle
         PutResult         logical = true
         ActiveBookName    char = ''
         ActiveSheetName   char = ''
+        SupportsCreatePage logical = false   % off by default → toOrigin uses the
+                                             % newbook fallback (legacy behaviour)
+        ExistingBooks     cell = {}          % short names already taken (collision sim)
     end
 
     methods
         function obj = MockOriginCom()
             obj.Calls = {};
+        end
+
+        function name = CreatePage(obj, type, reqName, template, varargin)
+        %CREATEPAGE  Mock of Application.CreatePage — returns the ACTUAL short
+        %   name assigned (a unique variant when reqName is taken), mirroring
+        %   real Origin.  Errors when SupportsCreatePage is false so toOrigin
+        %   exercises its newbook fallback.
+            if ~obj.SupportsCreatePage
+                error('MockOriginCom:noCreatePage', ...
+                    'CreatePage not supported by this mock instance.');
+            end
+            obj.Calls{end+1} = {'CreatePage', type, char(reqName)};
+            base = char(reqName);
+            name = base;
+            n = 1;
+            while any(strcmp(name, obj.ExistingBooks))
+                n = n + 1;
+                name = sprintf('%s%d', base, n);   % Origin-style unique variant
+            end
+            obj.ExistingBooks{end+1} = name;
+            obj.ActiveBookName  = name;
+            obj.ActiveSheetName = 'Sheet1';
         end
 
         function result = Execute(obj, cmd)

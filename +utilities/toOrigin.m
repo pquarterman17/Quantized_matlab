@@ -1,4 +1,4 @@
-function success = toOrigin(data, options)
+function [success, bookUsed] = toOrigin(data, options)
 %TOORIGIN  Send a data struct to OriginPro via COM automation.
 %
 %   success = utilities.toOrigin(data)
@@ -23,7 +23,11 @@ function success = toOrigin(data, options)
 %       Visible     — logical; make Origin visible (default true)
 %
 %   OUTPUTS:
-%       success — true if data was sent; false if Origin not available
+%       success  — true if data was sent; false if Origin not available
+%       bookUsed — the ACTUAL workbook short name the data landed in ('' on
+%                  failure).  May differ from BookName when the requested name
+%                  was taken; callers adding sibling sheets (AddSheet=true)
+%                  must pass this back as BookName so they target the same book.
 
     arguments
         data                  (1,1) struct
@@ -38,7 +42,8 @@ function success = toOrigin(data, options)
         options.ColTypes                    = {}      % optional cellstr of per-column designations ('X'/'Y'/'yErr'); overrides auto-typing
     end
 
-    success = false;
+    success  = false;
+    bookUsed = '';
 
     % ── Validate input struct ─────────────────────────────────────────
     if ~isfield(data, 'time') || ~isfield(data, 'values') || ...
@@ -121,20 +126,33 @@ function success = toOrigin(data, options)
             origin.Execute(sprintf('newsheet name:="%s" cols:=%d;', ...
                 escapeLT(sheetName), totalCols));
         else
-            % `name:=` sets the short name directly for a FRESH name, which is
-            % what range references like [BookName]Sheet! and `win -a Book`
-            % require.  But if bookName is already taken (e.g. a prior send) or
-            % Origin treats name:= as the long name, the short name diverges to
-            % an auto value (Book1…) and subsequent `win -a bookName` activates
-            % the wrong (or no) window — datasets then scatter or overwrite.
-            % page.name$ pins the short name to bookName.  Wrapped so a
-            % duplicate-name rejection is non-fatal (we fall back to whatever
-            % short name Origin assigned, plus the bare-sheet PutWorksheet path).
-            origin.Execute(sprintf('newbook name:="%s" sheet:=1;', bookName));
+            % Create the workbook and resolve its ACTUAL short name.
+            %
+            % Preferred: Application.CreatePage(2=Worksheet, name, template)
+            % RETURNS the short name Origin actually assigned — so we never
+            % guess it.  If `name` is already taken (e.g. a prior send) Origin
+            % hands back a unique variant (Book2…); we then reference THAT for
+            % win -a / [book]sheet! and there is no scatter/overwrite.
+            %
+            % Fallback (older Origin, or injected mocks without CreatePage):
+            % `newbook name:=name` + page.name$ to pin the short name.  `name:=`
+            % sets the short name for a fresh name, but diverges when taken or
+            % treated as a long name; page.name$ pins it (non-fatal if rejected).
+            realBook = '';
             try
-                origin.Execute(sprintf('page.name$ = "%s";', bookName));
+                realBook = char(origin.CreatePage(2, bookName, 'Origin'));
             catch
+                realBook = '';
             end
+            if isempty(realBook)
+                origin.Execute(sprintf('newbook name:="%s" sheet:=1;', bookName));
+                try
+                    origin.Execute(sprintf('page.name$ = "%s";', bookName));
+                catch
+                end
+                realBook = bookName;
+            end
+            bookName = realBook;   % every reference below uses the ACTUAL name
             origin.Execute(sprintf('win -a %s;', bookName));
             origin.Execute(sprintf('wks.name$ = "%s";', escapeLT(sheetName)));
             if totalCols > 2
@@ -216,7 +234,8 @@ function success = toOrigin(data, options)
             origin.Execute(sprintf('yl.text$ = "%s";', escapeLT(char(options.AxisLabels.y))));
         end
 
-        success = true;
+        bookUsed = bookName;   % the actual workbook name the data landed in
+        success  = true;
     catch ME
         warning('toOrigin:comError', 'Origin COM error: %s', ME.message);
         utilities.logError('toOrigin:comError', ...

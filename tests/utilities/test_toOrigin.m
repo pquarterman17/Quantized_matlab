@@ -357,6 +357,50 @@ function test_toOrigin
     end
 
     % ════════════════════════════════════════════════════════════════════
+    %  TEST 14: CreatePage path — capture the real book name, no newbook
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 14: CreatePage path (capture actual book name) ==\n');
+    try
+        mock = MockOriginCom();
+        mock.SupportsCreatePage = true;
+        data = makeData(4, 1);
+        [ok, bookUsed] = utilities.toOrigin(data, 'OriginObj', mock, ...
+            'BookName', 'TFK', 'SheetName', 'S');
+
+        check('toOrigin returned true',              ok == true);
+        check('bookUsed echoes the fresh name TFK',  strcmp(bookUsed, 'TFK'));
+        check('CreatePage was used',                 mock.findCall('CreatePage') > 0);
+        check('no newbook when CreatePage available', mock.findCall('Execute', 'newbook') == 0);
+
+        putIdx = mock.findCall('PutWorksheet');
+        check('PutWorksheet range uses the real book', ...
+            strcmp(mock.Calls{putIdx}{2}, '[TFK]S!'));
+    catch ME
+        recordCrash('TEST 14', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  TEST 15: CreatePage collision → unique variant flows to PutWorksheet
+    % ════════════════════════════════════════════════════════════════════
+    fprintf('\n== TEST 15: CreatePage name collision returns a variant ==\n');
+    try
+        mock = MockOriginCom();
+        mock.SupportsCreatePage = true;
+        mock.ExistingBooks = {'TFK'};   % requested name already taken
+        data = makeData(3, 1);
+        [ok, bookUsed] = utilities.toOrigin(data, 'OriginObj', mock, ...
+            'BookName', 'TFK', 'SheetName', 'S');
+
+        check('toOrigin returned true',                 ok == true);
+        check('bookUsed is the unique variant TFK2',    strcmp(bookUsed, 'TFK2'));
+        putIdx = mock.findCall('PutWorksheet');
+        check('PutWorksheet targets the variant [TFK2]S!', ...
+            strcmp(mock.Calls{putIdx}{2}, '[TFK2]S!'));
+    catch ME
+        recordCrash('TEST 15', ME);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
     %  Summary
     % ════════════════════════════════════════════════════════════════════
     fprintf('\n%s\n', repmat('=', 1, 68));
