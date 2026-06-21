@@ -39,7 +39,7 @@ function result = confidenceBand(datasets, options)
         datasets  (1,:) cell
         options.Method  (1,1) string {mustBeMember(options.Method, {'mean','median'})} = 'mean'
         options.Channel (1,1) double {mustBePositive, mustBeInteger} = 1
-        options.NPoints (1,1) double {mustBePositive, mustBeInteger} = 0
+        options.NPoints (1,1) double {mustBeNonnegative, mustBeInteger} = 0
     end
 
     nSets = numel(datasets);

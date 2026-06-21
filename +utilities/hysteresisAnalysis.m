@@ -59,7 +59,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 
 if options.PreSmooth > 0
-    M = utilities.smoothData(H, M, options.PreSmooth, 'Method', 'savitzky-golay');
+    M = utilities.smoothData(M, 'Window', options.PreSmooth, 'Method', 'savitzky-golay');
 end
 
 % ════════════════════════════════════════════════════════════════════════
