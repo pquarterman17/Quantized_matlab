@@ -238,7 +238,7 @@ switch modelName
         posIdx = xData > 0;
         if sum(posIdx) > 1
             logX = log(xData(posIdx));
-            p0(1) = yRange / max(range(logX), eps);
+            p0(1) = yRange / max((max(logX) - min(logX)), eps);
             p0(2) = yMean - p0(1)*mean(logX);
         end
 
@@ -246,7 +246,7 @@ switch modelName
         posIdx = xData >= 0;
         if sum(posIdx) > 1
             sqrtX = sqrt(xData(posIdx));
-            p0(1) = yRange / max(range(sqrtX), eps);
+            p0(1) = yRange / max((max(sqrtX) - min(sqrtX)), eps);
             p0(2) = yMean - p0(1)*mean(sqrtX);
         end
 
