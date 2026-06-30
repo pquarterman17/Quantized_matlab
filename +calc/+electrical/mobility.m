@@ -21,7 +21,7 @@ function result = mobility(rho, n)
 %
 %   Example:
 %     r = calc.electrical.mobility(1e-2, 1e18);
-%     disp(r.mu)   % ~62.4 cm²/V·s
+%     disp(r.mu)   % ~624.15 cm²/V·s
 
 % ════════════════════════════════════════════════════════════════════
 
