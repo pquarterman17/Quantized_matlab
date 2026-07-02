@@ -68,10 +68,29 @@ function map2DHandle = draw2DMap(targetAx, ds, map2DHandleIn, wgts)
     else
         xLbl = [map.axis2Name ' (' map.axis2Unit ')'];
         yLbl = [map.axis1Name ' (' map.axis1Unit ')'];
-        % Defer meshgrid — only needed for Contour modes, not Heatmap.
-        % imagesc uses the axis vectors directly, avoiding two [N×M]
-        % temporary matrices on every replot.
-        Xmat = [];  Ymat = [];
+        if isfield(map, 'axis2Grid') || isfield(map, 'axis1Grid')
+            % Non-rectilinear layout (snapshot/coupled): render the exact
+            % per-point mesh via the pcolor path (imagesc would rectify it).
+            if isfield(map, 'axis2Grid')
+                Xmat = map.axis2Grid;
+            else
+                Xmat = repmat(map.axis2(:)', size(map.intensity, 1), 1);
+            end
+            if isfield(map, 'axis1Grid')
+                Ymat = map.axis1Grid;
+            else
+                Ymat = repmat(map.axis1(:), 1, size(map.intensity, 2));
+            end
+            if strideR > 1 || strideC > 1
+                Xmat = Xmat(rIdx, cIdx);
+                Ymat = Ymat(rIdx, cIdx);
+            end
+        else
+            % Defer meshgrid — only needed for Contour modes, not Heatmap.
+            % imagesc uses the axis vectors directly, avoiding two [N×M]
+            % temporary matrices on every replot.
+            Xmat = [];  Ymat = [];
+        end
     end
 
     % Log intensity — use dedicated 2D scale dropdown (ddMap2DScale)
@@ -104,7 +123,7 @@ function map2DHandle = draw2DMap(targetAx, ds, map2DHandleIn, wgts)
     canReuse = ~isempty(h2D) && isvalid(h2D) && strcmp(wgts.ddMap2DType.Value, 'Heatmap');
     switch wgts.ddMap2DType.Value
         case 'Heatmap'
-            if useQSpace
+            if useQSpace || ~isempty(Xmat)
                 if canReuse && isa(h2D, 'matlab.graphics.chart.primitive.Surface')
                     h2D.XData = Xmat;  h2D.YData = Ymat;  h2D.CData = I;
                     map2DHandle = h2D;

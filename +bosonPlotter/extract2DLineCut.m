@@ -45,7 +45,11 @@ function extract2DLineCut(appData, ui, callbacks, clickX, clickY, isHorizontal)
             cutLabel = sprintf('H-cut  Qz\x2248%.4g \x212B\x207B\xB9', meanQz(rowIdx));
         else
             [~, rowIdx] = min(abs(map.axis1 - clickY));
-            xVec = map.axis2(:);
+            if isfield(map, 'axis2Grid')
+                xVec = map.axis2Grid(rowIdx, :)';  % snapshot: this frame's own 2θ
+            else
+                xVec = map.axis2(:);
+            end
             xColName = [map.axis2Name ' (' map.axis2Unit ')'];
             cutLabel = sprintf('H-cut  %s=%.4g %s', ...
                 map.axis1Name, map.axis1(rowIdx), map.axis1Unit);
@@ -61,7 +65,11 @@ function extract2DLineCut(appData, ui, callbacks, clickX, clickY, isHorizontal)
             cutLabel = sprintf('V-cut  Qx\x2248%.4g \x212B\x207B\xB9', meanQx(colIdx));
         else
             [~, colIdx] = min(abs(map.axis2 - clickX));
-            xVec = map.axis1(:);
+            if isfield(map, 'axis1Grid')
+                xVec = map.axis1Grid(:, colIdx);   % coupled: this column's own ω
+            else
+                xVec = map.axis1(:);
+            end
             xColName = [map.axis1Name ' (' map.axis1Unit ')'];
             cutLabel = sprintf('V-cut  %s=%.4g %s', ...
                 map.axis2Name, map.axis2(colIdx), map.axis2Unit);

@@ -248,6 +248,8 @@ function data = importXRDML(filepath, options)
     scanSecVals  = NaN(1, nScans);     % fixed secondary-axis position per scan
     scanSecName  = '';                  % secondary axis name from first valid scan
     nValid2D     = 0;                   % count of valid scans (for trimming)
+    scanAxStart  = NaN(3, nScans);     % Omega/Chi/Phi start per scan (cloud 2D detection)
+    scanAxEnd    = NaN(3, nScans);     % Omega/Chi/Phi end per scan
 
     for si = 1:nScans
         sb = scanBlocks{sortIdx(si)};
@@ -359,6 +361,17 @@ function data = importXRDML(filepath, options)
                 scanSecVals(nValid2D) = NaN;
             end
         end
+        % Record every secondary-axis range for the generalized (cloud) 2D
+        % detection below — layouts the classic fixed-axis check can't see.
+        axNames3 = {'Omega', 'Chi', 'Phi'};
+        for axK = 1:3
+            [posK, ~] = rxPositions(dpBlock, axNames3{axK});
+            if ~isempty(posK)
+                scanAxStart(axK, nValid2D) = posK(1);
+                scanAxEnd(axK, nValid2D)   = posK(2);
+            end
+        end
+
         scanTTRanges{nValid2D} = ttRange;
         scanTTLists{nValid2D}  = ttPosList;
         scanCounts{nValid2D}   = cntVals;
@@ -394,11 +407,16 @@ function data = importXRDML(filepath, options)
     scanTTLists  = scanTTLists(1:nValid2D);
     scanCounts   = scanCounts(1:nValid2D);
     scanSecVals  = scanSecVals(1:nValid2D);
+    scanAxStart  = scanAxStart(:, 1:nValid2D);
+    scanAxEnd    = scanAxEnd(:, 1:nValid2D);
     nValid       = nValid2D;
     is2D         = false;
     intensityMap = [];
     twoThetaVec  = [];
     secSorted    = [];
+    meshKind     = 'mesh';   % 'mesh' | 'snapshot' | 'coupled' (map2D.meshKind)
+    axis1Grid    = [];       % [N x M] per-pixel omega   (coupled layouts only)
+    axis2Grid    = [];       % [N x M] per-row 2theta    (snapshot layouts only)
 
     if nValid > 1 && ~isempty(scanSecName)
         ttStarts    = cellfun(@(r) r(1), scanTTRanges);
@@ -440,6 +458,78 @@ function data = importXRDML(filepath, options)
         % 1D fallback: override concatenated vectors with integrated profile
         twoTheta_all = twoThetaVec';
         counts_all   = sum(intensityMap, 1);
+    end
+
+    % ── Generalized 2D layouts the classic check rejects ───────────────────
+    % (a) 'snapshot' — PIXcel3D area snapshots (schema 2.x): a secondary axis
+    %     is fixed within every scan while BOTH that axis and the 2theta
+    %     window step scan-to-scan, so ttSame fails above.
+    % (b) 'coupled'  — schema-1.0 Omega-2Theta RSMs: all scans share one
+    %     2theta window while the axis sweeps WITHIN each scan at a stepped
+    %     offset, so no fixed secondary axis exists.
+    % >= 3 scans required (a 2-range 1D file must never classify as a map);
+    % frames must share a pixel count (ragged clouds stay 1D here).
+    if ~is2D && nValid >= 3
+        nPtsAll   = cellfun(@numel, scanCounts);
+        ttStarts2 = cellfun(@(r) r(1), scanTTRanges);
+        ttEnds2   = cellfun(@(r) r(2), scanTTRanges);
+        ttSame2   = all(abs(ttStarts2 - ttStarts2(1)) < 1e-4) && ...
+                    all(abs(ttEnds2   - ttEnds2(1))   < 1e-4);
+        axNames3  = {'Omega', 'Chi', 'Phi'};
+        cloudAx   = 0;
+        for axK = 1:3
+            a0 = scanAxStart(axK, :);
+            a1 = scanAxEnd(axK, :);
+            if any(isnan(a0)) || any(isnan(a1)); continue; end
+            midsK = (a0 + a1) / 2;
+            if (max(midsK) - min(midsK)) <= 1e-6; continue; end
+            if all(a0 == a1) && ~ttSame2
+                meshKind = 'snapshot';  cloudAx = axK;  break;
+            elseif all(a0 ~= a1) && ttSame2
+                meshKind = 'coupled';   cloudAx = axK;  break;
+            end
+        end
+        if cloudAx > 0 && all(nPtsAll == nPtsAll(1))
+            is2D        = true;
+            scanSecName = axNames3{cloudAx};
+            nPtsPerScan = nPtsAll(1);
+            mids        = (scanAxStart(cloudAx, :) + scanAxEnd(cloudAx, :)) / 2;
+            [secSorted, secOrder] = sort(mids);
+            secSorted    = secSorted(:);
+            intensityMap = zeros(nValid, nPtsPerScan);
+            axis2Grid    = zeros(nValid, nPtsPerScan);
+            axis1Grid    = zeros(nValid, nPtsPerScan);
+            for i = 1:nValid
+                j = secOrder(i);
+                intensityMap(i, :) = scanCounts{j};
+                if ~isempty(scanTTLists{j}) && numel(scanTTLists{j}) == nPtsPerScan
+                    axis2Grid(i, :) = scanTTLists{j}(:)';
+                else
+                    axis2Grid(i, :) = linspace(scanTTRanges{j}(1), ...
+                        scanTTRanges{j}(2), nPtsPerScan);
+                end
+                axis1Grid(i, :) = linspace(scanAxStart(cloudAx, j), ...
+                    scanAxEnd(cloudAx, j), nPtsPerScan);
+            end
+            twoThetaVec = mean(axis2Grid, 1)';   % representative rectilinear axis
+            % Keep only the non-rectilinear grid on map2D (the other axis is
+            % exactly described by its vector):
+            if strcmp(meshKind, 'snapshot')
+                axis1Grid = [];
+            else
+                axis2Grid = [];
+                % Shared 2theta window -> the integrated 1D fallback is aligned
+                % (snapshot windows differ, so those keep the concatenated 1D).
+                twoTheta_all = twoThetaVec';
+                counts_all   = sum(intensityMap, 1);
+            end
+            if options.Verbose
+                fprintf('  [importXRDML] 2D %s cloud: %d %s frames x %d pixels\n', ...
+                    meshKind, nValid, scanSecName, nPtsPerScan);
+            end
+        else
+            meshKind = 'mesh';   % cloud candidate rejected (ragged pixel counts)
+        end
     end
 
     % Warn on mixed counting times
@@ -542,6 +632,11 @@ function data = importXRDML(filepath, options)
         map2D.axis2Name     = '2Theta';
         map2D.axis2Unit     = 'deg';
         map2D.intensityUnit = mapIntUnit;
+        map2D.meshKind      = meshKind;
+        % Exact per-point grids for non-rectilinear layouts (consumed by
+        % computeQSpace / draw2DMap / extract2DLineCut when present):
+        if ~isempty(axis2Grid); map2D.axis2Grid = axis2Grid; end  % snapshot
+        if ~isempty(axis1Grid); map2D.axis1Grid = axis1Grid; end  % coupled
 
         % ── Reciprocal-space: store wavelength for lazy Qx/Qz computation ──
         % Qx/Qz grids are computed on demand (in draw2DMap / computeQSpace)
@@ -571,7 +666,7 @@ function data = importXRDML(filepath, options)
     %  8. Build unified output struct
     % ════════════════════════════════════════════════════════════════════════
     labelStr = 'Intensity';
-    if is2D; labelStr = 'Intensity (integrated)'; end
+    if is2D && ~strcmp(meshKind, 'snapshot'); labelStr = 'Intensity (integrated)'; end
     data = parser.createDataStruct(twoTheta_col, intensity, ...
         'labels',   {labelStr}, ...
         'units',    {intensUnit},  ...

@@ -60,7 +60,20 @@ function map = computeQSpace(map)
     end
 
     lambda    = map.wavelength_A;  % Angstroms
-    [TT_rad, OM_rad] = meshgrid(deg2rad(map.axis2(:)'), deg2rad(map.axis1(:)));
+    % Non-rectilinear layouts (importXRDML meshKind 'snapshot'/'coupled')
+    % carry exact per-point grids; rectilinear meshes expand their vectors.
+    nR = size(map.intensity, 1);
+    nC = size(map.intensity, 2);
+    if isfield(map, 'axis2Grid')
+        TT_rad = deg2rad(map.axis2Grid);
+    else
+        TT_rad = deg2rad(repmat(map.axis2(:)', nR, 1));
+    end
+    if isfield(map, 'axis1Grid')
+        OM_rad = deg2rad(map.axis1Grid);
+    else
+        OM_rad = deg2rad(repmat(map.axis1(:), 1, nC));
+    end
     theta_rad = TT_rad / 2;
     k0        = 2 * pi / lambda;
     map.Qx    = 2 * k0 .* sin(theta_rad) .* sin(OM_rad - theta_rad);
